@@ -1,3 +1,4 @@
+using Gateway.Extensions;
 using Master.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -5,7 +6,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddSignalR()
     .AddMessagePackProtocol();
+
 builder.Services.AddMasterService();
+builder.Services.AddGatewayService(builder.Configuration.GetSection("Gateway"));
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -24,6 +27,8 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
 app.MapMasterEndpoints();
+app.MapGatewayEndpoints();
 
 app.Run();

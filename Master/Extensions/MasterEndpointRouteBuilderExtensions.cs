@@ -9,12 +9,12 @@ public static class MasterEndpointRouteBuilderExtensions
 {
     public static void MapMasterEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/status", async context =>
+        endpoints.MapGet("/api/master/status", async context =>
         {
             context.Response.ContentType = "application/json";
             await context.Response.WriteAsync("{\"status\":\"ok\"}");
         });
 
-        endpoints.MapHub<SessionHub>("/hub/session");
+        endpoints.MapHub<MasterHub>("/hub/master");
     }
 }
