@@ -8,6 +8,8 @@ public static class AuthEndpointRouteBuilderExtensions
 {
     public static void MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/auth/status", (AuthController controller) => controller.Status());
+        endpoints.MapGet("/api/auth/status", AuthController.Status);
+        endpoints.MapGet("/api/auth/redirect/{provider}", AuthController.Redirect);
+        endpoints.MapGet("/api/auth/login/{provider}", AuthController.Login);
     }
 }

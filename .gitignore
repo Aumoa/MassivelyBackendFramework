@@ -3,3 +3,6 @@
 **/obj/
 **/bin/
 
+# ASP.NET
+appsettings.*.json
+

@@ -1,12 +1,14 @@
 ﻿using Auth.Controllers;
+using Auth.Options;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Auth.Extensions;
 
 public static class AuthServiceCollectionExtensions
 {
-    public static void AddAuthService(this IServiceCollection services)
+    public static void AddAuthService(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddTransient<AuthController>();
+        services.Configure<AuthOptions>(configuration.GetSection(nameof(AuthController)));
     }
 }
