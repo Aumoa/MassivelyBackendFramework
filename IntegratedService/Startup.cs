@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddSignalR()
     .AddMessagePackProtocol();
+builder.Services.AddHttpClient();
 
 builder.Services.AddMasterService();
 builder.Services.AddGatewayService(builder.Configuration.GetSection("Gateway"));
