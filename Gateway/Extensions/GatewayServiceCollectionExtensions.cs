@@ -1,4 +1,5 @@
-﻿using Gateway.Hosts;
+﻿using Gateway.Controllers;
+using Gateway.Hosts;
 using Gateway.Options;
 using Gateway.Services;
 using Microsoft.Extensions.Configuration;
@@ -13,5 +14,6 @@ public static class GatewayServiceCollectionExtensions
         services.Configure<MasterConnectionOptions>(configuration.GetSection(nameof(MasterConnection)));
         services.AddSingleton<MasterConnection>();
         services.AddHostedService<MasterConnector>();
+        services.AddTransient<GatewayController>();
     }
 }

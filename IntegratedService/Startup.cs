@@ -1,3 +1,4 @@
+using Auth.Extensions;
 using Gateway.Extensions;
 using Master.Extensions;
 
@@ -9,6 +10,7 @@ builder.Services.AddSignalR()
 
 builder.Services.AddMasterService();
 builder.Services.AddGatewayService(builder.Configuration.GetSection("Gateway"));
+builder.Services.AddAuthService();
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -30,5 +32,6 @@ app.MapControllers();
 
 app.MapMasterEndpoints();
 app.MapGatewayEndpoints();
+app.MapAuthEndpoints();
 
 app.Run();
