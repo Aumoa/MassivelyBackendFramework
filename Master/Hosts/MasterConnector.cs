@@ -1,10 +1,10 @@
-﻿using Gateway.Services;
+﻿using Master.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Gateway.Hosts;
+namespace Master.Hosts;
 
-internal class MasterConnector(MasterConnection connection, ILogger<MasterConnector> logger) : IHostedService
+public class MasterConnector<T>(MasterConnection<T> connection, ILogger<MasterConnector<T>> logger, T identifier) : IHostedService where T : ISlaveIdentifier
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -21,11 +21,11 @@ internal class MasterConnector(MasterConnection connection, ILogger<MasterConnec
     {
         connection.Connection.Reconnected += OnReconnected;
         await connection.Connection.StartAsync(cancellationToken);
-        logger.LogInformation("Connected to master hub with connection ID: {ConnectionId}", connection.Connection.ConnectionId);
+        logger.LogInformation("Connected to master hub with connection ID: {ConnectionId}, slave ID: {SlaveId}", connection.Connection.ConnectionId, identifier.SlaveId);
 
         Task OnReconnected(string? connectionId)
         {
-            logger.LogInformation("Reconnected to master hub with connection ID: {ConnectionId}", connectionId);
+            logger.LogInformation("Reconnected to master hub with connection ID: {ConnectionId}, slave ID: {SlaveId}", connectionId, identifier.SlaveId);
             return Task.CompletedTask;
         }
     }

@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gateway", "Gateway\Gateway.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Auth", "Auth\Auth.csproj", "{73551037-26EC-41AE-A83F-5BD30145FFC1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Auth.DTO", "Auth.DTO\Auth.DTO.csproj", "{CBDA223C-913A-4EE2-A8E6-BE96E8BB2BF0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -51,6 +53,10 @@ Global
 		{73551037-26EC-41AE-A83F-5BD30145FFC1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{73551037-26EC-41AE-A83F-5BD30145FFC1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{73551037-26EC-41AE-A83F-5BD30145FFC1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CBDA223C-913A-4EE2-A8E6-BE96E8BB2BF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CBDA223C-913A-4EE2-A8E6-BE96E8BB2BF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CBDA223C-913A-4EE2-A8E6-BE96E8BB2BF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CBDA223C-913A-4EE2-A8E6-BE96E8BB2BF0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

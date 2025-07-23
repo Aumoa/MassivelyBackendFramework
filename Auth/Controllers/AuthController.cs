@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
 using Auth.Options;
+using Auth.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,7 @@ internal static class AuthController
         HttpContext context,
         [FromServices] IOptions<AuthOptions> options,
         [FromServices] IHttpClientFactory httpClientFactory,
+        [FromServices] IAccounts accounts,
         string provider,
         CancellationToken cancellationToken
         )
@@ -28,13 +30,13 @@ internal static class AuthController
         switch (provider)
         {
             case "google":
-                return RedirectForGoogle(context, options, httpClientFactory, cancellationToken);
+                return RedirectForGoogle(context, options, httpClientFactory, accounts, cancellationToken);
         }
 
         return ValueTask.FromResult(Results.BadRequest("Unexpected provider."));
     }
 
-    private static async ValueTask<IResult> RedirectForGoogle(HttpContext context, IOptions<AuthOptions> options, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken)
+    private static async ValueTask<IResult> RedirectForGoogle(HttpContext context, IOptions<AuthOptions> options, IHttpClientFactory httpClientFactory, IAccounts accounts, CancellationToken cancellationToken)
     {
         if (context.Request.Query.TryGetValue("code", out var codeStringValues) == false)
         {
@@ -80,12 +82,10 @@ internal static class AuthController
         string email = userJson["email"]!.GetValue<string>()!;
         string name = userJson["name"]!.GetValue<string>()!;
 
-        // TODO:
-        return Results.Ok(new
+        var accessJwt = await accounts.RegisterOrGetAccessAsync("google", userId, name, email, cancellationToken);
+        return Results.Json(new
         {
-            userId,
-            email,
-            name
+            accessJwt
         });
     }
 

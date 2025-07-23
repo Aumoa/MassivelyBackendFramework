@@ -9,7 +9,7 @@ builder.Services.AddSignalR()
     .AddMessagePackProtocol();
 builder.Services.AddHttpClient();
 
-builder.Services.AddMasterService();
+builder.Services.AddMasterService(builder.Configuration.GetSection("Master"));
 builder.Services.AddGatewayService(builder.Configuration.GetSection("Gateway"));
 builder.Services.AddAuthService(builder.Configuration.GetSection("Auth"));
 

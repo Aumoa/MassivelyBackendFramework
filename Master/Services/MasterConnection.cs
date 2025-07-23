@@ -1,12 +1,10 @@
-﻿using Gateway.Options;
-using Microsoft.AspNetCore.SignalR.Client;
+﻿using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 
-namespace Gateway.Services;
+namespace Master.Services;
 
-internal class MasterConnection
+public class MasterConnection<T>(T identifier, ILogger<MasterConnection<T>> logger) where T : ISlaveIdentifier
 {
     private static readonly TimeSpan[] kReconnectIntervals = [
         TimeSpan.FromSeconds(1),
@@ -32,14 +30,9 @@ internal class MasterConnection
         }
     }
 
-    public readonly HubConnection Connection;
-
-    public MasterConnection(IOptions<MasterConnectionOptions> options, ILogger<MasterConnection> logger)
-    {
-        Connection = new HubConnectionBuilder()
-            .WithUrl(options.Value.Url + "/hub/master")
-            .AddMessagePackProtocol()
-            .WithAutomaticReconnect(new LoggingRetryPolicy(kReconnectIntervals, logger))
-            .Build();
-    }
+    public readonly HubConnection Connection = new HubConnectionBuilder()
+        .WithUrl(identifier.MasterUrl + $"/hub/master?slave_id={Uri.EscapeDataString(identifier.SlaveId)}")
+        .AddMessagePackProtocol()
+        .WithAutomaticReconnect(new LoggingRetryPolicy(kReconnectIntervals, logger))
+        .Build();
 }
