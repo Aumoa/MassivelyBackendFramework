@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Master.Services;
 
-public class MasterConnection<T>(T identifier, ILogger<MasterConnection<T>> logger) where T : ISlaveIdentifier
+public class MasterConnection<T> where T : ISlaveIdentifier
 {
     private static readonly TimeSpan[] kReconnectIntervals = [
         TimeSpan.FromSeconds(1),
@@ -30,9 +30,15 @@ public class MasterConnection<T>(T identifier, ILogger<MasterConnection<T>> logg
         }
     }
 
-    public readonly HubConnection Connection = new HubConnectionBuilder()
-        .WithUrl(identifier.MasterUrl + $"/hub/master?slave_id={Uri.EscapeDataString(identifier.SlaveId)}")
-        .AddMessagePackProtocol()
-        .WithAutomaticReconnect(new LoggingRetryPolicy(kReconnectIntervals, logger))
-        .Build();
+    public readonly HubConnection Connection;
+
+    public MasterConnection(T identifier, ILogger<MasterConnection<T>> logger)
+    {
+        Connection = new HubConnectionBuilder()
+            .WithUrl(identifier.MasterUrl + $"/hub/master?slave_id={Uri.EscapeDataString(identifier.SlaveId)}")
+            .AddMessagePackProtocol()
+            .WithAutomaticReconnect(new LoggingRetryPolicy(kReconnectIntervals, logger))
+            .Build();
+        identifier.RegisterHandlers(Connection);
+    }
 }

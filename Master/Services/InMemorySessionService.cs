@@ -11,7 +11,7 @@ internal class InMemorySessionService : ISessionService
 
     private readonly Dictionary<string, GatewayClients> m_GatewayClients = [];
 
-    public ValueTask<bool> AddClientAsync(string connectionId, string clientId)
+    public ValueTask<bool> AddClientAsync(string connectionId, string clientId, CancellationToken cancellationToken)
     {
         lock (m_GatewayClients)
         {
@@ -25,7 +25,7 @@ internal class InMemorySessionService : ISessionService
         }
     }
 
-    public ValueTask<bool> RemoveClientAsync(string connectionId, string clientId)
+    public ValueTask<bool> RemoveClientAsync(string connectionId, string clientId, CancellationToken cancellationToken)
     {
         lock (m_GatewayClients)
         {
@@ -41,6 +41,22 @@ internal class InMemorySessionService : ISessionService
             }
 
             return ValueTask.FromResult(false);
+        }
+    }
+
+    public ValueTask<string> FindConnectionIdAsync(string clientId, CancellationToken cancellationToken)
+    {
+        lock (m_GatewayClients)
+        {
+            foreach (var gatewayClients in m_GatewayClients.Values)
+            {
+                if (gatewayClients.Clients.Contains(clientId))
+                {
+                    return ValueTask.FromResult(gatewayClients.ConnectionId);
+                }
+            }
+
+            return ValueTask.FromResult(string.Empty);
         }
     }
 }

@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "새 프로필",
+    "Projects": [
+      {
+        "Path": "IntegratedService\\IntegratedService.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "TestClient\\TestClient.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

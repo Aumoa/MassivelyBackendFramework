@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Gateway.DTO\Gateway.DTO.csproj" />
     <ProjectReference Include="..\Master.DTO\Master.DTO.csproj" />
   </ItemGroup>
 

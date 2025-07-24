@@ -1,4 +1,5 @@
-﻿using Master.DTO;
+﻿using Gateway.DTO;
+using Master.DTO;
 using Master.Options;
 using Master.Services;
 using Microsoft.AspNetCore.SignalR;
@@ -8,7 +9,7 @@ using Scripting.DTO;
 
 namespace Master.Hubs;
 
-internal class MasterHub(ISessionService sessions, ILogger<MasterHub> logger, IOptions<SlaveIdentifiersOptions> slaveIdentifiersOptions) : Hub<IMasterHubClient>
+internal class MasterHub(ISessionService sessions, ILogger<MasterHub> logger, IOptions<SlaveIdentifiersOptions> slaveIdentifiersOptions) : Hub
 {
     public override async Task OnConnectedAsync()
     {
@@ -61,7 +62,7 @@ internal class MasterHub(ISessionService sessions, ILogger<MasterHub> logger, IO
             };
         }
 
-        bool success = await sessions.AddClientAsync(Context.ConnectionId, request.ClientId);
+        bool success = await sessions.AddClientAsync(Context.ConnectionId, request.ClientId, Context.ConnectionAborted);
         if (success == false)
         {
             return new SessionRegisterResponse
@@ -86,7 +87,7 @@ internal class MasterHub(ISessionService sessions, ILogger<MasterHub> logger, IO
             };
         }
 
-        bool success = await sessions.RemoveClientAsync(Context.ConnectionId, request.ClientId);
+        bool success = await sessions.RemoveClientAsync(Context.ConnectionId, request.ClientId, Context.ConnectionAborted);
         if (success == false)
         {
             return new SessionUnregisterResponse
@@ -99,5 +100,18 @@ internal class MasterHub(ISessionService sessions, ILogger<MasterHub> logger, IO
         {
             Code = ResponseCode.Success
         };
+    }
+
+    public async ValueTask LoginResponse(LoginResponseNotify notify)
+    {
+        var connectionId = await sessions.FindConnectionIdAsync(notify.ClientId, Context.ConnectionAborted);
+        if (string.IsNullOrEmpty(connectionId))
+        {
+            logger.LogError("Failed to find connection ID for client {ClientId}.", notify.ClientId);
+            return;
+        }
+
+        var gateway = Clients.Client(connectionId);
+        await gateway.SendAsync("LoginResponse", notify);
     }
 }

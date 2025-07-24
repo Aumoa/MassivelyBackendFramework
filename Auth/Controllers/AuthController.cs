@@ -2,9 +2,13 @@
 using System.Text.Json.Nodes;
 using Auth.Options;
 using Auth.Services;
+using Gateway.DTO;
+using Master.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Options;
+using Scripting.DTO;
 
 namespace Auth.Controllers;
 
@@ -23,6 +27,7 @@ internal static class AuthController
         [FromServices] IOptions<AuthOptions> options,
         [FromServices] IHttpClientFactory httpClientFactory,
         [FromServices] IAccounts accounts,
+        [FromServices] MasterConnection<AuthIdentifier> master,
         string provider,
         CancellationToken cancellationToken
         )
@@ -30,20 +35,32 @@ internal static class AuthController
         switch (provider)
         {
             case "google":
-                return RedirectForGoogle(context, options, httpClientFactory, accounts, cancellationToken);
+                return RedirectForGoogle(context, options, httpClientFactory, accounts, master, cancellationToken);
         }
 
         return ValueTask.FromResult(Results.BadRequest("Unexpected provider."));
     }
 
-    private static async ValueTask<IResult> RedirectForGoogle(HttpContext context, IOptions<AuthOptions> options, IHttpClientFactory httpClientFactory, IAccounts accounts, CancellationToken cancellationToken)
+    private static async ValueTask<IResult> RedirectForGoogle(
+        HttpContext context,
+        IOptions<AuthOptions> options,
+        IHttpClientFactory httpClientFactory,
+        IAccounts accounts,
+        MasterConnection<AuthIdentifier> master,
+        CancellationToken cancellationToken
+        )
     {
-        if (context.Request.Query.TryGetValue("code", out var codeStringValues) == false)
+        string? code = context.Request.Query["code"];
+        if (string.IsNullOrEmpty(code))
         {
             return Results.BadRequest("Missing code parameter.");
         }
 
-        var code = codeStringValues.ToString();
+        string? client_id = context.Request.Query["state"];
+        if (string.IsNullOrEmpty(client_id))
+        {
+            return Results.BadRequest("Missing state parameter.");
+        }
 
         using var httpClient = httpClientFactory.CreateClient("grant-for-google-auth");
         var tokenResponse = await httpClient.PostAsync("https://oauth2.googleapis.com/token", new FormUrlEncodedContent(
@@ -83,13 +100,18 @@ internal static class AuthController
         string name = userJson["name"]!.GetValue<string>()!;
 
         var accessJwt = await accounts.RegisterOrGetAccessAsync("google", userId, name, email, cancellationToken);
-        return Results.Json(new
+
+        await master.Connection.SendAsync("LoginResponse", new LoginResponseNotify
         {
-            accessJwt
-        });
+            Code = ResponseCode.Success,
+            ClientId = client_id,
+            AccessJwt = accessJwt
+        }, cancellationToken);
+
+        return Results.NoContent();
     }
 
-    public static IResult Login(IOptions<AuthOptions> options, string provider)
+    public static IResult Login(IOptions<AuthOptions> options, string provider, string client_id)
     {
         switch (provider)
         {
@@ -100,7 +122,8 @@ internal static class AuthController
                     $"?response_type=code" +
                     $"&client_id={options.Value.ClientId}" +
                     $"&redirect_uri={Uri.EscapeDataString(redirectUrl)}" +
-                    $"&scope={Uri.EscapeDataString(scope)}";
+                    $"&scope={Uri.EscapeDataString(scope)}" +
+                    $"&state={Uri.EscapeDataString(client_id)}";
                 return Results.Redirect(authUrl);
         }
 

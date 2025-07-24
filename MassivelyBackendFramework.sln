@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Auth", "Auth\Auth.csproj", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Auth.DTO", "Auth.DTO\Auth.DTO.csproj", "{CBDA223C-913A-4EE2-A8E6-BE96E8BB2BF0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestClient", "TestClient\TestClient.csproj", "{BFB8E0E4-AF9A-4012-9401-E047015F8364}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -57,6 +59,10 @@ Global
 		{CBDA223C-913A-4EE2-A8E6-BE96E8BB2BF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CBDA223C-913A-4EE2-A8E6-BE96E8BB2BF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CBDA223C-913A-4EE2-A8E6-BE96E8BB2BF0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BFB8E0E4-AF9A-4012-9401-E047015F8364}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BFB8E0E4-AF9A-4012-9401-E047015F8364}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BFB8E0E4-AF9A-4012-9401-E047015F8364}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BFB8E0E4-AF9A-4012-9401-E047015F8364}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
