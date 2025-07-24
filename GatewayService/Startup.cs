@@ -1,15 +1,13 @@
-using Auth.Extensions;
+using Gateway.Extensions;
 using Master.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddSignalR()
-    .AddMessagePackProtocol();
+builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
 
-builder.Services.AddMasterService(builder.Configuration.GetSection("Master"));
-builder.Services.AddAuthService(builder.Configuration.GetSection("Auth"));
+builder.Services.AddGatewayService(builder.Configuration.GetSection("Gateway"));
 
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen(c =>
@@ -47,7 +45,6 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapMasterEndpoints();
-app.MapAuthEndpoints();
+app.MapGatewayEndpoints();
 
 app.Run();

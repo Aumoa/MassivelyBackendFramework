@@ -1,8 +1,8 @@
 # Visual Studio
 .vs
+*.slnLaunch.user
 **/obj/
 **/bin/
 
 # ASP.NET
 appsettings.*.json
-
