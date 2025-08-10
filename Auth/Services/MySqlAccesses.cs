@@ -35,7 +35,7 @@ internal class MySqlAccesses(
         }
 
         using var connection = GetConnection();
-        connection.Open();
+        await connection.OpenAsync(cancellationToken);
 
         string accessToken = Guid.NewGuid().ToString();
         string email = account.Email;
@@ -46,6 +46,20 @@ internal class MySqlAccesses(
         await connection.ExecuteAsync(command);
 
         return jwt.Generate(account.Id, account.Name, account.Email, accessToken);
+    }
+
+    public async ValueTask LogoutAsync(string accessToken, CancellationToken cancellationToken)
+    {
+        using var connection = GetConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        const string QUERY1 =
+            "UPDATE `accesses`" +
+            "    SET `access_token` = '', `last_logout_date` = NOW()" +
+            "    WHERE `access_token` = @accessToken";
+
+        var command = new CommandDefinition(QUERY1, new { accessToken }, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
     }
 
     private MySqlConnection GetConnection()

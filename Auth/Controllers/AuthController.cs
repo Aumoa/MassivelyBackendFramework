@@ -1,4 +1,5 @@
-﻿using Auth.Services;
+﻿using System.IdentityModel.Tokens.Jwt;
+using Auth.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Scripting.DTO;
@@ -41,18 +42,53 @@ internal class AuthController
     public static async ValueTask<IResult> LoginAsync(
         [FromServices] IAccounts accounts,
         [FromServices] IAccesses accesses,
+        HttpContext context,
         [FromRoute] string provider,
         [FromQuery] string code,
         CancellationToken cancellationToken
         )
     {
-        var accessToken = await accesses.GetAccessAsync(provider, code, cancellationToken);
-        if (accessToken == null)
+        var jwtToken = await accesses.GetAccessAsync(provider, code, cancellationToken);
+        if (jwtToken == null)
         {
             return Results.Unauthorized();
         }
 
-        return Results.Ok(accessToken);
+        context.Response.Cookies.Append("jwt_token", jwtToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict
+        });
+
+        return Results.Ok();
+    }
+
+    public static async ValueTask LogoutAsync(
+        [FromServices] IAccesses accesses,
+        HttpContext context,
+        CancellationToken cancellationToken
+        )
+    {
+        var jwt_token = context.Request.Cookies["jwt_token"];
+        if (jwt_token != null)
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var token = handler.ReadJwtToken(jwt_token);
+            var accessToken = token.Claims.FirstOrDefault(c => c.Type == "access_token");
+            if (accessToken?.Value != null)
+            {
+                await accesses.LogoutAsync(accessToken.Value, cancellationToken);
+            }
+        }
+
+        context.Response.Cookies.Append("jwt_token", string.Empty, new CookieOptions
+        {
+            Expires = DateTimeOffset.UtcNow.AddDays(-1),
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict
+        });
     }
 
     public static IResult Status()

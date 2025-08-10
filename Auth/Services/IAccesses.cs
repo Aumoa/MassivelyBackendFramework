@@ -8,4 +8,5 @@ internal interface IAccesses
     }
 
     ValueTask<string?> GetAccessAsync(string provider, string code, CancellationToken cancellationToken);
+    ValueTask LogoutAsync(string accessToken, CancellationToken cancellationToken);
 }

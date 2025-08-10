@@ -1,7 +1,6 @@
 ﻿using System.Net;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.JSInterop;
 
 namespace Management.Components.Pages.Auth;
 
@@ -16,14 +15,6 @@ public partial class Login
     {
         m_ID = e.Value?.ToString() ?? string.Empty;
         m_ErrorMessage = string.Empty;
-    }
-
-    private async Task OnInputKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(m_ID))
-        {
-            await OnContinueButtonClickedAsync();
-        }
     }
 
     private async Task OnContinueButtonClickedAsync()
@@ -44,21 +35,23 @@ public partial class Login
                 break;
             case 1:
                 var code = $"{m_ID}${m_Password}";
-                response = await Http.GetAsync($"{Urls.Value.Auth}/api/auth/self-provide/login?code={Uri.EscapeDataString(code)}");
-                if (response.StatusCode == HttpStatusCode.Unauthorized)
+                var loginUrl = $"{Urls.Value.Auth}/api/auth/self-provide/login?code={Uri.EscapeDataString(code)}";
+                var result = await JSRuntime.InvokeAsync<dynamic>("authInterop.login", loginUrl);
+                var ok = (bool)result.GetProperty("ok").GetBoolean();
+                var status = (int)result.GetProperty("status").GetInt32();
+                if (!ok || status == 401)
                 {
-                    m_ErrorMessage = "ID 또는 비밀번호가 올바르지 않거나 계정이 등록되어 있지 않습니다.";
+                    m_ErrorMessage = "The ID or password is incorrect, or the account is not registered.";
                 }
-                else if (response.StatusCode == HttpStatusCode.OK)
+                else if (ok)
                 {
                     m_ErrorMessage = null;
-                    var jwtToken = await response.Content.ReadAsStringAsync();
-                    Auth.InjectPrincipal(jwtToken.Trim('"'));
-                    Navigation.NavigateTo("/");
+                    Auth.ReloadPrincipal();
+                    Navigation.NavigateTo("/", forceLoad: true);
                 }
                 else
                 {
-                    Logger.LogError("Response: {Response}", response.ToString());
+                    Logger.LogError("Login failed. Status: {Status}", status);
                 }
                 break;
         }

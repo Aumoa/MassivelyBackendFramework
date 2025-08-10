@@ -1,0 +1,11 @@
+﻿@page "/auth/logout"
+@using Management.Components.Layout
+@using Management.Configurations
+@using Management.Services
+@using Microsoft.Extensions.Options
+@layout NotAuthorizedLayout
+@inject NavigationManager Navigation
+@inject AuthProvider Auth
+@inject IJSRuntime JSRuntime
+@inject IOptions<BackendUrls> Urls
+@inject IHttpContextAccessor HttpAccessor
