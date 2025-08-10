@@ -1,0 +1,38 @@
+﻿@page "/auth/login"
+@using Management.Components.Layout
+@using Management.Configurations
+@using Microsoft.Extensions.Localization
+@using System.Net
+@using Microsoft.Extensions.Options
+@using Management.Components.Pages
+@layout NotAuthorizedLayout
+@inject ILogger<Login> Logger
+@inject HttpClient Http
+@inject IOptions<BackendUrls> Urls
+@inject NavigationManager Navigation
+
+<PageTitle>Management - Login</PageTitle>
+
+<div class="login-form" style="position:relative;">
+    <div style="display:flex; flex-direction:column; gap:24px;">
+        <div class="floating-group" style="min-height:44px;">
+            <input id="id" type="text" class="login-input floating-input" placeholder=" " @bind-value="m_ID" @oninput="ClearErrorMessage" @onkeydown="OnInputKeyDown" />
+            <label for="id" class="floating-label">ID</label>
+        </div>
+        @if (m_Step == 1)
+        {
+            <div class="floating-group slide-fade-in" style="min-height:44px;">
+                <input id="pw" type="password" class="login-input floating-input" placeholder=" " @bind-value="m_Password" />
+                <label for="pw" class="floating-label">Password</label>
+            </div>
+        }
+        @if (!string.IsNullOrEmpty(m_ErrorMessage))
+        {
+            <div class="input-error">@m_ErrorMessage</div>
+        }
+    </div>
+    <div class="login-buttons-row">
+        <button style="background: transparent;" disabled="@string.IsNullOrWhiteSpace(m_ID)" @onclick="OnRegisterButtonClicked">Register</button>
+        <button disabled="@string.IsNullOrWhiteSpace(m_ID)" @onclick="OnContinueButtonClickedAsync">Continue</button>
+    </div>
+</div>

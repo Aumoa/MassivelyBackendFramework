@@ -11,12 +11,11 @@ internal class JwtTokenGenerator(IOptions<JwtOptions> options)
 {
     public readonly SymmetricSecurityKey Key = new(Encoding.UTF8.GetBytes(options.Value.SecretKey));
 
-    public string Generate(string provider, string id, string name, string email)
+    public string Generate(string id, string name, string email)
     {
         var credentials = new SigningCredentials(Key, SecurityAlgorithms.HmacSha256);
         var claims = new Claim[]
         {
-            new(JwtRegisteredClaimNames.Sub, provider),
             new(JwtRegisteredClaimNames.Jti, id),
             new(JwtRegisteredClaimNames.Name, name),
             new(JwtRegisteredClaimNames.Email, email)

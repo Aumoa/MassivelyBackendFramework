@@ -1,132 +1,45 @@
-﻿using System.Net.Http.Headers;
-using System.Text.Json.Nodes;
-using Auth.Options;
-using Auth.Services;
-using Gateway.DTO;
-using Master.Services;
+﻿using Auth.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.Options;
 using Scripting.DTO;
 
 namespace Auth.Controllers;
 
-internal static class AuthController
+internal class AuthController
 {
+    public static async ValueTask<IResult> ContainsAsync(
+        [FromServices] IAccounts accounts,
+        [FromQuery] string id,
+        CancellationToken cancellationToken
+        )
+    {
+        bool contains = await accounts.ContainsAsync(id, cancellationToken);
+        return contains ? Results.Ok() : Results.NotFound();
+    }
+
+    public static async ValueTask<IResult> RegisterAsync(
+        [FromServices] IAccounts accounts,
+        [FromRoute] string id,
+        [FromQuery] string password,
+        [FromQuery] string email,
+        CancellationToken cancellationToken
+        )
+    {
+        var responseCode = await accounts.RegisterAsync(id, password, email, cancellationToken);
+        switch (responseCode)
+        {
+            case ResponseCode.Success:
+                return Results.Ok();
+            case ResponseCode.AccountEmailDuplicated:
+            case ResponseCode.AccountAlreadyRegistered:
+                return Results.Conflict(responseCode);
+            default:
+                return Results.BadRequest(responseCode);
+        }
+    }
+
     public static IResult Status()
     {
-        return Results.Json(new
-        {
-            status = "ok"
-        });
-    }
-
-    public static ValueTask<IResult> Redirect(
-        HttpContext context,
-        [FromServices] IOptions<AuthOptions> options,
-        [FromServices] IHttpClientFactory httpClientFactory,
-        [FromServices] IAccounts accounts,
-        [FromServices] MasterConnection<AuthIdentifier> master,
-        string provider,
-        CancellationToken cancellationToken
-        )
-    {
-        switch (provider)
-        {
-            case "google":
-                return RedirectForGoogle(context, options, httpClientFactory, accounts, master, cancellationToken);
-        }
-
-        return ValueTask.FromResult(Results.BadRequest("Unexpected provider."));
-    }
-
-    private static async ValueTask<IResult> RedirectForGoogle(
-        HttpContext context,
-        IOptions<AuthOptions> options,
-        IHttpClientFactory httpClientFactory,
-        IAccounts accounts,
-        MasterConnection<AuthIdentifier> master,
-        CancellationToken cancellationToken
-        )
-    {
-        string? code = context.Request.Query["code"];
-        if (string.IsNullOrEmpty(code))
-        {
-            return Results.BadRequest("Missing code parameter.");
-        }
-
-        string? client_id = context.Request.Query["state"];
-        if (string.IsNullOrEmpty(client_id))
-        {
-            return Results.BadRequest("Missing state parameter.");
-        }
-
-        using var httpClient = httpClientFactory.CreateClient("grant-for-google-auth");
-        var tokenResponse = await httpClient.PostAsync("https://oauth2.googleapis.com/token", new FormUrlEncodedContent(
-        [
-            new("code", code),
-            new("client_id", options.Value.ClientId),
-            new("client_secret", options.Value.ClientSecret),
-            new("redirect_uri", options.Value.RedirectUrl + "/api/auth/redirect/google"),
-            new("grant_type", "authorization_code")
-        ]), cancellationToken);
-
-        var tokenContent = await tokenResponse.Content.ReadAsStringAsync(cancellationToken);
-        var tokenJson = JsonNode.Parse(tokenContent);
-        if (tokenJson == null)
-        {
-            return Results.Unauthorized();
-        }
-
-        var accessToken = tokenJson["access_token"]?.GetValue<string>();
-        if (accessToken == null)
-        {
-            return Results.Unauthorized();
-        }
-
-        var request = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        var userRes = await httpClient.SendAsync(request, cancellationToken);
-        var userContent = await userRes.Content.ReadAsStringAsync(cancellationToken);
-        var userJson = JsonNode.Parse(userContent);
-        if (userJson == null)
-        {
-            return Results.Unauthorized();
-        }
-
-        string userId = userJson["id"]!.GetValue<string>()!;
-        string email = userJson["email"]!.GetValue<string>()!;
-        string name = userJson["name"]!.GetValue<string>()!;
-
-        var accessJwt = await accounts.RegisterOrGetAccessAsync("google", userId, name, email, cancellationToken);
-
-        await master.Connection.SendAsync("LoginResponse", new LoginResponseNotify
-        {
-            Code = ResponseCode.Success,
-            ClientId = client_id,
-            AccessJwt = accessJwt
-        }, cancellationToken);
-
-        return Results.NoContent();
-    }
-
-    public static IResult Login(IOptions<AuthOptions> options, string provider, string client_id)
-    {
-        switch (provider)
-        {
-            case "google":
-                string redirectUrl = options.Value.RedirectUrl + "/api/auth/redirect/google";
-                string scope = "openid profile email";
-                string authUrl = $"https://accounts.google.com/o/oauth2/v2/auth" +
-                    $"?response_type=code" +
-                    $"&client_id={options.Value.ClientId}" +
-                    $"&redirect_uri={Uri.EscapeDataString(redirectUrl)}" +
-                    $"&scope={Uri.EscapeDataString(scope)}" +
-                    $"&state={Uri.EscapeDataString(client_id)}";
-                return Results.Redirect(authUrl);
-        }
-
-        return Results.BadRequest("Unexpected provider.");
+        return Results.Ok();
     }
 }

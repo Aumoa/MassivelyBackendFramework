@@ -1,0 +1,134 @@
+.floating-group {
+    position: relative;
+    margin-bottom: 0px;
+}
+
+.floating-input {
+    width: 100%;
+    padding: 16px 8px 6px 8px;
+    border: 1.5px solid #444;
+    border-radius: 4px;
+    background: #2c313a;
+    color: #e0e0e0;
+    font-size: 16px;
+    outline: none;
+}
+
+.floating-label {
+    position: absolute;
+    left: 12px;
+    top: 16px;
+    background: #2c313a;
+    color: #aaa;
+    font-size: 16px;
+    pointer-events: none;
+    transition: 0.2s ease all;
+    padding: 0 4px;
+}
+
+.floating-input:focus + .floating-label,
+.floating-input:not(:placeholder-shown) + .floating-label {
+    top: -8px;
+    left: 8px;
+    font-size: 13px;
+    color: #4f5b6e;
+    background: #2c313a;
+}
+
+.input-error {
+    color: #ff4d4f;
+    font-size: 14px;
+    margin-top: 0px;
+    margin-left: 2px;
+    animation: fade-in 0.4s ease;
+    min-height: 12px;
+    display: block;
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.login-form {
+    width: 400px;
+    padding: 32px 24px;
+    border-radius: 12px;
+    background: #2c313a;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+}
+
+.register-form {
+    position: relative;
+    width: 100%;
+}
+
+.login-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.login-buttons-row {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.login-buttons-row button {
+    min-width: 80px;
+    padding: 6px 15px;
+    border-radius: 16px;
+    border: none;
+    background: #4f5b6e;
+    color: #fff;
+    cursor: pointer;
+}
+
+.login-buttons-row button:disabled {
+    background: #888;
+    color: #ccc;
+    opacity: 0.6;
+    cursor: not-allowed;
+    border: none;
+}
+
+.back-button {
+    position: absolute;
+    top: 12px;
+    left: 16px;
+    background: transparent;
+    border: none;
+    color: #4f5b6e;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 2;
+    padding: 4px 12px;
+    transition: color 0.2s;
+}
+
+.back-button:hover {
+    color: #ff4d4f;
+}
+
+.slide-fade-in {
+    animation: slide-fade-in 0.5s cubic-bezier(.4,0,.2,1);
+}
+@keyframes slide-fade-in {
+    from {
+        opacity: 0;
+        transform: translateX(40px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}

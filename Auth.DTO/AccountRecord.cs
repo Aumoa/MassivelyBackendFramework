@@ -6,14 +6,11 @@ namespace Auth.DTO;
 public record AccountRecord
 {
     [Key(0)]
-    public string Provider { get; set; } = string.Empty;
-
-    [Key(1)]
     public string Id { get; set; } = string.Empty;
 
-    [Key(2)]
+    [Key(1)]
     public string Name { get; set; } = string.Empty;
 
-    [Key(3)]
+    [Key(2)]
     public string Email { get; set; } = string.Empty;
 }

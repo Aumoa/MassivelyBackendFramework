@@ -7,5 +7,9 @@ public enum ResponseCode
     DuplicateClientId = -2,
     ClientNotFound = -3,
     AccountAlreadyRegistered = -4,
-    AccountNotFound = -5,
+    AccountOrPasswordInvalid = -5,
+    AccountNotFound = -6,
+    AccountEmailDuplicated = -7,
+
+    Error_User = -65536,
 }

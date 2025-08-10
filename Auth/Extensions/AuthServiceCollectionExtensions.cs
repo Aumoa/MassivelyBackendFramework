@@ -19,6 +19,8 @@ public static class AuthServiceCollectionExtensions
         services.Configure<AuthOptions>(configuration.GetSection(nameof(AuthOptions)));
         services.Configure<JwtOptions>(configuration.GetSection(nameof(JwtOptions)));
         services.AddScoped<JwtTokenGenerator>();
-        services.AddScoped<IAccounts, InMemoryAccounts>();
+        services.AddScoped<PasswordHash>();
+        services.Configure<MySqlAccounts.Configuration>(configuration.GetSection(nameof(MySqlAccounts)));
+        services.AddScoped<IAccounts, MySqlAccounts>();
     }
 }
