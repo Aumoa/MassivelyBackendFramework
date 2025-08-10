@@ -12,7 +12,8 @@ builder.Services.AddHttpClient();
 builder.Services.Configure<BackendUrls>(builder.Configuration.GetSection(nameof(BackendUrls)));
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<AuthenticationStateProvider, AuthProvider>();
+builder.Services.AddScoped<AuthProvider>();
+builder.Services.AddScoped<AuthenticationStateProvider>(p => p.GetRequiredService<AuthProvider>());
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {

@@ -38,6 +38,23 @@ internal class AuthController
         }
     }
 
+    public static async ValueTask<IResult> LoginAsync(
+        [FromServices] IAccounts accounts,
+        [FromServices] IAccesses accesses,
+        [FromRoute] string provider,
+        [FromQuery] string code,
+        CancellationToken cancellationToken
+        )
+    {
+        var accessToken = await accesses.GetAccessAsync(provider, code, cancellationToken);
+        if (accessToken == null)
+        {
+            return Results.Unauthorized();
+        }
+
+        return Results.Ok(accessToken);
+    }
+
     public static IResult Status()
     {
         return Results.Ok();

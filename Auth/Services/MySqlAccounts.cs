@@ -1,4 +1,5 @@
-﻿using Dapper;
+﻿using Auth.DTO;
+using Dapper;
 using Microsoft.Extensions.Options;
 using MySql.Data.MySqlClient;
 using Scripting.DTO;
@@ -15,7 +16,7 @@ internal class MySqlAccounts(IOptions<MySqlAccounts.Configuration> options, Pass
     public async ValueTask<bool> ContainsAsync(string id, CancellationToken cancellationToken)
     {
         using var connection = GetConnection();
-        connection.Open();
+        await connection.OpenAsync(cancellationToken);
 
         const string QUERY1 = "SELECT COUNT(*) FROM `accounts` WHERE `id` = @id";
         var command = new CommandDefinition(QUERY1, new { id }, cancellationToken: cancellationToken);
@@ -29,7 +30,7 @@ internal class MySqlAccounts(IOptions<MySqlAccounts.Configuration> options, Pass
         var hss = $"{hash}${salt}";
 
         using var connection = GetConnection();
-        connection.Open();
+        await connection.OpenAsync(cancellationToken);
 
         await using var transaction = await connection.BeginTransactionAsync();
         const string QUERY1 = "SELECT COUNT(*) FROM `accounts` WHERE `email` = @email";
@@ -54,8 +55,44 @@ internal class MySqlAccounts(IOptions<MySqlAccounts.Configuration> options, Pass
         return ResponseCode.Success;
     }
 
+    public async ValueTask<AccountRecord?> GetIdAsync(string code, CancellationToken cancellationToken)
+    {
+        var (id, password) = As2(code.Split('$', 2));
+
+        using var connection = GetConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        const string QUERY1 = "SELECT `password`, `email` FROM `accounts` WHERE `id` = @id";
+        var command = new CommandDefinition(QUERY1, new { id }, cancellationToken: cancellationToken);
+        var account = await connection.QuerySingleOrDefaultAsync<dynamic>(command);
+        if (account == null)
+        {
+            return null;
+        }
+
+        var (hash, salt) = As2((string[])account.password.Split('$', 2));
+        if (pwhash.VerifyPassword(password, hash, salt) == false)
+        {
+            return null;
+        }
+
+        return new AccountRecord
+        {
+            Id = id,
+            Name = id,
+            Email = account.email
+        };
+    }
+
     private MySqlConnection GetConnection()
     {
         return new MySqlConnection(options.Value.ConnectionString);
+    }
+
+    private static (string, string) As2(string[] values)
+    {
+        return (values[0], values[1]);
     }
 }
