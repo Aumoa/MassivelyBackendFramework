@@ -15,48 +15,87 @@
 @inject AuthProvider Auth
 @inject IJSRuntime JSRuntime
 
-<PageTitle>Management - Login</PageTitle>
-
-<AuthorizeView>
-    <Authorized>
-        <RedirectToMain />
-    </Authorized>
-    <NotAuthorized>
-        <div class="login-form" style="position:relative;">
-            <form @onsubmit="OnContinueButtonClickedAsync">
-                <div style="display:flex; flex-direction:column; gap:24px;">
-                    <div class="floating-group" style="min-height:44px;">
-                        <input id="id" type="text" class="login-input floating-input" placeholder=" " @bind-value="m_ID" @oninput="ClearErrorMessage" @onkeydown="HandleIdKeyDown" />
-                        <label for="id" class="floating-label">ID</label>
-                    </div>
-                    @if (m_Step == 1)
-                    {
-                        <div class="floating-group slide-fade-in" style="min-height:44px;">
-                            <input id="pw" type="password" class="login-input floating-input" placeholder=" " @bind-value="m_Password" @bind-value:event="oninput" @ref="pwInputRef" />
-                            <label for="pw" class="floating-label">Password</label>
+<div class="login-form" style="position:relative;">
+    <div style="display:flex; flex-direction:row; gap:10px; padding-bottom: 20px;">
+        <h2 class="title">
+            @LoginStrings.FORM_TITLE
+        </h2>
+        <form @onsubmit="OnContinueButtonClickedAsync">
+            @if (m_States.Count == 1)
+            {
+                @switch (m_States.Last())
+                {
+                    @case RenderStates.None:
+                        <div class="input-form">
+                            <div class="floating-group">
+                                <input id="id" type="text" class="floating-input @(HasError ? "error" : "")" @bind-value="ID" placeholder=" " @oninput="ClearErrorMessage" />
+                                <label for="id" class="floating-label @(HasError ? "error" : "")">@LoginStrings.LABEL_ID</label>
+                            </div>
                         </div>
-                    }
-                    @if (!string.IsNullOrEmpty(m_ErrorMessage))
+                        break;
+                    @case RenderStates.Login:
+                        <div class="input-form">
+                            <div class="floating-group">
+                                <input id="pw" type="password" class="floating-input @(HasError ? "error" : "")" @bind-value="Password" placeholder=" " @oninput="ClearErrorMessage" />
+                                <label for="pw" class="floating-label @(HasError ? "error" : "")">@LoginStrings.LABEL_PW</label>
+                            </div>
+                        </div>
+                        break;
+                }
+            }
+            else
+            {
+                <div style="display:flex; flex-direction:row; gap:10px;">
+                    @switch (m_States[0])
                     {
-                        <div class="input-error">@m_ErrorMessage</div>
+                        case RenderStates.None:
+                            <div class="input-form slide-out">
+                                <div class="floating-group">
+                                    <input id="id" type="text" class="floating-input @(HasError ? "error" : "")" @bind-value="ID" placeholder=" " @oninput="ClearErrorMessage" />
+                                    <label for="id" class="floating-label @(HasError ? "error" : "")">@LoginStrings.LABEL_ID</label>
+                                </div>
+                            </div>
+                            break;
+                        case RenderStates.Login:
+                            <div class="input-form slide-out">
+                                <div class="floating-group">
+                                    <input id="pw" type="password" class="floating-input @(HasError ? "error" : "")" @bind-value="Password" placeholder=" " @oninput="ClearErrorMessage" />
+                                    <label for="pw" class="floating-label @(HasError ? "error" : "")">@LoginStrings.LABEL_PW</label>
+                                </div>
+                            </div>
+                            break;
+                    }
+                    @switch (m_States[1])
+                    {
+                        case RenderStates.None:
+                            <div class="input-form slide-in">
+                                <div class="floating-group">
+                                    <input id="id" type="text" class="floating-input @(HasError ? "error" : "")" @bind-value="ID" placeholder=" " @oninput="ClearErrorMessage" />
+                                    <label for="id" class="floating-label @(HasError ? "error" : "")">@LoginStrings.LABEL_ID</label>
+                                </div>
+                            </div>
+                            break;
+                        case RenderStates.Login:
+                            <div class="input-form slide-in">
+                                <div class="floating-group">
+                                    <input id="pw" type="password" class="floating-input @(HasError ? "error" : "")" @bind-value="Password" placeholder=" " @oninput="ClearErrorMessage" />
+                                    <label for="pw" class="floating-label @(HasError ? "error" : "")">@LoginStrings.LABEL_PW</label>
+                                </div>
+                            </div>
+                            break;
                     }
                 </div>
-                <div class="login-buttons-row">
-                    <button type="button" style="background: transparent;" disabled="@string.IsNullOrWhiteSpace(m_ID)" @onclick="OnRegisterButtonClicked">Register</button>
-                    <button type="submit" disabled="@string.IsNullOrWhiteSpace(m_ID)">Continue</button>
-                </div>
-            </form>
-        </div>
-    </NotAuthorized>
-</AuthorizeView>
-
-@code {
-    private ElementReference pwInputRef;
-    private async Task HandleIdKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && m_Step == 1)
-        {
-            await pwInputRef.FocusAsync();
-        }
-    }
-}
+            }
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="input-error">@ErrorMessage</div>
+            }
+            <div class="login-buttons-row">
+                <button type="submit" disabled="@string.IsNullOrWhiteSpace(ID)">@LoginStrings.BUTTON_CONTINUE</button>
+            </div>
+        </form>
+    </div>
+    <div class="progress-bar-container @(Requesting ? "visible" : "")">
+        <div class="progress-bar" />
+    </div>
+</div>

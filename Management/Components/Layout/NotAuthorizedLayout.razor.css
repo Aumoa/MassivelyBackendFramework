@@ -1,6 +1,4 @@
 ﻿body {
-    background: #23272f;
-    color: #e0e0e0;
 }
 
 .page-center {
@@ -8,5 +6,4 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #23272f;
 }
