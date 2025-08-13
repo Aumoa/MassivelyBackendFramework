@@ -1,0 +1,35 @@
+﻿@implements IAsyncDisposable
+@inject IWebHostEnvironment Environment
+
+@if (Container is null)
+{
+    if (Environment.IsDevelopment())
+    {
+        <h2>
+            SelectorView must be used within a SelectorContainer.
+        </h2>
+    }
+}
+
+@code {
+    [CascadingParameter]
+    public SelectorContainer? Container { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public object? Key { get; set; }
+
+    protected override Task OnInitializedAsync()
+    {
+        Container?.AddView(this);
+        return Task.CompletedTask;
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Container?.RemoveView(this);
+        return ValueTask.CompletedTask;
+    }
+}
