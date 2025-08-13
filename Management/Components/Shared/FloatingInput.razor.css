@@ -1,0 +1,95 @@
+﻿.floating-group {
+    position: relative;
+}
+
+    .floating-group .floating-input {
+        width: 100%;
+        padding: 16px 8px 6px 8px;
+        border: 1.5px solid;
+        border-color: #aaa;
+        border-radius: 4px;
+        font-size: 16px;
+        outline: none;
+        transition: 0.2s ease border-color;
+    }
+
+        .floating-group .floating-input:hover:not(:disabled) {
+            border-color: #444;
+        }
+
+        .floating-group .floating-input:focus,
+        .floating-group .floating-input:focus:hover:not(:disabled) {
+            border-color: #4af;
+        }
+
+        .floating-group .floating-input.error {
+            border-color: #faa;
+            animation: shake 0.3s;
+        }
+
+        .floating-group .floating-input:hover:not(:disabled).error {
+            border-color: #f66;
+        }
+
+        .floating-group .floating-input:focus.error,
+        .floating-group .floating-input:focus:hover:not(:disabled).error {
+            border-color: #f00;
+        }
+
+        .floating-group .floating-input + .floating-label {
+            position: absolute;
+            left: 12px;
+            top: 16px;
+            color: #aaa;
+            font-size: 16px;
+            pointer-events: none;
+            transition: 0.2s ease all;
+            padding: 0 4px;
+        }
+
+            .floating-group .floating-input + .floating-label.error {
+                animation: shake 0.3s;
+            }
+
+        .floating-group .floating-input:focus + .floating-label {
+            color: #4af;
+        }
+
+        .floating-group .floating-input:focus + .floating-label,
+        .floating-group .floating-input:not(:placeholder-shown) + .floating-label {
+            top: -8px;
+            left: 8px;
+            font-size: 13px;
+            background: #fff;
+        }
+
+            .floating-group .floating-input:focus + .floating-label.error,
+            .floating-group .floating.floating-input:not(:placeholder-shown) + .floating-label.error {
+                color: red;
+            }
+
+@keyframes shake {
+    0% {
+        transform: translateX(0);
+    }
+
+    20% {
+        transform: translateX(-6px);
+    }
+
+    40% {
+        transform: translateX(6px);
+    }
+
+    60% {
+        transform: translateX(-4px);
+    }
+
+    80% {
+        transform: translateX(4px);
+    }
+
+    100% {
+        transform: translateX(0);
+    }
+}
