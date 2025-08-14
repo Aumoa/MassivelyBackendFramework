@@ -5,3 +5,24 @@ html, body {
 .content {
     padding-top: 1.1rem;
 }
+
+button {
+    min-width: 80px;
+    padding: 6px 15px;
+    border-radius: 16px;
+    border: none;
+    color: #222;
+    cursor: pointer;
+    transition: background-color 0.4s ease, color 0.4s ease;
+    background-color: transparent;
+}
+
+    button:disabled {
+        color: #999;
+        cursor: not-allowed;
+    }
+
+    button:not(:disabled):hover {
+        background-color: #ddd;
+        color: #040404;
+    }

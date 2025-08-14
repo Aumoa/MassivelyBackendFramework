@@ -32,10 +32,4 @@ public class AuthProvider(IHttpContextAccessor Accessor) : AuthenticationStatePr
 
         return Task.FromResult(new AuthenticationState(m_CurrentUser));
     }
-
-    public void ReloadPrincipal()
-    {
-        m_CurrentUser = null;
-        NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
-    }
 }

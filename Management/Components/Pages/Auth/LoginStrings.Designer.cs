@@ -70,11 +70,38 @@ namespace Management.Components.Pages.Auth {
         }
         
         /// <summary>
+        ///   Register과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        public static string BUTTON_REGISTER {
+            get {
+                return ResourceManager.GetString("BUTTON_REGISTER", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Return과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        public static string BUTTON_RETURN {
+            get {
+                return ResourceManager.GetString("BUTTON_RETURN", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   LOGIN과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         public static string FORM_TITLE {
             get {
                 return ResourceManager.GetString("FORM_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Email과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        public static string LABEL_EMAIL {
+            get {
+                return ResourceManager.GetString("LABEL_EMAIL", resourceCulture);
             }
         }
         
@@ -97,20 +124,65 @@ namespace Management.Components.Pages.Auth {
         }
         
         /// <summary>
-        ///   ID does not exist.과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Email format is invalid.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
-        public static string VALIDATION_ERROR_ID {
+        public static string VALIDATION_ERROR_EMAIL_INVALID_FORMAT {
             get {
-                return ResourceManager.GetString("VALIDATION_ERROR_ID", resourceCulture);
+                return ResourceManager.GetString("VALIDATION_ERROR_EMAIL_INVALID_FORMAT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Email is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        public static string VALIDATION_ERROR_EMAIL_REQUIRED {
+            get {
+                return ResourceManager.GetString("VALIDATION_ERROR_EMAIL_REQUIRED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   ID already registered.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        public static string VALIDATION_ERROR_ID_ALREADY_EXISTS {
+            get {
+                return ResourceManager.GetString("VALIDATION_ERROR_ID_ALREADY_EXISTS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   ID is not registered.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        public static string VALIDATION_ERROR_ID_NOT_FOUND {
+            get {
+                return ResourceManager.GetString("VALIDATION_ERROR_ID_NOT_FOUND", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   ID is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        public static string VALIDATION_ERROR_ID_REQUIRED {
+            get {
+                return ResourceManager.GetString("VALIDATION_ERROR_ID_REQUIRED", resourceCulture);
             }
         }
         
         /// <summary>
         ///   The password is incorrect.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
-        public static string VALIDATION_ERROR_PW {
+        public static string VALIDATION_ERROR_PW_INVALID {
             get {
-                return ResourceManager.GetString("VALIDATION_ERROR_PW", resourceCulture);
+                return ResourceManager.GetString("VALIDATION_ERROR_PW_INVALID", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   The password is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        public static string VALIDATION_ERROR_PW_REQUIRED {
+            get {
+                return ResourceManager.GetString("VALIDATION_ERROR_PW_REQUIRED", resourceCulture);
             }
         }
     }

@@ -1,8 +1,18 @@
-﻿using System.Net;
-using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
+﻿using System.Text.RegularExpressions;
 
 namespace Management.Components.Pages.Auth;
+
+public partial class Login
+{
+
+    [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase)]
+    private static partial Regex ValidEmailRegex();
+}
+
+/*
+using System.Net;
+using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 public partial class Login
 {
@@ -116,3 +126,5 @@ public partial class Login
         Navigation.NavigateTo($"/auth/register/{Uri.EscapeDataString(ID)}", true);
     }
 }
+
+*/

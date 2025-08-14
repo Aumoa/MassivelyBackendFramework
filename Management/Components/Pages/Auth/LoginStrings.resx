@@ -120,6 +120,9 @@
   <data name="BUTTON_CONTINUE" xml:space="preserve">
     <value>Continue</value>
   </data>
+  <data name="BUTTON_RETURN" xml:space="preserve">
+    <value>Return</value>
+  </data>
   <data name="FORM_TITLE" xml:space="preserve">
     <value>LOGIN</value>
   </data>
@@ -129,10 +132,31 @@
   <data name="LABEL_PW" xml:space="preserve">
     <value>Password</value>
   </data>
-  <data name="VALIDATION_ERROR_ID" xml:space="preserve">
-    <value>ID does not exist.</value>
+  <data name="VALIDATION_ERROR_ID_REQUIRED" xml:space="preserve">
+    <value>ID is required.</value>
   </data>
-  <data name="VALIDATION_ERROR_PW" xml:space="preserve">
+  <data name="VALIDATION_ERROR_PW_INVALID" xml:space="preserve">
     <value>The password is incorrect.</value>
+  </data>
+  <data name="VALIDATION_ERROR_ID_NOT_FOUND" xml:space="preserve">
+    <value>ID is not registered.</value>
+  </data>
+  <data name="VALIDATION_ERROR_PW_REQUIRED" xml:space="preserve">
+    <value>The password is required.</value>
+  </data>
+  <data name="BUTTON_REGISTER" xml:space="preserve">
+    <value>Register</value>
+  </data>
+  <data name="LABEL_EMAIL" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="VALIDATION_ERROR_ID_ALREADY_EXISTS" xml:space="preserve">
+    <value>ID already registered.</value>
+  </data>
+  <data name="VALIDATION_ERROR_EMAIL_REQUIRED" xml:space="preserve">
+    <value>Email is required.</value>
+  </data>
+  <data name="VALIDATION_ERROR_EMAIL_INVALID_FORMAT" xml:space="preserve">
+    <value>Email format is invalid.</value>
   </data>
 </root>

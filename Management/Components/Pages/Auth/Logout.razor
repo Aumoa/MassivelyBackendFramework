@@ -1,11 +1,29 @@
 ﻿@page "/auth/logout"
-@using Management.Components.Layout
 @using Management.Configurations
-@using Management.Services
 @using Microsoft.Extensions.Options
-@layout NotAuthorizedLayout
-@inject NavigationManager Navigation
-@inject AuthProvider Auth
 @inject IJSRuntime JSRuntime
+@inject ILogger<Logout> Logger
 @inject IOptions<BackendUrls> Urls
-@inject IHttpContextAccessor HttpAccessor
+@inject NavigationManager Navigation
+
+@code {
+    private IJSObjectReference m_Module = null!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            m_Module = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Components/Pages/Auth/Logout.razor.js");
+            if (m_Module == null)
+            {
+                Logger.LogCritical("Failed to load JS module for login page. Please check that the JavaScript file is in the correct location.");
+                return;
+            }
+
+            var url = $"{Urls.Value.Auth}/api/auth/logout";
+            await m_Module.InvokeVoidAsync("logoutAsync", url);
+
+            Navigation.NavigateTo("/auth/login", true);
+        }
+    }
+}

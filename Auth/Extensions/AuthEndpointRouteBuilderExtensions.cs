@@ -10,7 +10,7 @@ public static class AuthEndpointRouteBuilderExtensions
     {
         endpoints.MapGet("/api/auth/status", AuthController.Status);
         endpoints.MapGet("/api/auth", AuthController.ContainsAsync);
-        endpoints.MapGet("/api/auth/{provider}/login", AuthController.LoginAsync);
+        endpoints.MapPost("/api/auth/{provider}/login", AuthController.LoginAsync);
         endpoints.MapPost("/api/auth/logout", AuthController.LogoutAsync);
         endpoints.MapPost("/api/auth/{id}", AuthController.RegisterAsync);
     }
