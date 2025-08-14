@@ -2,7 +2,7 @@
     @{
         string extendClass = ErrorAndEnabled ? "error" : string.Empty;
     }
-    <input id="@GetHashCode()" type="@Type" class="floating-input @extendClass" value="@Value" onchange="@OnChange" placeholder=" " disabled="@Disabled" />
+    <input @ref="m_Input" id="@GetHashCode()" type="@Type" class="floating-input @extendClass" value="@Value" onchange="@OnChangeAsync" placeholder=" " disabled="@Disabled" autocomplete="@AutoComplete" />
     <label for="@GetHashCode()" class="floating-label @extendClass">@Placeholder</label>
 </div>
 
@@ -17,6 +17,9 @@
     public EventCallback<string> ValueChanged { get; set; }
 
     [Parameter]
+    public EventCallback<ChangeEventArgs> Changed { get; set; }
+
+    [Parameter]
     public string? Placeholder { get; set; }
 
     [Parameter]
@@ -25,11 +28,22 @@
     [Parameter]
     public bool Disabled { get; set; }
 
+    [Parameter]
+    public string? AutoComplete { get; set; }
+
     private bool ErrorAndEnabled => HasError && Disabled == false;
 
-    private void OnChange(ChangeEventArgs e)
+    private ElementReference m_Input;
+
+    private async ValueTask OnChangeAsync(ChangeEventArgs e)
     {
         Value = e.Value?.ToString();
-        ValueChanged.InvokeAsync(Value);
+        await ValueChanged.InvokeAsync(Value);
+        await Changed.InvokeAsync(e);
+    }
+
+    public async ValueTask FocusAsync()
+    {
+        await m_Input.FocusAsync();
     }
 }
