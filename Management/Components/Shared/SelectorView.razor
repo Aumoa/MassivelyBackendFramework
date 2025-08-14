@@ -1,14 +1,13 @@
-﻿@implements IAsyncDisposable
-@inject IWebHostEnvironment Environment
+﻿@using Microsoft.AspNetCore.Components.Web;
+@implements IAsyncDisposable
 
 @if (Container is null)
 {
-    if (Environment.IsDevelopment())
-    {
+    <environment include="Development">
         <h2>
             SelectorView must be used within a SelectorContainer.
         </h2>
-    }
+    </environment>
 }
 
 @code {
