@@ -1,16 +1,15 @@
-﻿using Auth.DTO;
-using Dapper;
+﻿using Dapper;
 using Microsoft.Extensions.Options;
 using MySql.Data.MySqlClient;
-using Scripting.DTO;
 
-namespace Auth.Services;
+namespace OAuth2.Services;
 
-internal class MySqlAccounts(IOptions<MySqlAccounts.Configuration> options, PasswordHash pwhash) : IAccounts, IAccesses
+internal class MySqlAccountsAndAccesses(IOptions<MySqlAccountsAndAccesses.Configuration> Options, PasswordHash PwHash) : IAccounts, IAccesses
 {
     public record Configuration
     {
         public required string ConnectionString { get; init; }
+        public required TimeSpan AccessTimeout { get; init; }
     }
 
     public async ValueTask<bool> ContainsAsync(string id, CancellationToken cancellationToken)
@@ -24,38 +23,30 @@ internal class MySqlAccounts(IOptions<MySqlAccounts.Configuration> options, Pass
         return count > 0;
     }
 
-    public async ValueTask<ResponseCode> RegisterAsync(string id, string password, string email, CancellationToken cancellationToken)
+    public async ValueTask<bool> AcceptAsync(string id, string password, CancellationToken cancellationToken)
     {
-        pwhash.HashPassword(password, out var hash, out var salt);
-        var hss = $"{hash}${salt}";
-
         using var connection = GetConnection();
         await connection.OpenAsync(cancellationToken);
 
-        await using var transaction = await connection.BeginTransactionAsync();
-        const string QUERY1 = "SELECT COUNT(*) FROM `accounts` WHERE `email` = @email";
-        var command = new CommandDefinition(QUERY1, new { email }, cancellationToken: cancellationToken);
-        var exists = await connection.QuerySingleAsync<int>(command) > 0;
-        if (exists)
+        const string QUERY1 = "SELECT `password` FROM `accounts` WHERE `id` = @id";
+        var command = new CommandDefinition(QUERY1, new { id }, cancellationToken: cancellationToken);
+        var hss = await connection.QuerySingleOrDefaultAsync<string>(command);
+        if (string.IsNullOrEmpty(hss))
         {
-            await transaction.RollbackAsync(cancellationToken);
-            return ResponseCode.AccountEmailDuplicated;
+            return false;
         }
 
-        const string QUERY2 = "INSERT IGNORE INTO `accounts` VALUES(@id, @hss, @email, NOW())";
-        command = new CommandDefinition(QUERY2, new { id, hss, email }, cancellationToken: cancellationToken);
-        var result = await connection.ExecuteAsync(command) > 0;
-        if (result == false)
+        var parts = hss.Split('$');
+        if (parts.Length != 2)
         {
-            await transaction.RollbackAsync(cancellationToken);
-            return ResponseCode.AccountAlreadyRegistered;
+            throw new InvalidOperationException("Invalid password hash format.");
         }
 
-        await transaction.CommitAsync(cancellationToken);
-        return ResponseCode.Success;
+        var (hash, salt) = (parts[0], parts[1]);
+        return PwHash.VerifyPassword(password, hash, salt);
     }
 
-    public async ValueTask<string> GetAccessAsync(string id, string password, string scope, TimeSpan expireTime, CancellationToken cancellationToken)
+    public async ValueTask<string> GetAccessAsync(string id, string scope, TimeSpan expireTime, CancellationToken cancellationToken)
     {
         string access_token = Guid.NewGuid().ToString();
         DateTime expires_at = DateTime.UtcNow.Add(expireTime);
@@ -80,13 +71,20 @@ internal class MySqlAccounts(IOptions<MySqlAccounts.Configuration> options, Pass
         return access_token;
     }
 
-    private MySqlConnection GetConnection()
+    public async ValueTask<string[]> QueryRolesAsync(string accessToken, CancellationToken cancellationToken)
     {
-        return new MySqlConnection(options.Value.ConnectionString);
+        using var connection = GetConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        const string QUERY1 = "SELECT `scope` FROM `access_scopes` WHERE `access_token` = @accessToken";
+        var command = new CommandDefinition(QUERY1, new { accessToken }, cancellationToken: cancellationToken);
+        var results = await connection.QueryAsync<string>(command);
+
+        return [.. results];
     }
 
-    private static (string, string) As2(string[] values)
+    private MySqlConnection GetConnection()
     {
-        return (values[0], values[1]);
+        return new MySqlConnection(Options.Value.ConnectionString);
     }
 }

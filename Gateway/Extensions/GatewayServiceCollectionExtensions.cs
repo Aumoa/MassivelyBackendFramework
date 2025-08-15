@@ -17,6 +17,6 @@ public static class GatewayServiceCollectionExtensions
         services.AddSingleton<MasterConnection<GatewayIdentifier>>();
         services.AddHostedService<MasterConnector<GatewayIdentifier>>();
 
-        services.AddTransient<GatewayController>();
+        services.AddScoped<GatewayController>();
     }
 }

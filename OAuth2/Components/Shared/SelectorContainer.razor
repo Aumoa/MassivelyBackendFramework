@@ -1,0 +1,83 @@
+﻿<CascadingValue Value="this">
+    @ChildContent
+</CascadingValue>
+
+<div class="selector-container">
+    @foreach (var leavingView in m_Leaving)
+    {
+        <div class="selector-view slide-out">
+            @leavingView.ChildContent
+        </div>
+    }
+
+    @if (m_CurrentView is { ChildContent: { } } currentView)
+    {
+        string selectorViewExtend = m_Leaving.Count > 0 ? "slide-in" : "";
+        <div @key="currentView" class="selector-view @selectorViewExtend">
+            @currentView.ChildContent
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public object? View { get; set; }
+
+    private readonly List<SelectorView> m_Views = [];
+    private readonly List<SelectorView> m_Leaving = [];
+    private SelectorView? m_CurrentView;
+
+    protected override Task OnParametersSetAsync()
+    {
+        SetView(View);
+        return Task.CompletedTask;
+    }
+
+    public void AddView(SelectorView view)
+    {
+        m_Views.Add(view);
+        if (m_CurrentView == null)
+        {
+            SetView(m_Views.FirstOrDefault());
+        }
+    }
+
+    public void RemoveView(SelectorView view)
+    {
+        m_Views.Remove(view);
+        if (ReferenceEquals(m_CurrentView, view))
+        {
+            SetView(m_Views.FirstOrDefault());
+        }
+    }
+
+    public void SetView(SelectorView? view)
+    {
+        if (ReferenceEquals(m_CurrentView, view))
+        {
+            return;
+        }
+
+        if (m_CurrentView is { ChildContent: { } } previous && m_Views.Contains(m_CurrentView))
+        {
+            m_Leaving.Add(previous);
+            InvokeAsync(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(0.4));
+                m_Leaving.RemoveAt(0);
+                StateHasChanged();
+            });
+        }
+
+        m_CurrentView = view;
+        StateHasChanged();
+    }
+
+    public void SetView(object? key)
+    {
+        SetView(m_Views.FirstOrDefault(p => p.Key?.Equals(key) ?? false));
+    }
+}

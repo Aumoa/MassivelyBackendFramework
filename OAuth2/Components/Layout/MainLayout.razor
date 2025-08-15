@@ -1,0 +1,12 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using OAuth2.Components.Redirects
+@inherits LayoutComponentBase
+
+<AuthorizeView>
+    <Authorized>
+        @Body
+    </Authorized>
+    <NotAuthorized>
+        <RedirectToLogin />
+    </NotAuthorized>
+</AuthorizeView>

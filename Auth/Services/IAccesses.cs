@@ -1,12 +1,6 @@
 ﻿namespace Auth.Services;
 
-internal interface IAccesses
+public interface IAccesses
 {
-    record Configuration
-    {
-        public required TimeSpan AccessTimeout { get; init; } = TimeSpan.FromHours(24);
-    }
-
-    ValueTask<string?> GetAccessAsync(string provider, string code, CancellationToken cancellationToken);
-    ValueTask LogoutAsync(string accessToken, CancellationToken cancellationToken);
+    ValueTask<string> GetAccessAsync(string id, string password, string scope, TimeSpan expireTime, CancellationToken cancellationToken);
 }
