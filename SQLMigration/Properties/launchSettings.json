@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "SQLMigration": {
+      "commandName": "Project",
+      "commandLineArgs": "server=localhost;username=root;password=root; \"OAuth2.SQL\\\\bin\\\\Debug\\\\net9.0\\\\OAuth2.SQL.dll\" MassivelyBackendFramework__OAuth2",
+      "workingDirectory": "$(SolutionDir)"
+    }
+  }
+}
