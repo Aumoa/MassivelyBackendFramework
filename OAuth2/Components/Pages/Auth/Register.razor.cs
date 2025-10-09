@@ -1,13 +1,10 @@
 ﻿using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.JSInterop;
-using OAuth2.Components.Shared;
 using OAuth2.DTO;
 using OAuth2.Localizations;
 using OAuth2.Services;
 
-namespace OAuth2.Components.Pages;
+namespace OAuth2.Components.Pages.Auth;
 
 public partial class Register(
     IAccounts accounts,

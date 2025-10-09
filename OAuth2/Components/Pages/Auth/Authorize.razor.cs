@@ -8,7 +8,7 @@ using OAuth2.Localizations;
 using OAuth2.Services;
 using HostOptions = OAuth2.Options.HostOptions;
 
-namespace OAuth2.Components.Pages;
+namespace OAuth2.Components.Pages.Auth;
 
 public partial class Authorize(
     IAccounts accounts,
@@ -89,7 +89,7 @@ public partial class Authorize(
             return;
         }
 
-        if (ClientId == hostOptions.Value.ClientId && RedirectUri == hostOptions.Value.Uri + "/redirect")
+        if (ClientId == hostOptions.Value.ClientId && RedirectUri == nav.BaseUri + "redirect")
         {
             return;
         }
@@ -172,7 +172,7 @@ public partial class Authorize(
         }
 
         var uri = QueryHelpers.AddQueryString(RedirectUri, query);
-        nav.NavigateTo(uri);
+        nav.NavigateTo(uri, forceLoad: true);
     }
 
     private async Task OnContinue_StateIdAsync()
