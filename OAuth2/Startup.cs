@@ -21,7 +21,6 @@ builder.Services.AddAuthentication("Bearer")
     });
 builder.Services.AddAuthorizationCore();
 
-builder.Services.Configure<JwtOptions>(builder.Configuration.GetRequiredSection("JwtOptions"));
 builder.Services.AddOAuth2(builder.Configuration.GetRequiredSection("OAuth2"));
 
 var app = builder.Build();
