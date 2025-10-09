@@ -185,5 +185,14 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("LOGIN_VALIDATION_ERROR_PW_REQUIRED", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   REGISTER과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string REGISTER_FORM_TITLE {
+            get {
+                return ResourceManager.GetString("REGISTER_FORM_TITLE", resourceCulture);
+            }
+        }
     }
 }

@@ -159,4 +159,7 @@
   <data name="LOGIN_VALIDATION_ERROR_PW_REQUIRED" xml:space="preserve">
     <value>암호는 필수 요소입니다.</value>
   </data>
+  <data name="REGISTER_FORM_TITLE" xml:space="preserve">
+    <value>등록</value>
+  </data>
 </root>

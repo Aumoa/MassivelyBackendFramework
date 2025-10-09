@@ -1,14 +1,5 @@
-﻿@using Microsoft.AspNetCore.Components.Authorization
-@using OAuth2.Components.Redirects
-@inherits LayoutComponentBase
+﻿@inherits LayoutComponentBase
 
-<AuthorizeView>
-    <Authorized>
-        <RedirectToMain />
-    </Authorized>
-    <NotAuthorized>
-        <div class="page-center">
-            @Body
-        </div>
-    </NotAuthorized>
-</AuthorizeView>
+<div class="page-center">
+    @Body
+</div>

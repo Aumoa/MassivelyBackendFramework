@@ -1,7 +1,10 @@
-using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Options;
 using OAuth2.Components;
+using OAuth2.Core.Extensions;
 using OAuth2.Options;
-using OAuth2.Services;
+using OAuth2.SQL.Migration;
+using OAuth2.Utility;
+using SQLMigration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,13 +12,7 @@ builder.Services.AddControllers();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddHttpClient("Origin", client =>
-{
-    client.BaseAddress = new Uri(GetRequiredValue<string>(builder.Configuration.GetRequiredSection("Blazor"), "Origin"));
-});
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<AuthProvider>();
-builder.Services.AddScoped<AuthenticationStateProvider>(p => p.GetRequiredService<AuthProvider>());
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
@@ -24,15 +21,8 @@ builder.Services.AddAuthentication("Bearer")
     });
 builder.Services.AddAuthorizationCore();
 
-builder.Services.Configure<BlazorOptions>(builder.Configuration.GetRequiredSection("Blazor"));
-
-builder.Services.Configure<MySqlAccountsAndAccesses.Configuration>(builder.Configuration.GetRequiredSection("Accesses"));
-builder.Services.AddScoped<PasswordHash>();
-builder.Services.AddScoped<IAccounts, MySqlAccountsAndAccesses>();
-builder.Services.AddScoped<IAccesses, MySqlAccountsAndAccesses>();
-
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetRequiredSection("JwtOptions"));
-builder.Services.AddScoped<JwtTokenGenerator>();
+builder.Services.AddOAuth2(builder.Configuration.GetRequiredSection("OAuth2"));
 
 var app = builder.Build();
 
@@ -54,15 +44,14 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+await StartMigrationAsync(app.Lifetime.ApplicationStopping);
+
 app.Run();
 
-static T GetRequiredValue<T>(IConfiguration config, string key)
+async ValueTask StartMigrationAsync(CancellationToken cancellationToken)
 {
-    var value = config.GetValue<T>(key);
-    if (EqualityComparer<T>.Default.Equals(value, default!))
-    {
-        throw new InvalidOperationException($"Configuration value for '{key}' is required.");
-    }
-
-    return value;
+    var options = app.Services.GetRequiredService<IOptions<MySqlOptions>>();
+    var scripts = new Scripts();
+    var logger = new LoggerTextWriter(app.Logger);
+    await Executor.RunAsync(options.Value.ConnectionString, options.Value.Database, [.. scripts.GetScripts()], logger, cancellationToken);
 }

@@ -35,6 +35,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Utility", "Utility", "{71FF
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SQLMigration", "SQLMigration\SQLMigration.csproj", "{581161F2-9F45-43E3-AACE-09C9C2C1EBA9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OAuth2.Controllers", "OAuth2.Controllers\OAuth2.Controllers.csproj", "{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -89,6 +91,10 @@ Global
 		{581161F2-9F45-43E3-AACE-09C9C2C1EBA9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{581161F2-9F45-43E3-AACE-09C9C2C1EBA9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{581161F2-9F45-43E3-AACE-09C9C2C1EBA9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -106,6 +112,7 @@ Global
 		{CAA68E77-2269-4307-BB14-1D13590A7FF7} = {C8D5274F-AC00-46C7-1F8D-E88E81087A52}
 		{35467584-34B1-46C6-BE9B-0AD44395DB0A} = {C8D5274F-AC00-46C7-1F8D-E88E81087A52}
 		{581161F2-9F45-43E3-AACE-09C9C2C1EBA9} = {71FF9D2E-1C8B-423C-8A73-C8513FBD1E9E}
+		{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17} = {C8D5274F-AC00-46C7-1F8D-E88E81087A52}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AA50FDB1-B30B-44CD-90FC-E31B5B3C7AAA}

@@ -10,6 +10,12 @@
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="MySql.Data" Version="9.4.0" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OAuth2.Controllers\OAuth2.Controllers.csproj" />
+    <ProjectReference Include="..\OAuth2.SQL\OAuth2.SQL.csproj" />
+    <ProjectReference Include="..\Services\OAuth2.Core\OAuth2.Core.csproj" />
+    <ProjectReference Include="..\SQLMigration\SQLMigration.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <Compile Update="Components\AppStrings.Designer.cs">
