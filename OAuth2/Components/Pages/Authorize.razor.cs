@@ -73,7 +73,7 @@ public partial class Authorize(
 
     protected override Task OnParametersSetAsync()
     {
-        if (string.IsNullOrWhiteSpace(ResponseType) || string.IsNullOrWhiteSpace(RedirectUri) || string.IsNullOrWhiteSpace(ClientId))
+        if (string.IsNullOrWhiteSpace(ResponseType) || string.IsNullOrWhiteSpace(RedirectUri) || string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope))
         {
             nav.NavigateTo("/error");
             return Task.CompletedTask;

@@ -13,12 +13,14 @@ public static class ServiceCollectionExtensions
         s.Configure<RedisOptions>(config.GetRequiredSection("Redis"));
         s.AddTransient<IAccounts, MySqlAccounts>();
         s.AddTransient<IClaims, MySqlClaims>();
+
         s.AddSingleton<RedisAccesses>();
         s.AddHostedService(p => p.GetRequiredService<RedisAccesses>());
-        s.AddSingleton<IAccesses, RedisAccesses>();
+        s.AddSingleton<IAccesses, RedisAccesses>(p => p.GetRequiredService<RedisAccesses>());
+
         s.AddSingleton<RedisAuthorizationCodes>();
         s.AddHostedService(p => p.GetRequiredService<RedisAuthorizationCodes>());
-        s.AddSingleton<IAuthorizationCodes, RedisAuthorizationCodes>();
+        s.AddSingleton<IAuthorizationCodes, RedisAuthorizationCodes>(p => p.GetRequiredService<RedisAuthorizationCodes>());
         return s;
     }
 }
