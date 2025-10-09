@@ -1,16 +1,20 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
 using OAuth2.Components.Shared;
 using OAuth2.DTO;
 using OAuth2.Localizations;
 using OAuth2.Services;
+using HostOptions = OAuth2.Options.HostOptions;
 
 namespace OAuth2.Components.Pages;
 
 public partial class Authorize(
     IAccounts accounts,
     IAuthorizationCodes authorizationCodes,
+    IOptions<HostOptions> hostOptions,
+    IClients clients,
     NavigationManager nav)
 {
     private enum RenderStates
@@ -71,21 +75,31 @@ public partial class Authorize(
     private bool CanSubmit => string.IsNullOrEmpty(m_ID) == false;
     private bool Requesting => m_Requesting > 0;
 
-    protected override Task OnParametersSetAsync()
+    protected override async Task OnParametersSetAsync()
     {
         if (string.IsNullOrWhiteSpace(ResponseType) || string.IsNullOrWhiteSpace(RedirectUri) || string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope))
         {
             nav.NavigateTo("/error");
-            return Task.CompletedTask;
+            return;
         }
 
         if (ResponseType != "code")
         {
             nav.NavigateTo("/error");
-            return Task.CompletedTask;
+            return;
         }
 
-        return Task.CompletedTask;
+        if (ClientId == hostOptions.Value.ClientId && RedirectUri == hostOptions.Value.Uri + "/redirect")
+        {
+            return;
+        }
+
+        var targetClient = await clients.GetClientAsync(ClientId);
+        if (targetClient == null)
+        {
+            nav.NavigateTo("/error");
+            return;
+        }
     }
 
     private IEnumerable<string> GetErrorMessages()
@@ -141,7 +155,7 @@ public partial class Authorize(
             return;
         }
 
-        if (await accounts.AccessAsync(m_ID, m_Password) == false)
+        if (await accounts.VerifyAsync(m_ID, m_Password) == false)
         {
             m_ErrorMessagePassword = Strings.LOGIN_VALIDATION_ERROR_PW_INVALID;
             return;

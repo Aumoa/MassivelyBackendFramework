@@ -1,0 +1,49 @@
+﻿using System.Data;
+using System.Security.Cryptography;
+using Dapper;
+using Microsoft.Extensions.Options;
+using OAuth2.DTO;
+using OAuth2.Options;
+
+namespace OAuth2.Services;
+
+internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(options.Value), IClients
+{
+    public async ValueTask<string> AddClientAsync(string name, string ownerId, string[] redirectUris, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        await using var tx = await connection.BeginTransactionAsync(IsolationLevel.ReadUncommitted, cancellationToken);
+
+        string id = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        const string QUERY1 = "INSERT INTO `client` (`id`, `owner_id`, `name`) VALUES(@id, @ownerId, @name)";
+        var command = new CommandDefinition(QUERY1, new { id, ownerId, name }, tx, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
+
+        const string QUERY2 = "INSERT INTO `client_claim` (`client_id`, `name`, `value`) VALUES(@id, 'redirect_uri', @value)";
+        command = new CommandDefinition(QUERY2, redirectUris.Select(value => new { id, value }), tx, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
+
+        await tx.CommitAsync(cancellationToken);
+        return id;
+    }
+
+    public async ValueTask<ClientInfo?> GetClientAsync(string clientId, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY1 = "SELECT `id`, `owner_id` AS `OwnerId`, `name`, `created_at` AS `CreatedAt` FROM `client` WHERE `id` = @clientId AND `removed_at` IS NULL;";
+        var command = new CommandDefinition(QUERY1, new { clientId }, cancellationToken: cancellationToken);
+        var result = await connection.QuerySingleOrDefaultAsync<ClientInfo>(command);
+        if (result == default)
+        {
+            return null;
+        }
+
+        const string QUERY2 = "SELECT `value` FROM `client_claim` WHERE `client_id` = @clientId AND `removed_at` IS NULL AND `name` = 'redirect_uri'";
+        command = new CommandDefinition(QUERY2, new { clientId }, cancellationToken: cancellationToken);
+        var results = await connection.QueryAsync<string>(command);
+
+        return result with { RedirectUris = [.. results] };
+    }
+}

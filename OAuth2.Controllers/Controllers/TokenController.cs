@@ -8,6 +8,8 @@ namespace OAuth2.Controllers;
 [Route("api/v1/token")]
 public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses) : ControllerBase
 {
+    private static readonly TimeSpan ExpiresIn = TimeSpan.FromHours(1);
+
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] TokenRequest request, CancellationToken cancellationToken)
     {
@@ -27,15 +29,35 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_grant" });
         }
 
-        var expiresIn = TimeSpan.FromHours(1);
-        var access = await accesses.WriteAccessAsync(code.Value.AccountId, expiresIn, cancellationToken);
+        var access = await accesses.WriteAccessAsync(code.Value.AccountId, code.Value.Scope, ExpiresIn, cancellationToken);
         var response = new TokenResponse
         {
             AccessToken = access.AccessToken,
             TokenType = "Bearer",
-            ExpiresIn = (int)expiresIn.TotalSeconds,
-            Scope = code.Value.Scope,
+            ExpiresIn = (int)ExpiresIn.TotalSeconds,
+            Scope = access.Scope,
             RefreshToken = access.RefreshToken
+        };
+
+        return Ok(response);
+    }
+
+    [HttpPost("refresh")]
+    public async ValueTask<IActionResult> RefreshAsync([FromForm] TokenRefreshRequest request, CancellationToken cancellationToken)
+    {
+        var newAccess = await accesses.RefreshAccessAsync(request.RefreshToken, ExpiresIn, cancellationToken);
+        if (newAccess.HasValue == false)
+        {
+            return BadRequest(new { error = "invalid_refresh_token" });
+        }
+
+        var response = new TokenResponse
+        {
+            AccessToken = newAccess.Value.AccessToken,
+            TokenType = "Bearer",
+            ExpiresIn = (int)ExpiresIn.TotalSeconds,
+            Scope = newAccess.Value.Scope,
+            RefreshToken = newAccess.Value.RefreshToken
         };
 
         return Ok(response);

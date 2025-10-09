@@ -16,7 +16,7 @@ internal class MySqlAccounts(IOptions<MySqlOptions> options) : MySqlDbContext(op
         return result == 1;
     }
 
-    public async ValueTask<bool> AccessAsync(string id, string password, CancellationToken cancellationToken = default)
+    public async ValueTask<bool> VerifyAsync(string id, string password, CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
 

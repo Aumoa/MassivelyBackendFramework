@@ -1,0 +1,49 @@
+﻿@page "/redirect"
+@using Microsoft.Extensions.Options
+@using HostOptions = OAuth2.Options.HostOptions
+@using OAuth2.DTO
+@inject IOptions<HostOptions> HostOptions
+@inject NavigationManager Nav
+@inject HttpClient Http
+@inject IHttpContextAccessor HttpContextAccessor
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "code")]
+    public string Code { get; set; } = null!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var formData = new Dictionary<string, string>()
+        {
+            ["grant_type"] = "authorization_code",
+            ["code"] = Code,
+            ["redirect_uri"] = HostOptions.Value.Uri + "/redirect",
+            ["client_id"] = HostOptions.Value.ClientId
+        };
+        using var content = new FormUrlEncodedContent(formData);
+        using var response = await Http.PostAsync(Nav.BaseUri + "api/v1/token", content);
+        if (response.IsSuccessStatusCode == false)
+        {
+            var str = await content.ReadAsStringAsync();
+            Nav.NavigateTo("/error");
+            return;
+        }
+
+        var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>();
+        if (tokenResponse == null)
+        {
+            Nav.NavigateTo("/error");
+            return;
+        }
+
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext == null)
+        {
+            Nav.NavigateTo("/error");
+            return;
+        }
+
+        Nav.NavigateTo("/dashboard");
+    }
+}

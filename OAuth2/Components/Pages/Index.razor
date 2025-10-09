@@ -1,9 +1,14 @@
 ﻿@page "/"
+@using Microsoft.Extensions.Options
+@using HostOptions = OAuth2.Options.HostOptions;
 @inject NavigationManager Nav
+@inject IOptions<HostOptions> HostOptions
 
 @code {
     protected override void OnInitialized()
     {
-        Nav.NavigateTo("/authorize");
+        var clientId = Uri.EscapeDataString(HostOptions.Value.ClientId);
+        var redirectUri = Uri.EscapeDataString($"{HostOptions.Value.Uri}/redirect");
+        Nav.NavigateTo($"/authorize?client_id={clientId}&redirect_uri={redirectUri}&response_type=code&scope=all");
     }
 }

@@ -11,8 +11,11 @@ public static class ServiceCollectionExtensions
     {
         s.Configure<MySqlOptions>(config.GetRequiredSection("MySql"));
         s.Configure<RedisOptions>(config.GetRequiredSection("Redis"));
+        s.Configure<HostOptions>(config.GetRequiredSection("Host"));
+
         s.AddTransient<IAccounts, MySqlAccounts>();
-        s.AddTransient<IClaims, MySqlClaims>();
+        s.AddTransient<IAccountClaims, MySqlAccountClaims>();
+        s.AddTransient<IClients, MySqlClients>();
 
         s.AddSingleton<RedisAccesses>();
         s.AddHostedService(p => p.GetRequiredService<RedisAccesses>());

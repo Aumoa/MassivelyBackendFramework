@@ -22,6 +22,7 @@ builder.Services.AddAuthentication("Bearer")
     });
 builder.Services.AddAuthorizationCore();
 
+builder.Services.AddHttpClient();
 builder.Services.AddOAuth2(builder.Configuration.GetRequiredSection("OAuth2"));
 
 var app = builder.Build();

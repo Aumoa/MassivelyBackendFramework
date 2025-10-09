@@ -3,12 +3,13 @@ using Microsoft.Extensions.Options;
 using OAuth2.DTO;
 using OAuth2.Misc;
 using OAuth2.Options;
+using StackExchange.Redis;
 
 namespace OAuth2.Services;
 
 internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(options.Value), IAccesses
 {
-    public async ValueTask<Access> WriteAccessAsync(string id, TimeSpan expire, CancellationToken cancellationToken = default)
+    public async ValueTask<Access> WriteAccessAsync(string id, string scope, TimeSpan expire, CancellationToken cancellationToken = default)
     {
         var db = GetDatabase();
         var tx = db.CreateTransaction();
@@ -22,7 +23,8 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         var refreshKey = KeyNames.Refresh(refreshToken);
         _ = db.HashSetAsync(refreshKey, [
             new("access_token", accessToken),
-            new("account_id", id)
+            new("account_id", id),
+            new("scope", scope)
             ]).WaitAsync(cancellationToken);
 
         await tx.ExecuteAsync().WaitAsync(cancellationToken);
@@ -30,11 +32,18 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         return new Access
         {
             AccessToken = accessToken,
-            RefreshToken = refreshToken
+            RefreshToken = refreshToken,
+            Scope = scope
         };
     }
 
-    public async ValueTask<bool> VerifyAsync(string accessToken, CancellationToken cancellationToken = default)
+    private static readonly RedisValue[] VerifyFields =
+    [
+        "access_token",
+        "account_id"
+    ];
+
+    public async ValueTask<string?> VerifyAsync(string accessToken, CancellationToken cancellationToken = default)
     {
         var db = GetDatabase();
 
@@ -42,15 +51,25 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         var refreshToken = await db.StringGetAsync(accessKey).WaitAsync(cancellationToken);
         if (refreshToken.IsNullOrEmpty)
         {
-            return false;
+            return null;
         }
 
         var refreshKey = KeyNames.Refresh(refreshToken!);
-        var savedAccessToken = await db.HashGetAsync(refreshKey, "access_token").WaitAsync(cancellationToken);
-        return savedAccessToken == accessToken;
+        var fields = await db.HashGetAsync(refreshKey, VerifyFields).WaitAsync(cancellationToken);
+        if (fields.Length != VerifyFields.Length)
+        {
+            return null;
+        }
+
+        if (fields[0] != accessToken)
+        {
+            return null;
+        }
+
+        return fields[1];
     }
 
-    public async ValueTask<string?> RefreshAccessAsync(string refreshToken, TimeSpan expire, CancellationToken cancellationToken = default)
+    public async ValueTask<Access?> RefreshAccessAsync(string refreshToken, TimeSpan expire, CancellationToken cancellationToken = default)
     {
         var db = GetDatabase();
         var refreshKey = KeyNames.Refresh(refreshToken);
@@ -68,11 +87,17 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         var newAccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         accessKey = KeyNames.Access(newAccessToken);
         _ = batch.StringSetAsync(accessKey, refreshToken, expire);
-        var last = batch.HashSetAsync(refreshKey, "access_token", newAccessToken);
+        _ = batch.HashSetAsync(refreshKey, "access_token", newAccessToken);
+        var scopeTask = batch.HashGetAsync(refreshKey, "scope").WaitAsync(cancellationToken);
 
         batch.Execute();
-        await last;
+        var scope = await scopeTask;
 
-        return newAccessToken;
+        return new Access
+        {
+            AccessToken = accessToken!,
+            RefreshToken = refreshToken,
+            Scope = scope!
+        };
     }
 }

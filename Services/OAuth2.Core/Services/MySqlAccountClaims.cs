@@ -5,15 +5,15 @@ using OAuth2.Options;
 
 namespace OAuth2.Services;
 
-internal class MySqlClaims(IOptions<MySqlOptions> options) : MySqlDbContext(options.Value), IClaims
+internal class MySqlAccountClaims(IOptions<MySqlOptions> options) : MySqlDbContext(options.Value), IAccountClaims
 {
-    public async ValueTask<Claim[]> GetClaimsAsync(string accountId, CancellationToken cancellationToken)
+    public async ValueTask<AccountClaim[]> GetClaimsAsync(string accountId, CancellationToken cancellationToken)
     {
         using var connection = GetConnection();
 
         const string QUERY1 = "SELECT `id`, `name`, `value` FROM `account_claim` WHERE `account_id` = @accountId AND `removed_at` IS NULL;";
         var command = new CommandDefinition(QUERY1, new { accountId }, cancellationToken: cancellationToken);
-        var results = await connection.QueryAsync<Claim>(command);
+        var results = await connection.QueryAsync<AccountClaim>(command);
 
         return [.. results];
     }

@@ -38,24 +38,39 @@ USE `{databaseName}`;
                 throw new InvalidOperationException(sb.ToString() + "One or more failed migration items exist. You must resolve these migration failures manually. After resolving, you must also update the values in the __MigrationHistory table accordingly.");
             }
 
-            scripts = [.. from s in scripts
-                          where !installedItems.Any(i => i.Name == s.Name && i.InstalledRank == s.InstalledRank && i.UpSql == s.UpSql && i.DownSql == s.DownSql)
-                          orderby s.InstalledRank
-                          select s];
-
+            scripts = [.. scripts.OrderBy(s => s.InstalledRank)];
             if (scripts.Length == 0)
+            {
+                logger.WriteLine("No migrations to apply.");
+                return;
+            }
+
+            int startIndex = scripts.Length;
+            for (int i = 0; i < scripts.Length; ++i)
+            {
+                var s = scripts[i];
+                var f = Array.FindIndex(installedItems, i => i.InstalledRank == s.InstalledRank);
+                if (f == -1)
+                {
+                    startIndex = i;
+                    break;
+                }
+
+                var installed = installedItems[f];
+                if (installed.UpSql != s.UpSql || installed.DownSql != s.DownSql)
+                {
+                    startIndex = i;
+                    break;
+                }
+            }
+
+            if (startIndex >= scripts.Length)
             {
                 logger.WriteLine("No new migrations to apply.");
                 return;
             }
 
-            int startRank = scripts
-                .Select(s => Array.FindIndex(installedItems, i => i.InstalledRank == s.InstalledRank))
-                .Where(i => i != -1)
-                .DefaultIfEmpty(0)
-                .Min();
-
-            foreach (var installed in installedItems.Where(i => i.InstalledRank >= startRank))
+            foreach (var installed in installedItems.Where(i => i.InstalledRank >= scripts[startIndex].InstalledRank))
             {
                 logger.WriteLine("Reverting migration with rank {0} - {1} to the previous state.", installed.InstalledRank, installed.Name);
 
@@ -74,7 +89,7 @@ USE `{databaseName}`;
                 }
             }
 
-            foreach (var script in scripts)
+            foreach (var script in scripts.Skip(startIndex))
             {
                 logger.WriteLine("Applying migration with rank {0} - {1}.", script.InstalledRank, script.Name);
 

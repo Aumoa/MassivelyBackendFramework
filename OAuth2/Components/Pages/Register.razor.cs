@@ -11,7 +11,7 @@ namespace OAuth2.Components.Pages;
 
 public partial class Register(
     IAccounts accounts,
-    IClaims claims,
+    IAccountClaims claims,
     NavigationManager nav)
 {
     private readonly struct RequestScope : IDisposable
