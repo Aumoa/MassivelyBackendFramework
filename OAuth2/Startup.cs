@@ -24,6 +24,8 @@ builder.Services.AddAuthentication("Bearer")
     });
 builder.Services.AddAuthorizationCore();
 
+builder.Services.Configure<BlazorOptions>(builder.Configuration.GetRequiredSection("Blazor"));
+
 builder.Services.Configure<MySqlAccountsAndAccesses.Configuration>(builder.Configuration.GetRequiredSection("Accesses"));
 builder.Services.AddScoped<PasswordHash>();
 builder.Services.AddScoped<IAccounts, MySqlAccountsAndAccesses>();
@@ -54,7 +56,7 @@ app.MapRazorComponents<App>()
 
 app.Run();
 
-T GetRequiredValue<T>(IConfiguration config, string key)
+static T GetRequiredValue<T>(IConfiguration config, string key)
 {
     var value = config.GetValue<T>(key);
     if (EqualityComparer<T>.Default.Equals(value, default!))

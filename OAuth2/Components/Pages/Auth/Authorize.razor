@@ -1,0 +1,11 @@
+﻿@page "/authorize"
+@inject NavigationManager Nav
+
+@code {
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(Nav.Uri);
+        var query = uri.Query;
+        Nav.NavigateTo("/v1/auth/login" + query);
+    }
+}

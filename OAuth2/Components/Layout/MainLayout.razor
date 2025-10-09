@@ -4,9 +4,11 @@
 
 <AuthorizeView>
     <Authorized>
-        @Body
+        <RedirectToMain />
     </Authorized>
     <NotAuthorized>
-        <RedirectToLogin />
+        <div class="page-center">
+            @Body
+        </div>
     </NotAuthorized>
 </AuthorizeView>

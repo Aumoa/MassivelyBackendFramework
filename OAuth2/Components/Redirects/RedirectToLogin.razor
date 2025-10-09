@@ -1,8 +1,11 @@
-﻿@inject NavigationManager Navigation
+﻿@using Microsoft.Extensions.Options
+@using OAuth2.Options
+@inject NavigationManager Navigation
+@inject IOptions<BlazorOptions> Options
 
 @code {
     protected override void OnInitialized()
     {
-        Navigation.NavigateTo("/auth/login", true);
+        Navigation.NavigateTo($"/auth/login?redirect_url={Uri.EscapeDataString(Options.Value.Origin)}", true);
     }
 }
