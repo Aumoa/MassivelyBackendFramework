@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 using OAuth2.Components;
 using OAuth2.Core.Extensions;
@@ -31,6 +32,11 @@ if (app.Environment.IsDevelopment() == false)
     app.UseExceptionHandler("/error", createScopeForErrors: true);
     app.UseHsts();
 }
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
