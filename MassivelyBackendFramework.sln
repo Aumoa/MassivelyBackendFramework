@@ -37,6 +37,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SQLMigration", "SQLMigratio
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OAuth2.Controllers", "OAuth2.Controllers\OAuth2.Controllers.csproj", "{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BlazorSharedComponent", "BlazorSharedComponent\BlazorSharedComponent.csproj", "{CECD8984-E59C-42A6-8C63-CCDECDE259A8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -95,6 +97,10 @@ Global
 		{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CECD8984-E59C-42A6-8C63-CCDECDE259A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CECD8984-E59C-42A6-8C63-CCDECDE259A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CECD8984-E59C-42A6-8C63-CCDECDE259A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CECD8984-E59C-42A6-8C63-CCDECDE259A8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -113,6 +119,7 @@ Global
 		{35467584-34B1-46C6-BE9B-0AD44395DB0A} = {C8D5274F-AC00-46C7-1F8D-E88E81087A52}
 		{581161F2-9F45-43E3-AACE-09C9C2C1EBA9} = {71FF9D2E-1C8B-423C-8A73-C8513FBD1E9E}
 		{FF8DCA7A-C6D0-405A-B4F8-8257CC47AC17} = {C8D5274F-AC00-46C7-1F8D-E88E81087A52}
+		{CECD8984-E59C-42A6-8C63-CCDECDE259A8} = {71FF9D2E-1C8B-423C-8A73-C8513FBD1E9E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AA50FDB1-B30B-44CD-90FC-E31B5B3C7AAA}

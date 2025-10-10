@@ -11,6 +11,7 @@
     <PackageReference Include="MySql.Data" Version="9.4.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\BlazorSharedComponent\BlazorSharedComponent.csproj" />
     <ProjectReference Include="..\OAuth2.Controllers\OAuth2.Controllers.csproj" />
     <ProjectReference Include="..\OAuth2.SQL\OAuth2.SQL.csproj" />
     <ProjectReference Include="..\Services\OAuth2.Core\OAuth2.Core.csproj" />

@@ -1,8 +1,8 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using BlazorSharedComponent;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
-using OAuth2.Components.Shared;
 using OAuth2.DTO;
 using OAuth2.Localizations;
 using OAuth2.Services;
