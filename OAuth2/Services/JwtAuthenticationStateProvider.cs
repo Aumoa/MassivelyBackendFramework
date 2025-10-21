@@ -32,4 +32,6 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor) : Aut
 
         return Task.FromResult(new AuthenticationState(m_CurrentUser));
     }
+
+    public string? AccessToken => m_CurrentUser?.Claims.FirstOrDefault(p => p.Type == "access_token")?.Value;
 }

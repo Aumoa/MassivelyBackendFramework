@@ -135,6 +135,9 @@
   <data name="LOGIN_LABEL_ID" xml:space="preserve">
     <value>ID</value>
   </data>
+  <data name="LOGIN_LABEL_NAME" xml:space="preserve">
+    <value>Name</value>
+  </data>
   <data name="LOGIN_LABEL_PW" xml:space="preserve">
     <value>Password</value>
   </data>
@@ -152,6 +155,9 @@
   </data>
   <data name="LOGIN_VALIDATION_ERROR_ID_REQUIRED" xml:space="preserve">
     <value>ID is required.</value>
+  </data>
+  <data name="LOGIN_VALIDATION_ERROR_NAME_REQUIRED" xml:space="preserve">
+    <value>The name is required.</value>
   </data>
   <data name="LOGIN_VALIDATION_ERROR_PW_INVALID" xml:space="preserve">
     <value>The password is incorrect.</value>

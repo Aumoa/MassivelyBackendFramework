@@ -115,6 +115,15 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Name과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_LABEL_NAME {
+            get {
+                return ResourceManager.GetString("LOGIN_LABEL_NAME", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Password과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_LABEL_PW {
@@ -165,6 +174,15 @@ namespace OAuth2.Localizations {
         internal static string LOGIN_VALIDATION_ERROR_ID_REQUIRED {
             get {
                 return ResourceManager.GetString("LOGIN_VALIDATION_ERROR_ID_REQUIRED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   The name is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_VALIDATION_ERROR_NAME_REQUIRED {
+            get {
+                return ResourceManager.GetString("LOGIN_VALIDATION_ERROR_NAME_REQUIRED", resourceCulture);
             }
         }
         

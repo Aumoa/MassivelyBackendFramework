@@ -18,7 +18,7 @@ internal class MySqlAccountClaims(IOptions<MySqlOptions> options) : MySqlDbConte
         return [.. results];
     }
 
-    public async ValueTask AddClaimAsync(string accountId, ClaimName name, string value, CancellationToken cancellationToken)
+    public async ValueTask AddClaimAsync(string accountId, string name, string value, CancellationToken cancellationToken)
     {
         using var connection = GetConnection();
         var name_s = name.ToString();
@@ -28,7 +28,7 @@ internal class MySqlAccountClaims(IOptions<MySqlOptions> options) : MySqlDbConte
         await connection.ExecuteAsync(command);
     }
 
-    public async ValueTask SetUniqueClaimAsync(string accountId, ClaimName name, string value, CancellationToken cancellationToken)
+    public async ValueTask SetUniqueClaimAsync(string accountId, string name, string value, CancellationToken cancellationToken)
     {
         using var connection = GetConnection();
         var name_s = name.ToString();
@@ -55,7 +55,7 @@ internal class MySqlAccountClaims(IOptions<MySqlOptions> options) : MySqlDbConte
         await connection.ExecuteAsync(command);
     }
 
-    public async ValueTask RemoveClaimsAsync(string accountId, ClaimName name, CancellationToken cancellationToken)
+    public async ValueTask RemoveClaimsAsync(string accountId, string name, CancellationToken cancellationToken)
     {
         using var connection = GetConnection();
         var name_s = name.ToString();

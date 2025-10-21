@@ -9,5 +9,6 @@ public partial class Scripts : IScripts
     {
         yield return new _1__Init();
         yield return new _2__Add_client();
+        yield return new _3__Add_account_sub();
     }
 }

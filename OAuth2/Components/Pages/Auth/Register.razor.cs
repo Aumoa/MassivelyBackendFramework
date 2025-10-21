@@ -34,18 +34,26 @@ public partial class Register(
     public string? ReturnUrl { get; set; }
 
     private string m_ID = string.Empty;
+    private string m_Name = string.Empty;
     private string m_Email = string.Empty;
     private string m_Password = string.Empty;
     private int m_Requesting = 0;
     private string m_ErrorMessageId = string.Empty;
+    private string m_ErrorMessageName = string.Empty;
     private string m_ErrorMessagePassword = string.Empty;
     private string m_ErrorMessageEmail = string.Empty;
 
     private bool IdError => string.IsNullOrEmpty(m_ErrorMessageId) == false;
+    private bool NameError => string.IsNullOrEmpty(m_ErrorMessageName) == false;
     private bool PasswordError => string.IsNullOrEmpty(m_ErrorMessagePassword) == false;
     private bool EmailError => string.IsNullOrEmpty(m_ErrorMessageEmail) == false;
 
-    private bool CanSubmit => string.IsNullOrEmpty(m_ID) == false && string.IsNullOrEmpty(m_Password) == false && string.IsNullOrEmpty(m_Email) == false && ValidEmailRegex().IsMatch(m_Email);
+    private bool CanSubmit =>
+        string.IsNullOrEmpty(m_ID) == false &&
+        string.IsNullOrEmpty(m_Name) == false &&
+        string.IsNullOrEmpty(m_Password) == false &&
+        string.IsNullOrEmpty(m_Email) == false &&
+        ValidEmailRegex().IsMatch(m_Email);
     private bool Requesting => m_Requesting > 0;
 
     private IEnumerable<string> GetErrorMessages()
@@ -53,6 +61,11 @@ public partial class Register(
         if (string.IsNullOrEmpty(m_ErrorMessageId) == false)
         {
             yield return m_ErrorMessageId;
+        }
+
+        if (string.IsNullOrEmpty(m_ErrorMessageName) == false)
+        {
+            yield return m_ErrorMessageName;
         }
 
         if (string.IsNullOrEmpty(m_ErrorMessagePassword) == false)
@@ -81,13 +94,19 @@ public partial class Register(
             return;
         }
 
-        if (string.IsNullOrEmpty(m_Password))
+        if (string.IsNullOrWhiteSpace(m_Name))
+        {
+            m_ErrorMessageName = Strings.LOGIN_VALIDATION_ERROR_NAME_REQUIRED;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(m_Password))
         {
             m_ErrorMessagePassword = Strings.LOGIN_VALIDATION_ERROR_PW_REQUIRED;
             return;
         }
 
-        if (string.IsNullOrEmpty(m_Email))
+        if (string.IsNullOrWhiteSpace(m_Email))
         {
             m_ErrorMessageEmail = Strings.LOGIN_VALIDATION_ERROR_EMAIL_REQUIRED;
             return;
@@ -100,7 +119,8 @@ public partial class Register(
         }
 
         await accounts.AddAsync(m_ID, m_Password);
-        await claims.AddClaimAsync(m_ID, ClaimName.Email, m_Email);
+        await claims.AddClaimAsync(m_Name, ClaimNames.Name, m_Name);
+        await claims.AddClaimAsync(m_ID, ClaimNames.Email, m_Email);
 
         if (string.IsNullOrEmpty(ReturnUrl) == false)
         {

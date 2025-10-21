@@ -9,6 +9,7 @@
         <form class="input-form" @onsubmit="OnContinueAsync">
             <div style="display:flex; flex-direction:column; gap:10px;">
                 <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_ID" @bind-Value="m_ID" Input="@OnChangedAsync" HasError="@IdError" />
+                <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_NAME" @bind-Value="m_Name" Input="@OnChangedAsync" HasError="@NameError" />
                 <FloatingInput Type="password" Placeholder="@Strings.LOGIN_LABEL_PW" @bind-Value="m_Password" Input="@OnChangedAsync" HasError="@PasswordError" />
                 <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_EMAIL" @bind-Value="m_Email" Input="@OnChangedAsync" HasError="@EmailError" />
             </div>

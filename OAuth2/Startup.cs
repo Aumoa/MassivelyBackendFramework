@@ -16,7 +16,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<AuthenticationStateProvider, JwtAuthenticationStateProvider>();
+builder.Services.AddScoped<JwtAuthenticationStateProvider>();
+builder.Services.AddScoped<AuthenticationStateProvider>(p => p.GetRequiredService<JwtAuthenticationStateProvider>());
 builder.Services.AddScoped<JwtTokenIssuer>();
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetRequiredSection("JwtOptions"));
 builder.Services.AddAuthentication("Bearer")
