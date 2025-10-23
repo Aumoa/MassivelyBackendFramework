@@ -61,6 +61,15 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   OAuth2과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string APP_TITLE {
+            get {
+                return ResourceManager.GetString("APP_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Continue과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_BUTTON_CONTINUE {

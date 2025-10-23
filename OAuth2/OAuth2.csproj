@@ -19,11 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="Components\AppStrings.Designer.cs">
-      <DesignTime>True</DesignTime>
-      <AutoGen>True</AutoGen>
-      <DependentUpon>AppStrings.resx</DependentUpon>
-    </Compile>
     <Compile Update="Localizations\Strings.Designer.cs">
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
@@ -32,14 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Update="Components\AppStrings.resx">
-      <Generator>PublicResXFileCodeGenerator</Generator>
-      <LastGenOutput>AppStrings.Designer.cs</LastGenOutput>
-      <DependentUpon>App.razor</DependentUpon>
-    </EmbeddedResource>
-    <EmbeddedResource Update="Components\AppStrings.ko.resx">
-      <DependentUpon>AppStrings.resx</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Update="Localizations\Strings.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Strings.Designer.cs</LastGenOutput>
