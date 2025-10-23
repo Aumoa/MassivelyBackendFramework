@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 using OAuth2.Components;
@@ -14,6 +15,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+var dataProtection = builder.Configuration.GetSection("DataProtection");
+if (dataProtection.Exists())
+{
+    var keyPath = dataProtection.GetValue<string>("KeyPath")
+        ?? throw new InvalidOperationException("DataProtection:KeyPath is not configured.");
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(keyPath))
+        .SetApplicationName("OAuth2");
+}
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<JwtAuthenticationStateProvider>();
