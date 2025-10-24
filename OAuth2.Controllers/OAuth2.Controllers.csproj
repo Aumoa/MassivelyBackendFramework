@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Services\OAuth2.Abstractions\OAuth2.Abstractions.csproj" />
+    <ProjectReference Include="..\OAuth2.Abstractions\OAuth2.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>
