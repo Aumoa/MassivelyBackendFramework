@@ -70,6 +70,15 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   An unknown error has occurred on the page.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERROR_TEXT_BODY {
+            get {
+                return ResourceManager.GetString("ERROR_TEXT_BODY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Continue과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_BUTTON_CONTINUE {

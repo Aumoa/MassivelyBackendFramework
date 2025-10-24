@@ -120,6 +120,9 @@
   <data name="APP_TITLE" xml:space="preserve">
     <value>OAuth2</value>
   </data>
+  <data name="ERROR_TEXT_BODY" xml:space="preserve">
+    <value>An unknown error has occurred on the page.</value>
+  </data>
   <data name="LOGIN_BUTTON_CONTINUE" xml:space="preserve">
     <value>Continue</value>
   </data>
