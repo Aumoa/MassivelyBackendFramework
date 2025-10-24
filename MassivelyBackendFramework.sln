@@ -3,15 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36301.6
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Management", "Management\Management.csproj", "{B40D6912-CD8C-9B8D-8CC3-3F3B26B70D21}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OAuth2", "OAuth2\OAuth2.csproj", "{D6A04BF8-E906-4953-9D22-B8C9AD5AFF9D}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Services", "Services", "{C8D5274F-AC00-46C7-1F8D-E88E81087A52}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Frontend", "Frontend", "{E90F7EFD-FAD3-4219-8CA7-4D115A9E288B}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Backend", "Backend", "{C9518A22-42F1-491D-8BC9-CED1260F75B3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gateway.Abstractions", "Gateway.Abstractions\Gateway.Abstractions.csproj", "{2355755B-E5FC-36EF-949F-6AE379899187}"
 EndProject
@@ -45,10 +41,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{B40D6912-CD8C-9B8D-8CC3-3F3B26B70D21}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B40D6912-CD8C-9B8D-8CC3-3F3B26B70D21}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B40D6912-CD8C-9B8D-8CC3-3F3B26B70D21}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B40D6912-CD8C-9B8D-8CC3-3F3B26B70D21}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D6A04BF8-E906-4953-9D22-B8C9AD5AFF9D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{D6A04BF8-E906-4953-9D22-B8C9AD5AFF9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D6A04BF8-E906-4953-9D22-B8C9AD5AFF9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -106,7 +98,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{B40D6912-CD8C-9B8D-8CC3-3F3B26B70D21} = {E90F7EFD-FAD3-4219-8CA7-4D115A9E288B}
 		{D6A04BF8-E906-4953-9D22-B8C9AD5AFF9D} = {E90F7EFD-FAD3-4219-8CA7-4D115A9E288B}
 		{2355755B-E5FC-36EF-949F-6AE379899187} = {C8D5274F-AC00-46C7-1F8D-E88E81087A52}
 		{61FD1765-363F-0CE2-1AD0-65AB5136FAE8} = {C8D5274F-AC00-46C7-1F8D-E88E81087A52}

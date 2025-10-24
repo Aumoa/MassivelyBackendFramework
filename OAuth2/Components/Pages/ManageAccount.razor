@@ -1,0 +1,11 @@
+﻿@page "/"
+@using OAuth2.Services
+@layout AuthorizedLayout
+@inject JwtAuthenticationStateProvider Auth
+
+<table>
+    <tr>
+        <th>@Strings.MANAGEACCOUNTS_HEAD_SUB</th>
+        <td>@Auth.Sub</td>
+    </tr>
+</table>

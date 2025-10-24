@@ -26,3 +26,28 @@ button {
         background-color: #ddd;
         color: #040404;
     }
+
+.link-button {
+    background: none;
+    border: none;
+    color: #0078d4;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+    font: inherit;
+    border-radius: 0;
+    transition: color 0.3s;
+}
+
+.link-button:hover:not(:disabled) {
+    color: #005a9e;
+    text-decoration: underline;
+    background: none;
+}
+
+.link-button:disabled {
+    color: #999;
+    cursor: not-allowed;
+    text-decoration: none;
+}
+

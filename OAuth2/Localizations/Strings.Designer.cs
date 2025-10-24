@@ -223,6 +223,33 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   User Identifier과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_SUB {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_SUB", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Manage Account과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NAVMENU_LABEL_MANAGE_ACCOUNT {
+            get {
+                return ResourceManager.GetString("NAVMENU_LABEL_MANAGE_ACCOUNT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Logout과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string PROFILECARD_LOGOUT {
+            get {
+                return ResourceManager.GetString("PROFILECARD_LOGOUT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   REGISTER과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string REGISTER_FORM_TITLE {

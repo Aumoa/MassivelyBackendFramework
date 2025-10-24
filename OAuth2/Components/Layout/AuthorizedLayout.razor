@@ -8,7 +8,7 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="/auth/logout">Logout</a>
+            <ProfileCard />
         </div>
 
         <article class="content px-4">
@@ -20,6 +20,6 @@
 @code {
     private static readonly NavMenu.NavMenuItem[] Items =
     [
-        new("Home", "home", "/")
+        new(Strings.NAVMENU_LABEL_MANAGE_ACCOUNT, "manage_accounts", "/")
     ];
 }
