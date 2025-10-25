@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.IdentityModel.Tokens.Jwt;
+using Microsoft.AspNetCore.Mvc;
 using OAuth2.DTO;
 using OAuth2.Services;
 
@@ -19,7 +20,7 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
                 rawAccount.Sub,
                 rawAccount.Name,
                 rawAccount.Email,
-                accountClaims.FirstOrDefault(p => p.Name == ClaimNames.Picture).Value
+                accountClaims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value
                 ));
         }, cancellationToken);
     }

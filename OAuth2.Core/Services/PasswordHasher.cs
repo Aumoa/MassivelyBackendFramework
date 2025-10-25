@@ -2,7 +2,7 @@
 
 namespace OAuth2.Services;
 
-internal static class PasswordHasher
+public static class PasswordHasher
 {
     private const int Iterations = 100000;
 

@@ -9,7 +9,6 @@
 @inject NavigationManager Nav
 @inject HttpClient Http
 @inject IHttpContextAccessor HttpContextAccessor
-@inject JwtTokenIssuer JwtIssuer
 @layout AuthorizeLayout
 
 @code {
@@ -30,7 +29,8 @@
             ["grant_type"] = "authorization_code",
             ["code"] = Code,
             ["redirect_uri"] = Nav.BaseUri + "redirect",
-            ["client_id"] = HostOptions.Value.ClientId
+            ["client_id"] = HostOptions.Value.ClientId,
+            ["client_secret"] = HostOptions.Value.Secret
         };
         using var content = new FormUrlEncodedContent(formData);
         using var response = await Http.PostAsync(Nav.BaseUri + "api/v1/token", content);
@@ -55,12 +55,14 @@
             return;
         }
 
-        var jwtToken = JwtIssuer.Issue(
-            new Claim("access_token", tokenResponse.AccessToken),
-            new Claim("refresh_token", tokenResponse.RefreshToken)
-        );
+        httpContext.Response.Cookies.Append("access_token", tokenResponse.AccessToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict
+        });
 
-        httpContext.Response.Cookies.Append("jwt_token", jwtToken, new CookieOptions
+        httpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,

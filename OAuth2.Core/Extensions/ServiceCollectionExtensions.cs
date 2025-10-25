@@ -12,10 +12,12 @@ public static class ServiceCollectionExtensions
         s.Configure<MySqlOptions>(config.GetRequiredSection("MySql"));
         s.Configure<RedisOptions>(config.GetRequiredSection("Redis"));
         s.Configure<HostOptions>(config.GetRequiredSection("Host"));
+        s.Configure<JwtOptions>(config.GetRequiredSection("Jwt"));
 
         s.AddTransient<IAccounts, MySqlAccounts>();
         s.AddTransient<IAccountClaims, MySqlAccountClaims>();
         s.AddTransient<IClients, MySqlClients>();
+        s.AddTransient<IClientClaims, MySqlClientClaims>();
 
         s.AddSingleton<RedisAccesses>();
         s.AddHostedService(p => p.GetRequiredService<RedisAccesses>());
@@ -24,6 +26,9 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<RedisAuthorizationCodes>();
         s.AddHostedService(p => p.GetRequiredService<RedisAuthorizationCodes>());
         s.AddSingleton<IAuthorizationCodes, RedisAuthorizationCodes>(p => p.GetRequiredService<RedisAuthorizationCodes>());
+
+        s.AddSingleton<IJwt, Jwt>();
+        
         return s;
     }
 }

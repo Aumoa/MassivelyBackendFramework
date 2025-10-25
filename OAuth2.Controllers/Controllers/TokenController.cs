@@ -1,12 +1,16 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using OAuth2.DTO;
+using OAuth2.Options;
 using OAuth2.Services;
 
 namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/token")]
-public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses) : ControllerBase
+public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IOptions<HostOptions> hostOptions) : ControllerBase
 {
     private static readonly TimeSpan ExpiresIn = TimeSpan.FromHours(1);
 
@@ -29,14 +33,50 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_grant" });
         }
 
-        var access = await accesses.WriteAccessAsync(code.Value.AccountId, code.Value.Scope, ExpiresIn, cancellationToken);
+        if (request.ClientId == hostOptions.Value.ClientId)
+        {
+            if (request.ClientSecret != hostOptions.Value.Secret)
+            {
+                return BadRequest(new { error = "invalid_client_secret" });
+            }
+        }
+        else
+        {
+            var cclaims = await clientClaims.GetClaimsAsync(code.Value.ClientId, cancellationToken);
+            if (cclaims.Length == 0)
+            {
+                return BadRequest(new { error = "invalid_client_id" });
+            }
+
+            var secret = cclaims.FirstOrDefault(p => p.Name == "secret").Value ?? string.Empty;
+            if (string.IsNullOrEmpty(secret))
+            {
+                return BadRequest(new { error = "invalid_client_id" });
+            }
+
+            if (PasswordHasher.Verify(request.ClientSecret, secret) == false)
+            {
+                return BadRequest(new { error = "invalid_client_secret" });
+            }
+        }
+
+        var access = await accesses.WriteAccessAsync(code.Value.AccountId, code.Value.Scope, code.Value.ClientId, ExpiresIn, cancellationToken);
+        var rawAccount = await accounts.GetRawAccountAsync(code.Value.AccountId, cancellationToken);
+        var claims = await accountClaims.GetClaimsAsync(code.Value.AccountId, cancellationToken);
+
         var response = new TokenResponse
         {
             AccessToken = access.AccessToken,
             TokenType = "Bearer",
             ExpiresIn = (int)ExpiresIn.TotalSeconds,
             Scope = access.Scope,
-            RefreshToken = access.RefreshToken
+            RefreshToken = access.RefreshToken,
+            IdToken = jwt.Issue(code.Value.ClientId,
+                new Claim(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
+                new Claim(JwtRegisteredClaimNames.Name, rawAccount.Value.Name),
+                new Claim(JwtRegisteredClaimNames.Email, rawAccount.Value.Email),
+                new Claim(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty)
+                )
         };
 
         return Ok(response);
@@ -57,7 +97,8 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             TokenType = "Bearer",
             ExpiresIn = (int)ExpiresIn.TotalSeconds,
             Scope = newAccess.Value.Scope,
-            RefreshToken = newAccess.Value.RefreshToken
+            RefreshToken = newAccess.Value.RefreshToken,
+            IdToken = jwt.Issue(newAccess.Value.ClientId)
         };
 
         return Ok(response);

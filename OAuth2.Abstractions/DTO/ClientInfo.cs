@@ -1,3 +1,3 @@
 ﻿namespace OAuth2.DTO;
 
-public record struct ClientInfo(string Id, string OwnerId, string Name, string[] RedirectUris, DateTime CreatedAt);
+public record struct ClientInfo(string Id, string OwnerId, string Name, string SecretHash, string[] RedirectUris, DateTime CreatedAt);

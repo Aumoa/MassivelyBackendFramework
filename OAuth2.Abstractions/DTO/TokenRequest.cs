@@ -15,4 +15,7 @@ public record TokenRequest
 
     [FromForm(Name = "client_id")]
     public required string ClientId { get; set; }
+
+    [FromForm(Name = "client_secret")]
+    public required string ClientSecret { get; set; }
 }

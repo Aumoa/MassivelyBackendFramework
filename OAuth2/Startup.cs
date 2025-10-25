@@ -12,7 +12,11 @@ using SQLMigration;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.WriteIndented = true;
+    });
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -38,13 +42,10 @@ if (dataProtection.Exists())
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<JwtAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(p => p.GetRequiredService<JwtAuthenticationStateProvider>());
-builder.Services.AddScoped<JwtTokenIssuer>();
-builder.Services.Configure<JwtOptions>(builder.Configuration.GetRequiredSection("JwtOptions"));
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
-        var bearer = builder.Configuration.GetSection("Bearer");
-        options.Audience = bearer["Audience"];
+        options.Audience = "oauth2";
     });
 builder.Services.AddAuthorizationCore();
 

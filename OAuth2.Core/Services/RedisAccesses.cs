@@ -9,7 +9,7 @@ namespace OAuth2.Services;
 
 internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(options.Value), IAccesses
 {
-    public async ValueTask<Access> WriteAccessAsync(string id, string scope, TimeSpan expire, CancellationToken cancellationToken = default)
+    public async ValueTask<Access> WriteAccessAsync(string id, string scope, string clientId, TimeSpan expire, CancellationToken cancellationToken = default)
     {
         var db = GetDatabase();
         var tx = db.CreateTransaction();
@@ -24,7 +24,8 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         _ = db.HashSetAsync(refreshKey, [
             new("access_token", accessToken),
             new("account_id", id),
-            new("scope", scope)
+            new("scope", scope),
+            new("client_id", clientId)
             ]).WaitAsync(cancellationToken);
 
         await tx.ExecuteAsync().WaitAsync(cancellationToken);
@@ -33,7 +34,8 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         {
             AccessToken = accessToken,
             RefreshToken = refreshToken,
-            Scope = scope
+            Scope = scope,
+            ClientId = clientId
         };
     }
 
@@ -88,16 +90,17 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         accessKey = KeyNames.Access(newAccessToken);
         _ = batch.StringSetAsync(accessKey, refreshToken, expire);
         _ = batch.HashSetAsync(refreshKey, "access_token", newAccessToken);
-        var scopeTask = batch.HashGetAsync(refreshKey, "scope").WaitAsync(cancellationToken);
+        var resultsTask = batch.HashGetAsync(refreshKey, ["scope", "client_id"]).WaitAsync(cancellationToken);
 
         batch.Execute();
-        var scope = await scopeTask;
+        var results = await resultsTask;
 
         return new Access
         {
             AccessToken = accessToken!,
             RefreshToken = refreshToken,
-            Scope = scope!
+            Scope = results[0]!,
+            ClientId = results[1]!
         };
     }
 }

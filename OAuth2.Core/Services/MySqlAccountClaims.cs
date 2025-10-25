@@ -21,10 +21,9 @@ internal class MySqlAccountClaims(IOptions<MySqlOptions> options) : MySqlDbConte
     public async ValueTask AddClaimAsync(string accountId, string name, string value, CancellationToken cancellationToken)
     {
         using var connection = GetConnection();
-        var name_s = name.ToString();
 
-        const string QUERY1 = "INSERT INTO `account_claim` (`account_id`, `name`, `value`) VALUES(@accountId, @name_s, @value)";
-        var command = new CommandDefinition(QUERY1, new { accountId, name_s, value }, cancellationToken: cancellationToken);
+        const string QUERY1 = "INSERT INTO `account_claim` (`account_id`, `name`, `value`) VALUES(@accountId, @name, @value)";
+        var command = new CommandDefinition(QUERY1, new { accountId, name, value }, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);
     }
 

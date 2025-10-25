@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\OAuth2.Abstractions\OAuth2.Abstractions.csproj" />
+    <ProjectReference Include="..\OAuth2.Core\OAuth2.Core.csproj" />
   </ItemGroup>
 
 </Project>

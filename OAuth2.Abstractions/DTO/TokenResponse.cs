@@ -18,4 +18,7 @@ public record TokenResponse
 
     [JsonPropertyName("refresh_token")]
     public required string RefreshToken { get; set; }
+
+    [JsonPropertyName("id_token")]
+    public required string IdToken { get; set; }
 }
