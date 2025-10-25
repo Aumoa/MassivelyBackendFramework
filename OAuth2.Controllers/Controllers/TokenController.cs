@@ -106,7 +106,10 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
                 new Claim(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
                 new Claim(JwtRegisteredClaimNames.Name, rawAccount.Value.Name),
                 new Claim(JwtRegisteredClaimNames.Email, rawAccount.Value.Email),
-                new Claim(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty)
+                new Claim(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty),
+                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new Claim(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new Claim(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
                 )
         };
 
