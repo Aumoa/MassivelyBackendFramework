@@ -1,14 +1,13 @@
 ﻿@using OAuth2.Services
 @inject JwtAuthenticationStateProvider Auth
 @inject NavigationManager Nav
-@inject IJSRuntime JS
 
-<div>
-    <img src="@Auth.Picture" alt="Profile" class="profile-img" @onclick="TogglePanel" />
+<div @onmouseover="ShowPanel" @onmouseout="HidePanel">
+    <img src="@Auth.Picture" alt="Profile" class="profile-img" />
 
     @if (m_ShowPanel)
     {
-        <div id="@PanelId" class="user-info-panel">
+        <div id="@PanelId" class="user-info-panel @(m_ShowPanelVisible ? "visible" : "")">
             <div class="summary-panel">
                 <img src="@Auth.Picture" alt="Profile" class="profile-img-large" />
                 <div class="informations">
@@ -18,18 +17,20 @@
                 </div>
             </div>
             <hr />
-            <button onclick="@OnClick_Logout">
-                <span class="material-symbols-outlined">logout</span>
-                <span>@Strings.PROFILECARD_LOGOUT</span>
-            </button>
+            <div class="functions">
+                <button onclick="@OnClick_Logout">
+                    <span class="material-symbols-outlined">logout</span>
+                    <span>@Strings.PROFILECARD_LOGOUT</span>
+                </button>
+            </div>
         </div>
     }
 </div>
 
 @code {
-    private IJSObjectReference m_Module = null!;
     private bool m_ShowPanel = false;
-    private DotNetObjectReference<ProfileCard> m_DotNetRef = null!;
+    private bool m_ShowPanelVisible;
+    private int m_RequestId;
     private readonly string PanelId = $"usercard-panel-{Guid.NewGuid()}";
 
     public string ShortSub
@@ -46,47 +47,25 @@
         }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private void ShowPanel()
     {
-        if (firstRender)
-        {
-            m_Module = await JS.InvokeAsync<IJSObjectReference>("import", "./Components/Shared/ProfileCard.razor.js");
-            if (m_Module == null)
-            {
-                Nav.NavigateTo("/error", forceLoad: true);
-                return;
-            }
-
-            m_DotNetRef = DotNetObjectReference.Create(this);
-            await m_Module.InvokeVoidAsync("registerOutsideClick", m_DotNetRef, PanelId);
-        }
+        ++m_RequestId;
+        m_ShowPanel = true;
+        m_ShowPanelVisible = true;
     }
 
-    public async ValueTask DisposeAsync()
+    private async void HidePanel()
     {
-        try
+        var localId = ++m_RequestId;
+        m_ShowPanelVisible = false;
+        await Task.Delay(TimeSpan.FromSeconds(0.4));
+        if (localId != m_RequestId)
         {
-            m_DotNetRef?.Dispose();
-            if (m_Module != null)
-            {
-                await m_Module.DisposeAsync();
-            }
+            return;
         }
-        catch
-        {
-        }
-    }
 
-    [JSInvokable]
-    public void OnOutsideClick()
-    {
         m_ShowPanel = false;
         StateHasChanged();
-    }
-
-    private void TogglePanel()
-    {
-        m_ShowPanel = !m_ShowPanel;
     }
 
     private void OnClick_Logout()

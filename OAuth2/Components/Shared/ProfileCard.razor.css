@@ -12,17 +12,40 @@
     cursor: pointer;
 }
 
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scaleY(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scaleY(1.0);
+    }
+}
+
 .user-info-panel {
     position: absolute;
-    top: 36px;
-    right: 0;
+    top: 40px;
+    right: 12px;
     background: #fff;
     border: 1px solid #ddd;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.12);
     min-width: 180px;
     z-index: 100;
+    animation: fadeIn 0.4s ease;
+    opacity: 0;
+    transform-origin: top;
+    transform: scaleY(0.99);
+    transition: opacity 0.4s, transform 0.4s;
 }
+
+    .user-info-panel.visible {
+        opacity: 1.0;
+        transform: scaleY(1.0);
+        transition: opacity 0.4s, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
 
     .user-info-panel .summary-panel {
         display: flex;
@@ -69,6 +92,10 @@
         .user-info-panel button:active {
             background: #d0d0d0;
         }
+
+    .user-info-panel .functions {
+        padding-bottom: 8px;
+    }
 
 .profile-img-large {
     width: 64px;
