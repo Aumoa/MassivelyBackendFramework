@@ -13,12 +13,12 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
     {
         return await VerifiedAsync(async accountId =>
         {
-            var sub = await accounts.GetSubAsync(accountId);
+            var rawAccount = (await accounts.GetRawAccountAsync(accountId)).Value!;
             var accountClaims = await claims.GetClaimsAsync(accountId, cancellationToken);
             return Ok(new UserInfo(
-                sub,
-                accountClaims.FirstOrDefault(p => p.Name == ClaimNames.Name).Value,
-                accountClaims.FirstOrDefault(p => p.Name == ClaimNames.Email).Value,
+                rawAccount.Sub,
+                rawAccount.Name,
+                rawAccount.Email,
                 accountClaims.FirstOrDefault(p => p.Name == ClaimNames.Picture).Value
                 ));
         }, cancellationToken);

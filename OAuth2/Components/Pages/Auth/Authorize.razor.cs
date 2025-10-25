@@ -155,9 +155,16 @@ public partial class Authorize(
             return;
         }
 
-        if (await accounts.VerifyAsync(m_ID, m_Password) == false)
+        var verified = await accounts.LoginAsync(m_ID, m_Password);
+        if (verified == null)
         {
             m_ErrorMessagePassword = Strings.LOGIN_VALIDATION_ERROR_PW_INVALID;
+            return;
+        }
+
+        if (verified.Value == false)
+        {
+            nav.NavigateTo($"/email-verify/required?id={Uri.EscapeDataString(m_ID)}");
             return;
         }
 

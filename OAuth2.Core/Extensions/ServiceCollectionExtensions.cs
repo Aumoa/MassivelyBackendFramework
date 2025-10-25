@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using OAuth2.Options;
 using OAuth2.Services;
 
-namespace OAuth2.Core.Extensions;
+namespace OAuth2.Extensions;
 
 public static class ServiceCollectionExtensions
 {

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
 using OAuth2.Components;
-using OAuth2.Core.Extensions;
+using OAuth2.Extensions;
 using OAuth2.Options;
 using OAuth2.Services;
 using OAuth2.SQL.Migration;
@@ -41,6 +41,9 @@ builder.Services.AddAuthorizationCore();
 
 builder.Services.AddHttpClient();
 builder.Services.AddOAuth2(builder.Configuration.GetRequiredSection("OAuth2"));
+
+builder.Services.Configure<EmailVerifyOptions>(builder.Configuration.GetRequiredSection("EmailVerify"));
+builder.Services.AddTransient<EmailVerify>();
 
 var app = builder.Build();
 

@@ -1,0 +1,34 @@
+﻿@page "/email-verify/redirect"
+@using OAuth2.Services
+@inject NavigationManager Nav
+@inject IAccounts Accounts
+@layout AuthorizeLayout
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "sub")]
+    public string Sub { get; set; } = null!;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "code")]
+    public string Code { get; set; } = null!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Sub) || string.IsNullOrWhiteSpace(Code))
+        {
+            Nav.NavigateTo("/error");
+            return;
+        }
+
+        bool verified = await Accounts.VerifyAsync(Sub, Code);
+        if (verified)
+        {
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            Nav.NavigateTo("/error");
+        }
+    }
+}

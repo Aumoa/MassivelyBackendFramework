@@ -70,6 +70,24 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Please visit the address below to complete email verification.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string EMAIL_VERIFY_MAIL_BODY {
+            get {
+                return ResourceManager.GetString("EMAIL_VERIFY_MAIL_BODY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   OAuth2 Email Verification과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string EMAIL_VERIFY_MAIL_SUBJECT {
+            get {
+                return ResourceManager.GetString("EMAIL_VERIFY_MAIL_SUBJECT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   An unknown error has occurred on the page.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string ERROR_TEXT_BODY {
@@ -147,6 +165,15 @@ namespace OAuth2.Localizations {
         internal static string LOGIN_LABEL_PW {
             get {
                 return ResourceManager.GetString("LOGIN_LABEL_PW", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   The ID or email is already in use.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_VALIDATION_ERROR_EMAIL_ALREADY_EXISTS {
+            get {
+                return ResourceManager.GetString("LOGIN_VALIDATION_ERROR_EMAIL_ALREADY_EXISTS", resourceCulture);
             }
         }
         
@@ -237,6 +264,24 @@ namespace OAuth2.Localizations {
         internal static string NAVMENU_LABEL_MANAGE_ACCOUNT {
             get {
                 return ResourceManager.GetString("NAVMENU_LABEL_MANAGE_ACCOUNT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Email verification has not been completed.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NO_EMAIL_VERIFIED_MESSAGE {
+            get {
+                return ResourceManager.GetString("NO_EMAIL_VERIFIED_MESSAGE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Authenticate again과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NO_EMAIL_VERIFIED_REVERIFY {
+            get {
+                return ResourceManager.GetString("NO_EMAIL_VERIFIED_REVERIFY", resourceCulture);
             }
         }
         

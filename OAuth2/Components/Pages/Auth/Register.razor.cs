@@ -1,6 +1,7 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Net.Mail;
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
-using OAuth2.DTO;
 using OAuth2.Localizations;
 using OAuth2.Services;
 
@@ -8,8 +9,8 @@ namespace OAuth2.Components.Pages.Auth;
 
 public partial class Register(
     IAccounts accounts,
-    IAccountClaims claims,
-    NavigationManager nav)
+    NavigationManager nav,
+    EmailVerify emailVerify)
 {
     private readonly struct RequestScope : IDisposable
     {
@@ -118,13 +119,27 @@ public partial class Register(
             return;
         }
 
-        await accounts.AddAsync(m_ID, m_Password);
-        await claims.AddClaimAsync(m_Name, ClaimNames.Name, m_Name);
-        await claims.AddClaimAsync(m_ID, ClaimNames.Email, m_Email);
-
-        if (string.IsNullOrEmpty(ReturnUrl) == false)
+        Interlocked.Increment(ref m_Requesting);
+        StateHasChanged();
+        try
         {
-            nav.NavigateTo(ReturnUrl);
+            var verifyCode = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+            var sub = await accounts.AddAsync(m_ID, m_Password, m_Name, m_Email, verifyCode);
+            await emailVerify.SendAsync(sub, verifyCode, new MailAddress(m_Email));
+
+            if (string.IsNullOrEmpty(ReturnUrl) == false)
+            {
+                nav.NavigateTo(ReturnUrl);
+            }
+        }
+        catch (Exception)
+        {
+            m_ErrorMessageId = Strings.LOGIN_VALIDATION_ERROR_EMAIL_ALREADY_EXISTS;
+        }
+        finally
+        {
+            Interlocked.Decrement(ref m_Requesting);
+            StateHasChanged();
         }
     }
 

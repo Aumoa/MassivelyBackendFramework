@@ -19,6 +19,12 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        if (string.IsNullOrWhiteSpace(Code))
+        {
+            Nav.NavigateTo("/error");
+            return;
+        }
+
         var formData = new Dictionary<string, string>()
         {
             ["grant_type"] = "authorization_code",

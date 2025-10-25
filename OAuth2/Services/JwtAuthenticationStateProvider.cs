@@ -33,14 +33,26 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
             }
 
             m_CurrentUser ??= new ClaimsPrincipal(new ClaimsIdentity());
-            var id = (await accesses.VerifyAsync(AccessToken!))!;
-
+            var accessToken = AccessToken;
+            if (string.IsNullOrEmpty(accessToken) == false)
             {
-                var claims = await accountClaims.GetClaimsAsync(id);
-                m_Name = claims.FirstOrDefault(p => p.Name == ClaimNames.Name).Value;
-                m_Email = claims.FirstOrDefault(p => p.Name == ClaimNames.Email).Value;
-                m_Picture = claims.FirstOrDefault(p => p.Name == ClaimNames.Picture).Value;
-                m_Sub = await accounts.GetSubAsync(id);
+                var id = (await accesses.VerifyAsync(accessToken))!;
+
+                {
+                    var raw = (await accounts.GetRawAccountAsync(id)).Value;
+                    var claims = await accountClaims.GetClaimsAsync(id);
+                    m_Sub = raw.Sub;
+                    m_Name = raw.Name;
+                    m_Email = raw.Email;
+                    m_Picture = claims.FirstOrDefault(p => p.Name == ClaimNames.Picture).Value;
+                }
+            }
+            else
+            {
+                m_Sub = null;
+                m_Name = null;
+                m_Email = null;
+                m_Picture = null;
             }
         }
 
@@ -48,8 +60,8 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
     }
 
     public string? AccessToken => m_CurrentUser?.Claims.FirstOrDefault(p => p.Type == "access_token")?.Value;
+    public string? Sub => m_Sub;
     public string? Name => m_Name;
     public string? Email => m_Email;
     public string? Picture => m_Picture;
-    public string? Sub => m_Sub;
 }

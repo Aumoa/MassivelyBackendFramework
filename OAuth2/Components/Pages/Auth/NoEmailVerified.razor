@@ -1,0 +1,37 @@
+﻿@page "/email-verify/required"
+@using OAuth2.Services
+@using System.Security.Cryptography
+@using System.Net.Mail
+@layout NotAuthorizedLayout
+@inject IAccounts Accounts
+@inject NavigationManager Nav
+@inject EmailVerify EmailVerify
+
+<div style="flex-direction: column;">
+    <h4>@Strings.NO_EMAIL_VERIFIED_MESSAGE</h4>
+    <button type="button" onclick="@OnClickReverifyAsync">@Strings.NO_EMAIL_VERIFIED_REVERIFY</button>
+</div>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "id")]
+    public required string ID { get; set; }
+
+    private async Task OnClickReverifyAsync()
+    {
+        var rawAccount = await Accounts.GetRawAccountAsync(ID);
+        if (rawAccount.HasValue == false)
+        {
+            Nav.NavigateTo("/error");
+            return;
+        }
+
+        var verifyCode = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+        if (await Accounts.RefreshVerifyCodeAsync(rawAccount.Value.Sub, verifyCode))
+        {
+            await EmailVerify.SendAsync(rawAccount.Value.Sub, verifyCode, new MailAddress(rawAccount.Value.Email));
+        }
+
+        Nav.NavigateTo("/");
+    }
+}
