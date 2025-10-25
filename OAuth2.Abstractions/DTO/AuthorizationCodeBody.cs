@@ -4,5 +4,6 @@ public record struct AuthorizationCodeBody(
     string AccountId,
     string ClientId,
     string Scope,
-    string RedirectUri
+    string RedirectUri,
+    string? Nonce
     );

@@ -61,6 +61,10 @@ public partial class Authorize(
     [SupplyParameterFromQuery(Name = "state")]
     public string? State { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "nonce")]
+    public string? Nonce { get; set; }
+
     private RenderStates m_RenderState = RenderStates.Id;
     private string m_ID = string.Empty;
     private string m_Password = string.Empty;
@@ -168,7 +172,7 @@ public partial class Authorize(
             return;
         }
 
-        var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(m_ID, ClientId, Scope, RedirectUri));
+        var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(m_ID, ClientId, Scope, RedirectUri, Nonce));
         var query = new Dictionary<string, string?>
         {
             ["code"] = code

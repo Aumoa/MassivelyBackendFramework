@@ -20,7 +20,8 @@ internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<R
             new("account_id", body.AccountId),
             new("client_id", body.ClientId),
             new("scope", body.Scope),
-            new("redirect_uri", body.RedirectUri)
+            new("redirect_uri", body.RedirectUri),
+            new("nonce", body.Nonce)
         ];
 
         await db.HashSetAsync(codeKey, entries).WaitAsync(cancellationToken);
@@ -44,6 +45,7 @@ internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<R
         string? clientId = null;
         string? scope = null;
         string? redirectUri = null;
+        string? nonce = null;  // nonce is optional
 
         foreach (var entry in entries)
         {
@@ -61,6 +63,9 @@ internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<R
                 case "redirect_uri":
                     redirectUri = entry.Value;
                     break;
+                case "nonce":
+                    nonce = entry.Value;
+                    break;
             }
         }
 
@@ -70,6 +75,6 @@ internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<R
             return null;
         }
 
-        return new AuthorizationCodeBody(accountId, clientId, scope, redirectUri);
+        return new AuthorizationCodeBody(accountId, clientId, scope, redirectUri, nonce);
     }
 }

@@ -95,6 +95,22 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         var rawAccount = await accounts.GetRawAccountAsync(code.Value.AccountId, cancellationToken);
         var claims = await accountClaims.GetClaimsAsync(code.Value.AccountId, cancellationToken);
 
+        var idTokenClaims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
+            new(JwtRegisteredClaimNames.Name, rawAccount.Value.Name),
+            new(JwtRegisteredClaimNames.Email, rawAccount.Value.Email),
+            new(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty),
+            new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+        };
+
+        if (!string.IsNullOrEmpty(code.Value.Nonce))
+        {
+            idTokenClaims.Add(new Claim(JwtRegisteredClaimNames.Nonce, code.Value.Nonce));
+        }
+
         var response = new TokenResponse
         {
             AccessToken = access.AccessToken,
@@ -102,15 +118,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             ExpiresIn = (int)ExpiresIn.TotalSeconds,
             Scope = access.Scope,
             RefreshToken = access.RefreshToken,
-            IdToken = jwt.Issue(code.Value.ClientId,
-                new Claim(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
-                new Claim(JwtRegisteredClaimNames.Name, rawAccount.Value.Name),
-                new Claim(JwtRegisteredClaimNames.Email, rawAccount.Value.Email),
-                new Claim(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty),
-                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new Claim(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new Claim(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
-                )
+            IdToken = jwt.Issue(code.Value.ClientId, [.. idTokenClaims])
         };
 
         return Ok(response);
