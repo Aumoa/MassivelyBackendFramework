@@ -21,7 +21,7 @@ internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<R
             new("client_id", body.ClientId),
             new("scope", body.Scope),
             new("redirect_uri", body.RedirectUri),
-            new("nonce", body.Nonce)
+            new("nonce", body.Nonce ?? string.Empty)
         ];
 
         await db.HashSetAsync(codeKey, entries).WaitAsync(cancellationToken);
