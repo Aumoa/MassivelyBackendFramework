@@ -1,13 +1,95 @@
 ﻿@using OAuth2.Services
 @inject JwtAuthenticationStateProvider Auth
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
-<span>@Auth.Name</span>
-<span style="padding-left: 6px;">(@Auth.Email)</span>
-<button type="button" class="link-button" onclick="@OnLogout">@Strings.PROFILECARD_LOGOUT</button>
+<div>
+    <img src="@Auth.Picture" alt="Profile" class="profile-img" @onclick="TogglePanel" />
+
+    @if (m_ShowPanel)
+    {
+        <div id="@PanelId" class="user-info-panel">
+            <div class="summary-panel">
+                <img src="@Auth.Picture" alt="Profile" class="profile-img-large" />
+                <div class="informations">
+                    <p class="user-info-name">@Auth.Name</p>
+                    <p class="user-info-email">@Auth.Email</p>
+                    <p class="user-info-sub">@ShortSub</p>
+                </div>
+            </div>
+            <hr />
+            <button onclick="@OnClick_Logout">
+                <span class="material-symbols-outlined">logout</span>
+                <span>@Strings.PROFILECARD_LOGOUT</span>
+            </button>
+        </div>
+    }
+</div>
 
 @code {
-    private void OnLogout()
+    private IJSObjectReference m_Module = null!;
+    private bool m_ShowPanel = false;
+    private DotNetObjectReference<ProfileCard> m_DotNetRef = null!;
+    private readonly string PanelId = $"usercard-panel-{Guid.NewGuid()}";
+
+    public string ShortSub
+    {
+        get
+        {
+            var sub = Auth.Sub;
+            if (sub == null)
+            {
+                return string.Empty;
+            }
+
+            return sub[..24] + "...";
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            m_Module = await JS.InvokeAsync<IJSObjectReference>("import", "./Components/Shared/ProfileCard.razor.js");
+            if (m_Module == null)
+            {
+                Nav.NavigateTo("/error", forceLoad: true);
+                return;
+            }
+
+            m_DotNetRef = DotNetObjectReference.Create(this);
+            await m_Module.InvokeVoidAsync("registerOutsideClick", m_DotNetRef, PanelId);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            m_DotNetRef?.Dispose();
+            if (m_Module != null)
+            {
+                await m_Module.DisposeAsync();
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    [JSInvokable]
+    public void OnOutsideClick()
+    {
+        m_ShowPanel = false;
+        StateHasChanged();
+    }
+
+    private void TogglePanel()
+    {
+        m_ShowPanel = !m_ShowPanel;
+    }
+
+    private void OnClick_Logout()
     {
         Nav.NavigateTo("/auth/logout", forceLoad: true);
     }
