@@ -35,7 +35,7 @@ public class WellKnownController(IJwt jwt) : ControllerBase
             issuer = jwt.Issuer,
             authorization_endpoint = jwt.Issuer + "/authorize",
             token_endpoint = jwt.Issuer + "/api/v1/token",
-            jwks_uri = "/.well-known/certs",
+            jwks_uri = jwt.Issuer + "/.well-known/certs",
             response_types_supported = (string[])["code", "token", "id_token"],
             subject_types_supported = (string[])["public"],
             id_token_signing_alg_values_supported = (string[])["RS256"],
