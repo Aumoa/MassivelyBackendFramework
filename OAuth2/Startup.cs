@@ -16,6 +16,15 @@ builder.Services.AddControllers();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    string[] supportedCultures = ["en", "ko"];
+    options.SetDefaultCulture("en")
+           .AddSupportedCultures(supportedCultures)
+           .AddSupportedUICultures(supportedCultures);
+});
+
 var dataProtection = builder.Configuration.GetSection("DataProtection");
 if (dataProtection.Exists())
 {
@@ -53,6 +62,8 @@ if (app.Environment.IsDevelopment() == false)
     app.UseExceptionHandler("/error", createScopeForErrors: true);
     app.UseHsts();
 }
+
+app.UseRequestLocalization();
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
