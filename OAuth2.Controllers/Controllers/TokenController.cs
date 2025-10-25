@@ -1,5 +1,6 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using OAuth2.DTO;
@@ -31,6 +32,36 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         if (code.Value.RedirectUri == request.RedirectUri == false)
         {
             return BadRequest(new { error = "invalid_grant" });
+        }
+
+        var authHeader = Request.Headers.Authorization.FirstOrDefault();
+        if (string.IsNullOrEmpty(authHeader) == false)
+        {
+            try
+            {
+                var encoded = authHeader.Substring("Basic ".Length);
+                var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+                var parts = decoded.Split(':');
+                if (parts.Length == 2)
+                {
+                    var clientId = Uri.UnescapeDataString(parts[0]);
+                    var clientSecret = Uri.UnescapeDataString(parts[1]);
+
+                    request = request with { ClientId = clientId, ClientSecret = clientSecret }; string.IsNullOrEmpty(clientSecret);
+
+                    request.ClientId = clientId;
+                    request.ClientSecret = clientSecret;
+                }
+            }
+            catch (Exception)
+            {
+                return BadRequest("Failed to decode Basic auth header.");
+            }
+        }
+
+        if (request.ClientSecret == null)
+        {
+            return BadRequest(new { error = "invalid_client_secret" });
         }
 
         if (request.ClientId == hostOptions.Value.ClientId)

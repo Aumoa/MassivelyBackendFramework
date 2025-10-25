@@ -14,8 +14,8 @@ public record TokenRequest
     public required string RedirectUri { get; set; }
 
     [FromForm(Name = "client_id")]
-    public required string ClientId { get; set; }
+    public string? ClientId { get; set; }
 
     [FromForm(Name = "client_secret")]
-    public required string ClientSecret { get; set; }
+    public string? ClientSecret { get; set; }
 }
