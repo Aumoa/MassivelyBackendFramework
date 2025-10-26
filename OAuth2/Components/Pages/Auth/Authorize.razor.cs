@@ -1,4 +1,6 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Threading;
 using BlazorSharedComponent;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -13,6 +15,8 @@ namespace OAuth2.Components.Pages.Auth;
 
 public partial class Authorize(
     IAccounts accounts,
+    IAccountClaims accountClaims,
+    IAccesses accesses,
     IAuthorizationCodes authorizationCodes,
     IOptions<HostOptions> hostOptions,
     IClients clients,
@@ -89,7 +93,7 @@ public partial class Authorize(
             return;
         }
 
-        if (ResponseType != "code")
+        if (ResponseType is not ("code" or "token"))
         {
             Error(Strings.ERRORS_UNSUPPORTED_RESPONSE_TYPE);
             return;
@@ -196,14 +200,34 @@ public partial class Authorize(
             return;
         }
 
-        var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(m_ID, ClientId, Scope, RedirectUri, Nonce));
-        var query = new Dictionary<string, string?>
-        {
-            ["code"] = code
-        };
+        var query = new Dictionary<string, string?>();
         if (string.IsNullOrEmpty(State) == false)
         {
             query.Add("state", State);
+        }
+
+        if (ResponseType == "code")
+        {
+            var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(m_ID, ClientId, Scope, RedirectUri, Nonce));
+            query.Add("code", code);
+        }
+        else if (ResponseType == "token")
+        {
+            var expiresIn = TimeSpan.FromHours(1);
+            var access = await accesses.WriteAccessAsync(m_ID, Scope, ClientId, expiresIn);
+            var rawAccount = await accounts.GetRawAccountAsync(m_ID);
+            var claims = await accountClaims.GetClaimsAsync(m_ID);
+
+            var idTokenClaims = new List<Claim>
+            {
+                new(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
+                new(JwtRegisteredClaimNames.Name, rawAccount.Value.Name),
+                new(JwtRegisteredClaimNames.Email, rawAccount.Value.Email),
+                new(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty),
+                new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(expiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+            };
         }
 
         var uri = QueryHelpers.AddQueryString(RedirectUri, query);
