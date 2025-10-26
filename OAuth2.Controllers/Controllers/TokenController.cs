@@ -108,29 +108,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         var rawAccount = await accounts.GetRawAccountAsync(code.Value.AccountId, cancellationToken);
         var claims = await accountClaims.GetClaimsAsync(code.Value.AccountId, cancellationToken);
 
-        var idTokenClaims = new List<Claim>
-        {
-            new(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
-            new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-            new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-            new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
-        };
-
-        if (code.Value.Scope.Contains("profile"))
-        {
-            idTokenClaims.Add(new(JwtRegisteredClaimNames.Name, rawAccount.Value.Name));
-            idTokenClaims.Add(new(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty));
-        }
-
-        if (code.Value.Scope.Contains("email"))
-        {
-            idTokenClaims.Add(new(JwtRegisteredClaimNames.Email, rawAccount.Value.Email));
-        }
-
-        if (!string.IsNullOrEmpty(code.Value.Nonce))
-        {
-            idTokenClaims.Add(new Claim(JwtRegisteredClaimNames.Nonce, code.Value.Nonce));
-        }
+        var idTokenClaims = ConfigureClaims(rawAccount.Value, code.Value.Scope, claims, code.Value.Nonce);
 
         var response = new TokenResponse
         {
@@ -162,24 +140,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         var rawAccount = await accounts.GetRawAccountAsync(id!, cancellationToken);
         var claims = await accountClaims.GetClaimsAsync(id!, cancellationToken);
 
-        var idTokenClaims = new List<Claim>
-        {
-            new(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
-            new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-            new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-            new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
-        };
-
-        if (newAccess.Value.Scope.Contains("profile"))
-        {
-            idTokenClaims.Add(new(JwtRegisteredClaimNames.Name, rawAccount.Value.Name));
-            idTokenClaims.Add(new(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty));
-        }
-
-        if (newAccess.Value.Scope.Contains("email"))
-        {
-            idTokenClaims.Add(new(JwtRegisteredClaimNames.Email, rawAccount.Value.Email));
-        }
+        var idTokenClaims = ConfigureClaims(rawAccount.Value, newAccess.Value.Scope, claims, null);
 
         var response = new TokenResponse
         {
@@ -192,5 +153,57 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         };
 
         return Ok(response);
+    }
+
+    private Claim[] ConfigureClaims(in RawAccount account, string scope, AccountClaim[] claims, string? nonce)
+    {
+        var idTokenClaims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+        };
+
+        if (scope.Contains("openid"))
+        {
+            idTokenClaims.Add(new(JwtRegisteredClaimNames.Sub, account.Sub));
+        }
+
+        if (scope.Contains("profile"))
+        {
+            idTokenClaims.Add(new(JwtRegisteredClaimNames.Name, account.Name));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.Picture));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.FamilyName));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.GivenName));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.MiddleName));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.Nickname));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.PreferredUsername));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.Profile));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.Website));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.Gender));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.Birthdate));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.ZoneInfo));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.Locale));
+            idTokenClaims.Add(GetClaim(JwtRegisteredClaimNames.UpdatedAt));
+        }
+        else
+        {
+            if (scope.Contains("email"))
+            {
+                idTokenClaims.Add(new(JwtRegisteredClaimNames.Email, account.Email));
+            }
+        }
+
+        if (!string.IsNullOrEmpty(nonce))
+        {
+            idTokenClaims.Add(new Claim(JwtRegisteredClaimNames.Nonce, nonce));
+        }
+
+        return [.. idTokenClaims];
+
+        Claim GetClaim(string claimName)
+        {
+            return new Claim(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty);
+        }
     }
 }
