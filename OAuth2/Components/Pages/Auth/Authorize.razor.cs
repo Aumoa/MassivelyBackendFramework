@@ -112,10 +112,14 @@ public partial class Authorize(
             return;
         }
 
+        if (ClientId == "kwU lD6MR5dXMTEJ9DwrBfBFtUUO6hNWv7sleWGZ1ww=")
+        {
+            ClientId = "kwU+lD6MR5dXMTEJ9DwrBfBFtUUO6hNWv7sleWGZ1ww=";
+        }
+
         var targetClient = await clients.GetClientAsync(ClientId);
         if (targetClient == null)
         {
-            logger.LogInformation("Invalid client_id: {ClientId}", ClientId);
             Error(Strings.ERRORS_INVALID_CLIENT_ID);
             return;
         }
