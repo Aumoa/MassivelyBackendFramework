@@ -4,7 +4,7 @@
 <div class="login-form">
     <div style="display:flex; flex-direction:row; gap:10px; padding-bottom: 20px;">
         <h2 class="title">
-            @Strings.LOGIN_FORM_TITLE
+            @string.Format(Strings.LOGIN_FORM_TITLE, m_ClientName)
         </h2>
         <form class="input-form" @onsubmit="OnContinueAsync">
             <SelectorContainer View="m_RenderState">

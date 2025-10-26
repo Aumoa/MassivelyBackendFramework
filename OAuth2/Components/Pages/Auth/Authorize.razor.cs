@@ -71,6 +71,7 @@ public partial class Authorize(
     public string? Nonce { get; set; }
 
     private RenderStates m_RenderState = RenderStates.Id;
+    private string m_ClientName = string.Empty;
     private string m_ID = string.Empty;
     private string m_Password = string.Empty;
     private int m_Requesting = 0;
@@ -103,6 +104,7 @@ public partial class Authorize(
         {
             if (RedirectUri == hostOptions.Value.Uri + "/redirect")
             {
+                m_ClientName = "OAuth2";
                 return;
             }
 
@@ -130,6 +132,7 @@ public partial class Authorize(
             return;
         }
 
+        m_ClientName = targetClient.Value.Name;
         return;
 
         void Error(string message)

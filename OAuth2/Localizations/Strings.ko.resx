@@ -133,7 +133,7 @@
     <value>뒤로</value>
   </data>
   <data name="LOGIN_FORM_TITLE" xml:space="preserve">
-    <value>로그인</value>
+    <value>{0}에 로그인</value>
   </data>
   <data name="LOGIN_LABEL_EMAIL" xml:space="preserve">
     <value>이메일</value>
@@ -142,7 +142,7 @@
     <value>ID</value>
   </data>
   <data name="LOGIN_LABEL_NAME" xml:space="preserve">
-    <value>이름</value>
+    <value>전체 이름</value>
   </data>
   <data name="LOGIN_LABEL_PW" xml:space="preserve">
     <value>암호</value>

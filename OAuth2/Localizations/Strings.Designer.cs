@@ -169,7 +169,7 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
-        ///   LOGIN과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Login to {0}과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_FORM_TITLE {
             get {
@@ -196,7 +196,7 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
-        ///   Name과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Full name과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_LABEL_NAME {
             get {

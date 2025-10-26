@@ -133,7 +133,7 @@
     <value>Return</value>
   </data>
   <data name="LOGIN_FORM_TITLE" xml:space="preserve">
-    <value>LOGIN</value>
+    <value>Login to {0}</value>
   </data>
   <data name="LOGIN_LABEL_EMAIL" xml:space="preserve">
     <value>Email</value>
@@ -142,7 +142,7 @@
     <value>ID</value>
   </data>
   <data name="LOGIN_LABEL_NAME" xml:space="preserve">
-    <value>Name</value>
+    <value>Full name</value>
   </data>
   <data name="LOGIN_LABEL_PW" xml:space="preserve">
     <value>Password</value>
