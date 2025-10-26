@@ -18,9 +18,22 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] TokenRequest request, CancellationToken cancellationToken)
     {
-        if (request.GrantType != "authorization_code")
+        switch (request.GrantType)
         {
-            return BadRequest(new { error = "unsupported_grant_type" });
+            case "authorization_code":
+                return await HandleAuthorizeCodeAsync(request, cancellationToken);
+            case "refresh_token":
+                return await HandleRefreshTokenAsync(request, cancellationToken);
+            default:
+                return BadRequest(new { error = "unsupported_grant_type" });
+        }
+    }
+
+    private async ValueTask<IActionResult> HandleAuthorizeCodeAsync(TokenRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Code == null)
+        {
+            return BadRequest(new { error = "invalid_grant" });
         }
 
         var code = await authorizationCodes.PopAsync(request.Code, cancellationToken);
@@ -124,14 +137,33 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         return Ok(response);
     }
 
-    [HttpPost("refresh")]
-    public async ValueTask<IActionResult> RefreshAsync([FromForm] TokenRefreshRequest request, CancellationToken cancellationToken)
+    private async ValueTask<IActionResult> HandleRefreshTokenAsync(TokenRequest request, CancellationToken cancellationToken)
     {
+        if (request.RefreshToken == null)
+        {
+            return BadRequest(new { error = "invalid_refresh_token" });
+        }
+
         var newAccess = await accesses.RefreshAccessAsync(request.RefreshToken, ExpiresIn, cancellationToken);
         if (newAccess.HasValue == false)
         {
             return BadRequest(new { error = "invalid_refresh_token" });
         }
+
+        var id = await accesses.VerifyAsync(newAccess.Value.AccessToken, cancellationToken);
+        var rawAccount = await accounts.GetRawAccountAsync(id!, cancellationToken);
+        var claims = await accountClaims.GetClaimsAsync(id!, cancellationToken);
+
+        var idTokenClaims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
+            new(JwtRegisteredClaimNames.Name, rawAccount.Value.Name),
+            new(JwtRegisteredClaimNames.Email, rawAccount.Value.Email),
+            new(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty),
+            new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+        };
 
         var response = new TokenResponse
         {
@@ -140,7 +172,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             ExpiresIn = (int)ExpiresIn.TotalSeconds,
             Scope = newAccess.Value.Scope,
             RefreshToken = newAccess.Value.RefreshToken,
-            IdToken = jwt.Issue(newAccess.Value.ClientId)
+            IdToken = jwt.Issue(newAccess.Value.ClientId, [.. idTokenClaims])
         };
 
         return Ok(response);

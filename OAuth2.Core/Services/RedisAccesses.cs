@@ -97,7 +97,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
 
         return new Access
         {
-            AccessToken = accessToken!,
+            AccessToken = newAccessToken!,
             RefreshToken = refreshToken,
             Scope = results[0]!,
             ClientId = results[1]!
