@@ -162,7 +162,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-            new(JwtRegisteredClaimNames.EmailVerified, "true")
+            new(JwtRegisteredClaimNames.EmailVerified, "true", ClaimValueTypes.Boolean)
         };
 
         if (scope.Contains("openid"))
