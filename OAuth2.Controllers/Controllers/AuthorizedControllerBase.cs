@@ -5,9 +5,14 @@ namespace OAuth2.Controllers;
 
 public class AuthorizedControllerBase(IAccesses accesses) : ControllerBase
 {
-    protected async ValueTask<IActionResult> VerifiedAsync(Func<string, ValueTask<IActionResult>> body, CancellationToken cancellationToken)
+    protected async ValueTask<IActionResult> VerifiedAsync(Func<string, ValueTask<IActionResult>> body, string? accessToken, CancellationToken cancellationToken)
     {
         var token = Request.Headers.Authorization.ToString();
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            token = accessToken ?? string.Empty;
+        }
+
         if (token.StartsWith("Bearer "))
         {
             token = token["Bearer ".Length..];

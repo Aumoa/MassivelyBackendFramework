@@ -1,6 +1,5 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Threading;
 using BlazorSharedComponent;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -21,8 +20,7 @@ public partial class Authorize(
     IOptions<HostOptions> hostOptions,
     IClients clients,
     IClientClaims clientClaims,
-    NavigationManager nav,
-    ILogger<Authorize> logger)
+    NavigationManager nav)
 {
     private enum RenderStates
     {
@@ -128,7 +126,6 @@ public partial class Authorize(
         var allowedUris = claims.Where(p => p.Name == "redirect_uri");
         if (allowedUris.Any(p => p.Value == RedirectUri) == false)
         {
-            logger.LogInformation("Invalid redirect_uri: {RedirectUri}", RedirectUri);
             Error(Strings.ERRORS_INVALID_REDIRECT_URI);
             return;
         }

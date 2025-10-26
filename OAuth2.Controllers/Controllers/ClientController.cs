@@ -18,6 +18,6 @@ public class ClientController(IClients clients, IAccesses accesses) : Authorized
             {
                 Id = clientId
             });
-        },cancellationToken);
+        }, null, cancellationToken);
     }
 }

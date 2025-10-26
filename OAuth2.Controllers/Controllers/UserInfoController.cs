@@ -11,7 +11,7 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
 {
     [HttpGet]
     [HttpPost]
-    public async ValueTask<IActionResult> GetAsync(CancellationToken cancellationToken)
+    public async ValueTask<IActionResult> GetAsync([FromForm] UserInfoRequest request, CancellationToken cancellationToken)
     {
         return await VerifiedAsync(async accountId =>
         {
@@ -23,6 +23,6 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
                 rawAccount.Email,
                 accountClaims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value
                 ));
-        }, cancellationToken);
+        }, request.AccessToken, cancellationToken);
     }
 }
