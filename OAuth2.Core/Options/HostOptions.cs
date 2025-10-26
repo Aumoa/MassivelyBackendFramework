@@ -5,4 +5,6 @@ public record HostOptions
     public required string ClientId { get; init; }
 
     public required string Secret { get; init; }
+
+    public required string Uri { get; init; }
 }

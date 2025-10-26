@@ -1,4 +1,5 @@
-﻿using BlazorSharedComponent;
+﻿using System.IdentityModel.Tokens.Jwt;
+using BlazorSharedComponent;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.WebUtilities;
@@ -15,6 +16,7 @@ public partial class Authorize(
     IAuthorizationCodes authorizationCodes,
     IOptions<HostOptions> hostOptions,
     IClients clients,
+    IClientClaims clientClaims,
     NavigationManager nav)
 {
     private enum RenderStates
@@ -83,26 +85,48 @@ public partial class Authorize(
     {
         if (string.IsNullOrWhiteSpace(ResponseType) || string.IsNullOrWhiteSpace(RedirectUri) || string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope))
         {
-            nav.NavigateTo("/error");
+            Error(Strings.ERRORS_BAD_REQUEST);
             return;
         }
 
         if (ResponseType != "code")
         {
-            nav.NavigateTo("/error");
+            Error(Strings.ERRORS_UNSUPPORTED_RESPONSE_TYPE);
             return;
         }
 
-        if (ClientId == hostOptions.Value.ClientId && RedirectUri == nav.BaseUri + "redirect")
+        // hosting service
+        if (ClientId == hostOptions.Value.ClientId)
         {
+            if (RedirectUri == hostOptions.Value.Uri + "/redirect")
+            {
+                return;
+            }
+
+            Error(Strings.ERRORS_INVALID_REDIRECT_URI);
             return;
         }
 
         var targetClient = await clients.GetClientAsync(ClientId);
         if (targetClient == null)
         {
-            nav.NavigateTo("/error");
+            Error(Strings.ERRORS_INVALID_CLIENT_ID);
             return;
+        }
+
+        var claims = await clientClaims.GetClaimsAsync(ClientId);
+        var allowedUris = claims.Where(p => p.Name == "redirect_uri");
+        if (allowedUris.Any(p => p.Value == RedirectUri) == false)
+        {
+            Error(Strings.ERRORS_INVALID_REDIRECT_URI);
+            return;
+        }
+
+        return;
+
+        void Error(string message)
+        {
+            nav.NavigateTo($"/error?error={Uri.EscapeDataString(message)}");
         }
     }
 

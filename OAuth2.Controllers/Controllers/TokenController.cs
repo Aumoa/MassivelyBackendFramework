@@ -39,7 +39,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         {
             try
             {
-                var encoded = authHeader.Substring("Basic ".Length);
+                var encoded = authHeader["Basic ".Length..];
                 var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
                 var parts = decoded.Split(':');
                 if (parts.Length == 2)

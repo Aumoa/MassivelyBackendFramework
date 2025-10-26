@@ -1,4 +1,49 @@
 ﻿@page "/error"
 @layout NotAuthorizedLayout
+@inject NavigationManager Nav
 
-<h4>@Strings.ERROR_TEXT_BODY</h4>
+<div class="error-container">
+    <p class="material-symbols-outlined error-icon @m_ShakeClass" @onclick="Shake">error</p>
+    <h4>@Strings.ERRORS_TEXT_BODY</h4>
+    <p>@ErrorText</p>
+    @if (ShowReturnMain)
+    {
+        <button @onclick="ReturnMain">@Strings.ERRORS_BUTTON_RETURN_TO_MAIN</button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? ErrorText { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "return_main")]
+    public bool ShowReturnMain { get; set; }
+
+    private string m_ShakeClass = string.Empty;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Shake();
+        }
+    }
+
+    private async void Shake()
+    {
+        m_ShakeClass = "shake";
+        StateHasChanged();
+
+        await Task.Delay(TimeSpan.FromSeconds(0.4));
+
+        m_ShakeClass = string.Empty;
+        StateHasChanged();
+    }
+
+    private void ReturnMain()
+    {
+        Nav.NavigateTo("/", forceLoad: true);
+    }
+}

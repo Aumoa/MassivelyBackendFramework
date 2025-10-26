@@ -88,11 +88,56 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
-        ///   An unknown error has occurred on the page.과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Some required parameters were not passed correctly.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
-        internal static string ERROR_TEXT_BODY {
+        internal static string ERRORS_BAD_REQUEST {
             get {
-                return ResourceManager.GetString("ERROR_TEXT_BODY", resourceCulture);
+                return ResourceManager.GetString("ERRORS_BAD_REQUEST", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Return to main과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERRORS_BUTTON_RETURN_TO_MAIN {
+            get {
+                return ResourceManager.GetString("ERRORS_BUTTON_RETURN_TO_MAIN", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   The client ID is invalid.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERRORS_INVALID_CLIENT_ID {
+            get {
+                return ResourceManager.GetString("ERRORS_INVALID_CLIENT_ID", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   The &apos;redirect_uri&apos; is not authorized.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERRORS_INVALID_REDIRECT_URI {
+            get {
+                return ResourceManager.GetString("ERRORS_INVALID_REDIRECT_URI", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   An error has occurred on the page.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERRORS_TEXT_BODY {
+            get {
+                return ResourceManager.GetString("ERRORS_TEXT_BODY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Unsupported response type.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERRORS_UNSUPPORTED_RESPONSE_TYPE {
+            get {
+                return ResourceManager.GetString("ERRORS_UNSUPPORTED_RESPONSE_TYPE", resourceCulture);
             }
         }
         

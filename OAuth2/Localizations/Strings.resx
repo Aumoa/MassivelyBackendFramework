@@ -120,8 +120,8 @@
   <data name="APP_TITLE" xml:space="preserve">
     <value>OAuth2</value>
   </data>
-  <data name="ERROR_TEXT_BODY" xml:space="preserve">
-    <value>An unknown error has occurred on the page.</value>
+  <data name="ERRORS_TEXT_BODY" xml:space="preserve">
+    <value>An error has occurred on the page.</value>
   </data>
   <data name="LOGIN_BUTTON_CONTINUE" xml:space="preserve">
     <value>Continue</value>
@@ -197,5 +197,20 @@
   </data>
   <data name="EMAIL_VERIFY_MAIL_BODY" xml:space="preserve">
     <value>Please visit the address below to complete email verification.</value>
+  </data>
+  <data name="ERRORS_BUTTON_RETURN_TO_MAIN" xml:space="preserve">
+    <value>Return to main</value>
+  </data>
+  <data name="ERRORS_BAD_REQUEST" xml:space="preserve">
+    <value>Some required parameters were not passed correctly.</value>
+  </data>
+  <data name="ERRORS_UNSUPPORTED_RESPONSE_TYPE" xml:space="preserve">
+    <value>Unsupported response type.</value>
+  </data>
+  <data name="ERRORS_INVALID_REDIRECT_URI" xml:space="preserve">
+    <value>The 'redirect_uri' is not authorized.</value>
+  </data>
+  <data name="ERRORS_INVALID_CLIENT_ID" xml:space="preserve">
+    <value>The client ID is invalid.</value>
   </data>
 </root>
