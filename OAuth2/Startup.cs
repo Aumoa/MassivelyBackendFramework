@@ -82,7 +82,10 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-await StartMigrationAsync(app.Lifetime.ApplicationStopping);
+if (app.Environment.IsDevelopment())
+{
+    await StartMigrationAsync(app.Lifetime.ApplicationStopping);
+}
 
 app.Run();
 

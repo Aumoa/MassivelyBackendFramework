@@ -21,7 +21,8 @@ public partial class Authorize(
     IOptions<HostOptions> hostOptions,
     IClients clients,
     IClientClaims clientClaims,
-    NavigationManager nav)
+    NavigationManager nav,
+    ILogger<Authorize> logger)
 {
     private enum RenderStates
     {
@@ -114,6 +115,7 @@ public partial class Authorize(
         var targetClient = await clients.GetClientAsync(ClientId);
         if (targetClient == null)
         {
+            logger.LogInformation("Invalid client_id: {ClientId}", ClientId);
             Error(Strings.ERRORS_INVALID_CLIENT_ID);
             return;
         }
@@ -122,6 +124,7 @@ public partial class Authorize(
         var allowedUris = claims.Where(p => p.Name == "redirect_uri");
         if (allowedUris.Any(p => p.Value == RedirectUri) == false)
         {
+            logger.LogInformation("Invalid redirect_uri: {RedirectUri}", RedirectUri);
             Error(Strings.ERRORS_INVALID_REDIRECT_URI);
             return;
         }

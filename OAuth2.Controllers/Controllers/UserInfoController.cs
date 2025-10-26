@@ -10,6 +10,7 @@ namespace OAuth2.Controllers;
 public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccountClaims claims) : AuthorizedControllerBase(accesses)
 {
     [HttpGet]
+    [HttpPost]
     public async ValueTask<IActionResult> GetAsync(CancellationToken cancellationToken)
     {
         return await VerifiedAsync(async accountId =>
