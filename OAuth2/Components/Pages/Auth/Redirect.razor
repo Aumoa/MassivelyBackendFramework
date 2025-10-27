@@ -69,12 +69,15 @@
             SameSite = SameSiteMode.Strict
         });
 
-        httpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
+        if (tokenResponse.IdToken != null)
         {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict
-        });
+            httpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict
+            });
+        }
 
         Nav.NavigateTo("/", forceLoad: true);
     }

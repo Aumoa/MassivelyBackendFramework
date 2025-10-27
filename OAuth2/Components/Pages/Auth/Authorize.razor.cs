@@ -334,7 +334,7 @@ public partial class Authorize(
                 redirect_uri += '#';
             }
 
-            redirect_uri += $"error={Uri.EscapeDataString("login required")}";
+            redirect_uri += $"error={Uri.EscapeDataString("login_required")}";
             if (string.IsNullOrEmpty(State) == false)
             {
                 redirect_uri += $"&state={Uri.EscapeDataString(State)}";
