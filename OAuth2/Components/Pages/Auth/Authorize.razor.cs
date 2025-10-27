@@ -239,7 +239,7 @@ public partial class Authorize(
             {
                 if (Prompt == "none")
                 {
-                    _ = ContinueWithCachedAsync();
+                    await ContinueWithCachedAsync();
                 }
                 else
                 {
