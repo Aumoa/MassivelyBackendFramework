@@ -155,10 +155,11 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         return Ok(response);
     }
 
-    private static Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] claims, string? nonce)
+    private Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] claims, string? nonce)
     {
         var idTokenClaims = new List<Claim>
         {
+            new(JwtRegisteredClaimNames.Iss, jwt.Issuer),
             new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
