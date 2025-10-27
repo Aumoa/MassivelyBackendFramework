@@ -54,11 +54,11 @@ internal class Jwt : IJwt
 
     public TimeSpan ExpiresIn => m_ExpiresIn;
 
-    public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool includeMetadata)
+    public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken)
     {
         var idTokenClaims = new List<Claim>();
 
-        if (includeMetadata)
+        if (idToken)
         {
             idTokenClaims.AddRange([
                 new(JwtRegisteredClaimNames.Iss, Issuer),
@@ -69,14 +69,14 @@ internal class Jwt : IJwt
         }
 
         HashSet<string> expectedClaims = [];
+        expectedClaims.Add(JwtRegisteredClaimNames.Sub);
 
-        foreach (var scope in scopes.Split(' '))
+        HashSet<string> scopesSet = scopes.Split(' ').ToHashSet();
+
+        foreach (var scope in scopesSet)
         {
             switch (scope)
             {
-                case "openid":
-                    AddOpenId();
-                    break;
                 case "profile":
                     AddProfile();
                     break;
@@ -84,18 +84,12 @@ internal class Jwt : IJwt
                     AddEmail();
                     break;
                 case "all":
-                    AddOpenId();
                     AddProfile();
                     AddEmail();
                     break;
             }
 
             continue;
-
-            void AddOpenId()
-            {
-                expectedClaims.Add(JwtRegisteredClaimNames.Sub);
-            }
 
             void AddProfile()
             {
@@ -117,8 +111,11 @@ internal class Jwt : IJwt
 
             void AddEmail()
             {
-                expectedClaims.Add(JwtRegisteredClaimNames.Email);
-                expectedClaims.Add(JwtRegisteredClaimNames.EmailVerified);
+                if (idToken == false || scopesSet.Contains("all") || scopesSet.Contains("profile"))
+                {
+                    expectedClaims.Add(JwtRegisteredClaimNames.Email);
+                    expectedClaims.Add(JwtRegisteredClaimNames.EmailVerified);
+                }
             }
         }
 

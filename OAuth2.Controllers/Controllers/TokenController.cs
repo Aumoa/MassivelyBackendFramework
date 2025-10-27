@@ -102,6 +102,12 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         var rawAccount = await accounts.GetRawAccountAsync(code.Value.AccountId, cancellationToken);
         var claims = await accountClaims.GetClaimsAsync(code.Value.AccountId, cancellationToken);
 
+        string? idToken = null;
+        if (code.Value.Scope.Split(' ').Any(p => p == "openid"))
+        {
+            idToken = jwt.Issue(code.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, claims, code.Value.Nonce, true));
+        }
+
         var response = new TokenResponse
         {
             AccessToken = access.AccessToken,
@@ -109,7 +115,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
             Scope = access.Scope,
             RefreshToken = access.RefreshToken,
-            IdToken = jwt.Issue(code.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, claims, code.Value.Nonce, true))
+            IdToken = idToken
         };
 
         return Ok(response);

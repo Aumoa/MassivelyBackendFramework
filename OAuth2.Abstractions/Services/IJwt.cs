@@ -11,6 +11,6 @@ public interface IJwt
     string KId { get; }
     TimeSpan ExpiresIn { get; }
 
-    Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool includeMetadata);
+    Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken);
     string Issue(string audience, params Claim[] claims);
 }

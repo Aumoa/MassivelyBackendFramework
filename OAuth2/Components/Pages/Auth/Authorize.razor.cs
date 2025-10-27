@@ -300,12 +300,12 @@ public partial class Authorize(
             return;
         }
 
-        await ContinueWithAsync(m_ID);
+        await ContinueWithAsync(m_ID, true);
     }
 
     private async Task ContinueWithCachedAsync()
     {
-        await ContinueWithAsync(CachedId);
+        await ContinueWithAsync(CachedId, false);
     }
 
     private void ResetCached()
@@ -314,7 +314,7 @@ public partial class Authorize(
         StateHasChanged();
     }
 
-    private async Task ContinueWithAsync(string id)
+    private async Task ContinueWithAsync(string id, bool refreshCache)
     {
         var query = new Dictionary<string, string?>();
         string? frag = null;
@@ -339,11 +339,16 @@ public partial class Authorize(
             frag = $"#access_token={Uri.EscapeDataString(access.AccessToken)}&id_token={Uri.EscapeDataString(idToken)}&token_type=Bearer&expires_in={(int)jwt.ExpiresIn.TotalSeconds}&scope={Uri.EscapeDataString(access.Scope)}";
         }
 
+        var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query) + frag;
+        if (refreshCache)
         {
-            var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query) + frag;
             var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", "/authorize/int", null));
 
             nav.NavigateTo($"/authorize/int?redirect_uri={Uri.EscapeDataString(redirect_uri)}&code={Uri.EscapeDataString(code)}", forceLoad: true);
+        }
+        else
+        {
+            nav.NavigateTo(redirect_uri, forceLoad: true);
         }
     }
 

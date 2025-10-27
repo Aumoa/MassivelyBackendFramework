@@ -20,5 +20,5 @@ public record TokenResponse
     public required string RefreshToken { get; set; }
 
     [JsonPropertyName("id_token")]
-    public required string IdToken { get; set; }
+    public required string? IdToken { get; set; }
 }
