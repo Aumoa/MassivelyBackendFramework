@@ -103,7 +103,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         var claims = await accountClaims.GetClaimsAsync(code.Value.AccountId, cancellationToken);
 
         string? idToken = null;
-        if (code.Value.Scope.Split(' ').Any(p => p == "openid"))
+        if (code.Value.Scope.Split(' ').Any(p => p is "openid" or "all"))
         {
             idToken = jwt.Issue(code.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, claims, code.Value.Nonce, true));
         }

@@ -73,6 +73,10 @@ public partial class Authorize(
     [SupplyParameterFromQuery(Name = "nonce")]
     public string? Nonce { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "prompt")]
+    public string? Prompt { get; set; }
+
     private JwtSecurityToken? m_CachedJwt;
 
     public string CachedId => m_CachedJwt?.Claims.FirstOrDefault(p => p.Type == "id")?.Value ?? string.Empty;
@@ -149,6 +153,12 @@ public partial class Authorize(
             }
 
             m_ClientName = targetClient.Value.Name;
+        }
+
+        if (Prompt == "login")
+        {
+            // does not use cached login
+            return;
         }
 
         try
