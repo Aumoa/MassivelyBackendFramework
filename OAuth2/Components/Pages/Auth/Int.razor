@@ -44,7 +44,7 @@
                     new Claim("access_token", access.AccessToken),
                     new Claim("refresh_token", access.RefreshToken),
                     new Claim("id", code.Value.AccountId),
-                    .. Jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, claims, null)
+                    .. Jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, claims, null, true)
                 ]);
 
                 httpContext.Response.Cookies.Append("cached_jwt", jwt, new CookieOptions

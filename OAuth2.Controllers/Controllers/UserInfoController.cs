@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
 using OAuth2.DTO;
 using OAuth2.Services;
 
@@ -16,8 +17,21 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
         {
             var rawAccount = (await accounts.GetRawAccountAsync(access.Id)).Value!;
             var accountClaims = await claims.GetClaimsAsync(access.Id, cancellationToken);
-            var scopedClaims = jwt.ConfigureClaims(rawAccount, access.Scope, accountClaims, null);
-            return Ok(scopedClaims.ToDictionary(c => c.Type, c => c.Value));
+            var scopedClaims = jwt.ConfigureClaims(rawAccount, access.Scope, accountClaims, null, false);
+            return Ok(scopedClaims.ToDictionary(c => c.Type, c => GetClaimValue(c)));
         }, request.AccessToken, cancellationToken);
+
+        static object GetClaimValue(Claim claim)
+        {
+            switch (claim.ValueType)
+            {
+                case ClaimValueTypes.Boolean:
+                    return bool.Parse(claim.Value);
+                case ClaimValueTypes.Integer64:
+                    return long.Parse(claim.Value);
+                default:
+                    return claim.Value;
+            }
+        }
     }
 }

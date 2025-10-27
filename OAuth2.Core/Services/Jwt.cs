@@ -54,15 +54,19 @@ internal class Jwt : IJwt
 
     public TimeSpan ExpiresIn => m_ExpiresIn;
 
-    public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce)
+    public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool includeMetadata)
     {
-        var idTokenClaims = new List<Claim>
+        var idTokenClaims = new List<Claim>();
+
+        if (includeMetadata)
         {
-            new(JwtRegisteredClaimNames.Iss, Issuer),
-            new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-            new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(m_ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-            new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
-        };
+            idTokenClaims.AddRange([
+                new(JwtRegisteredClaimNames.Iss, Issuer),
+                new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(m_ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+            ]);
+        }
 
         HashSet<string> expectedClaims = [];
 

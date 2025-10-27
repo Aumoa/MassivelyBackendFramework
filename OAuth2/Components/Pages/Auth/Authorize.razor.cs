@@ -334,7 +334,7 @@ public partial class Authorize(
             var access = await accesses.WriteAccessAsync(id, Scope, ClientId, expiresIn);
             var rawAccount = await accounts.GetRawAccountAsync(id);
             var claims = await accountClaims.GetClaimsAsync(id);
-            var idTokenClaims = jwt.ConfigureClaims(rawAccount.Value, Scope, claims, Nonce);
+            var idTokenClaims = jwt.ConfigureClaims(rawAccount.Value, Scope, claims, Nonce, true);
             var idToken = jwt.Issue(ClientId, idTokenClaims);
             frag = $"#access_token={Uri.EscapeDataString(access.AccessToken)}&id_token={Uri.EscapeDataString(idToken)}&token_type=Bearer&expires_in={(int)jwt.ExpiresIn.TotalSeconds}&scope={Uri.EscapeDataString(access.Scope)}";
         }
