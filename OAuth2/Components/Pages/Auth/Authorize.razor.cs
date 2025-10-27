@@ -317,6 +317,7 @@ public partial class Authorize(
     private async Task ContinueWithAsync(string id)
     {
         var query = new Dictionary<string, string?>();
+        string? frag = null;
         if (string.IsNullOrEmpty(State) == false)
         {
             query.Add("state", State);
@@ -335,14 +336,11 @@ public partial class Authorize(
             var claims = await accountClaims.GetClaimsAsync(id);
             var idTokenClaims = jwt.ConfigureClaims(rawAccount.Value, Scope, claims, Nonce);
             var idToken = jwt.Issue(ClientId, idTokenClaims);
-            query.Add("access_token", idToken);
-            query.Add("token_type", "Bearer");
-            query.Add("expires_in", ((int)jwt.ExpiresIn.TotalSeconds).ToString());
-            query.Add("scope", access.Scope);
+            frag = $"#access_token={Uri.EscapeDataString(access.AccessToken)}&id_token={Uri.EscapeDataString(idToken)}&token_type=Bearer&expires_in={(int)jwt.ExpiresIn.TotalSeconds}&scope={Uri.EscapeDataString(access.Scope)}";
         }
 
         {
-            var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query);
+            var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query) + frag;
             var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", "/authorize/int", null));
 
             nav.NavigateTo($"/authorize/int?redirect_uri={Uri.EscapeDataString(redirect_uri)}&code={Uri.EscapeDataString(code)}", forceLoad: true);
