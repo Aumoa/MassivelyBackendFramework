@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using OAuth2.DTO;
 using OAuth2.Options;
 
 namespace OAuth2.Services;
@@ -50,6 +51,122 @@ internal class Jwt : IJwt
     public string Exponent => m_Exponent;
 
     public string KId => m_KId;
+
+    public TimeSpan ExpiresIn => m_ExpiresIn;
+
+    public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce)
+    {
+        var idTokenClaims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Iss, Issuer),
+            new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(m_ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+        };
+
+        HashSet<string> expectedClaims = [];
+
+        foreach (var scope in scopes.Split(' '))
+        {
+            switch (scope)
+            {
+                case "openid":
+                    AddOpenId();
+                    break;
+                case "profile":
+                    AddProfile();
+                    break;
+                case "email":
+                    AddEmail();
+                    break;
+                case "all":
+                    AddOpenId();
+                    AddProfile();
+                    AddEmail();
+                    break;
+            }
+
+            continue;
+
+            void AddOpenId()
+            {
+                expectedClaims.Add(JwtRegisteredClaimNames.Sub);
+            }
+
+            void AddProfile()
+            {
+                expectedClaims.Add(JwtRegisteredClaimNames.Name);
+                expectedClaims.Add(JwtRegisteredClaimNames.Picture);
+                expectedClaims.Add(JwtRegisteredClaimNames.FamilyName);
+                expectedClaims.Add(JwtRegisteredClaimNames.GivenName);
+                expectedClaims.Add(JwtRegisteredClaimNames.MiddleName);
+                expectedClaims.Add(JwtRegisteredClaimNames.Nickname);
+                expectedClaims.Add(JwtRegisteredClaimNames.PreferredUsername);
+                expectedClaims.Add(JwtRegisteredClaimNames.Profile);
+                expectedClaims.Add(JwtRegisteredClaimNames.Website);
+                expectedClaims.Add(JwtRegisteredClaimNames.Gender);
+                expectedClaims.Add(JwtRegisteredClaimNames.Birthdate);
+                expectedClaims.Add(JwtRegisteredClaimNames.ZoneInfo);
+                expectedClaims.Add(JwtRegisteredClaimNames.Locale);
+                expectedClaims.Add(JwtRegisteredClaimNames.UpdatedAt);
+            }
+
+            void AddEmail()
+            {
+                expectedClaims.Add(JwtRegisteredClaimNames.Email);
+                expectedClaims.Add(JwtRegisteredClaimNames.EmailVerified);
+            }
+        }
+
+        var claimNames = accountClaims.ToDictionary(v => v.Name, v => v.Value);
+        claimNames.Add(JwtRegisteredClaimNames.Email, account.Email);
+        claimNames.Add(JwtRegisteredClaimNames.EmailVerified, "true");
+
+        foreach (var expectedClaim in expectedClaims)
+        {
+            switch (expectedClaim)
+            {
+                case JwtRegisteredClaimNames.Sub:
+                    idTokenClaims.Add(new(JwtRegisteredClaimNames.Sub, account.Sub));
+                    break;
+                case JwtRegisteredClaimNames.Name:
+                    idTokenClaims.Add(new(JwtRegisteredClaimNames.Name, account.Name));
+                    break;
+                case JwtRegisteredClaimNames.UpdatedAt:
+                    var updatedAt = (DateTimeOffset)accountClaims.Select(p => p.CreatedAt).Append(account.CreatedAt).Max();
+                    idTokenClaims.Add(new Claim(JwtRegisteredClaimNames.UpdatedAt, updatedAt.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
+                    break;
+                default:
+                    if (claimNames.TryGetValue(expectedClaim, out var value))
+                    {
+                        idTokenClaims.Add(new Claim(expectedClaim, value, ValueTypeMatch.GetValueOrDefault(expectedClaim, ClaimValueTypes.String)));
+                    }
+                    else
+                    {
+                        switch (expectedClaim)
+                        {
+                            case JwtRegisteredClaimNames.Picture:
+                                idTokenClaims.Add(new Claim(expectedClaim, "https://assets.ayla.r-e.kr/img/profile.png"));
+                                break;
+                        }
+                    }
+                    break;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(nonce))
+        {
+            idTokenClaims.Add(new Claim(JwtRegisteredClaimNames.Nonce, nonce));
+        }
+
+        return [.. idTokenClaims];
+    }
+
+    private static readonly IReadOnlyDictionary<string, string> ValueTypeMatch = new Dictionary<string, string>()
+    {
+        [JwtRegisteredClaimNames.Birthdate] = ClaimValueTypes.Integer64,
+        [JwtRegisteredClaimNames.EmailVerified] = ClaimValueTypes.Boolean
+    };
 
     public string Issue(string audience, params Claim[] claims)
     {

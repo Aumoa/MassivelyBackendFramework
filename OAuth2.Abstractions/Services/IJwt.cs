@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using OAuth2.DTO;
 
 namespace OAuth2.Services;
 
@@ -8,6 +9,8 @@ public interface IJwt
     string Modulus { get; }
     string Exponent { get; }
     string KId { get; }
+    TimeSpan ExpiresIn { get; }
 
+    Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce);
     string Issue(string audience, params Claim[] claims);
 }

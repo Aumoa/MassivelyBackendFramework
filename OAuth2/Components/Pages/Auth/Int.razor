@@ -1,0 +1,72 @@
+﻿@page "/authorize/int"
+@using Microsoft.Extensions.Options
+@using OAuth2.Services
+@using OAuth2.Options
+@using System.Security.Claims
+@inject IAccesses Accesses
+@inject IAuthorizationCodes AuthorizationCodes
+@inject NavigationManager Nav
+@inject IJwt Jwt
+@inject IAccounts Accounts
+@inject IAccountClaims AccountClaims
+@inject IHttpContextAccessor HttpContextAccessor
+@inject ILogger<Int> Logger
+@inject IOptions<HostOptions> HostOptions
+@layout AuthorizeLayout
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "redirect_uri")]
+    public string RedirectUri { get; set; } = null!;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "code")]
+    public string Code { get; set; } = null!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var code = await AuthorizationCodes.PopAsync(Code);
+        if (code.HasValue == false)
+        {
+            Error(Strings.ERRORS_INVALID_ACCESS);
+            return;
+        }
+
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext != null)
+        {
+            try
+            {
+                var access = await Accesses.WriteAccessAsync(code.Value.AccountId, code.Value.Scope, code.Value.ClientId, Jwt.ExpiresIn);
+                var rawAccount = await Accounts.GetRawAccountAsync(code.Value.AccountId);
+                var claims = await AccountClaims.GetClaimsAsync(code.Value.AccountId);
+                var jwt = Jwt.Issue(HostOptions.Value.ClientId, [
+                    new Claim("access_token", access.AccessToken),
+                    new Claim("refresh_token", access.RefreshToken),
+                    new Claim("id", code.Value.AccountId),
+                    .. Jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, claims, null)
+                ]);
+
+                httpContext.Response.Cookies.Append("cached_jwt", jwt, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Lax,
+                    Expires = DateTimeOffset.UtcNow.Add(Jwt.ExpiresIn)
+                });
+            }
+            catch (Exception e)
+            {
+                Logger.LogWarning("Failed to cache access token: {Message}", e.Message);
+            }
+        }
+
+        Nav.NavigateTo(RedirectUri, forceLoad: true);
+        return;
+
+        void Error(string message)
+        {
+            Nav.NavigateTo($"/error?error={Uri.EscapeDataString(message)}");
+        }
+    }
+}

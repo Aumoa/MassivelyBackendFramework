@@ -213,4 +213,13 @@
   <data name="ERRORS_INVALID_CLIENT_ID" xml:space="preserve">
     <value>올바르지 않은 클라이언트 ID입니다.</value>
   </data>
+  <data name="ERRORS_INVALID_ACCESS" xml:space="preserve">
+    <value>잘못된 접근입니다.</value>
+  </data>
+  <data name="LOGIN_CONTINUE_WITH_CACHED_ID" xml:space="preserve">
+    <value>'{0}' 계정으로 계속</value>
+  </data>
+  <data name="LOGIN_CONTINUE_WITH_LOGIN" xml:space="preserve">
+    <value>다른 계정으로 계속</value>
+  </data>
 </root>

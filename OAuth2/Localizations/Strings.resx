@@ -213,4 +213,13 @@
   <data name="ERRORS_INVALID_CLIENT_ID" xml:space="preserve">
     <value>The client ID is invalid.</value>
   </data>
+  <data name="ERRORS_INVALID_ACCESS" xml:space="preserve">
+    <value>Invalid access.</value>
+  </data>
+  <data name="LOGIN_CONTINUE_WITH_CACHED_ID" xml:space="preserve">
+    <value>Continue with '{0}' account</value>
+  </data>
+  <data name="LOGIN_CONTINUE_WITH_LOGIN" xml:space="preserve">
+    <value>Use another account</value>
+  </data>
 </root>

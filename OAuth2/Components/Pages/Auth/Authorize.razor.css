@@ -49,6 +49,30 @@
     margin-top: 12px;
 }
 
+.cached-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+    .cached-container button {
+        border-radius: 2px;
+        text-align: left;
+    }
+
+    .cached-container button:last-child {
+        align-self: flex-end;
+    }
+
+.profile-img {
+    width: 28px;
+    height: 28px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    cursor: pointer;
+}
+
 @keyframes fade-in {
     from {
         opacity: 0;

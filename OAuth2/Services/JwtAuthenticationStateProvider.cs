@@ -34,10 +34,6 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor) : Aut
                     m_Name = m_CurrentUser.FindFirstValue(JwtRegisteredClaimNames.Name);
                     m_Email = m_CurrentUser.FindFirstValue(JwtRegisteredClaimNames.Email);
                     m_Picture = m_CurrentUser.FindFirstValue(JwtRegisteredClaimNames.Picture);
-                    if (string.IsNullOrEmpty(m_Picture))
-                    {
-                        m_Picture = "https://assets.ayla.r-e.kr/img/profile.png";
-                    }
                 }
             }
 

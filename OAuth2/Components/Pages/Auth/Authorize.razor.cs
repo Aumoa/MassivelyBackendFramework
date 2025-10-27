@@ -20,7 +20,10 @@ public partial class Authorize(
     IOptions<HostOptions> hostOptions,
     IClients clients,
     IClientClaims clientClaims,
-    NavigationManager nav)
+    NavigationManager nav,
+    IHttpContextAccessor accessor,
+    ILogger<Authorize> logger,
+    IJwt jwt)
 {
     private enum RenderStates
     {
@@ -70,6 +73,11 @@ public partial class Authorize(
     [SupplyParameterFromQuery(Name = "nonce")]
     public string? Nonce { get; set; }
 
+    private JwtSecurityToken? m_CachedJwt;
+
+    public string CachedId => m_CachedJwt?.Claims.FirstOrDefault(p => p.Type == "id")?.Value ?? string.Empty;
+    public string CachedPicture => m_CachedJwt?.Claims.FirstOrDefault(p => p.Type == JwtRegisteredClaimNames.Picture)?.Value ?? string.Empty;
+
     private RenderStates m_RenderState = RenderStates.Id;
     private string m_ClientName = string.Empty;
     private string m_ID = string.Empty;
@@ -87,6 +95,11 @@ public partial class Authorize(
 
     protected override async Task OnParametersSetAsync()
     {
+        if (string.IsNullOrEmpty(m_ClientName) == false)
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(ResponseType) || string.IsNullOrWhiteSpace(RedirectUri) || string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope))
         {
             Error(Strings.ERRORS_BAD_REQUEST);
@@ -105,34 +118,114 @@ public partial class Authorize(
             if (RedirectUri == hostOptions.Value.Uri + "/redirect")
             {
                 m_ClientName = "OAuth2";
+            }
+            else
+            {
+                Error(Strings.ERRORS_INVALID_REDIRECT_URI);
+                return;
+            }
+        }
+        else
+        {
+            // TODO: Support openid-conformance
+            if (ClientId == "kwU lD6MR5dXMTEJ9DwrBfBFtUUO6hNWv7sleWGZ1ww=")
+            {
+                ClientId = "kwU+lD6MR5dXMTEJ9DwrBfBFtUUO6hNWv7sleWGZ1ww=";
+            }
+
+            var targetClient = await clients.GetClientAsync(ClientId);
+            if (targetClient == null)
+            {
+                Error(Strings.ERRORS_INVALID_CLIENT_ID);
                 return;
             }
 
-            Error(Strings.ERRORS_INVALID_REDIRECT_URI);
-            return;
+            var claims = await clientClaims.GetClaimsAsync(ClientId);
+            var allowedUris = claims.Where(p => p.Name == "redirect_uri");
+            if (allowedUris.Any(p => p.Value == RedirectUri) == false)
+            {
+                Error(Strings.ERRORS_INVALID_REDIRECT_URI);
+                return;
+            }
+
+            m_ClientName = targetClient.Value.Name;
         }
 
-        if (ClientId == "kwU lD6MR5dXMTEJ9DwrBfBFtUUO6hNWv7sleWGZ1ww=")
+        try
         {
-            ClientId = "kwU+lD6MR5dXMTEJ9DwrBfBFtUUO6hNWv7sleWGZ1ww=";
-        }
+            var httpContext = accessor.HttpContext;
+            if (httpContext != null)
+            {
+                try
+                {
+                    if (httpContext.Request.Cookies.TryGetValue("cached_jwt", out var cachedJwt) == false)
+                    {
+                        return;
+                    }
 
-        var targetClient = await clients.GetClientAsync(ClientId);
-        if (targetClient == null)
+                    var handler = new JwtSecurityTokenHandler();
+                    m_CachedJwt = handler.ReadJwtToken(cachedJwt);
+
+                    var access_token = m_CachedJwt.Claims.FirstOrDefault(p => p.Type == "access_token")?.Value;
+                    if (access_token == null)
+                    {
+                        DeleteCache();
+                        return;
+                    }
+
+                    var verified = await accesses.VerifyAsync(access_token);
+                    if (verified == null)
+                    {
+                        var refresh_token = m_CachedJwt.Claims.FirstOrDefault(p => p.Type == "refresh_token")?.Value;
+                        if (refresh_token == null)
+                        {
+                            DeleteCache();
+                            return;
+                        }
+
+                        var newAccess = await accesses.RefreshAccessAsync(refresh_token, jwt.ExpiresIn);
+                        if (newAccess.HasValue == false)
+                        {
+                            DeleteCache();
+                            return;
+                        }
+
+                        var except = m_CachedJwt.Claims.Where(p => p.Type != "access_token");
+                        var newJwt = jwt.Issue(hostOptions.Value.ClientId, [.. except, new Claim("access_token", newAccess.Value.AccessToken)]);
+
+                        httpContext.Response.Cookies.Append("cached_jwt", newJwt, new CookieOptions
+                        {
+                            HttpOnly = true,
+                            Secure = true,
+                            SameSite = SameSiteMode.Lax,
+                            Expires = DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)
+                        });
+                    }
+
+                    void DeleteCache()
+                    {
+                        m_CachedJwt = null;
+                        httpContext.Response.Cookies.Delete("cached_jwt", new CookieOptions
+                        {
+                            HttpOnly = true,
+                            Secure = true,
+                            SameSite = SameSiteMode.Lax,
+                            Expires = DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)
+                        });
+                    }
+                }
+                catch (Exception e)
+                {
+                    logger.LogWarning("Failed to export cached jwt token. {Message}", e.Message);
+                    m_CachedJwt = null;
+                }
+            }
+        }
+        finally
         {
-            Error(Strings.ERRORS_INVALID_CLIENT_ID);
-            return;
+            StateHasChanged();
         }
 
-        var claims = await clientClaims.GetClaimsAsync(ClientId);
-        var allowedUris = claims.Where(p => p.Name == "redirect_uri");
-        if (allowedUris.Any(p => p.Value == RedirectUri) == false)
-        {
-            Error(Strings.ERRORS_INVALID_REDIRECT_URI);
-            return;
-        }
-
-        m_ClientName = targetClient.Value.Name;
         return;
 
         void Error(string message)
@@ -207,6 +300,22 @@ public partial class Authorize(
             return;
         }
 
+        await ContinueWithAsync(m_ID);
+    }
+
+    private async Task ContinueWithCachedAsync()
+    {
+        await ContinueWithAsync(CachedId);
+    }
+
+    private void ResetCached()
+    {
+        m_CachedJwt = null;
+        StateHasChanged();
+    }
+
+    private async Task ContinueWithAsync(string id)
+    {
         var query = new Dictionary<string, string?>();
         if (string.IsNullOrEmpty(State) == false)
         {
@@ -215,30 +324,29 @@ public partial class Authorize(
 
         if (ResponseType == "code")
         {
-            var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(m_ID, ClientId, Scope, RedirectUri, Nonce));
+            var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, ClientId, Scope, RedirectUri, Nonce));
             query.Add("code", code);
         }
         else if (ResponseType == "token")
         {
             var expiresIn = TimeSpan.FromHours(1);
-            var access = await accesses.WriteAccessAsync(m_ID, Scope, ClientId, expiresIn);
-            var rawAccount = await accounts.GetRawAccountAsync(m_ID);
-            var claims = await accountClaims.GetClaimsAsync(m_ID);
-
-            var idTokenClaims = new List<Claim>
-            {
-                new(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
-                new(JwtRegisteredClaimNames.Name, rawAccount.Value.Name),
-                new(JwtRegisteredClaimNames.Email, rawAccount.Value.Email),
-                new(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty),
-                new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(expiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
-            };
+            var access = await accesses.WriteAccessAsync(id, Scope, ClientId, expiresIn);
+            var rawAccount = await accounts.GetRawAccountAsync(id);
+            var claims = await accountClaims.GetClaimsAsync(id);
+            var idTokenClaims = jwt.ConfigureClaims(rawAccount.Value, Scope, claims, Nonce);
+            var idToken = jwt.Issue(ClientId, idTokenClaims);
+            query.Add("access_token", idToken);
+            query.Add("token_type", "Bearer");
+            query.Add("expires_in", ((int)jwt.ExpiresIn.TotalSeconds).ToString());
+            query.Add("scope", access.Scope);
         }
 
-        var uri = QueryHelpers.AddQueryString(RedirectUri, query);
-        nav.NavigateTo(uri, forceLoad: true);
+        {
+            var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query);
+            var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", "/authorize/int", null));
+
+            nav.NavigateTo($"/authorize/int?redirect_uri={Uri.EscapeDataString(redirect_uri)}&code={Uri.EscapeDataString(code)}", forceLoad: true);
+        }
     }
 
     private async Task OnContinue_StateIdAsync()

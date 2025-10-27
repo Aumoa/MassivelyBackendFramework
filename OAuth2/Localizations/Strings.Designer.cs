@@ -106,6 +106,15 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Invalid access.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERRORS_INVALID_ACCESS {
+            get {
+                return ResourceManager.GetString("ERRORS_INVALID_ACCESS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   The client ID is invalid.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string ERRORS_INVALID_CLIENT_ID {
@@ -165,6 +174,24 @@ namespace OAuth2.Localizations {
         internal static string LOGIN_BUTTON_RETURN {
             get {
                 return ResourceManager.GetString("LOGIN_BUTTON_RETURN", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Continue with &apos;{0}&apos; account과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONTINUE_WITH_CACHED_ID {
+            get {
+                return ResourceManager.GetString("LOGIN_CONTINUE_WITH_CACHED_ID", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Use another account과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONTINUE_WITH_LOGIN {
+            get {
+                return ResourceManager.GetString("LOGIN_CONTINUE_WITH_LOGIN", resourceCulture);
             }
         }
         
