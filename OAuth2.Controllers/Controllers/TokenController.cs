@@ -128,9 +128,9 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_refresh_token" });
         }
 
-        var id = await accesses.VerifyAsync(newAccess.Value.AccessToken, cancellationToken);
-        var rawAccount = await accounts.GetRawAccountAsync(id!, cancellationToken);
-        var claims = await accountClaims.GetClaimsAsync(id!, cancellationToken);
+        var access = await accesses.VerifyAsync(newAccess.Value.AccessToken, cancellationToken);
+        var rawAccount = await accounts.GetRawAccountAsync(access.Value.Id, cancellationToken);
+        var claims = await accountClaims.GetClaimsAsync(access.Value.Id, cancellationToken);
 
         var response = new TokenResponse
         {

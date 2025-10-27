@@ -1,11 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using OAuth2.DTO;
 using OAuth2.Services;
 
 namespace OAuth2.Controllers;
 
 public class AuthorizedControllerBase(IAccesses accesses) : ControllerBase
 {
-    protected async ValueTask<IActionResult> VerifiedAsync(Func<string, ValueTask<IActionResult>> body, string? accessToken, CancellationToken cancellationToken)
+    protected async ValueTask<IActionResult> VerifiedAsync(Func<Access, ValueTask<IActionResult>> body, string? accessToken, CancellationToken cancellationToken)
     {
         var token = Request.Headers.Authorization.ToString();
         if (string.IsNullOrWhiteSpace(token))
@@ -23,12 +24,12 @@ public class AuthorizedControllerBase(IAccesses accesses) : ControllerBase
             return Unauthorized("Authorization header is not included.");
         }
 
-        var ownerId = await accesses.VerifyAsync(token, cancellationToken);
-        if (ownerId == null)
+        var access = await accesses.VerifyAsync(token, cancellationToken);
+        if (access.HasValue == false)
         {
             return Unauthorized("access_token is expired.");
         }
 
-        return await body(ownerId);
+        return await body(access.Value);
     }
 }

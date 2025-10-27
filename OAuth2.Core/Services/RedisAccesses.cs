@@ -32,6 +32,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
 
         return new Access
         {
+            Id = id,
             AccessToken = accessToken,
             RefreshToken = refreshToken,
             Scope = scope,
@@ -42,10 +43,12 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
     private static readonly RedisValue[] VerifyFields =
     [
         "access_token",
-        "account_id"
+        "account_id",
+        "scope",
+        "client_id"
     ];
 
-    public async ValueTask<string?> VerifyAsync(string accessToken, CancellationToken cancellationToken = default)
+    public async ValueTask<Access?> VerifyAsync(string accessToken, CancellationToken cancellationToken = default)
     {
         var db = GetDatabase();
 
@@ -68,7 +71,14 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
             return null;
         }
 
-        return fields[1];
+        return new Access
+        {
+            Id = fields[1]!,
+            AccessToken = accessToken,
+            RefreshToken = refreshToken!,
+            Scope = fields[2]!,
+            ClientId = fields[3]!
+        };
     }
 
     public async ValueTask<Access?> RefreshAccessAsync(string refreshToken, TimeSpan expire, CancellationToken cancellationToken = default)
@@ -90,17 +100,18 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         accessKey = KeyNames.Access(newAccessToken);
         _ = batch.StringSetAsync(accessKey, refreshToken, expire);
         _ = batch.HashSetAsync(refreshKey, "access_token", newAccessToken);
-        var resultsTask = batch.HashGetAsync(refreshKey, ["scope", "client_id"]).WaitAsync(cancellationToken);
+        var resultsTask = batch.HashGetAsync(refreshKey, ["account_id", "scope", "client_id"]).WaitAsync(cancellationToken);
 
         batch.Execute();
         var results = await resultsTask;
 
         return new Access
         {
+            Id = results[0]!,
             AccessToken = newAccessToken!,
             RefreshToken = refreshToken,
-            Scope = results[0]!,
-            ClientId = results[1]!
+            Scope = results[1]!,
+            ClientId = results[2]!
         };
     }
 }

@@ -11,9 +11,9 @@ public class ClientController(IClients clients, IAccesses accesses) : Authorized
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] CreateClientRequest request, CancellationToken cancellationToken)
     {
-        return await VerifiedAsync(async ownerId =>
+        return await VerifiedAsync(async access =>
         {
-            string clientId = await clients.AddClientAsync(request.Name, ownerId, [], cancellationToken);
+            string clientId = await clients.AddClientAsync(request.Name, access.Id, [], cancellationToken);
             return Ok(new CreateClientResponse
             {
                 Id = clientId
