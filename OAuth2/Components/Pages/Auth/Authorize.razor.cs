@@ -233,12 +233,14 @@ public partial class Authorize(
         }
         finally
         {
-            StateHasChanged();
-        }
-
-        if (Prompt == "none")
-        {
-            _ = ContinueWithCachedAsync();
+            if (Prompt == "none")
+            {
+                _ = ContinueWithCachedAsync();
+            }
+            else
+            {
+                StateHasChanged();
+            }
         }
 
         return;
