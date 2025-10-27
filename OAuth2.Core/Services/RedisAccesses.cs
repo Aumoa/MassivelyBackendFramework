@@ -9,6 +9,14 @@ namespace OAuth2.Services;
 
 internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(options.Value), IAccesses
 {
+    private static readonly RedisValue[] Fields =
+    [
+        "access_token",
+        "account_id",
+        "scope",
+        "client_id"
+    ];
+
     public async ValueTask<Access> WriteAccessAsync(string id, string scope, string clientId, TimeSpan expire, CancellationToken cancellationToken = default)
     {
         var db = GetDatabase();
@@ -40,14 +48,6 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         };
     }
 
-    private static readonly RedisValue[] VerifyFields =
-    [
-        "access_token",
-        "account_id",
-        "scope",
-        "client_id"
-    ];
-
     public async ValueTask<Access?> VerifyAsync(string accessToken, CancellationToken cancellationToken = default)
     {
         var db = GetDatabase();
@@ -60,8 +60,8 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         }
 
         var refreshKey = KeyNames.Refresh(refreshToken!);
-        var fields = await db.HashGetAsync(refreshKey, VerifyFields).WaitAsync(cancellationToken);
-        if (fields.Length != VerifyFields.Length)
+        var fields = await db.HashGetAsync(refreshKey, Fields).WaitAsync(cancellationToken);
+        if (fields.Length != Fields.Length)
         {
             return null;
         }
@@ -93,25 +93,46 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
 
         var batch = db.CreateBatch();
 
-        var accessKey = KeyNames.Access(accessToken!);
-        _ = batch.KeyDeleteAsync(accessKey).WaitAsync(cancellationToken);
-
         var newAccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        accessKey = KeyNames.Access(newAccessToken);
-        _ = batch.StringSetAsync(accessKey, refreshToken, expire);
-        _ = batch.HashSetAsync(refreshKey, "access_token", newAccessToken);
+        var newRefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+        var accessKey = KeyNames.Access(newAccessToken);
+
+        _ = batch.StringSetAsync(accessKey, newRefreshToken, expire);
         var resultsTask = batch.HashGetAsync(refreshKey, ["account_id", "scope", "client_id"]).WaitAsync(cancellationToken);
 
         batch.Execute();
         var results = await resultsTask;
 
+        var prevRefreshKey = refreshKey;
+        refreshKey = KeyNames.Refresh(newRefreshToken);
+        await db.HashSetAsync(refreshKey, [
+            new("access_token", newAccessToken),
+            new("account_id", results[0]!),
+            new("scope", results[1]!),
+            new("client_id", results[2]!)
+            ]).WaitAsync(cancellationToken);
+
+        CleanupAsync();
+
         return new Access
         {
             Id = results[0]!,
-            AccessToken = newAccessToken!,
-            RefreshToken = refreshToken,
+            AccessToken = newAccessToken,
+            RefreshToken = newRefreshToken,
             Scope = results[1]!,
             ClientId = results[2]!
         };
+
+        async void CleanupAsync()
+        {
+            var batch = db.CreateBatch();
+
+            _ = batch.KeyDeleteAsync(KeyNames.Access(accessToken!));
+            var task = batch.KeyDeleteAsync(prevRefreshKey);
+
+            batch.Execute();
+            await task;
+        }
     }
 }

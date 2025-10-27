@@ -55,6 +55,8 @@ builder.Services.AddOAuth2(builder.Configuration.GetRequiredSection("OAuth2"));
 builder.Services.Configure<EmailVerifyOptions>(builder.Configuration.GetRequiredSection("EmailVerify"));
 builder.Services.AddTransient<EmailVerify>();
 
+builder.Services.AddScoped<ScopedSemaphore>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

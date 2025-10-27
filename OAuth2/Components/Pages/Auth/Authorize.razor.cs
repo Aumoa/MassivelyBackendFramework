@@ -23,6 +23,7 @@ public partial class Authorize(
     NavigationManager nav,
     IHttpContextAccessor accessor,
     ILogger<Authorize> logger,
+    ScopedSemaphore semaphore,
     IJwt jwt)
 {
     private enum RenderStates
@@ -101,13 +102,15 @@ public partial class Authorize(
 
     protected override async Task OnParametersSetAsync()
     {
-        if (string.IsNullOrEmpty(m_ClientName) == false)
-        {
-            return;
-        }
+        await semaphore.WaitAsync();
 
         try
         {
+            if (string.IsNullOrEmpty(m_ClientName) == false)
+            {
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(ResponseType) || string.IsNullOrWhiteSpace(RedirectUri) || string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope))
             {
                 Error(Strings.ERRORS_BAD_REQUEST);
@@ -204,8 +207,8 @@ public partial class Authorize(
                                 return;
                             }
 
-                            var except = m_CachedJwt.Claims.Where(p => p.Type != "access_token");
-                            var newJwt = jwt.Issue(hostOptions.Value.ClientId, [.. except, new Claim("access_token", newAccess.Value.AccessToken)]);
+                            var except = m_CachedJwt.Claims.Where(p => p.Type is not ("access_token" or "refresh_token"));
+                            var newJwt = jwt.Issue(hostOptions.Value.ClientId, [.. except, new Claim("access_token", newAccess.Value.AccessToken), new Claim("refresh_token", newAccess.Value.RefreshToken)]);
 
                             httpContext.Response.Cookies.Append("cached_jwt", newJwt, new CookieOptions
                             {
@@ -257,6 +260,7 @@ public partial class Authorize(
         finally
         {
             HasParametersSet = true;
+            semaphore.Release();
         }
     }
 
