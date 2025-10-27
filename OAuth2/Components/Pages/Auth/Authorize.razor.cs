@@ -211,29 +211,34 @@ public partial class Authorize(
                             Expires = DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)
                         });
                     }
-
-                    void DeleteCache()
-                    {
-                        m_CachedJwt = null;
-                        httpContext.Response.Cookies.Delete("cached_jwt", new CookieOptions
-                        {
-                            HttpOnly = true,
-                            Secure = true,
-                            SameSite = SameSiteMode.Lax,
-                            Expires = DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)
-                        });
-                    }
                 }
                 catch (Exception e)
                 {
                     logger.LogWarning("Failed to export cached jwt token. {Message}", e.Message);
                     m_CachedJwt = null;
                 }
+
+                void DeleteCache()
+                {
+                    m_CachedJwt = null;
+                    httpContext.Response.Cookies.Delete("cached_jwt", new CookieOptions
+                    {
+                        HttpOnly = true,
+                        Secure = true,
+                        SameSite = SameSiteMode.Lax,
+                        Expires = DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)
+                    });
+                }
             }
         }
         finally
         {
             StateHasChanged();
+        }
+
+        if (Prompt == "none")
+        {
+            _ = ContinueWithCachedAsync();
         }
 
         return;
@@ -315,7 +320,30 @@ public partial class Authorize(
 
     private async Task ContinueWithCachedAsync()
     {
-        await ContinueWithAsync(CachedId, false);
+        if (m_CachedJwt == null)
+        {
+            var redirect_uri = RedirectUri;
+            if (ResponseType == "code")
+            {
+                redirect_uri += '?';
+            }
+            else
+            {
+                redirect_uri += '#';
+            }
+
+            redirect_uri += $"error={Uri.EscapeDataString("login required")}";
+            if (string.IsNullOrEmpty(State) == false)
+            {
+                redirect_uri += $"&state={Uri.EscapeDataString(State)}";
+            }
+
+            nav.NavigateTo(redirect_uri, forceLoad: true);
+        }
+        else
+        {
+            await ContinueWithAsync(CachedId, false);
+        }
     }
 
     private void ResetCached()
