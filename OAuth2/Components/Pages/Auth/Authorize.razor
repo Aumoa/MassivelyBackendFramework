@@ -1,61 +1,64 @@
 ﻿@page "/authorize"
 @layout AuthorizeLayout
 
-<div class="login-form">
-    <div style="display:flex; flex-direction:row; gap:10px; padding-bottom: 20px;">
-        <h2 class="title">
-            @string.Format(Strings.LOGIN_FORM_TITLE, m_ClientName)
-        </h2>
-        @if (m_CachedJwt == null)
-        {
-            <form class="input-form" @onsubmit="OnContinueAsync">
-                <SelectorContainer View="m_RenderState">
-                    <SelectorView Key="RenderStates.Id">
-                        <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_ID" @bind-Value="m_ID" Input="@OnChangedAsync" HasError="@IdError" />
-                    </SelectorView>
-                    <SelectorView Key="RenderStates.Login">
-                        <div style="display:flex; flex-direction:column; gap:10px;">
-                            <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_ID" Value="@m_ID" Disabled="true" />
-                            <FloatingInput @ref="m_InputPassword" Type="password" Placeholder="@Strings.LOGIN_LABEL_PW" @bind-Value="m_Password" Input="@OnChangedAsync" HasError="@PasswordError" />
-                        </div>
-                    </SelectorView>
-                </SelectorContainer>
-                <div>
-                    @foreach (var error in GetErrorMessages())
-                    {
-                        <p class="error-message">
-                            <span class="material-symbols-outlined error-message">error</span>
-                            <span class="error-message">@error</span>
-                        </p>
-                    }
+@if (HasParametersSet)
+{
+    <div class="login-form">
+        <div style="display:flex; flex-direction:row; gap:10px; padding-bottom: 20px;">
+            <h2 class="title">
+                @string.Format(Strings.LOGIN_FORM_TITLE, m_ClientName)
+            </h2>
+            @if (m_CachedJwt == null)
+            {
+                <form class="input-form" @onsubmit="OnContinueAsync">
+                    <SelectorContainer View="m_RenderState">
+                        <SelectorView Key="RenderStates.Id">
+                            <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_ID" @bind-Value="m_ID" Input="@OnChangedAsync" HasError="@IdError" />
+                        </SelectorView>
+                        <SelectorView Key="RenderStates.Login">
+                            <div style="display:flex; flex-direction:column; gap:10px;">
+                                <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_ID" Value="@m_ID" Disabled="true" />
+                                <FloatingInput @ref="m_InputPassword" Type="password" Placeholder="@Strings.LOGIN_LABEL_PW" @bind-Value="m_Password" Input="@OnChangedAsync" HasError="@PasswordError" />
+                            </div>
+                        </SelectorView>
+                    </SelectorContainer>
+                    <div>
+                        @foreach (var error in GetErrorMessages())
+                        {
+                            <p class="error-message">
+                                <span class="material-symbols-outlined error-message">error</span>
+                                <span class="error-message">@error</span>
+                            </p>
+                        }
+                    </div>
+                    <div class="login-buttons-row">
+                        @if (m_RenderState is RenderStates.Id)
+                        {
+                            <button type="button" onclick="@OnRegister">@Strings.LOGIN_BUTTON_REGISTER</button>
+                        }
+                        else
+                        {
+                            <button type="button" onclick="@OnReturn">@Strings.LOGIN_BUTTON_RETURN</button>
+                        }
+                        <button type="submit" disabled="@(CanSubmit == false)">@Strings.LOGIN_BUTTON_CONTINUE</button>
+                    </div>
+                </form>
+            }
+            else
+            {
+                <div class="cached-container">
+                    <button @onclick="ContinueWithCachedAsync">
+                        <img src="@CachedPicture" alt="Profile" class="profile-img" />
+                        <span>
+                            @string.Format(Strings.LOGIN_CONTINUE_WITH_CACHED_ID, CachedId)
+                        </span>
+                    </button>
+                    <button @onclick="ResetCached">
+                        @Strings.LOGIN_CONTINUE_WITH_LOGIN
+                    </button>
                 </div>
-                <div class="login-buttons-row">
-                    @if (m_RenderState is RenderStates.Id)
-                    {
-                        <button type="button" onclick="@OnRegister">@Strings.LOGIN_BUTTON_REGISTER</button>
-                    }
-                    else
-                    {
-                        <button type="button" onclick="@OnReturn">@Strings.LOGIN_BUTTON_RETURN</button>
-                    }
-                    <button type="submit" disabled="@(CanSubmit == false)">@Strings.LOGIN_BUTTON_CONTINUE</button>
-                </div>
-            </form>
-        }
-        else
-        {
-            <div class="cached-container">
-                <button @onclick="ContinueWithCachedAsync">
-                    <img src="@CachedPicture" alt="Profile" class="profile-img" />
-                    <span>
-                        @string.Format(Strings.LOGIN_CONTINUE_WITH_CACHED_ID, CachedId)
-                    </span>
-                </button>
-                <button @onclick="ResetCached">
-                    @Strings.LOGIN_CONTINUE_WITH_LOGIN
-                </button>
-            </div>
-        }
+            }
+        </div>
+        <AsyncOperationProgress Display="@Requesting" />
     </div>
-    <AsyncOperationProgress Display="@Requesting" />
-</div>
+}
