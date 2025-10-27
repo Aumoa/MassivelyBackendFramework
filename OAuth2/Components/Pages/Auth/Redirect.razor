@@ -62,6 +62,13 @@
             SameSite = SameSiteMode.Strict
         });
 
+        httpContext.Response.Cookies.Append("refresh_token", tokenResponse.RefreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict
+        });
+
         httpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
         {
             HttpOnly = true,

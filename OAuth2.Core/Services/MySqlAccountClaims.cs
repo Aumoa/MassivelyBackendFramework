@@ -11,7 +11,7 @@ internal class MySqlAccountClaims(IOptions<MySqlOptions> options) : MySqlDbConte
     {
         using var connection = GetConnection();
 
-        const string QUERY1 = "SELECT `id`, `name`, `value` FROM `account_claim` WHERE `account_id` = @accountId AND `removed_at` IS NULL;";
+        const string QUERY1 = "SELECT `id`, `name`, `value`, `created_at` AS `createdAt` FROM `account_claim` WHERE `account_id` = @accountId AND `removed_at` IS NULL;";
         var command = new CommandDefinition(QUERY1, new { accountId }, cancellationToken: cancellationToken);
         var results = await connection.QueryAsync<AccountClaim>(command);
 

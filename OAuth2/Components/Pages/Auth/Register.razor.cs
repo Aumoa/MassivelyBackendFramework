@@ -1,7 +1,9 @@
-﻿using System.Net.Mail;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using OAuth2.Localizations;
 using OAuth2.Services;
 
@@ -9,7 +11,9 @@ namespace OAuth2.Components.Pages.Auth;
 
 public partial class Register(
     IAccounts accounts,
+    IAccountClaims accountClaims,
     NavigationManager nav,
+    IJSRuntime js,
     EmailVerify emailVerify)
 {
     private readonly struct RequestScope : IDisposable
@@ -123,8 +127,11 @@ public partial class Register(
         StateHasChanged();
         try
         {
+            var locale = await js.InvokeAsync<string[]>("getUserLocale");
             var verifyCode = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
             var sub = await accounts.AddAsync(m_ID, m_Password, m_Name, m_Email, verifyCode);
+            await accountClaims.AddClaimAsync(m_ID, JwtRegisteredClaimNames.Locale, locale[0]);
+            await accountClaims.AddClaimAsync(m_ID, JwtRegisteredClaimNames.ZoneInfo, locale[1]);
             await emailVerify.SendAsync(sub, verifyCode, new MailAddress(m_Email));
 
             if (string.IsNullOrEmpty(ReturnUrl) == false)
