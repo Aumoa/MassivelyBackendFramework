@@ -204,7 +204,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
 
         Claim GetClaim(string claimName)
         {
-            return new Claim(JwtRegisteredClaimNames.Picture, claims.FirstOrDefault(p => p.Name == JwtRegisteredClaimNames.Picture).Value ?? string.Empty);
+            return new Claim(claimName, claims.FirstOrDefault(p => p.Name == claimName).Value ?? string.Empty);
         }
     }
 }
