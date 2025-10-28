@@ -71,7 +71,7 @@ internal class Jwt : IJwt
         HashSet<string> expectedClaims = [];
         expectedClaims.Add(JwtRegisteredClaimNames.Sub);
 
-        HashSet<string> scopesSet = scopes.Split(' ').ToHashSet();
+        HashSet<string> scopesSet = [.. scopes.Split(' ')];
 
         foreach (var scope in scopesSet)
         {
@@ -83,9 +83,13 @@ internal class Jwt : IJwt
                 case "email":
                     AddEmail();
                     break;
+                case "address":
+                    AddAddress();
+                    break;
                 case "all":
                     AddProfile();
                     AddEmail();
+                    AddAddress();
                     break;
             }
 
@@ -116,6 +120,11 @@ internal class Jwt : IJwt
                     expectedClaims.Add(JwtRegisteredClaimNames.Email);
                     expectedClaims.Add(JwtRegisteredClaimNames.EmailVerified);
                 }
+            }
+
+            void AddAddress()
+            {
+                expectedClaims.Add(JwtRegisteredClaimNames.Address);
             }
         }
 
