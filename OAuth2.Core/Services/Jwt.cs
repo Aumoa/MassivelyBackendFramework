@@ -165,7 +165,6 @@ internal class Jwt : IJwt
 
     private static readonly IReadOnlyDictionary<string, string> ValueTypeMatch = new Dictionary<string, string>()
     {
-        [JwtRegisteredClaimNames.Birthdate] = ClaimValueTypes.Integer64,
         [JwtRegisteredClaimNames.EmailVerified] = ClaimValueTypes.Boolean
     };
 
