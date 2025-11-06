@@ -1,4 +1,6 @@
-﻿using System.Security.Claims;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using OAuth2.DTO;
 using OAuth2.Services;
@@ -21,7 +23,7 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
             return Ok(scopedClaims.ToDictionary(c => c.Type, c => GetClaimValue(c)));
         }, request.AccessToken, cancellationToken);
 
-        static object GetClaimValue(Claim claim)
+        static object? GetClaimValue(Claim claim)
         {
             switch (claim.ValueType)
             {
@@ -30,7 +32,11 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
                 case ClaimValueTypes.Integer64:
                     return long.Parse(claim.Value);
                 default:
-                    return claim.Value;
+                    return claim.Type switch
+                    {
+                        JwtRegisteredClaimNames.Address => JsonSerializer.Deserialize<Dictionary<string, object>>(claim.Value),
+                        _ => claim.Value,
+                    };
             }
         }
     }
