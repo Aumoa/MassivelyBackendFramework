@@ -174,7 +174,8 @@ internal class Jwt : IJwt
 
     private static readonly IReadOnlyDictionary<string, string> ValueTypeMatch = new Dictionary<string, string>()
     {
-        [JwtRegisteredClaimNames.EmailVerified] = ClaimValueTypes.Boolean
+        [JwtRegisteredClaimNames.EmailVerified] = ClaimValueTypes.Boolean,
+        [JwtRegisteredClaimNames.Address] = JsonClaimValueTypes.Json
     };
 
     public string Issue(string audience, params Claim[] claims)
