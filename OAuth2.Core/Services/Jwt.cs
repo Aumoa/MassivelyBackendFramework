@@ -86,10 +86,14 @@ internal class Jwt : IJwt
                 case "address":
                     AddAddress();
                     break;
+                case "phone":
+                    AddPhone();
+                    break;
                 case "all":
                     AddProfile();
                     AddEmail();
                     AddAddress();
+                    AddPhone();
                     break;
             }
 
@@ -125,6 +129,12 @@ internal class Jwt : IJwt
             void AddAddress()
             {
                 expectedClaims.Add(JwtRegisteredClaimNames.Address);
+            }
+
+            void AddPhone()
+            {
+                expectedClaims.Add(JwtRegisteredClaimNames.PhoneNumber);
+                expectedClaims.Add(JwtRegisteredClaimNames.PhoneNumberVerified);
             }
         }
 
@@ -175,6 +185,7 @@ internal class Jwt : IJwt
     private static readonly IReadOnlyDictionary<string, string> ValueTypeMatch = new Dictionary<string, string>()
     {
         [JwtRegisteredClaimNames.EmailVerified] = ClaimValueTypes.Boolean,
+        [JwtRegisteredClaimNames.PhoneNumberVerified] = ClaimValueTypes.Boolean,
         [JwtRegisteredClaimNames.Address] = JsonClaimValueTypes.Json
     };
 
