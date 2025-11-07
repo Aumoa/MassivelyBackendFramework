@@ -12,6 +12,7 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
     public async ValueTask<string> AddClientAsync(string name, string ownerId, string[] redirectUris, CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
+        await connection.OpenAsync();
 
         await using var tx = await connection.BeginTransactionAsync(IsolationLevel.ReadUncommitted, cancellationToken);
 
@@ -45,5 +46,29 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
         var results = await connection.QueryAsync<string>(command);
 
         return result with { RedirectUris = [.. results] };
+    }
+
+    public async ValueTask<ClientInfo[]> GetClientsAsync(string ownerId, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY1 = "SELECT `id`, `name`, `created_at` AS `CreatedAt` FROM `client` WHERE `owner_id` = @ownerId AND `removed_at` IS NULL;";
+        var command = new CommandDefinition(QUERY1, new { ownerId }, cancellationToken: cancellationToken);
+        var results = await connection.QueryAsync<ClientInfo>(command);
+
+        return [.. results.Select(p => p with { OwnerId = ownerId })];
+    }
+
+    public async ValueTask<string> NewClientSecretAsync(string clientId, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        string secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+        const string QUERY1 = "INSERT INTO `client_claim` (`client_id`, `name`, `value`) VALUES(@clientId, 'secret', @value)";
+        var command = new CommandDefinition(QUERY1, new { clientId, value = PasswordHasher.Hash(secret) }, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
+
+        return secret;
     }
 }

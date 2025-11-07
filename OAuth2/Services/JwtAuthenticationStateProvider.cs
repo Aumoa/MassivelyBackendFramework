@@ -1,17 +1,21 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Http;
 
 namespace OAuth2.Services;
 
 public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAccesses accesses, IJwt jwt, ScopedSemaphore sem) : AuthenticationStateProvider
 {
     private ClaimsPrincipal? m_CurrentUser;
-    private string? m_Name;
-    private string? m_Email;
-    private string? m_Picture;
-    private string? m_Sub;
+
+    public string? Id
+    {
+        get
+        {
+            var httpContext = accessor.HttpContext;
+            return httpContext?.Request.Cookies["id"];
+        }
+    }
 
     public string ? AccessToken
     {
@@ -29,15 +33,6 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
             var httpContext = accessor.HttpContext;
             return httpContext?.Request.Cookies["refresh_token"];
         }
-    }
-
-    private void ResetAll()
-    {
-        m_CurrentUser = null;
-        m_Name = null;
-        m_Email = null;
-        m_Picture = null;
-        m_Sub = null;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
@@ -60,10 +55,6 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                         var identity = new ClaimsIdentity(claims, "JwtAuthType");
                         var principal = new ClaimsPrincipal(identity);
                         m_CurrentUser = principal;
-                        m_Sub = m_CurrentUser.FindFirstValue(JwtRegisteredClaimNames.Sub);
-                        m_Name = m_CurrentUser.FindFirstValue(JwtRegisteredClaimNames.Name);
-                        m_Email = m_CurrentUser.FindFirstValue(JwtRegisteredClaimNames.Email);
-                        m_Picture = m_CurrentUser.FindFirstValue(JwtRegisteredClaimNames.Picture);
                     }
                 }
 
@@ -97,8 +88,6 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                         }
                     }
                 }
-
-                ResetAll();
             }
 
             m_CurrentUser ??= new ClaimsPrincipal();
@@ -110,8 +99,8 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
         }
     }
 
-    public string? Sub => m_Sub;
-    public string? Name => m_Name;
-    public string? Email => m_Email;
-    public string? Picture => m_Picture;
+    public string? Sub => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value;
+    public string? Name => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Name)?.Value;
+    public string? Email => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email)?.Value;
+    public string? Picture => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Picture)?.Value;
 }

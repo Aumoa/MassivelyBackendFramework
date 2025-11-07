@@ -1,0 +1,33 @@
+﻿.container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+}
+
+    .container form {
+        width: 48%;
+    }
+
+        .container form table {
+            width: 100%;
+        }
+
+        .container form table tbody tr th {
+            padding-right: 40px;
+        }
+
+    .container .seperator {
+        width: 4%;
+    }
+
+    .container .details {
+        width: 48%;
+    }
+
+.submit-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 12px;
+}

@@ -9,6 +9,7 @@
 @inject NavigationManager Nav
 @inject HttpClient Http
 @inject IHttpContextAccessor HttpContextAccessor
+@inject IAccesses Access
 @layout AuthorizeLayout
 
 @code {
@@ -55,6 +56,13 @@
             return;
         }
 
+        var access = await Access.VerifyAsync(tokenResponse.AccessToken);
+        if (access.HasValue == false)
+        {
+            Nav.NavigateTo("/error");
+            return;
+        }
+
         httpContext.Response.Cookies.Append("access_token", tokenResponse.AccessToken, new CookieOptions
         {
             HttpOnly = true,
@@ -63,6 +71,13 @@
         });
 
         httpContext.Response.Cookies.Append("refresh_token", tokenResponse.RefreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict
+        });
+
+        httpContext.Response.Cookies.Append("id", access.Value.Id, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,

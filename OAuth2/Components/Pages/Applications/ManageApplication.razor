@@ -1,0 +1,79 @@
+﻿@using OAuth2.Services
+@using OAuth2.Utility
+@layout AuthorizedLayout
+@inject IClients Clients
+@inject JwtAuthenticationStateProvider Auth
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="container">
+    <h4>@Strings.NEWCLIENT_TITLE</h4>
+    <form @onsubmit="OnContinueAsync">
+        <table>
+            <tbody>
+                <tr>
+                    <th>
+                        @Strings.NEWCLIENT_FORM_LABEL_NAME
+                    </th>
+                    <td>
+                        <FloatingInput Type="text" Placeholder="@Strings.NEWCLIENT_FORM_LABEL_NAME" @bind-Value="m_Name" />
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="submit-buttons">
+            <button type="button" onclick="@OnContinueAsync">Register</button>
+        </div>
+    </form>
+    <p>Details</p>
+    <div class="separator">
+        <p>Details</p>
+    </div>
+    <div class="details">
+        <p>Details</p>
+    </div>
+</div>
+
+@code {
+    private IJSObjectReference? m_Module;
+    private string? m_Name;
+    private (string ClientId, string Secret)? m_Credentials;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            m_Module = await JS.InvokeAsync<IJSObjectReference>("import", "./OAuth2/Components/Pages/Applications/ManageApplication.razor.js");
+            m_Credentials = await m_Module.InvokeAsync<(string ClientId, string Secret)>("getFragmentParams");
+        }
+    }
+
+    private async Task OnContinueAsync()
+    {
+        if (string.IsNullOrEmpty(m_Name) || string.IsNullOrEmpty(Auth.Id))
+        {
+            Nav.NavigateTo("/error");
+            return;
+        }
+
+        var clientId = await Clients.AddClientAsync(m_Name, Auth.Id, []);
+        var secret = await Clients.NewClientSecretAsync(clientId);
+        Nav.NavigateWithFragment(("client_id", clientId), ("secret", secret));
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (m_Module != null)
+        {
+            try
+            {
+            }
+            catch (Exception e) when (e is ObjectDisposedException || e is JSDisconnectedException)
+            {
+                await m_Module.DisposeAsync();
+            }
+        }
+    }
+}

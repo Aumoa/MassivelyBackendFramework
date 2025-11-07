@@ -222,4 +222,25 @@
   <data name="LOGIN_CONTINUE_WITH_LOGIN" xml:space="preserve">
     <value>다른 계정으로 계속</value>
   </data>
+  <data name="NAVMENU_LABEL_MANAGE_APPLICATIONS" xml:space="preserve">
+    <value>애플리케이션 관리</value>
+  </data>
+  <data name="NEWCLIENT_FORM_LABEL_NAME" xml:space="preserve">
+    <value>이름</value>
+  </data>
+  <data name="NEWCLIENT_BUTTONS_NEW" xml:space="preserve">
+    <value>새 클라이언트 생성</value>
+  </data>
+  <data name="NEWCLIENT_TITLE" xml:space="preserve">
+    <value>새 클라이언트</value>
+  </data>
+  <data name="CLIENTS_CLIENT_NAME_LABEL" xml:space="preserve">
+    <value>이름</value>
+  </data>
+  <data name="CLIENTS_CLIENT_MANAGE_LABEL" xml:space="preserve">
+    <value>관리</value>
+  </data>
+  <data name="CLIENTS_CLIENT_SUB_LABEL" xml:space="preserve">
+    <value>식별자</value>
+  </data>
 </root>

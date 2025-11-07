@@ -1,0 +1,72 @@
+﻿@using OAuth2.DTO
+@using OAuth2.Services
+@using OAuth2.Utility
+@inject IClients Clients
+@inject JwtAuthenticationStateProvider Auth
+@inject NavigationManager Nav
+
+<div class="container">
+    <button class="link-button" @onclick="OnAddButtonClickedAsync">@Strings.NEWCLIENT_BUTTONS_NEW</button>
+    <div>
+        <table>
+            <tbody>
+                @foreach (var client in m_Clients)
+                {
+                    <tr>
+                        <th>
+                            @Strings.CLIENTS_CLIENT_NAME_LABEL
+                        </th>
+                        <td>
+                            @client.Name
+                        </td>
+                        <td>
+                            <button class="link-button" @onclick="() => OnManageClientAsync(client.Id)">@Strings.CLIENTS_CLIENT_MANAGE_LABEL</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>
+                            @Strings.CLIENTS_CLIENT_SUB_LABEL
+                        </th>
+                        <td>
+                            @client.Id
+                        </td>
+                        <td>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private ClientInfo[] m_Clients = [];
+
+    [Parameter]
+    public ManageApplications Owner { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var id = Auth.Id;
+        if (id == null)
+        {
+            Nav.NavigateTo("/error");
+            return;
+        }
+
+        m_Clients = await Clients.GetClientsAsync(id);
+        StateHasChanged();
+    }
+
+    private Task OnAddButtonClickedAsync()
+    {
+        Nav.NavigateWithQuery(("view_type", "new"));
+        return Task.CompletedTask;
+    }
+
+    private Task OnManageClientAsync(string id)
+    {
+        Nav.NavigateWithQuery(("view_type", "new"));
+        return Task.CompletedTask;
+    }
+}

@@ -70,6 +70,33 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Manage과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTS_CLIENT_MANAGE_LABEL {
+            get {
+                return ResourceManager.GetString("CLIENTS_CLIENT_MANAGE_LABEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   NAME과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTS_CLIENT_NAME_LABEL {
+            get {
+                return ResourceManager.GetString("CLIENTS_CLIENT_NAME_LABEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   SUB과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTS_CLIENT_SUB_LABEL {
+            get {
+                return ResourceManager.GetString("CLIENTS_CLIENT_SUB_LABEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Please visit the address below to complete email verification.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string EMAIL_VERIFY_MAIL_BODY {
@@ -336,6 +363,42 @@ namespace OAuth2.Localizations {
         internal static string NAVMENU_LABEL_MANAGE_ACCOUNT {
             get {
                 return ResourceManager.GetString("NAVMENU_LABEL_MANAGE_ACCOUNT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Manage Applications과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NAVMENU_LABEL_MANAGE_APPLICATIONS {
+            get {
+                return ResourceManager.GetString("NAVMENU_LABEL_MANAGE_APPLICATIONS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Create new client과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NEWCLIENT_BUTTONS_NEW {
+            get {
+                return ResourceManager.GetString("NEWCLIENT_BUTTONS_NEW", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Name과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NEWCLIENT_FORM_LABEL_NAME {
+            get {
+                return ResourceManager.GetString("NEWCLIENT_FORM_LABEL_NAME", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   New Client과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NEWCLIENT_TITLE {
+            get {
+                return ResourceManager.GetString("NEWCLIENT_TITLE", resourceCulture);
             }
         }
         

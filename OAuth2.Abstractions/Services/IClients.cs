@@ -6,4 +6,6 @@ public interface IClients
 {
     ValueTask<string> AddClientAsync(string name, string ownerId, string[] redirectUris, CancellationToken cancellationToken = default);
     ValueTask<ClientInfo?> GetClientAsync(string clientId, CancellationToken cancellationToken = default);
+    ValueTask<ClientInfo[]> GetClientsAsync(string ownerId, CancellationToken cancellationToken = default);
+    ValueTask<string> NewClientSecretAsync(string clientId, CancellationToken cancellationToken = default);
 }

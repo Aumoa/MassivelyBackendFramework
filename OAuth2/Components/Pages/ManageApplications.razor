@@ -1,0 +1,62 @@
+﻿@page "/manage-applications"
+@using OAuth2.Components.Pages.Applications
+@using OAuth2.DTO
+@using OAuth2.Services
+@using OAuth2.Utility
+@layout AuthorizedLayout
+@inject IClients Clients
+@inject JwtAuthenticationStateProvider Auth
+@inject NavigationManager Nav
+
+<div style="width: 100%;">
+    <SelectorContainer View="m_ViewType">
+        <SelectorView Key="ViewTypes.List">
+            <ListClients Owner="this" />
+        </SelectorView>
+        <SelectorView Key="ViewTypes.New">
+            <ManageApplication Owner="this" />
+        </SelectorView>
+    </SelectorContainer>
+</div>
+
+@code {
+    private enum ViewTypes
+    {
+        List,
+        New
+    }
+
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? view_type { get; set; }
+
+    private ClientInfo[] m_Clients = [];
+    private ViewTypes m_ViewType;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var id = Auth.Id;
+        if (id == null)
+        {
+            Nav.NavigateTo("/error");
+            return;
+        }
+
+        m_Clients = await Clients.GetClientsAsync(id);
+        StateHasChanged();
+    }
+
+    protected override Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrEmpty(view_type) == false && Enum.TryParse<ViewTypes>(view_type, true, out m_ViewType))
+        {
+            StateHasChanged();
+        }
+        else
+        {
+            m_ViewType = default;
+        }
+
+        return Task.CompletedTask;
+    }
+}

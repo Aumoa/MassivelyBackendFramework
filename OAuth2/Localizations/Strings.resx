@@ -222,4 +222,25 @@
   <data name="LOGIN_CONTINUE_WITH_LOGIN" xml:space="preserve">
     <value>Use another account</value>
   </data>
+  <data name="NAVMENU_LABEL_MANAGE_APPLICATIONS" xml:space="preserve">
+    <value>Manage Applications</value>
+  </data>
+  <data name="NEWCLIENT_FORM_LABEL_NAME" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="NEWCLIENT_BUTTONS_NEW" xml:space="preserve">
+    <value>Create new client</value>
+  </data>
+  <data name="NEWCLIENT_TITLE" xml:space="preserve">
+    <value>New Client</value>
+  </data>
+  <data name="CLIENTS_CLIENT_NAME_LABEL" xml:space="preserve">
+    <value>NAME</value>
+  </data>
+  <data name="CLIENTS_CLIENT_MANAGE_LABEL" xml:space="preserve">
+    <value>Manage</value>
+  </data>
+  <data name="CLIENTS_CLIENT_SUB_LABEL" xml:space="preserve">
+    <value>SUB</value>
+  </data>
 </root>
