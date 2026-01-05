@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OAuth2.DTO;
 using OAuth2.Options;
@@ -9,7 +10,7 @@ namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/token")]
-public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IOptions<HostOptions> hostOptions) : ControllerBase
+public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IOptions<HostOptions> hostOptions, ILogger<TokenController> logger) : ControllerBase
 {
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] TokenRequest request, CancellationToken cancellationToken)
@@ -38,8 +39,9 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "code_not_exists" });
         }
 
-        if (code.Value.RedirectUri == request.RedirectUri == false)
+        if (code.Value.RedirectUri != request.RedirectUri)
         {
+            logger.LogInformation("Redirect URI mismatch. Expected: {Expected}, Actual: {Actual}", code.Value.RedirectUri, request.RedirectUri);
             return BadRequest(new { error = "redirect_uri_mismatch" });
         }
 
