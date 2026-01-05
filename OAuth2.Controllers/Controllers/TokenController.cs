@@ -29,18 +29,18 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
     {
         if (request.Code == null)
         {
-            return BadRequest(new { error = "invalid_grant" });
+            return BadRequest(new { error = "code_missing" });
         }
 
         var code = await authorizationCodes.PopAsync(request.Code, cancellationToken);
         if (code.HasValue == false)
         {
-            return BadRequest(new { error = "invalid_grant" });
+            return BadRequest(new { error = "code_not_exists" });
         }
 
         if (code.Value.RedirectUri == request.RedirectUri == false)
         {
-            return BadRequest(new { error = "invalid_grant" });
+            return BadRequest(new { error = "redirect_uri_mismatch" });
         }
 
         var authHeader = Request.Headers.Authorization.FirstOrDefault();
