@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         s.AddTransient<IAccountClaims, MySqlAccountClaims>();
         s.AddTransient<IClients, MySqlClients>();
         s.AddTransient<IClientClaims, MySqlClientClaims>();
+        s.AddTransient<IClientUserGroups, MySqlClientUserGroups>();
 
         s.AddSingleton<RedisAccesses>();
         s.AddHostedService(p => p.GetRequiredService<RedisAccesses>());

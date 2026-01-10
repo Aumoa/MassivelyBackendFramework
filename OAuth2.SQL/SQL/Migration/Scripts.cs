@@ -11,5 +11,6 @@ public partial class Scripts : IScripts
         yield return new _2__Add_client();
         yield return new _3__Add_account_sub();
         yield return new _4__Add_email_verify();
+        yield return new _5__Add_client_user_group();
     }
 }

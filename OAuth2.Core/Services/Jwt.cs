@@ -89,11 +89,15 @@ internal class Jwt : IJwt
                 case "phone":
                     AddPhone();
                     break;
+                case "groups":
+                    AddGroups();
+                    break;
                 case "all":
                     AddProfile();
                     AddEmail();
                     AddAddress();
                     AddPhone();
+                    AddGroups();
                     break;
             }
 
@@ -135,6 +139,11 @@ internal class Jwt : IJwt
             {
                 expectedClaims.Add(JwtRegisteredClaimNames.PhoneNumber);
                 expectedClaims.Add(JwtRegisteredClaimNames.PhoneNumberVerified);
+            }
+
+            void AddGroups()
+            {
+                expectedClaims.Add("groups");
             }
         }
 

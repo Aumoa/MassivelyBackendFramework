@@ -1,5 +1,4 @@
 ﻿using System.Security.Cryptography;
-using System.Xml.Linq;
 using Dapper;
 using Microsoft.Extensions.Options;
 using OAuth2.DTO;

@@ -9,7 +9,7 @@ namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/userinfo")]
-public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccountClaims claims, IJwt jwt) : AuthorizedControllerBase(accesses)
+public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccountClaims claims, IJwt jwt, IClientUserGroups groups) : AuthorizedControllerBase(accesses)
 {
     [HttpGet]
     [HttpPost]
@@ -18,7 +18,7 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
         return await VerifiedAsync(async access =>
         {
             var rawAccount = (await accounts.GetRawAccountAsync(access.Id)).Value!;
-            var accountClaims = await claims.GetClaimsAsync(access.Id, cancellationToken);
+            AccountClaim[] accountClaims = [.. await claims.GetClaimsAsync(access.Id, cancellationToken), .. await groups.GetClientUserGroupsAsync(access.ClientId, access.Id)];
             var scopedClaims = jwt.ConfigureClaims(rawAccount, access.Scope, accountClaims, null, false);
             return Ok(scopedClaims.ToDictionary(c => c.Type, c => GetClaimValue(c)));
         }, request.AccessToken, cancellationToken);
