@@ -2,65 +2,121 @@
 @using OAuth2.Utility
 @layout AuthorizedLayout
 @inject IClients Clients
+@inject IClientClaims ClientClaims
 @inject JwtAuthenticationStateProvider Auth
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
 <div class="container">
-    <h4>@Strings.NEWCLIENT_TITLE</h4>
-    <form @onsubmit="OnContinueAsync">
-        <table>
-            <tbody>
-                <tr>
-                    <th>
-                        @Strings.NEWCLIENT_FORM_LABEL_NAME
-                    </th>
-                    <td>
-                        <FloatingInput Type="text" Placeholder="@Strings.NEWCLIENT_FORM_LABEL_NAME" @bind-Value="m_Name" />
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-        <div class="submit-buttons">
-            <button type="button" onclick="@OnContinueAsync">Register</button>
-        </div>
-    </form>
-    <p>Details</p>
-    <div class="separator">
-        <p>Details</p>
-    </div>
-    <div class="details">
-        <p>Details</p>
+    <h4>@(ViewType == ManageApplications.ViewTypes.New ? Strings.NEWCLIENT_TITLE : Strings.MANAGECLIENT_TITLE)</h4>
+    <div class="inner">
+        @if (ViewType == ManageApplications.ViewTypes.New)
+        {
+            <form @onsubmit="OnContinueAsync" @onsubmit:preventDefault="false">
+                <table>
+                    <tbody>
+                        <tr>
+                            <th>
+                                @Strings.NEWCLIENT_FORM_LABEL_NAME
+                            </th>
+                            <td>
+                                <FloatingInput Type="text" Placeholder="@Strings.NEWCLIENT_FORM_LABEL_NAME" @bind-Value="m_Name" />
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="submit-buttons">
+                    <button type="submit" disabled="@m_IsSubmitting">@(m_IsSubmitting ? Strings.NEWCLIENT_BUTTON_PROCESSING : Strings.NEWCLIENT_BUTTON_REGISTER)</button>
+                </div>
+            </form>
+        }
+        else
+        {
+            <div class="client-info">
+                <table>
+                    <tbody>
+                        <tr>
+                            <th>
+                                @Strings.NEWCLIENT_FORM_LABEL_NAME
+                            </th>
+                            <td>
+                                @m_Name
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        }
     </div>
 </div>
 
 @code {
     private IJSObjectReference? m_Module;
     private string? m_Name;
-    private (string ClientId, string Secret)? m_Credentials;
+    private string[] m_Secrets = [];
+    private bool m_IsSubmitting = false;
+
+    [Parameter]
+    public ManageApplications.ViewTypes ViewType { get; set; }
+
+    [Parameter]
+    public string? ClientId { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            m_Module = await JS.InvokeAsync<IJSObjectReference>("import", "./OAuth2/Components/Pages/Applications/ManageApplication.razor.js");
-            m_Credentials = await m_Module.InvokeAsync<(string ClientId, string Secret)>("getFragmentParams");
+            m_Module = await JS.InvokeAsync<IJSObjectReference>("import", "./Components/Pages/Applications/ManageApplication.razor.js");
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrEmpty(ClientId) == false)
+        {
+            var client = await Clients.GetClientAsync(ClientId);
+            if (client.HasValue)
+            {
+                m_Name = client.Value.Name;
+            }
+        }
+        else
+        {
+            m_Name = null;
         }
     }
 
     private async Task OnContinueAsync()
     {
+        if (m_IsSubmitting)
+        {
+            return;
+        }
+
         if (string.IsNullOrEmpty(m_Name) || string.IsNullOrEmpty(Auth.Id))
         {
             Nav.NavigateTo("/error");
             return;
         }
 
-        var clientId = await Clients.AddClientAsync(m_Name, Auth.Id, []);
-        var secret = await Clients.NewClientSecretAsync(clientId);
-        Nav.NavigateWithFragment(("client_id", clientId), ("secret", secret));
+        m_IsSubmitting = true;
         StateHasChanged();
+
+        try
+        {
+            var clientId = await Clients.AddClientAsync(m_Name, Auth.Id, []);
+            var secret = await Clients.NewClientSecretAsync(clientId);
+            
+            // 등록 완료 후 목록 페이지로 돌아가기
+            Nav.NavigateTo("/manage-applications", forceLoad: false);
+        }
+        catch
+        {
+            m_IsSubmitting = false;
+            StateHasChanged();
+            throw;
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -69,10 +125,10 @@
         {
             try
             {
+                await m_Module.DisposeAsync();
             }
             catch (Exception e) when (e is ObjectDisposedException || e is JSDisconnectedException)
             {
-                await m_Module.DisposeAsync();
             }
         }
     }

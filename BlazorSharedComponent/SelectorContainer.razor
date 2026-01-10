@@ -1,4 +1,5 @@
-﻿<CascadingValue Value="this">
+﻿@using System.Collections
+<CascadingValue Value="this">
     @ChildContent
 </CascadingValue>
 
@@ -78,6 +79,26 @@
 
     public void SetView(object? key)
     {
-        SetView(m_Views.FirstOrDefault(p => p.Key?.Equals(key) ?? false));
+        SetView(m_Views.FirstOrDefault(p => SafeEquals(p.Key, key)));
+    }
+
+    private static bool SafeEquals(object? key, object? operand)
+    {
+        if (key is IEnumerable arr)
+        {
+            foreach (var op in arr)
+            {
+                if (operand?.Equals(op) == true)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        else
+        {
+            return key?.Equals(operand) == true;
+        }
     }
 }

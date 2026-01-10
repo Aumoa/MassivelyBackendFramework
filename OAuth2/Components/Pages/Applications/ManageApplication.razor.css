@@ -5,8 +5,13 @@
     width: 100%;
 }
 
+    .container h4 {
+        margin-bottom: 20px;
+    }
+
     .container form {
-        width: 48%;
+        width: 100%;
+        max-width: 600px;
     }
 
         .container form table {
@@ -14,8 +19,41 @@
         }
 
         .container form table tbody tr th {
-            padding-right: 40px;
+            width: 120px;
+            text-align: left;
+            vertical-align: middle;
+            padding-right: 20px;
+            font-weight: bold;
         }
+
+        .container form table tbody tr td {
+            width: auto;
+        }
+
+    .container .client-info {
+        margin-bottom: 32px;
+        max-width: 600px;
+    }
+
+        .container .client-info table {
+            width: 100%;
+        }
+
+        .container .client-info table tbody tr th {
+            width: 120px;
+            text-align: left;
+            vertical-align: middle;
+            padding-right: 20px;
+            font-weight: bold;
+        }
+
+        .container .client-info table tbody tr td {
+            width: auto;
+        }
+
+    .container .details-section {
+        margin-top: 24px;
+    }
 
     .container .seperator {
         width: 4%;
@@ -30,4 +68,9 @@
     justify-content: flex-end;
     gap: 12px;
     margin-top: 12px;
+}
+
+.inner {
+    display: flex;
+    flex-direction: column;
 }

@@ -7,56 +7,134 @@
 @inject IClients Clients
 @inject JwtAuthenticationStateProvider Auth
 @inject NavigationManager Nav
+@implements IDisposable
 
 <div style="width: 100%;">
     <SelectorContainer View="m_ViewType">
         <SelectorView Key="ViewTypes.List">
             <ListClients Owner="this" />
         </SelectorView>
-        <SelectorView Key="ViewTypes.New">
-            <ManageApplication Owner="this" />
+        <SelectorView Key="kKeys">
+            <ManageApplication ViewType="m_ViewType" ClientId="@m_ClientId" />
         </SelectorView>
     </SelectorContainer>
 </div>
 
 @code {
-    private enum ViewTypes
+    public enum ViewTypes
     {
         List,
-        New
+        New,
+        Modify
     }
+
+    private static readonly ViewTypes[] kKeys = [ViewTypes.New, ViewTypes.Modify];
 
     [Parameter]
     [SupplyParameterFromQuery]
     public string? view_type { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? id { get; set; }
+
     private ClientInfo[] m_Clients = [];
     private ViewTypes m_ViewType;
+    private string? m_ClientId;
+    private bool m_IsDisposed = false;
 
     protected override async Task OnInitializedAsync()
     {
-        var id = Auth.Id;
-        if (id == null)
+        var userId = Auth.Id;
+        if (userId == null)
         {
             Nav.NavigateTo("/error");
             return;
         }
 
-        m_Clients = await Clients.GetClientsAsync(id);
-        StateHasChanged();
+        Nav.LocationChanged += OnLocationChanged;
+
+        m_Clients = await Clients.GetClientsAsync(userId);
     }
 
     protected override Task OnParametersSetAsync()
     {
-        if (string.IsNullOrEmpty(view_type) == false && Enum.TryParse<ViewTypes>(view_type, true, out m_ViewType))
+        if (m_IsDisposed)
         {
-            StateHasChanged();
+            return Task.CompletedTask;
+        }
+
+        if (string.IsNullOrEmpty(view_type) == false && Enum.TryParse<ViewTypes>(view_type, true, out var newViewType))
+        {
+            m_ViewType = newViewType;
         }
         else
         {
             m_ViewType = default;
         }
 
+        m_ClientId = id;
+
         return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        m_IsDisposed = true;
+        Nav.LocationChanged -= OnLocationChanged;
+        GC.SuppressFinalize(this);
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (m_IsDisposed)
+        {
+            return;
+        }
+
+        try
+        {
+            var uri = new Uri(args.Location);
+            var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+            var hasChanges = false;
+
+            if (query.TryGetValue("view_type", out var viewTypeValue) &&
+                Enum.TryParse<ViewTypes>(viewTypeValue, true, out var newViewType))
+            {
+                if (m_ViewType != newViewType)
+                {
+                    m_ViewType = newViewType;
+                    hasChanges = true;
+                }
+            }
+            else if (m_ViewType != default)
+            {
+                m_ViewType = default;
+                hasChanges = true;
+            }
+
+            if (query.TryGetValue("id", out var idValue))
+            {
+                if (m_ClientId != idValue)
+                {
+                    m_ClientId = idValue;
+                    hasChanges = true;
+                }
+            }
+            else if (m_ClientId != null)
+            {
+                m_ClientId = null;
+                hasChanges = true;
+            }
+
+            if (hasChanges && !m_IsDisposed)
+            {
+                InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 }

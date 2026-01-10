@@ -10,10 +10,29 @@
         align-self: flex-end;
     }
 
-    .container table tr {
-        padding-right: 20px;
+    .container .clients-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        width: 100%;
     }
 
-    .container table th {
-        padding-right: 20px;
+    .container .client-item {
+        width: 100%;
     }
+
+        .container .client-item table {
+            width: 100%;
+        }
+
+        .container .client-item table th {
+            width: 120px;
+            text-align: left;
+            vertical-align: middle;
+            padding-right: 20px;
+            font-weight: bold;
+        }
+
+        .container .client-item table td {
+            padding-right: 20px;
+        }

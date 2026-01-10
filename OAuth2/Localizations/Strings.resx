@@ -243,4 +243,13 @@
   <data name="CLIENTS_CLIENT_SUB_LABEL" xml:space="preserve">
     <value>SUB</value>
   </data>
+  <data name="NEWCLIENT_BUTTON_REGISTER" xml:space="preserve">
+    <value>Register</value>
+  </data>
+  <data name="NEWCLIENT_BUTTON_PROCESSING" xml:space="preserve">
+    <value>Processing...</value>
+  </data>
+  <data name="MANAGECLIENT_TITLE" xml:space="preserve">
+    <value>Manage Client</value>
+  </data>
 </root>

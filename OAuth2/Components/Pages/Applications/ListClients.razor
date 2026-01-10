@@ -7,35 +7,37 @@
 
 <div class="container">
     <button class="link-button" @onclick="OnAddButtonClickedAsync">@Strings.NEWCLIENT_BUTTONS_NEW</button>
-    <div>
-        <table>
-            <tbody>
-                @foreach (var client in m_Clients)
-                {
-                    <tr>
-                        <th>
-                            @Strings.CLIENTS_CLIENT_NAME_LABEL
-                        </th>
-                        <td>
-                            @client.Name
-                        </td>
-                        <td>
-                            <button class="link-button" @onclick="() => OnManageClientAsync(client.Id)">@Strings.CLIENTS_CLIENT_MANAGE_LABEL</button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>
-                            @Strings.CLIENTS_CLIENT_SUB_LABEL
-                        </th>
-                        <td>
-                            @client.Id
-                        </td>
-                        <td>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    <div class="clients-list">
+        @foreach (var client in m_Clients)
+        {
+            <div class="client-item">
+                <table>
+                    <tbody>
+                        <tr>
+                            <th>
+                                @Strings.CLIENTS_CLIENT_NAME_LABEL
+                            </th>
+                            <td>
+                                @client.Name
+                            </td>
+                            <td>
+                                <button class="link-button" @onclick="() => OnManageClientAsync(client.Id)">@Strings.CLIENTS_CLIENT_MANAGE_LABEL</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>
+                                @Strings.CLIENTS_CLIENT_SUB_LABEL
+                            </th>
+                            <td>
+                                @client.Id
+                            </td>
+                            <td>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        }
     </div>
 </div>
 
@@ -66,7 +68,7 @@
 
     private Task OnManageClientAsync(string id)
     {
-        Nav.NavigateWithQuery(("view_type", "new"));
+        Nav.NavigateWithQuery(("view_type", "modify"), ("id", id));
         return Task.CompletedTask;
     }
 }
