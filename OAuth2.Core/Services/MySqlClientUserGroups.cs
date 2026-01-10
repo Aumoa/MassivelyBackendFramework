@@ -1,15 +1,18 @@
 ﻿using Dapper;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OAuth2.DTO;
 using OAuth2.Options;
 
 namespace OAuth2.Services;
 
-internal class MySqlClientUserGroups(IOptions<MySqlOptions> options) : MySqlDbContext(options.Value), IClientUserGroups
+internal class MySqlClientUserGroups(ILogger<MySqlClientUserGroups> logger, IOptions<MySqlOptions> options) : MySqlDbContext(options.Value), IClientUserGroups
 {
     public async ValueTask<AccountClaim[]> GetClientUserGroupsAsync(string id, string accountId, CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
+
+        logger.LogInformation("Query {Id} {AccountId}", id, accountId);
 
         const string QUERY1 = "SELECT `group`, `created_at` AS `createdAt` FROM `client_user_group` WHERE `client_id` = @id AND `account_id` = @accountId";
         var command = new CommandDefinition(QUERY1, new { id, accountId }, cancellationToken: cancellationToken);
