@@ -1,4 +1,7 @@
 @using OAuth2.Localizations
+@using OAuth2.Services
+@inject IClientClaims Claims
+@inject NavigationManager Nav
 
 <form @onsubmit="OnSubmit" @onsubmit:preventDefault="false">
     <table>
@@ -18,6 +21,35 @@
                     }
                 </td>
             </tr>
+            <tr>
+                <th>
+                    @Strings.CLIENTFORM_REDIRECT_URIS
+                </th>
+                <td>
+                    <table>
+                        <tbody>
+                            @for (int i = 0; i < m_RedirectUris.Length; i++)
+                            {
+                                var index = i;
+                                <tr>
+                                    <td>
+                                        <div class="redirect-uri-row">
+                                            <FloatingInput Type="text" Placeholder="https://example.com" Value="@m_RedirectUris[index].Uri" ValueChanged="@(value => UpdateRedirectUri(index, value))" />
+                                            <button type="button" class="btn-apply" disabled="@(!m_RedirectUris[index].IsChanged)" @onclick="() => ApplyRedirectUriAsync(index)">@Strings.CLIENTFORM_BUTTON_APPLY</button>
+                                            <button type="button" class="btn-remove" @onclick="() => DeleteRedirectUriAsync(index)">@Strings.CLIENTFORM_BUTTON_REMOVE</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <div class="add-button-container">
+                        <button type="button" class="btn-add" @onclick="AddRedirectUriAsync">
+                            @Strings.CLIENTFORM_BUTTON_ADD
+                        </button>
+                    </div>
+                </td>
+            </tr>
         </tbody>
     </table>
     @if (IsNewMode)
@@ -29,11 +61,20 @@
 </form>
 
 @code {
+    public struct RedirectUri
+    {
+        public long Id { get; set; }
+        public string OriginUri { get; set; }
+        public string Uri { get; set; }
+
+        public bool IsChanged => OriginUri != Uri;
+    }
+
     [Parameter]
     public string? Name { get; set; }
 
     [Parameter]
-    public EventCallback<string?> NameChanged { get; set; }
+    public string? Id { get; set; }
 
     [Parameter]
     public bool IsNewMode { get; set; } = true;
@@ -43,4 +84,85 @@
 
     [Parameter]
     public EventCallback OnSubmit { get; set; }
+
+    private RedirectUri[] m_RedirectUris = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        await RefreshRedirectUrisAsync(Id);
+    }
+
+    public async Task AddRedirectUriAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        await Claims.AddClaimAsync(Id, "redirect_uri", "https://example.com");
+        await RefreshRedirectUrisAsync(Id);
+    }
+
+    private void UpdateRedirectUri(int index, string value)
+    {
+        if (index >= 0 && index < m_RedirectUris.Length)
+        {
+            m_RedirectUris[index].Uri = value;
+        }
+    }
+
+    private async Task ApplyRedirectUriAsync(int index)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        if (index < 0 || index >= m_RedirectUris.Length)
+        {
+            return;
+        }
+
+        ref var uri = ref m_RedirectUris[index];
+        if (!uri.IsChanged)
+        {
+            return;            
+        }
+
+        await Claims.ModifyClaimAsync(uri.Id, uri.Uri);
+        await RefreshRedirectUrisAsync(Id);
+    }
+
+    public async Task DeleteRedirectUriAsync(int index)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        if (index < 0 || index >= m_RedirectUris.Length)
+        {
+            return;
+        }
+
+        ref var uri = ref m_RedirectUris[index];
+        await Claims.RemoveClaimAsync(uri.Id);
+        await RefreshRedirectUrisAsync(Id);
+    }
+
+    private async ValueTask RefreshRedirectUrisAsync(string id)
+    {
+        var claims = await Claims.GetClaimsAsync(id);
+        m_RedirectUris = [.. claims.Where(c => c.Name == "redirect_uri").Select(c => new RedirectUri
+            {
+                Id = c.Id,
+                OriginUri = c.Value!,
+                Uri = c.Value!
+            })];
+    }
 }

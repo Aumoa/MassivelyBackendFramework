@@ -11,8 +11,8 @@
 <div class="container">
     <h4>@(ViewType == ManageApplications.ViewTypes.New ? Strings.NEWCLIENT_TITLE : Strings.MANAGECLIENT_TITLE)</h4>
     <div class="inner">
-        <ClientForm Name="@m_Name" 
-                    NameChanged="@((value) => m_Name = value)"
+        <ClientForm Name="@m_Name"
+                    Id="@m_Id"
                     IsNewMode="@(ViewType == ManageApplications.ViewTypes.New)"
                     IsSubmitting="@m_IsSubmitting"
                     OnSubmit="@OnContinueAsync" />
@@ -22,6 +22,7 @@
 @code {
     private IJSObjectReference? m_Module;
     private string? m_Name;
+    private string? m_Id;
     private string[] m_Secrets = [];
     private bool m_IsSubmitting = false;
 
@@ -47,11 +48,13 @@
             if (client.HasValue)
             {
                 m_Name = client.Value.Name;
+                m_Id = client.Value.Id;
             }
         }
         else
         {
             m_Name = null;
+            m_Id = null;
         }
     }
 

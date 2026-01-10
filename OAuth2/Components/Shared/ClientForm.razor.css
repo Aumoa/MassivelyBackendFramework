@@ -1,6 +1,6 @@
 form {
     width: 100%;
-    max-width: 600px;
+    max-width: 800px;
 }
 
     form table {
@@ -8,10 +8,11 @@ form {
     }
 
     form table tbody tr th {
-        width: 120px;
+        width: 160px;
         text-align: left;
-        vertical-align: middle;
+        vertical-align: top;
         padding-right: 20px;
+        padding-top: 12px;
         font-weight: bold;
     }
 
@@ -19,9 +20,63 @@ form {
         width: auto;
     }
 
+    form table tbody tr td table {
+        width: 100%;
+        table-layout: fixed;
+    }
+
+        form table tbody tr td table tbody tr td {
+            width: 100%;
+            padding: 4px 0;
+        }
+
 .submit-buttons {
     display: flex;
     justify-content: flex-end;
     gap: 12px;
     margin-top: 12px;
 }
+
+.add-button-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+}
+
+.redirect-uri-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.btn-apply {
+    background-color: #28a745;
+}
+
+    .btn-apply:hover {
+        background-color: #218838;
+    }
+
+    .btn-apply:disabled {
+        background-color: transparent;
+    }
+
+.btn-remove {
+    background-color: #dc3545;
+}
+
+    .btn-remove:hover {
+        background-color: #c82333;
+    }
+
+    .btn-remove:disabled {
+        background-color: #6c757d;
+    }
+
+.btn-add {
+    background-color: #28a745;
+}
+
+    .btn-add:hover {
+        background-color: #218838;
+    }

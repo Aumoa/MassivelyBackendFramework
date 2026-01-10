@@ -70,6 +70,42 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Add과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTFORM_BUTTON_ADD {
+            get {
+                return ResourceManager.GetString("CLIENTFORM_BUTTON_ADD", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Apply과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTFORM_BUTTON_APPLY {
+            get {
+                return ResourceManager.GetString("CLIENTFORM_BUTTON_APPLY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Remove과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTFORM_BUTTON_REMOVE {
+            get {
+                return ResourceManager.GetString("CLIENTFORM_BUTTON_REMOVE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Redirect URIs과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTFORM_REDIRECT_URIS {
+            get {
+                return ResourceManager.GetString("CLIENTFORM_REDIRECT_URIS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Manage과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string CLIENTS_CLIENT_MANAGE_LABEL {

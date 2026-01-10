@@ -252,4 +252,16 @@
   <data name="MANAGECLIENT_TITLE" xml:space="preserve">
     <value>Manage Client</value>
   </data>
+  <data name="CLIENTFORM_REDIRECT_URIS" xml:space="preserve">
+    <value>Redirect URIs</value>
+  </data>
+  <data name="CLIENTFORM_BUTTON_ADD" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="CLIENTFORM_BUTTON_APPLY" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="CLIENTFORM_BUTTON_REMOVE" xml:space="preserve">
+    <value>Remove</value>
+  </data>
 </root>
