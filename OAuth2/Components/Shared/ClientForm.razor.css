@@ -1,0 +1,27 @@
+form {
+    width: 100%;
+    max-width: 600px;
+}
+
+    form table {
+        width: 100%;
+    }
+
+    form table tbody tr th {
+        width: 120px;
+        text-align: left;
+        vertical-align: middle;
+        padding-right: 20px;
+        font-weight: bold;
+    }
+
+    form table tbody tr td {
+        width: auto;
+    }
+
+.submit-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 12px;
+}

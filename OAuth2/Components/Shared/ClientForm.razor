@@ -1,0 +1,46 @@
+@using OAuth2.Localizations
+
+<form @onsubmit="OnSubmit" @onsubmit:preventDefault="false">
+    <table>
+        <tbody>
+            <tr>
+                <th>
+                    @Strings.NEWCLIENT_FORM_LABEL_NAME
+                </th>
+                <td>
+                    @if (IsNewMode)
+                    {
+                        <FloatingInput Type="text" Placeholder="@Strings.NEWCLIENT_FORM_LABEL_NAME" @bind-Value="Name" />
+                    }
+                    else
+                    {
+                        @Name
+                    }
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    @if (IsNewMode)
+    {
+        <div class="submit-buttons">
+            <button type="submit" disabled="@IsSubmitting">@(IsSubmitting ? Strings.NEWCLIENT_BUTTON_PROCESSING : Strings.NEWCLIENT_BUTTON_REGISTER)</button>
+        </div>
+    }
+</form>
+
+@code {
+    [Parameter]
+    public string? Name { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> NameChanged { get; set; }
+
+    [Parameter]
+    public bool IsNewMode { get; set; } = true;
+
+    [Parameter]
+    public bool IsSubmitting { get; set; }
+
+    [Parameter]
+    public EventCallback OnSubmit { get; set; }
+}
