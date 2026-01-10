@@ -18,7 +18,7 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
         return await VerifiedAsync(async access =>
         {
             var rawAccount = (await accounts.GetRawAccountAsync(access.Id)).Value!;
-            AccountClaim[] accountClaims = [.. await claims.GetClaimsAsync(access.Id, cancellationToken), .. await groups.GetClientUserGroupsAsync(access.ClientId, access.Id)];
+            AccountClaim[] accountClaims = [.. await claims.GetClaimsAsync(access.Id, cancellationToken), .. await groups.GetClientUserGroupsAsync(access.ClientId, access.Sub)];
             var scopedClaims = jwt.ConfigureClaims(rawAccount, access.Scope, accountClaims, null, false);
             return Ok(scopedClaims.ToDictionary(c => c.Type, c => GetClaimValue(c)));
         }, request.AccessToken, cancellationToken);
@@ -35,6 +35,7 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
                     return claim.Type switch
                     {
                         JwtRegisteredClaimNames.Address => JsonSerializer.Deserialize<Dictionary<string, object>>(claim.Value),
+                        "groups" => JsonSerializer.Deserialize<string[]>(claim.Value),
                         _ => claim.Value,
                     };
             }

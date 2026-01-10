@@ -13,11 +13,12 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
     [
         "access_token",
         "account_id",
+        "sub",
         "scope",
         "client_id"
     ];
 
-    public async ValueTask<Access> WriteAccessAsync(string id, string scope, string clientId, TimeSpan expire, CancellationToken cancellationToken = default)
+    public async ValueTask<Access> WriteAccessAsync(string id, string sub, string scope, string clientId, TimeSpan expire, CancellationToken cancellationToken = default)
     {
         var db = GetDatabase();
         var tx = db.CreateTransaction();
@@ -29,9 +30,10 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         _ = tx.StringSetAsync(accessKey, refreshToken, expire).WaitAsync(cancellationToken);
 
         var refreshKey = KeyNames.Refresh(refreshToken);
-        _ = db.HashSetAsync(refreshKey, [
+        _ = tx.HashSetAsync(refreshKey, [
             new("access_token", accessToken),
             new("account_id", id),
+            new("sub", sub),
             new("scope", scope),
             new("client_id", clientId)
             ]).WaitAsync(cancellationToken);
@@ -41,6 +43,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         return new Access
         {
             Id = id,
+            Sub = sub,
             AccessToken = accessToken,
             RefreshToken = refreshToken,
             Scope = scope,
@@ -74,10 +77,11 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         return new Access
         {
             Id = fields[1]!,
+            Sub = fields[2]!,
             AccessToken = accessToken,
             RefreshToken = refreshToken!,
-            Scope = fields[2]!,
-            ClientId = fields[3]!
+            Scope = fields[3]!,
+            ClientId = fields[4]!
         };
     }
 
@@ -99,7 +103,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         var accessKey = KeyNames.Access(newAccessToken);
 
         _ = batch.StringSetAsync(accessKey, newRefreshToken, expire);
-        var resultsTask = batch.HashGetAsync(refreshKey, ["account_id", "scope", "client_id"]).WaitAsync(cancellationToken);
+        var resultsTask = batch.HashGetAsync(refreshKey, ["account_id", "sub", "scope", "client_id"]).WaitAsync(cancellationToken);
 
         batch.Execute();
         var results = await resultsTask;
@@ -109,8 +113,9 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         await db.HashSetAsync(refreshKey, [
             new("access_token", newAccessToken),
             new("account_id", results[0]!),
-            new("scope", results[1]!),
-            new("client_id", results[2]!)
+            new("sub", results[1]!),
+            new("scope", results[2]!),
+            new("client_id", results[3]!)
             ]).WaitAsync(cancellationToken);
 
         CleanupAsync();
@@ -118,10 +123,11 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
         return new Access
         {
             Id = results[0]!,
+            Sub = results[1]!,
             AccessToken = newAccessToken,
             RefreshToken = newRefreshToken,
-            Scope = results[1]!,
-            ClientId = results[2]!
+            Scope = results[2]!,
+            ClientId = results[3]!
         };
 
         async void CleanupAsync()

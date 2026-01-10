@@ -4,6 +4,8 @@ public record struct Access
 {
     public required string Id { get; set; }
 
+    public required string Sub { get; set; }
+
     public required string AccessToken { get; set; }
 
     public required string RefreshToken { get; set; }

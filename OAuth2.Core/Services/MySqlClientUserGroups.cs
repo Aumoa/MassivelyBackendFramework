@@ -23,7 +23,7 @@ internal class MySqlClientUserGroups(IOptions<MySqlOptions> options) : MySqlDbCo
         return [new AccountClaim
         {
             Name = "groups",
-            Value = $"[{string.Join(',', result.Select(r => $"\"{r}\""))}]",
+            Value = $"[{string.Join(',', result.Select(r => $"\"{r.group}\""))}]",
             CreatedAt = createdAt
         }];
     }

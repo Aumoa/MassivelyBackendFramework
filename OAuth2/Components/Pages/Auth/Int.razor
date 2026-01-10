@@ -37,13 +37,13 @@
         {
             try
             {
-                var access = await Accesses.WriteAccessAsync(code.Value.AccountId, code.Value.Scope, code.Value.ClientId, Jwt.ExpiresIn);
                 var rawAccount = await Accounts.GetRawAccountAsync(code.Value.AccountId);
+                var access = await Accesses.WriteAccessAsync(code.Value.AccountId, rawAccount.Value.Sub, code.Value.Scope, code.Value.ClientId, Jwt.ExpiresIn);
                 var claims = await AccountClaims.GetClaimsAsync(code.Value.AccountId);
                 var jwt = Jwt.Issue(HostOptions.Value.ClientId, [
-                    new Claim("access_token", access.AccessToken),
-                    new Claim("refresh_token", access.RefreshToken),
-                    new Claim("id", code.Value.AccountId),
+                    new("access_token", access.AccessToken),
+                    new("refresh_token", access.RefreshToken),
+                    new("id", code.Value.AccountId),
                     .. Jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, claims, null, true)
                 ]);
 

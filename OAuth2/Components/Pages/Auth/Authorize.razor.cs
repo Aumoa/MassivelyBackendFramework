@@ -384,8 +384,8 @@ public partial class Authorize(
         else if (ResponseType == "token")
         {
             var expiresIn = TimeSpan.FromHours(1);
-            var access = await accesses.WriteAccessAsync(id, Scope, ClientId, expiresIn);
             var rawAccount = await accounts.GetRawAccountAsync(id);
+            var access = await accesses.WriteAccessAsync(id, rawAccount.Value.Sub, Scope, ClientId, expiresIn);
             var claims = await accountClaims.GetClaimsAsync(id);
             var idTokenClaims = jwt.ConfigureClaims(rawAccount.Value, Scope, claims, Nonce, true);
             var idToken = jwt.Issue(ClientId, idTokenClaims);

@@ -100,8 +100,8 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             }
         }
 
-        var access = await accesses.WriteAccessAsync(code.Value.AccountId, code.Value.Scope, code.Value.ClientId, jwt.ExpiresIn, cancellationToken);
         var rawAccount = await accounts.GetRawAccountAsync(code.Value.AccountId, cancellationToken);
+        var access = await accesses.WriteAccessAsync(code.Value.AccountId, rawAccount.Value.Sub, code.Value.Scope, code.Value.ClientId, jwt.ExpiresIn, cancellationToken);
         var claims = await accountClaims.GetClaimsAsync(code.Value.AccountId, cancellationToken);
 
         string? idToken = null;

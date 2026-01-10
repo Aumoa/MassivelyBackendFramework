@@ -195,7 +195,8 @@ internal class Jwt : IJwt
     {
         [JwtRegisteredClaimNames.EmailVerified] = ClaimValueTypes.Boolean,
         [JwtRegisteredClaimNames.PhoneNumberVerified] = ClaimValueTypes.Boolean,
-        [JwtRegisteredClaimNames.Address] = JsonClaimValueTypes.Json
+        [JwtRegisteredClaimNames.Address] = JsonClaimValueTypes.Json,
+        ["groups"] = JsonClaimValueTypes.Json
     };
 
     public string Issue(string audience, params Claim[] claims)
