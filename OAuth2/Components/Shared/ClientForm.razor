@@ -34,7 +34,9 @@
                                 <tr>
                                     <td>
                                         <div class="redirect-uri-row">
-                                            <FloatingInput Type="text" Placeholder="https://example.com" Value="@m_RedirectUris[index].Uri" ValueChanged="@(value => UpdateRedirectUri(index, value))" />
+                                            <div class="input-field">
+                                                <FloatingInput Type="text" Placeholder="https://example.com" Value="@m_RedirectUris[index].Uri" ValueChanged="@(value => UpdateRedirectUri(index, value))" />
+                                            </div>
                                             <button type="button" class="btn-apply" disabled="@(!m_RedirectUris[index].IsChanged)" @onclick="() => ApplyRedirectUriAsync(index)">@Strings.CLIENTFORM_BUTTON_APPLY</button>
                                             <button type="button" class="btn-remove" @onclick="() => DeleteRedirectUriAsync(index)">@Strings.CLIENTFORM_BUTTON_REMOVE</button>
                                         </div>

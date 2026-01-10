@@ -48,6 +48,10 @@ form {
     gap: 8px;
     width: 100%;
 }
+    
+    .redirect-uri-row .input-field {
+        width: 500px;
+    }
 
 .btn-apply {
     background-color: #28a745;
