@@ -10,7 +10,7 @@ namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/token")]
-public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IOptions<HostOptions> hostOptions, ILogger<TokenController> logger) : ControllerBase
+public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IClientUserGroups groups, IOptions<HostOptions> hostOptions, ILogger<TokenController> logger) : ControllerBase
 {
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] TokenRequest request, CancellationToken cancellationToken)
@@ -136,9 +136,15 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_refresh_token" });
         }
 
+        if (string.IsNullOrWhiteSpace(request.ClientId))
+        {
+            return BadRequest(new { error = "invalid_client_id" });
+        }
+
         var access = await accesses.VerifyAsync(newAccess.Value.AccessToken, cancellationToken);
         var rawAccount = await accounts.GetRawAccountAsync(access.Value.Id, cancellationToken);
         var claims = await accountClaims.GetClaimsAsync(access.Value.Id, cancellationToken);
+        var groupsClaim = await groups.GetClientUserGroupsAsync(request.ClientId, access.Value.Sub, cancellationToken);
 
         var response = new TokenResponse
         {
@@ -147,7 +153,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
             Scope = newAccess.Value.Scope,
             RefreshToken = newAccess.Value.RefreshToken,
-            IdToken = jwt.Issue(newAccess.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, newAccess.Value.Scope, claims, null, true))
+            IdToken = jwt.Issue(newAccess.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, newAccess.Value.Scope, [.. claims, .. groupsClaim], null, true))
         };
 
         return Ok(response);
