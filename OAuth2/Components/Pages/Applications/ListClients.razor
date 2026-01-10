@@ -45,18 +45,18 @@
     private ClientInfo[] m_Clients = [];
 
     [Parameter]
-    public ManageApplications Owner { get; set; }
+    public ManageApplications? Owner { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
-        var id = Auth.Id;
-        if (id == null)
+        var sub = Auth.Sub;
+        if (sub == null)
         {
             Nav.NavigateTo("/error");
             return;
         }
 
-        m_Clients = await Clients.GetClientsAsync(id);
+        m_Clients = await Clients.GetClientsAsync(sub);
         StateHasChanged();
     }
 

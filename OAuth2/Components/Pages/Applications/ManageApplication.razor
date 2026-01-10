@@ -94,7 +94,7 @@
             return;
         }
 
-        if (string.IsNullOrEmpty(m_Name) || string.IsNullOrEmpty(Auth.Id))
+        if (string.IsNullOrEmpty(m_Name) || string.IsNullOrEmpty(Auth.Sub))
         {
             Nav.NavigateTo("/error");
             return;
@@ -105,7 +105,7 @@
 
         try
         {
-            var clientId = await Clients.AddClientAsync(m_Name, Auth.Id, []);
+            var clientId = await Clients.AddClientAsync(m_Name, Auth.Sub, []);
             var secret = await Clients.NewClientSecretAsync(clientId);
             
             // 등록 완료 후 목록 페이지로 돌아가기
