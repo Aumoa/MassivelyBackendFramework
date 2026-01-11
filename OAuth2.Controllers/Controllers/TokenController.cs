@@ -103,11 +103,12 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         var rawAccount = await accounts.GetRawAccountAsync(code.Value.AccountId, cancellationToken);
         var access = await accesses.WriteAccessAsync(code.Value.AccountId, rawAccount.Value.Sub, code.Value.Scope, code.Value.ClientId, jwt.ExpiresIn, cancellationToken);
         var claims = await accountClaims.GetClaimsAsync(code.Value.AccountId, cancellationToken);
+        var groupsClaim = await groups.GetClientUserGroupsAsync(request.ClientId, rawAccount.Value.Sub, cancellationToken);
 
         string? idToken = null;
         if (code.Value.Scope.Split(' ').Any(p => p is "openid" or "all"))
         {
-            idToken = jwt.Issue(code.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, claims, code.Value.Nonce, true));
+            idToken = jwt.Issue(code.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, [.. claims, .. groupsClaim], code.Value.Nonce, true));
         }
 
         var response = new TokenResponse
