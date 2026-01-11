@@ -28,9 +28,14 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
 
     private async ValueTask<IActionResult> HandleAuthorizeCodeAsync(TokenRequest request, CancellationToken cancellationToken)
     {
-        if (request.Code == null)
+        if (string.IsNullOrWhiteSpace(request.Code))
         {
             return BadRequest(new { error = "code_missing" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ClientId))
+        {
+            return BadRequest(new { error = "client_id_missing" });
         }
 
         var code = await authorizationCodes.PopAsync(request.Code, cancellationToken);
