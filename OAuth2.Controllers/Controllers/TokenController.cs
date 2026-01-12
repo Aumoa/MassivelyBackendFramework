@@ -33,25 +33,9 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "code_missing" });
         }
 
-        if (string.IsNullOrWhiteSpace(request.ClientId))
-        {
-            return BadRequest(new { error = "client_id_missing" });
-        }
-
-        var code = await authorizationCodes.PopAsync(request.Code, cancellationToken);
-        if (code.HasValue == false)
-        {
-            return BadRequest(new { error = "code_not_exists" });
-        }
-
-        if (code.Value.RedirectUri != request.RedirectUri)
-        {
-            logger.LogInformation("Redirect URI mismatch. Expected: {Expected}, Actual: {Actual}", code.Value.RedirectUri, request.RedirectUri);
-            return BadRequest(new { error = "redirect_uri_mismatch" });
-        }
-
+        // Basic 인증 헤더 파싱을 먼저 수행
         var authHeader = Request.Headers.Authorization.FirstOrDefault();
-        if (string.IsNullOrEmpty(authHeader) == false)
+        if (string.IsNullOrEmpty(authHeader) == false && authHeader.StartsWith("Basic "))
         {
             try
             {
@@ -69,8 +53,25 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             }
             catch (Exception)
             {
-                return BadRequest("Failed to decode Basic auth header.");
+                return BadRequest(new { error = "invalid_auth_header" });
             }
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ClientId))
+        {
+            return BadRequest(new { error = "client_id_missing" });
+        }
+
+        var code = await authorizationCodes.PopAsync(request.Code, cancellationToken);
+        if (code.HasValue == false)
+        {
+            return BadRequest(new { error = "code_not_exists" });
+        }
+
+        if (code.Value.RedirectUri != request.RedirectUri)
+        {
+            logger.LogInformation("Redirect URI mismatch. Expected: {Expected}, Actual: {Actual}", code.Value.RedirectUri, request.RedirectUri);
+            return BadRequest(new { error = "redirect_uri_mismatch" });
         }
 
         if (request.ClientSecret == null)
