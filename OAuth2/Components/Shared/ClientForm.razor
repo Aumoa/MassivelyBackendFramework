@@ -1,6 +1,7 @@
 @using OAuth2.Localizations
 @using OAuth2.Services
 @inject IClientClaims Claims
+@inject IClientUserGroups UserGroups
 @inject NavigationManager Nav
 
 <form @onsubmit="OnSubmit" @onsubmit:preventDefault="false">
@@ -13,7 +14,7 @@
                 <td>
                     @if (IsNewMode)
                     {
-                        <FloatingInput Type="text" Placeholder="@Strings.NEWCLIENT_FORM_LABEL_NAME" @bind-Value="Name" />
+                        <FloatingInput Type="text" Placeholder="@Strings.NEWCLIENT_FORM_LABEL_NAME" Value="@Name" ValueChanged="@NameChanged" />
                     }
                     else
                     {
@@ -26,29 +27,53 @@
                     @Strings.CLIENTFORM_REDIRECT_URIS
                 </th>
                 <td>
-                    <table>
-                        <tbody>
-                            @for (int i = 0; i < m_RedirectUris.Length; i++)
-                            {
-                                var index = i;
-                                <tr>
-                                    <td>
-                                        <div class="redirect-uri-row">
-                                            <div class="input-field">
-                                                <FloatingInput Type="text" Placeholder="https://example.com" Value="@m_RedirectUris[index].Uri" ValueChanged="@(value => UpdateRedirectUri(index, value))" />
-                                            </div>
-                                            <button type="button" class="btn-apply" disabled="@(!m_RedirectUris[index].IsChanged)" @onclick="() => ApplyRedirectUriAsync(index)">@Strings.CLIENTFORM_BUTTON_APPLY</button>
-                                            <button type="button" class="btn-remove" @onclick="() => DeleteRedirectUriAsync(index)">@Strings.CLIENTFORM_BUTTON_REMOVE</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                    <div class="redirect-uris-container">
+                        @for (int i = 0; i < m_RedirectUris.Length; i++)
+                        {
+                            var index = i;
+                            <div class="redirect-uri-row">
+                                <FloatingInput Type="text" Placeholder="https://example.com" Value="@m_RedirectUris[index].Uri" ValueChanged="@(value => UpdateRedirectUri(index, value))" />
+                                <button type="button" class="btn-apply" disabled="@(!m_RedirectUris[index].IsChanged)" @onclick="() => ApplyRedirectUriAsync(index)">@Strings.CLIENTFORM_BUTTON_APPLY</button>
+                                <button type="button" class="btn-remove" @onclick="() => DeleteRedirectUriAsync(index)">@Strings.CLIENTFORM_BUTTON_REMOVE</button>
+                            </div>
+                        }
+                    </div>
                     <div class="add-button-container">
                         <button type="button" class="btn-add" @onclick="AddRedirectUriAsync">
                             @Strings.CLIENTFORM_BUTTON_ADD
                         </button>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <th>
+                    User Groups
+                </th>
+                <td>
+                    <div class="user-groups-container">
+                        @foreach (var userGroups in m_UserGroups.GroupBy(g => g.AccountId))
+                        {
+                            <div class="user-group-section">
+                                <div class="user-id-header">User: @userGroups.Key</div>
+                                @for (int i = 0; i < userGroups.Count(); i++)
+                                {
+                                    var group = userGroups.ElementAt(i);
+                                    var groupIndex = Array.IndexOf(m_UserGroups, group);
+                                    <div class="user-group-row">
+                                        <FloatingInput Type="text" Placeholder="Group name" Value="@m_UserGroups[groupIndex].Group" ValueChanged="@(value => UpdateUserGroup(groupIndex, value))" />
+                                        <button type="button" class="btn-apply" disabled="@(!m_UserGroups[groupIndex].IsChanged)" @onclick="() => ApplyUserGroupAsync(groupIndex)">@Strings.CLIENTFORM_BUTTON_APPLY</button>
+                                        <button type="button" class="btn-remove" @onclick="() => DeleteUserGroupAsync(groupIndex)">@Strings.CLIENTFORM_BUTTON_REMOVE</button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        <div class="add-user-group-form">
+                            <FloatingInput Type="text" Placeholder="User Sub" @bind-Value="m_NewUserSub" />
+                            <FloatingInput Type="text" Placeholder="Group name" @bind-Value="m_NewGroupName" />
+                            <button type="button" class="btn-add" @onclick="AddUserGroupAsync">
+                                @Strings.CLIENTFORM_BUTTON_ADD
+                            </button>
+                        </div>
                     </div>
                 </td>
             </tr>
@@ -72,8 +97,21 @@
         public bool IsChanged => OriginUri != Uri;
     }
 
+    public struct UserGroupItem
+    {
+        public long Id { get; set; }
+        public string AccountId { get; set; }
+        public string OriginGroup { get; set; }
+        public string Group { get; set; }
+
+        public bool IsChanged => OriginGroup != Group;
+    }
+
     [Parameter]
     public string? Name { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> NameChanged { get; set; }
 
     [Parameter]
     public string? Id { get; set; }
@@ -88,6 +126,9 @@
     public EventCallback OnSubmit { get; set; }
 
     private RedirectUri[] m_RedirectUris = [];
+    private UserGroupItem[] m_UserGroups = [];
+    private string? m_NewUserSub;
+    private string? m_NewGroupName;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -97,6 +138,7 @@
         }
 
         await RefreshRedirectUrisAsync(Id);
+        await RefreshUserGroupsAsync(Id);
     }
 
     public async Task AddRedirectUriAsync()
@@ -165,6 +207,78 @@
                 Id = c.Id,
                 OriginUri = c.Value!,
                 Uri = c.Value!
+            })];
+    }
+
+    public async Task AddUserGroupAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(m_NewUserSub) || string.IsNullOrWhiteSpace(m_NewGroupName))
+        {
+            return;
+        }
+
+        await UserGroups.AddClientUserGroupAsync(Id, m_NewUserSub, m_NewGroupName);
+        m_NewUserSub = null;
+        m_NewGroupName = null;
+        await RefreshUserGroupsAsync(Id);
+    }
+
+    private void UpdateUserGroup(int index, string value)
+    {
+        if (index >= 0 && index < m_UserGroups.Length)
+        {
+            m_UserGroups[index].Group = value;
+        }
+    }
+
+    private async Task ApplyUserGroupAsync(int index)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        if (index < 0 || index >= m_UserGroups.Length)
+        {
+            return;
+        }
+
+        ref var group = ref m_UserGroups[index];
+        if (!group.IsChanged)
+        {
+            return;
+        }
+
+        await UserGroups.ModifyClientUserGroupAsync(group.Id, group.Group);
+        await RefreshUserGroupsAsync(Id);
+    }
+
+    public async Task DeleteUserGroupAsync(int index)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        if (index < 0 || index >= m_UserGroups.Length)
+        {
+            return;
+        }
+
+        ref var group = ref m_UserGroups[index];
+        await UserGroups.RemoveClientUserGroupAsync(group.Id);
+        await RefreshUserGroupsAsync(Id);
+    }
+
+    private async ValueTask RefreshUserGroupsAsync(string id)
+    {
+        var groups = await UserGroups.GetAllClientUserGroupsAsync(id);
+        m_UserGroups = [.. groups.Select(g => new UserGroupItem
+            {
+                Id = g.Id,
+                AccountId = g.AccountId,
+                OriginGroup = g.Group,
+                Group = g.Group
             })];
     }
 }

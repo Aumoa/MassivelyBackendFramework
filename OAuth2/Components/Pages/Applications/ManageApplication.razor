@@ -11,7 +11,7 @@
 <div class="container">
     <h4>@(ViewType == ManageApplications.ViewTypes.New ? Strings.NEWCLIENT_TITLE : Strings.MANAGECLIENT_TITLE)</h4>
     <div class="inner">
-        <ClientForm Name="@m_Name"
+        <ClientForm @bind-Name="m_Name"
                     Id="@m_Id"
                     IsNewMode="@(ViewType == ManageApplications.ViewTypes.New)"
                     IsSubmitting="@m_IsSubmitting"
