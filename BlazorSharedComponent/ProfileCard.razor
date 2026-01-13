@@ -1,0 +1,106 @@
+﻿@using System.IdentityModel.Tokens.Jwt
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider Auth
+@inject NavigationManager Nav
+@implements IDisposable
+
+@if (!IsAuthenticated)
+{
+    return;
+}
+
+<div class="usercard-container">
+    <img src="@m_Picture" alt="Profile" class="profile-img" />
+
+    <div class="user-info-panel">
+        <div class="summary-panel">
+            <img src="@m_Picture" alt="Profile" class="profile-img-large" />
+            <div class="informations">
+                <p class="user-info-name">@m_Name</p>
+                <p class="user-info-email">@m_Email</p>
+                <p class="user-info-sub">@m_ShortSub</p>
+            </div>
+        </div>
+        <hr />
+        <div class="functions">
+            <button @onclick="OnClick_Logout">
+                <span class="material-symbols-outlined">logout</span>
+                <span>@Strings.PROFILECARD_LOGOUT</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool m_Initialized;
+    private AuthenticationState? m_State;
+
+    private bool IsAuthenticated => m_State?.User.Identity?.IsAuthenticated == true;
+
+    private string m_Sub = string.Empty;
+    private string m_Name = string.Empty;
+    private string m_Email = string.Empty;
+    private string m_Picture = string.Empty;
+    private string m_ShortSub = string.Empty;
+
+    protected override Task OnInitializedAsync()
+    {
+        if (!m_Initialized)
+        {
+            Auth.AuthenticationStateChanged += OnAuthenticationStateChanged;
+            m_Initialized = true;
+        }
+        return Task.CompletedTask;
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            ReloadAuthenticationStateAsync();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void ReloadAuthenticationStateAsync()
+    {
+        OnAuthenticationStateChanged(Auth.GetAuthenticationStateAsync());
+    }
+
+    private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            m_State = await task;
+            if (m_State == null)
+            {
+                m_Sub = string.Empty;
+                m_Name = string.Empty;
+                m_Email = string.Empty;
+                m_Picture = string.Empty;
+                m_ShortSub = string.Empty;
+            }
+            else
+            {
+                m_Sub = m_State.User.FindFirst("sub")?.Value ?? string.Empty;
+                m_Name = m_State.User.FindFirst("name")?.Value ?? string.Empty;
+                m_Email = m_State.User.FindFirst("email")?.Value ?? string.Empty;
+                m_Picture = m_State.User.FindFirst("picture")?.Value ?? string.Empty;
+                m_ShortSub = m_Sub.Length > 24 ? m_Sub[..24] + "..." : m_Sub;
+            }
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        Auth.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+        GC.SuppressFinalize(this);
+    }
+
+    private void OnClick_Logout()
+    {
+        Nav.NavigateTo("/auth/logout", forceLoad: true);
+    }
+}
