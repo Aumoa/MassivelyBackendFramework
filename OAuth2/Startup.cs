@@ -21,6 +21,10 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
     string[] supportedCultures = ["en", "ko"];
