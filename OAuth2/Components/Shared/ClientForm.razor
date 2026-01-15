@@ -217,7 +217,7 @@
             return;
         }
 
-        await UserGroups.AddClientUserGroupAsync(Id, m_NewUserSub, m_NewGroupName);
+        await UserGroups.AddClientUserGroupAsync(Id, m_NewUserSub.Trim(), m_NewGroupName.Trim());
         m_NewUserSub = null;
         m_NewGroupName = null;
         await RefreshUserGroupsAsync(Id);

@@ -68,7 +68,7 @@
         OnAuthenticationStateChanged(Auth.GetAuthenticationStateAsync());
     }
 
-    private async void OnAuthenticationStateChanged(Task<AuthenticationState> task)
+    private void OnAuthenticationStateChanged(Task<AuthenticationState> task)
     {
         _ = InvokeAsync(async () =>
         {
