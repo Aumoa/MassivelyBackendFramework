@@ -1,0 +1,49 @@
+<div class="error-container">
+    <p class="material-symbols-outlined error-icon @m_ShakeClass" onclick="@Shake">error</p>
+    <h4>@ErrorTextBody</h4>
+    <p>@ErrorText</p>
+    @if (!string.IsNullOrEmpty(ReturnToMainText))
+    {
+        <button onclick="@OnReturnMainAsync">@ReturnToMainText</button>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string ErrorTextBody { get; set; } = string.Empty;
+
+    [Parameter]
+    public string ErrorText { get; set; } = string.Empty;
+
+    [Parameter]
+    public string ReturnToMainText { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback ReturnClicked { get; set; }
+
+    private string m_ShakeClass = string.Empty;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Shake();
+        }
+    }
+
+    private async void Shake()
+    {
+        m_ShakeClass = "shake";
+        StateHasChanged();
+
+        await Task.Delay(TimeSpan.FromSeconds(0.4));
+
+        m_ShakeClass = string.Empty;
+        StateHasChanged();
+    }
+
+    private async Task OnReturnMainAsync()
+    {
+        await ReturnClicked.InvokeAsync();
+    }
+}
