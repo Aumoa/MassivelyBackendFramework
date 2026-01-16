@@ -137,10 +137,27 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_refresh_token" });
         }
 
-        var newAccess = await accesses.RefreshAccessAsync(request.RefreshToken, jwt.ExpiresIn, cancellationToken);
-        if (newAccess.HasValue == false)
+        var authHeader = Request.Headers.Authorization.FirstOrDefault();
+        if (string.IsNullOrEmpty(authHeader) == false && authHeader.StartsWith("Basic "))
         {
-            return BadRequest(new { error = "invalid_refresh_token" });
+            try
+            {
+                var encoded = authHeader["Basic ".Length..];
+                var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+                var parts = decoded.Split(':');
+                if (parts.Length == 2)
+                {
+                    var clientId = Uri.UnescapeDataString(parts[0]);
+                    var clientSecret = Uri.UnescapeDataString(parts[1]);
+
+                    request.ClientId = clientId;
+                    request.ClientSecret = clientSecret;
+                }
+            }
+            catch (Exception)
+            {
+                return BadRequest(new { error = "invalid_auth_header" });
+            }
         }
 
         if (string.IsNullOrWhiteSpace(request.ClientId))
@@ -148,10 +165,61 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_client_id" });
         }
 
+        if (request.ClientSecret == null)
+        {
+            return BadRequest(new { error = "invalid_client_secret" });
+        }
+
+        var newAccess = await accesses.RefreshAccessAsync(request.RefreshToken, jwt.ExpiresIn, cancellationToken);
+        if (newAccess.HasValue == false)
+        {
+            return BadRequest(new { error = "invalid_refresh_token" });
+        }
+
+        if (newAccess.Value.ClientId != request.ClientId)
+        {
+            logger.LogWarning("Client ID mismatch in refresh token. Token ClientId: {TokenClientId}, Request ClientId: {RequestClientId}", 
+                newAccess.Value.ClientId, request.ClientId);
+            return BadRequest(new { error = "invalid_client" });
+        }
+
+        if (request.ClientId == hostOptions.Value.ClientId)
+        {
+            if (request.ClientSecret != hostOptions.Value.Secret)
+            {
+                return BadRequest(new { error = "invalid_client_secret" });
+            }
+        }
+        else
+        {
+            var cclaims = await clientClaims.GetClaimsAsync(request.ClientId, cancellationToken);
+            if (cclaims.Length == 0)
+            {
+                return BadRequest(new { error = "invalid_client_id" });
+            }
+
+            var secret = cclaims.FirstOrDefault(p => p.Name == "secret").Value ?? string.Empty;
+            if (string.IsNullOrEmpty(secret))
+            {
+                return BadRequest(new { error = "invalid_client_id" });
+            }
+
+            if (PasswordHasher.Verify(request.ClientSecret, secret) == false)
+            {
+                return BadRequest(new { error = "invalid_client_secret" });
+            }
+        }
+
         var access = await accesses.VerifyAsync(newAccess.Value.AccessToken, cancellationToken);
         var rawAccount = await accounts.GetRawAccountAsync(access.Value.Id, cancellationToken);
         var claims = await accountClaims.GetClaimsAsync(access.Value.Id, cancellationToken);
         var groupsClaim = await groups.GetClientUserGroupsAsync(request.ClientId, access.Value.Sub, cancellationToken);
+
+        string? idToken = null;
+        if (newAccess.Value.Scope.Split(' ').Any(p => p is "openid" or "all"))
+        {
+            idToken = jwt.Issue(newAccess.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, newAccess.Value.Scope, [.. claims, .. groupsClaim], null, true));
+        }
 
         var response = new TokenResponse
         {
@@ -160,7 +228,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
             Scope = newAccess.Value.Scope,
             RefreshToken = newAccess.Value.RefreshToken,
-            IdToken = jwt.Issue(newAccess.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, newAccess.Value.Scope, [.. claims, .. groupsClaim], null, true))
+            IdToken = idToken
         };
 
         return Ok(response);
