@@ -1,4 +1,5 @@
 ﻿using System.Security.Cryptography;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OAuth2.DTO;
 using OAuth2.Misc;
@@ -7,7 +8,7 @@ using StackExchange.Redis;
 
 namespace OAuth2.Services;
 
-internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(options.Value), IAccesses
+internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccesses> logger) : RedisConnection(options.Value), IAccesses
 {
     private static readonly RedisValue[] Fields =
     [
@@ -80,6 +81,59 @@ internal class RedisAccesses(IOptions<RedisOptions> options) : RedisConnection(o
             Sub = fields[2]!,
             AccessToken = accessToken,
             RefreshToken = refreshToken!,
+            Scope = fields[3]!,
+            ClientId = fields[4]!
+        };
+    }
+
+    public async ValueTask<Access?> VerifyRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        var db = GetDatabase();
+        var refreshKey = KeyNames.Refresh(refreshToken);
+        
+        logger.LogDebug("Verifying refresh token. Key: {RefreshKey}", refreshKey);
+        
+        // Check if key exists
+        var exists = await db.KeyExistsAsync(refreshKey).WaitAsync(cancellationToken);
+        if (!exists)
+        {
+            logger.LogWarning("Refresh token key does not exist in Redis: {RefreshKey}", refreshKey);
+            return null;
+        }
+        
+        var fields = await db.HashGetAsync(refreshKey, Fields).WaitAsync(cancellationToken);
+        
+        logger.LogDebug("Retrieved {FieldCount} fields from Redis. Expected: {ExpectedCount}", 
+            fields.Length, Fields.Length);
+        
+        if (fields.Length != Fields.Length)
+        {
+            logger.LogWarning("Field count mismatch. Expected: {Expected}, Actual: {Actual}", 
+                Fields.Length, fields.Length);
+            return null;
+        }
+        
+        // Log each field value
+        for (int i = 0; i < fields.Length; i++)
+        {
+            logger.LogDebug("Field[{Index}] ({Name}): {Value}", 
+                i, Fields[i], fields[i].IsNullOrEmpty ? "<empty>" : "***");
+        }
+        
+        if (fields[0].IsNullOrEmpty)
+        {
+            logger.LogWarning("Access token field is empty in refresh token data");
+            return null;
+        }
+
+        logger.LogInformation("Refresh token verified successfully. ClientId: {ClientId}", fields[4]);
+        
+        return new Access
+        {
+            Id = fields[1]!,
+            Sub = fields[2]!,
+            AccessToken = fields[0]!,
+            RefreshToken = refreshToken,
             Scope = fields[3]!,
             ClientId = fields[4]!
         };

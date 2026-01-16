@@ -26,6 +26,77 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         }
     }
 
+    /// <summary>
+    /// Parses the Basic authentication header and extracts Client ID and Secret.
+    /// </summary>
+    private bool TryParseBasicAuth(TokenRequest request)
+    {
+        var authHeader = Request.Headers.Authorization.FirstOrDefault();
+        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Basic "))
+        {
+            return false;
+        }
+
+        try
+        {
+            var encoded = authHeader["Basic ".Length..];
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
+            var parts = decoded.Split(':', 2);
+            
+            if (parts.Length == 2)
+            {
+                request.ClientId = Uri.UnescapeDataString(parts[0]);
+                request.ClientSecret = Uri.UnescapeDataString(parts[1]);
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to parse Basic authentication header");
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Validates the client secret.
+    /// </summary>
+    private async ValueTask<IActionResult?> ValidateClientSecretAsync(string clientId, string clientSecret, CancellationToken cancellationToken)
+    {
+        if (clientId == hostOptions.Value.ClientId)
+        {
+            if (clientSecret != hostOptions.Value.Secret)
+            {
+                logger.LogWarning("Client secret validation failed for internal client: {ClientId}", clientId);
+                return BadRequest(new { error = "invalid_client_secret" });
+            }
+        }
+        else
+        {
+            var cclaims = await clientClaims.GetClaimsAsync(clientId, cancellationToken);
+            if (cclaims.Length == 0)
+            {
+                logger.LogWarning("Client not found: {ClientId}", clientId);
+                return BadRequest(new { error = "invalid_client_id" });
+            }
+
+            var secret = cclaims.FirstOrDefault(p => p.Name == "secret").Value ?? string.Empty;
+            if (string.IsNullOrEmpty(secret))
+            {
+                logger.LogWarning("Client secret not configured: {ClientId}", clientId);
+                return BadRequest(new { error = "invalid_client_id" });
+            }
+
+            if (PasswordHasher.Verify(clientSecret, secret) == false)
+            {
+                logger.LogWarning("Client secret verification failed: {ClientId}", clientId);
+                return BadRequest(new { error = "invalid_client_secret" });
+            }
+        }
+
+        return null;
+    }
+
     private async ValueTask<IActionResult> HandleAuthorizeCodeAsync(TokenRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Code))
@@ -33,80 +104,58 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "code_missing" });
         }
 
-        // Basic 인증 헤더 파싱을 먼저 수행
-        var authHeader = Request.Headers.Authorization.FirstOrDefault();
-        if (string.IsNullOrEmpty(authHeader) == false && authHeader.StartsWith("Basic "))
-        {
-            try
-            {
-                var encoded = authHeader["Basic ".Length..];
-                var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
-                var parts = decoded.Split(':');
-                if (parts.Length == 2)
-                {
-                    var clientId = Uri.UnescapeDataString(parts[0]);
-                    var clientSecret = Uri.UnescapeDataString(parts[1]);
-
-                    request.ClientId = clientId;
-                    request.ClientSecret = clientSecret;
-                }
-            }
-            catch (Exception)
-            {
-                return BadRequest(new { error = "invalid_auth_header" });
-            }
-        }
+        // Parse Basic authentication header
+        TryParseBasicAuth(request);
 
         if (string.IsNullOrWhiteSpace(request.ClientId))
         {
             return BadRequest(new { error = "client_id_missing" });
         }
 
+        if (string.IsNullOrWhiteSpace(request.ClientSecret))
+        {
+            return BadRequest(new { error = "client_secret_missing" });
+        }
+
+        // Verify and remove authorization code (one-time use)
         var code = await authorizationCodes.PopAsync(request.Code, cancellationToken);
         if (code.HasValue == false)
         {
+            logger.LogWarning("Authorization code not found or already used: {Code}", request.Code);
             return BadRequest(new { error = "code_not_exists" });
         }
 
+        // Verify Client ID match
+        if (code.Value.ClientId != request.ClientId)
+        {
+            logger.LogWarning("Client ID mismatch. Code ClientId: {CodeClientId}, Request ClientId: {RequestClientId}", 
+                code.Value.ClientId, request.ClientId);
+            return BadRequest(new { error = "invalid_client" });
+        }
+
+        // Verify Redirect URI
         if (code.Value.RedirectUri != request.RedirectUri)
         {
-            logger.LogInformation("Redirect URI mismatch. Expected: {Expected}, Actual: {Actual}", code.Value.RedirectUri, request.RedirectUri);
+            logger.LogWarning("Redirect URI mismatch. Expected: {Expected}, Actual: {Actual}", 
+                code.Value.RedirectUri, request.RedirectUri);
             return BadRequest(new { error = "redirect_uri_mismatch" });
         }
 
-        if (request.ClientSecret == null)
+        // Validate client secret
+        var validationError = await ValidateClientSecretAsync(request.ClientId, request.ClientSecret, cancellationToken);
+        if (validationError != null)
         {
-            return BadRequest(new { error = "invalid_client_secret" });
+            return validationError;
         }
 
-        if (request.ClientId == hostOptions.Value.ClientId)
-        {
-            if (request.ClientSecret != hostOptions.Value.Secret)
-            {
-                return BadRequest(new { error = "invalid_client_secret" });
-            }
-        }
-        else
-        {
-            var cclaims = await clientClaims.GetClaimsAsync(code.Value.ClientId, cancellationToken);
-            if (cclaims.Length == 0)
-            {
-                return BadRequest(new { error = "invalid_client_id" });
-            }
-
-            var secret = cclaims.FirstOrDefault(p => p.Name == "secret").Value ?? string.Empty;
-            if (string.IsNullOrEmpty(secret))
-            {
-                return BadRequest(new { error = "invalid_client_id" });
-            }
-
-            if (PasswordHasher.Verify(request.ClientSecret, secret) == false)
-            {
-                return BadRequest(new { error = "invalid_client_secret" });
-            }
-        }
-
+        // Issue tokens
         var rawAccount = await accounts.GetRawAccountAsync(code.Value.AccountId, cancellationToken);
+        if (!rawAccount.HasValue)
+        {
+            logger.LogError("Account not found: {AccountId}", code.Value.AccountId);
+            return BadRequest(new { error = "account_not_found" });
+        }
+
         var access = await accesses.WriteAccessAsync(code.Value.AccountId, rawAccount.Value.Sub, code.Value.Scope, code.Value.ClientId, jwt.ExpiresIn, cancellationToken);
         var claims = await accountClaims.GetClaimsAsync(code.Value.AccountId, cancellationToken);
         var groupsClaim = await groups.GetClientUserGroupsAsync(request.ClientId, rawAccount.Value.Sub, cancellationToken);
@@ -127,94 +176,81 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             IdToken = idToken
         };
 
+        logger.LogInformation("Token issued successfully for client: {ClientId}, account: {AccountId}", request.ClientId, code.Value.AccountId);
         return Ok(response);
     }
 
     private async ValueTask<IActionResult> HandleRefreshTokenAsync(TokenRequest request, CancellationToken cancellationToken)
     {
-        if (request.RefreshToken == null)
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
         {
-            return BadRequest(new { error = "invalid_refresh_token" });
+            return BadRequest(new { error = "refresh_token_missing" });
         }
 
-        var authHeader = Request.Headers.Authorization.FirstOrDefault();
-        if (string.IsNullOrEmpty(authHeader) == false && authHeader.StartsWith("Basic "))
-        {
-            try
-            {
-                var encoded = authHeader["Basic ".Length..];
-                var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
-                var parts = decoded.Split(':');
-                if (parts.Length == 2)
-                {
-                    var clientId = Uri.UnescapeDataString(parts[0]);
-                    var clientSecret = Uri.UnescapeDataString(parts[1]);
-
-                    request.ClientId = clientId;
-                    request.ClientSecret = clientSecret;
-                }
-            }
-            catch (Exception)
-            {
-                return BadRequest(new { error = "invalid_auth_header" });
-            }
-        }
+        // Parse Basic authentication header
+        TryParseBasicAuth(request);
 
         if (string.IsNullOrWhiteSpace(request.ClientId))
         {
-            return BadRequest(new { error = "invalid_client_id" });
+            return BadRequest(new { error = "client_id_missing" });
         }
 
-        if (request.ClientSecret == null)
+        if (string.IsNullOrWhiteSpace(request.ClientSecret))
         {
-            return BadRequest(new { error = "invalid_client_secret" });
+            return BadRequest(new { error = "client_secret_missing" });
         }
 
-        var newAccess = await accesses.RefreshAccessAsync(request.RefreshToken, jwt.ExpiresIn, cancellationToken);
-        if (newAccess.HasValue == false)
+        // Step 1: Query refresh token information without refreshing it yet
+        // We need to verify the client ID before actually generating new tokens
+        var oldAccess = await accesses.VerifyRefreshTokenAsync(request.RefreshToken, cancellationToken);
+        if (!oldAccess.HasValue)
         {
+            logger.LogWarning("Invalid or expired refresh token");
             return BadRequest(new { error = "invalid_refresh_token" });
         }
 
-        if (newAccess.Value.ClientId != request.ClientId)
+        // Step 2: Verify Client ID match
+        if (oldAccess.Value.ClientId != request.ClientId)
         {
             logger.LogWarning("Client ID mismatch in refresh token. Token ClientId: {TokenClientId}, Request ClientId: {RequestClientId}", 
-                newAccess.Value.ClientId, request.ClientId);
+                oldAccess.Value.ClientId, request.ClientId);
             return BadRequest(new { error = "invalid_client" });
         }
 
-        if (request.ClientId == hostOptions.Value.ClientId)
+        // Step 3: Validate client secret
+        var validationError = await ValidateClientSecretAsync(request.ClientId, request.ClientSecret, cancellationToken);
+        if (validationError != null)
         {
-            if (request.ClientSecret != hostOptions.Value.Secret)
-            {
-                return BadRequest(new { error = "invalid_client_secret" });
-            }
-        }
-        else
-        {
-            var cclaims = await clientClaims.GetClaimsAsync(request.ClientId, cancellationToken);
-            if (cclaims.Length == 0)
-            {
-                return BadRequest(new { error = "invalid_client_id" });
-            }
-
-            var secret = cclaims.FirstOrDefault(p => p.Name == "secret").Value ?? string.Empty;
-            if (string.IsNullOrEmpty(secret))
-            {
-                return BadRequest(new { error = "invalid_client_id" });
-            }
-
-            if (PasswordHasher.Verify(request.ClientSecret, secret) == false)
-            {
-                return BadRequest(new { error = "invalid_client_secret" });
-            }
+            return validationError;
         }
 
+        // Step 4: Generate new tokens after all validations pass
+        var newAccess = await accesses.RefreshAccessAsync(request.RefreshToken, jwt.ExpiresIn, cancellationToken);
+        if (newAccess.HasValue == false)
+        {
+            logger.LogWarning("Failed to refresh access token");
+            return BadRequest(new { error = "invalid_refresh_token" });
+        }
+
+        // Retrieve token information
         var access = await accesses.VerifyAsync(newAccess.Value.AccessToken, cancellationToken);
+        if (!access.HasValue)
+        {
+            logger.LogError("Newly created access token verification failed");
+            return StatusCode(500, new { error = "internal_server_error" });
+        }
+
         var rawAccount = await accounts.GetRawAccountAsync(access.Value.Id, cancellationToken);
+        if (!rawAccount.HasValue)
+        {
+            logger.LogError("Account not found: {AccountId}", access.Value.Id);
+            return BadRequest(new { error = "account_not_found" });
+        }
+
         var claims = await accountClaims.GetClaimsAsync(access.Value.Id, cancellationToken);
         var groupsClaim = await groups.GetClientUserGroupsAsync(request.ClientId, access.Value.Sub, cancellationToken);
 
+        // Issue IdToken only when openid scope is present
         string? idToken = null;
         if (newAccess.Value.Scope.Split(' ').Any(p => p is "openid" or "all"))
         {
@@ -231,6 +267,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             IdToken = idToken
         };
 
+        logger.LogInformation("Token refreshed successfully for client: {ClientId}, account: {AccountId}", request.ClientId, access.Value.Id);
         return Ok(response);
     }
 }
