@@ -6,6 +6,8 @@ internal record JwtOptions
 
     public required TimeSpan ExpiresIn { get; init; }
 
+    public required TimeSpan RefreshTokenExpiresIn { get; init; }
+
     public required string PrivateKeyPath { get; init; }
 
     public required string PublicKeyPath { get; init; }

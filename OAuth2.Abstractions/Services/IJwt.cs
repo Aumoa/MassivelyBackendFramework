@@ -10,6 +10,7 @@ public interface IJwt
     string Exponent { get; }
     string KId { get; }
     TimeSpan ExpiresIn { get; }
+    TimeSpan RefreshTokenExpiresIn { get; }
 
     Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken);
     string Issue(string audience, params Claim[] claims);

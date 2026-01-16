@@ -38,7 +38,7 @@
             try
             {
                 var rawAccount = await Accounts.GetRawAccountAsync(code.Value.AccountId);
-                var access = await Accesses.WriteAccessAsync(code.Value.AccountId, rawAccount.Value.Sub, code.Value.Scope, code.Value.ClientId, Jwt.ExpiresIn);
+                var access = await Accesses.WriteAccessAsync(code.Value.AccountId, rawAccount.Value.Sub, code.Value.Scope, code.Value.ClientId, Jwt.ExpiresIn, Jwt.RefreshTokenExpiresIn);
                 var claims = await AccountClaims.GetClaimsAsync(code.Value.AccountId);
                 var jwt = Jwt.Issue(HostOptions.Value.ClientId, [
                     new("access_token", access.AccessToken),

@@ -156,7 +156,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "account_not_found" });
         }
 
-        var access = await accesses.WriteAccessAsync(code.Value.AccountId, rawAccount.Value.Sub, code.Value.Scope, code.Value.ClientId, jwt.ExpiresIn, cancellationToken);
+        var access = await accesses.WriteAccessAsync(code.Value.AccountId, rawAccount.Value.Sub, code.Value.Scope, code.Value.ClientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken);
         var claims = await accountClaims.GetClaimsAsync(code.Value.AccountId, cancellationToken);
         var groupsClaim = await groups.GetClientUserGroupsAsync(request.ClientId, rawAccount.Value.Sub, cancellationToken);
 
@@ -225,7 +225,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         }
 
         // Step 4: Generate new tokens after all validations pass
-        var newAccess = await accesses.RefreshAccessAsync(request.RefreshToken, jwt.ExpiresIn, cancellationToken);
+        var newAccess = await accesses.RefreshAccessAsync(request.RefreshToken, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken);
         if (newAccess.HasValue == false)
         {
             logger.LogWarning("Failed to refresh access token");

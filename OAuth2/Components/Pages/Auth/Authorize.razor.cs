@@ -200,7 +200,7 @@ public partial class Authorize(
                                 return;
                             }
 
-                            var newAccess = await accesses.RefreshAccessAsync(refresh_token, jwt.ExpiresIn);
+                            var newAccess = await accesses.RefreshAccessAsync(refresh_token, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn);
                             if (newAccess.HasValue == false)
                             {
                                 DeleteCache();
@@ -385,7 +385,7 @@ public partial class Authorize(
         {
             var expiresIn = TimeSpan.FromHours(1);
             var rawAccount = await accounts.GetRawAccountAsync(id);
-            var access = await accesses.WriteAccessAsync(id, rawAccount.Value.Sub, Scope, ClientId, expiresIn);
+            var access = await accesses.WriteAccessAsync(id, rawAccount.Value.Sub, Scope, ClientId, expiresIn, jwt.RefreshTokenExpiresIn);
             var claims = await accountClaims.GetClaimsAsync(id);
             var idTokenClaims = jwt.ConfigureClaims(rawAccount.Value, Scope, claims, Nonce, true);
             var idToken = jwt.Issue(ClientId, idTokenClaims);

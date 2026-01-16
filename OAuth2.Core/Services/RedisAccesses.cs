@@ -19,7 +19,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
         "client_id"
     ];
 
-    public async ValueTask<Access> WriteAccessAsync(string id, string sub, string scope, string clientId, TimeSpan expire, CancellationToken cancellationToken = default)
+    public async ValueTask<Access> WriteAccessAsync(string id, string sub, string scope, string clientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default)
     {
         var db = GetDatabase();
         var tx = db.CreateTransaction();
@@ -38,6 +38,9 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
             new("scope", scope),
             new("client_id", clientId)
             ]).WaitAsync(cancellationToken);
+        
+        // Set TTL for refresh token
+        _ = tx.KeyExpireAsync(refreshKey, refreshTokenExpire).WaitAsync(cancellationToken);
 
         await tx.ExecuteAsync().WaitAsync(cancellationToken);
 
@@ -139,7 +142,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
         };
     }
 
-    public async ValueTask<Access?> RefreshAccessAsync(string refreshToken, TimeSpan expire, CancellationToken cancellationToken = default)
+    public async ValueTask<Access?> RefreshAccessAsync(string refreshToken, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default)
     {
         var db = GetDatabase();
         var refreshKey = KeyNames.Refresh(refreshToken);
@@ -171,6 +174,9 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
             new("scope", results[2]!),
             new("client_id", results[3]!)
             ]).WaitAsync(cancellationToken);
+        
+        // Set TTL for new refresh token
+        await db.KeyExpireAsync(refreshKey, refreshTokenExpire).WaitAsync(cancellationToken);
 
         CleanupAsync();
 

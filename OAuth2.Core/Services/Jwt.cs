@@ -14,6 +14,7 @@ internal class Jwt : IJwt
     private readonly SigningCredentials m_Credentials;
     private readonly string m_Issuer;
     private readonly TimeSpan m_ExpiresIn;
+    private readonly TimeSpan m_RefreshTokenExpiresIn;
     private readonly JwtSecurityTokenHandler m_Handler = new();
     private readonly string m_Modulus;
     private readonly string m_Exponent;
@@ -27,6 +28,7 @@ internal class Jwt : IJwt
         m_Credentials = new SigningCredentials(m_Key, SecurityAlgorithms.RsaSha256);
         m_Issuer = options.Value.Issuer;
         m_ExpiresIn = options.Value.ExpiresIn;
+        m_RefreshTokenExpiresIn = options.Value.RefreshTokenExpiresIn;
 
         rsa = RSA.Create();
         rsa.ImportFromPem(File.ReadAllText(options.Value.PublicKeyPath));
@@ -53,6 +55,8 @@ internal class Jwt : IJwt
     public string KId => m_KId;
 
     public TimeSpan ExpiresIn => m_ExpiresIn;
+
+    public TimeSpan RefreshTokenExpiresIn => m_RefreshTokenExpiresIn;
 
     public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken)
     {
