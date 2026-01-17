@@ -76,7 +76,7 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                 var rt = RefreshToken;
                 if (string.IsNullOrEmpty(rt) == false)
                 {
-                    var access = await accesses.RefreshAccessAsync(rt, jwt.ExpiresIn);
+                    var access = await accesses.RefreshAccessAsync(rt, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn);
                     if (access.HasValue)
                     {
                         var httpContext = accessor.HttpContext;
