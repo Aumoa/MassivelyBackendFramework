@@ -237,9 +237,6 @@
   <data name="CLIENTS_CLIENT_NAME_LABEL" xml:space="preserve">
     <value>이름</value>
   </data>
-  <data name="CLIENTS_CLIENT_MANAGE_LABEL" xml:space="preserve">
-    <value>관리</value>
-  </data>
   <data name="CLIENTS_CLIENT_SUB_LABEL" xml:space="preserve">
     <value>식별자</value>
   </data>
@@ -263,5 +260,11 @@
   </data>
   <data name="CLIENTFORM_BUTTON_REMOVE" xml:space="preserve">
     <value>제거</value>
+  </data>
+  <data name="CLIENTS_CLIENT_TYPE_LABEL" xml:space="preserve">
+    <value>유형</value>
+  </data>
+  <data name="CLIENTS_CLIENT_TYPE_WEB_APPLICATION" xml:space="preserve">
+    <value>웹 애플리케이션</value>
   </data>
 </root>

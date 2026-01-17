@@ -106,15 +106,6 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
-        ///   Manage과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string CLIENTS_CLIENT_MANAGE_LABEL {
-            get {
-                return ResourceManager.GetString("CLIENTS_CLIENT_MANAGE_LABEL", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   NAME과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string CLIENTS_CLIENT_NAME_LABEL {
@@ -129,6 +120,24 @@ namespace OAuth2.Localizations {
         internal static string CLIENTS_CLIENT_SUB_LABEL {
             get {
                 return ResourceManager.GetString("CLIENTS_CLIENT_SUB_LABEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Type과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTS_CLIENT_TYPE_LABEL {
+            get {
+                return ResourceManager.GetString("CLIENTS_CLIENT_TYPE_LABEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Web Application과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTS_CLIENT_TYPE_WEB_APPLICATION {
+            get {
+                return ResourceManager.GetString("CLIENTS_CLIENT_TYPE_WEB_APPLICATION", resourceCulture);
             }
         }
         

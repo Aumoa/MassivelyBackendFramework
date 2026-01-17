@@ -237,9 +237,6 @@
   <data name="CLIENTS_CLIENT_NAME_LABEL" xml:space="preserve">
     <value>NAME</value>
   </data>
-  <data name="CLIENTS_CLIENT_MANAGE_LABEL" xml:space="preserve">
-    <value>Manage</value>
-  </data>
   <data name="CLIENTS_CLIENT_SUB_LABEL" xml:space="preserve">
     <value>SUB</value>
   </data>
@@ -263,5 +260,11 @@
   </data>
   <data name="CLIENTFORM_BUTTON_REMOVE" xml:space="preserve">
     <value>Remove</value>
+  </data>
+  <data name="CLIENTS_CLIENT_TYPE_LABEL" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="CLIENTS_CLIENT_TYPE_WEB_APPLICATION" xml:space="preserve">
+    <value>Web Application</value>
   </data>
 </root>

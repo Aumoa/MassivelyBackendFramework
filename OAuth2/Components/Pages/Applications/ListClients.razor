@@ -8,36 +8,41 @@
 <div class="container">
     <button class="link-button" @onclick="OnAddButtonClickedAsync">@Strings.NEWCLIENT_BUTTONS_NEW</button>
     <div class="clients-list">
-        @foreach (var client in m_Clients)
-        {
-            <div class="client-item">
-                <table>
-                    <tbody>
+        <div class="client-item">
+            <table>
+                <thead>
+                    <tr>
+                        <th>
+                            @Strings.CLIENTS_CLIENT_NAME_LABEL
+                        </th>
+                        <th>
+                            @Strings.CLIENTS_CLIENT_TYPE_LABEL
+                        </th>
+                        <th>
+                            @Strings.CLIENTS_CLIENT_SUB_LABEL
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var client in m_Clients)
+                    {
                         <tr>
-                            <th>
-                                @Strings.CLIENTS_CLIENT_NAME_LABEL
-                            </th>
                             <td>
-                                @client.Name
+                                <span class="link-button" @onclick="() => OnManageClientAsync(client.Id)">
+                                    @client.Name
+                                </span>
                             </td>
                             <td>
-                                <button class="link-button" @onclick="() => OnManageClientAsync(client.Id)">@Strings.CLIENTS_CLIENT_MANAGE_LABEL</button>
+                                @Strings.CLIENTS_CLIENT_TYPE_WEB_APPLICATION
                             </td>
-                        </tr>
-                        <tr>
-                            <th>
-                                @Strings.CLIENTS_CLIENT_SUB_LABEL
-                            </th>
                             <td>
                                 @client.Id
                             </td>
-                            <td>
-                            </td>
                         </tr>
-                    </tbody>
-                </table>
-            </div>
-        }
+                    }
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
