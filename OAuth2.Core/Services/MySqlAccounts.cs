@@ -117,4 +117,39 @@ internal class MySqlAccounts(IOptions<MySqlOptions> options) : MySqlDbContext(op
             CreatedAt = created_at
         };
     }
+
+    public async ValueTask<bool> ChangePasswordAsync(string sub, string previousPassword, string newPassword, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sub);
+        ArgumentException.ThrowIfNullOrWhiteSpace(previousPassword);
+        ArgumentException.ThrowIfNullOrWhiteSpace(newPassword);
+
+        using var connection = GetConnection();
+
+        const string QUERY1 = "SELECT `password` FROM `account` WHERE `sub` = @sub";
+        var command = new CommandDefinition(QUERY1, new { sub }, cancellationToken: cancellationToken);
+        var passwordHash = await connection.QuerySingleOrDefaultAsync<string>(command);
+        if (string.IsNullOrEmpty(passwordHash))
+        {
+            return false;
+        }
+
+        if (!PasswordHasher.Verify(previousPassword, passwordHash))
+        {
+            return false;
+        }
+
+        // After verification, check if the new password is the same as the previous password
+        if (previousPassword == newPassword)
+        {
+            return true;
+        }
+
+        var newPasswordHash = PasswordHasher.Hash(newPassword);
+        
+        const string QUERY2 = "UPDATE `account` SET `password` = @newPasswordHash WHERE `sub` = @sub AND `password` = @passwordHash";
+        command = new CommandDefinition(QUERY2, new { sub, newPasswordHash, passwordHash }, cancellationToken: cancellationToken);
+        int aff = await connection.ExecuteAsync(command);
+        return aff == 1;
+    }
 }

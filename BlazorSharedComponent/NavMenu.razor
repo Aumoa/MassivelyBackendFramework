@@ -13,7 +13,7 @@
         <div class="nav-item px-3">
             @foreach (var item in Items)
             {
-                <NavLink class="nav-link" href="@item.Href" Match="NavLinkMatch.All">
+                <NavLink class="nav-link" href="@item.Href" Match="NavLinkMatch.Prefix">
                     <span class="material-symbols-outlined" aria-hidden="true">@item.Icon</span>
                     <span style="margin-left: 4px;">@item.Text</span>
                 </NavLink>

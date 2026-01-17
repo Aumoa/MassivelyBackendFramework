@@ -1,4 +1,4 @@
-﻿@page "/manage-account"
+﻿@page "/manage-my-account"
 @page "/"
 @using OAuth2.Services
 @layout AuthorizedLayout
@@ -9,4 +9,23 @@
         <th>@Strings.MANAGEACCOUNTS_HEAD_SUB</th>
         <td>@Auth.Sub</td>
     </tr>
+    <tr>
+        <th>@Strings.MANAGEACCOUNTS_HEAD_PASSWORD</th>
+        <td>
+            <span class="link-button" @onclick="OnChangePasswordAsync">
+                @Strings.MANAGEACCOUNTS_PASSWORD_CHANGE
+            </span>
+        </td>
+    </tr>
 </table>
+
+<DlgChangePassword @ref="m_DlgChangePassword" />
+
+@code {
+    private DlgChangePassword m_DlgChangePassword = null!;
+
+    private async Task OnChangePasswordAsync()
+    {
+        await m_DlgChangePassword.ShowAsync();
+    }
+}

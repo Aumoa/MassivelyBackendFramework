@@ -177,8 +177,8 @@
   <data name="MANAGEACCOUNTS_HEAD_SUB" xml:space="preserve">
     <value>유저 식별자</value>
   </data>
-  <data name="NAVMENU_LABEL_MANAGE_ACCOUNT" xml:space="preserve">
-    <value>계정 관리</value>
+  <data name="NAVMENU_LABEL_MANAGE_MYACCOUNT" xml:space="preserve">
+    <value>내 계정 관리</value>
   </data>
   <data name="NO_EMAIL_VERIFIED_MESSAGE" xml:space="preserve">
     <value>이메일 인증이 완료되지 않았습니다.</value>
@@ -266,5 +266,53 @@
   </data>
   <data name="CLIENTS_CLIENT_TYPE_WEB_APPLICATION" xml:space="preserve">
     <value>웹 애플리케이션</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_PASSWORD" xml:space="preserve">
+    <value>암호</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PASSWORD_CHANGE" xml:space="preserve">
+    <value>변경</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_TITLE" xml:space="preserve">
+    <value>암호 변경</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_CURRENTPW" xml:space="preserve">
+    <value>현재 암호</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_NEWPW" xml:space="preserve">
+    <value>새 암호</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_CONFIRMPW" xml:space="preserve">
+    <value>암호 확인</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_CURRENTPWEMPTY" xml:space="preserve">
+    <value>현재 암호는 필수입니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_NEWPWEMPTY" xml:space="preserve">
+    <value>새 암호는 필수입니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_PWLENGTH" xml:space="preserve">
+    <value>암호는 {0}자리 이상 문자열이어야 합니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_MISMATCHCONRIM" xml:space="preserve">
+    <value>새 암호 확인이 일치하지 않습니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_NOTMODIFIED" xml:space="preserve">
+    <value>새 암호가 기존 암호와 같습니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_PASSWORDINCORRECT" xml:space="preserve">
+    <value>기존 암호가 일치하지 않습니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_SUCCESS_MESSAGE" xml:space="preserve">
+    <value>비밀번호가 성공적으로 변경되었습니다. 보안을 위해 로그아웃됩니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_TITLE" xml:space="preserve">
+    <value>비밀번호 변경 실패</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGE_CONFIRM" xml:space="preserve">
+    <value>변경</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGE_CANCEL" xml:space="preserve">
+    <value>취소</value>
   </data>
 </root>

@@ -177,8 +177,8 @@
   <data name="MANAGEACCOUNTS_HEAD_SUB" xml:space="preserve">
     <value>User Identifier</value>
   </data>
-  <data name="NAVMENU_LABEL_MANAGE_ACCOUNT" xml:space="preserve">
-    <value>Manage Account</value>
+  <data name="NAVMENU_LABEL_MANAGE_MYACCOUNT" xml:space="preserve">
+    <value>Manage My Account</value>
   </data>
   <data name="NO_EMAIL_VERIFIED_MESSAGE" xml:space="preserve">
     <value>Email verification has not been completed.</value>
@@ -266,5 +266,53 @@
   </data>
   <data name="CLIENTS_CLIENT_TYPE_WEB_APPLICATION" xml:space="preserve">
     <value>Web Application</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_PASSWORD" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PASSWORD_CHANGE" xml:space="preserve">
+    <value>Change</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_TITLE" xml:space="preserve">
+    <value>Change Password</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_CURRENTPW" xml:space="preserve">
+    <value>Current Password</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_NEWPW" xml:space="preserve">
+    <value>New Password</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_CONFIRMPW" xml:space="preserve">
+    <value>Confirm Password</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_CURRENTPWEMPTY" xml:space="preserve">
+    <value>Current password is required.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_NEWPWEMPTY" xml:space="preserve">
+    <value>New password is required.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_PWLENGTH" xml:space="preserve">
+    <value>Password must be at least {0} characters long.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_MISMATCHCONRIM" xml:space="preserve">
+    <value>Password confirmation does not match.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_NOTMODIFIED" xml:space="preserve">
+    <value>New password must be different from the current password.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_PASSWORDINCORRECT" xml:space="preserve">
+    <value>Current password is incorrect. Please try again.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_SUCCESS_MESSAGE" xml:space="preserve">
+    <value>Your password has been successfully changed. You will be logged out for security.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGEPW_ERROR_TITLE" xml:space="preserve">
+    <value>Password Change Failed</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGE_CONFIRM" xml:space="preserve">
+    <value>Change</value>
+  </data>
+  <data name="MANAGEACCOUNTS_CHANGE_CANCEL" xml:space="preserve">
+    <value>Cancel</value>
   </data>
 </root>

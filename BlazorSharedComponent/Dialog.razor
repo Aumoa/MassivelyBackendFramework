@@ -1,0 +1,82 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.Extensions.Logging
+@rendermode RenderMode.InteractiveServer
+@inject ILogger<Dialog> Logger
+
+@if (m_Visible)
+{
+    <div class="display-overlay @m_ExtendClass" @onclick="OnCloseAsync">
+        <div class="dialog-container" @onclick:stopPropagation="true">
+            @ChildContent
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public EventCallback OnBlur { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private bool m_Visible;
+    private string m_ExtendClass = string.Empty;
+    private bool m_DuringClose;
+
+    public Task ShowAsync()
+    {
+        m_Visible = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public async Task CloseAsync()
+    {
+        if (m_DuringClose)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                await OnBlur.InvokeAsync();
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "An error occurred while invoking the OnBlur callback during dialog close operation");
+            }
+        });
+
+        m_DuringClose = true;
+        m_ExtendClass = "close";
+        StateHasChanged();
+
+        await Task.Delay(TimeSpan.FromSeconds(0.2));
+
+        m_DuringClose = false;
+        m_ExtendClass = string.Empty;
+        m_Visible = false;
+
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                await OnClose.InvokeAsync();
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "An error occurred while invoking the OnClose callback during dialog close operation");
+            }
+        });
+    }
+
+    private async Task OnCloseAsync()
+    {
+        await CloseAsync();
+    }
+}

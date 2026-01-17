@@ -394,11 +394,155 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Cancel과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGE_CANCEL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGE_CANCEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Change과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGE_CONFIRM {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGE_CONFIRM", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Confirm Password과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_CONFIRMPW {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_CONFIRMPW", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Current Password과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_CURRENTPW {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_CURRENTPW", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Current password is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_ERROR_CURRENTPWEMPTY {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_ERROR_CURRENTPWEMPTY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Password confirmation does not match.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_ERROR_MISMATCHCONRIM {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_ERROR_MISMATCHCONRIM", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   New password is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_ERROR_NEWPWEMPTY {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_ERROR_NEWPWEMPTY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   New password must be different from the current password.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_ERROR_NOTMODIFIED {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_ERROR_NOTMODIFIED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Current password is incorrect. Please try again.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_ERROR_PASSWORDINCORRECT {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_ERROR_PASSWORDINCORRECT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Password must be at least {0} characters long.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_ERROR_PWLENGTH {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_ERROR_PWLENGTH", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Password Change Failed과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_ERROR_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_ERROR_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   New Password과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_NEWPW {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_NEWPW", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Your password has been successfully changed. You will be logged out for security.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_SUCCESS_MESSAGE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_SUCCESS_MESSAGE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Change Password과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_CHANGEPW_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_CHANGEPW_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Password과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_PASSWORD {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_PASSWORD", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   User Identifier과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string MANAGEACCOUNTS_HEAD_SUB {
             get {
                 return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_SUB", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Change과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PASSWORD_CHANGE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PASSWORD_CHANGE", resourceCulture);
             }
         }
         
@@ -412,20 +556,20 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
-        ///   Manage Account과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string NAVMENU_LABEL_MANAGE_ACCOUNT {
-            get {
-                return ResourceManager.GetString("NAVMENU_LABEL_MANAGE_ACCOUNT", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Manage Applications과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string NAVMENU_LABEL_MANAGE_APPLICATIONS {
             get {
                 return ResourceManager.GetString("NAVMENU_LABEL_MANAGE_APPLICATIONS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Manage My Account과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NAVMENU_LABEL_MANAGE_MYACCOUNT {
+            get {
+                return ResourceManager.GetString("NAVMENU_LABEL_MANAGE_MYACCOUNT", resourceCulture);
             }
         }
         
