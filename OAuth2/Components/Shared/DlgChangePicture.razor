@@ -1,0 +1,57 @@
+﻿@using OAuth2.Services
+@inject JwtAuthenticationStateProvider Auth
+@inject IAccesses Accesses
+@inject IAccountClaims AccountClaims
+@inject ILogger<DlgChangePicture> Logger
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<Dialog @ref="m_Ref">
+    <h5 style="font-weight: bold;">
+        @Strings.MANAGEACCOUNTS_PICTURE_CHANGE_TITLE
+    </h5>
+    <p>
+        <span>@Strings.MANAGEACCOUNTS_PICTURE_URI</span>
+        <input type="text" @bind-value="m_NewPictureUri" />
+        <span class="link-button" @onclick="OnConfirmAsync">
+            @Strings.MANAGEACCOUNTS_PICTURE_CHANGE
+        </span>
+    </p>
+    <img src="@m_NewPictureUri" />
+</Dialog>
+
+@code {
+    private Dialog m_Ref = null!;
+    private string? m_NewPictureUri;
+
+    public async Task ShowAsync()
+    {
+        m_NewPictureUri = Auth.Picture;
+        await m_Ref.ShowAsync();
+    }
+
+    private async Task OnConfirmAsync()
+    {
+        if (Auth.Picture == m_NewPictureUri)
+        {
+            await JS.InvokeVoidAsync("alert", Strings.MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE);
+            await m_Ref.CloseAsync();
+            return;
+        }
+
+        var verified = await Accesses.VerifyAsync(Auth.AccessToken ?? string.Empty);
+        if (verified.HasValue == false || verified.Value.Id != Auth.Id)
+        {
+            await JS.InvokeVoidAsync("alert", Strings.ERROR_COMMON_AUTHENTICATION_EXPIRED);
+            Nav.NavigateTo("/auth/logout", forceLoad: true);
+            return;
+        }
+
+        var accountId = Auth.Id;
+        const string kClaimName = "picture";
+        await AccountClaims.SetUniqueClaimAsync(accountId, kClaimName, m_NewPictureUri ?? string.Empty);
+
+        await JS.InvokeVoidAsync("alert", Strings.MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE);
+        Nav.NavigateTo("/auth/logout", forceLoad: true);
+    }
+}

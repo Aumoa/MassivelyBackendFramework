@@ -315,4 +315,25 @@
   <data name="MANAGEACCOUNTS_CHANGE_CANCEL" xml:space="preserve">
     <value>Cancel</value>
   </data>
+  <data name="MANAGEACCOUNTS_HEAD_PICTURE" xml:space="preserve">
+    <value>Picture</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_CHANGE" xml:space="preserve">
+    <value>Change</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_CHANGE_TITLE" xml:space="preserve">
+    <value>Change Picture</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_URI" xml:space="preserve">
+    <value>Picture Uri</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE" xml:space="preserve">
+    <value>No changes.</value>
+  </data>
+  <data name="ERROR_COMMON_AUTHENTICATION_EXPIRED" xml:space="preserve">
+    <value>Authentication has expired.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE" xml:space="preserve">
+    <value>Your picture has been successfully changed. You will be logged out for refresh.</value>
+  </data>
 </root>

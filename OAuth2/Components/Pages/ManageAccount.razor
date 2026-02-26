@@ -17,15 +17,31 @@
             </span>
         </td>
     </tr>
+    <tr>
+        <th>@Strings.MANAGEACCOUNTS_HEAD_PICTURE</th>
+        <td>
+            <img src="@Auth.Picture" style="max-width: 64px; max-height: 64px;" />
+            <span class="link-button" @onclick="OnChangePictureAsync">
+                @Strings.MANAGEACCOUNTS_PICTURE_CHANGE
+            </span>
+        </td>
+    </tr>
 </table>
 
 <DlgChangePassword @ref="m_DlgChangePassword" />
+<DlgChangePicture @ref="m_DlgChangePicture" />
 
 @code {
     private DlgChangePassword m_DlgChangePassword = null!;
+    private DlgChangePicture m_DlgChangePicture = null!;
 
     private async Task OnChangePasswordAsync()
     {
         await m_DlgChangePassword.ShowAsync();
+    }
+
+    private async Task OnChangePictureAsync()
+    {
+        await m_DlgChangePicture.ShowAsync();
     }
 }

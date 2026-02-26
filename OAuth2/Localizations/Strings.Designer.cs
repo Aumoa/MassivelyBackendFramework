@@ -160,6 +160,15 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Authentication has expired.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERROR_COMMON_AUTHENTICATION_EXPIRED {
+            get {
+                return ResourceManager.GetString("ERROR_COMMON_AUTHENTICATION_EXPIRED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Some required parameters were not passed correctly.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string ERRORS_BAD_REQUEST {
@@ -529,6 +538,15 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Picture과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_PICTURE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_PICTURE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   User Identifier과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string MANAGEACCOUNTS_HEAD_SUB {
@@ -543,6 +561,51 @@ namespace OAuth2.Localizations {
         internal static string MANAGEACCOUNTS_PASSWORD_CHANGE {
             get {
                 return ResourceManager.GetString("MANAGEACCOUNTS_PASSWORD_CHANGE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Change과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_CHANGE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_CHANGE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   No changes.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Your picture has been successfully changed. You will be logged out for refresh.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Change Picture과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_CHANGE_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_CHANGE_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Picture Uri과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_URI {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_URI", resourceCulture);
             }
         }
         

@@ -315,4 +315,25 @@
   <data name="MANAGEACCOUNTS_CHANGE_CANCEL" xml:space="preserve">
     <value>취소</value>
   </data>
+  <data name="MANAGEACCOUNTS_HEAD_PICTURE" xml:space="preserve">
+    <value>사진</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_CHANGE" xml:space="preserve">
+    <value>변경</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_CHANGE_TITLE" xml:space="preserve">
+    <value>사진 변경</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_URI" xml:space="preserve">
+    <value>사진 Uri</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE" xml:space="preserve">
+    <value>변경 내용이 없습니다.</value>
+  </data>
+  <data name="ERROR_COMMON_AUTHENTICATION_EXPIRED" xml:space="preserve">
+    <value>인증이 만료되었습니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE" xml:space="preserve">
+    <value>사진이 성공적으로 변경되었습니다. 갱신을 위해 로그아웃됩니다.</value>
+  </data>
 </root>

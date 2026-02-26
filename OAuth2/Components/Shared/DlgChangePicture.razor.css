@@ -1,0 +1,23 @@
+﻿p {
+    width: 512px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+p input {
+    flex: 1;
+}
+
+p span:first-child {
+    margin-right: 20px;
+}
+
+p span:last-child {
+    margin-left: 20px;
+}
+
+img {
+    width: 512px;
+    height: 512px;
+}
