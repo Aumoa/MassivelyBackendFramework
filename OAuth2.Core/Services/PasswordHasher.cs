@@ -27,12 +27,23 @@ public static class PasswordHasher
 
         var hash = components[0];
         var salt = components[1];
-        var iterations = int.Parse(components[2]);
 
-        byte[] saltBytes = Convert.FromBase64String(salt);
-        using var pbkdf2 = new Rfc2898DeriveBytes(password, saltBytes, iterations, HashAlgorithmName.SHA256);
-        byte[] computedHashBytes = pbkdf2.GetBytes(32);
-        byte[] savedHashBytes = Convert.FromBase64String(hash);
-        return CryptographicOperations.FixedTimeEquals(computedHashBytes, savedHashBytes);
+        if (!int.TryParse(components[2], out var iterations))
+        {
+            return false;
+        }
+
+        try
+        {
+            byte[] saltBytes = Convert.FromBase64String(salt);
+            using var pbkdf2 = new Rfc2898DeriveBytes(password, saltBytes, iterations, HashAlgorithmName.SHA256);
+            byte[] computedHashBytes = pbkdf2.GetBytes(32);
+            byte[] savedHashBytes = Convert.FromBase64String(hash);
+            return CryptographicOperations.FixedTimeEquals(computedHashBytes, savedHashBytes);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 }
