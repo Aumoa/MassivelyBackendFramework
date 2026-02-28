@@ -14,7 +14,7 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
         using var connection = GetConnection();
         await connection.OpenAsync();
 
-        await using var tx = await connection.BeginTransactionAsync(IsolationLevel.ReadUncommitted, cancellationToken);
+        await using var tx = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
         string id = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         const string QUERY1 = "INSERT INTO `client` (`id`, `owner_id`, `name`) VALUES(@id, @ownerId, @name)";

@@ -94,13 +94,13 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
         var db = GetDatabase();
         var refreshKey = KeyNames.Refresh(refreshToken);
         
-        logger.LogDebug("Verifying refresh token. Key: {RefreshKey}", refreshKey);
+        logger.LogDebug("Verifying refresh token");
         
         // Check if key exists
         var exists = await db.KeyExistsAsync(refreshKey).WaitAsync(cancellationToken);
         if (!exists)
         {
-            logger.LogWarning("Refresh token key does not exist in Redis: {RefreshKey}", refreshKey);
+            logger.LogWarning("Refresh token key does not exist in Redis");
             return null;
         }
         

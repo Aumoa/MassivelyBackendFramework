@@ -8,9 +8,9 @@ public record MySqlOptions
 
     public string Database { get; init; } = "MassivelyBackendFramework__OAuth2";
 
-    public string User { get; init; } = "root";
+    public required string User { get; init; }
 
-    public string Password { get; init; } = "root";
+    public required string Password { get; init; }
 
     public string ConnectionString => $"Server={Server};Port={Port};Database={Database};Uid={User};Pwd={Password};";
 }
