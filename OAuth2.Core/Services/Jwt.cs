@@ -64,10 +64,10 @@ internal class Jwt : IJwt
 
         if (idToken)
         {
+            // Note: iss and exp are set by JwtSecurityToken constructor in Issue(),
+            // so they must NOT be added here to avoid duplicate claims in the JWT payload.
             idTokenClaims.AddRange([
-                new(JwtRegisteredClaimNames.Iss, Issuer),
                 new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
-                new(JwtRegisteredClaimNames.Exp, DateTimeOffset.UtcNow.Add(m_ExpiresIn).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
                 new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
             ]);
         }
