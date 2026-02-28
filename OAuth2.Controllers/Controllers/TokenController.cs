@@ -121,7 +121,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         var code = await authorizationCodes.PopAsync(request.Code, cancellationToken);
         if (code.HasValue == false)
         {
-            logger.LogWarning("Authorization code not found or already used: {Code}", request.Code);
+            logger.LogWarning("Authorization code not found or already used");
             return BadRequest(new { error = "code_not_exists" });
         }
 

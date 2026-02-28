@@ -134,7 +134,7 @@ public partial class Register(
             await accountClaims.AddClaimAsync(m_ID, JwtRegisteredClaimNames.ZoneInfo, locale[1]);
             await emailVerify.SendAsync(sub, verifyCode, new MailAddress(m_Email));
 
-            if (string.IsNullOrEmpty(ReturnUrl) == false)
+            if (string.IsNullOrEmpty(ReturnUrl) == false && Uri.TryCreate(ReturnUrl, UriKind.Relative, out _))
             {
                 nav.NavigateTo(ReturnUrl);
             }
