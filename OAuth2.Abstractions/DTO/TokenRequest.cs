@@ -21,4 +21,7 @@ public record TokenRequest
 
     [FromForm(Name = "refresh_token")]
     public string? RefreshToken { get; set; }
+
+    [FromForm(Name = "code_verifier")]
+    public string? CodeVerifier { get; set; }
 }

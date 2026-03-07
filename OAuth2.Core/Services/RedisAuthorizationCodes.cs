@@ -21,7 +21,9 @@ internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<R
             new("client_id", body.ClientId),
             new("scope", body.Scope),
             new("redirect_uri", body.RedirectUri),
-            new("nonce", body.Nonce ?? string.Empty)
+            new("nonce", body.Nonce ?? string.Empty),
+            new("code_challenge", body.CodeChallenge ?? string.Empty),
+            new("code_challenge_method", body.CodeChallengeMethod ?? string.Empty)
         ];
 
         await db.HashSetAsync(codeKey, entries).WaitAsync(cancellationToken);
@@ -46,6 +48,8 @@ internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<R
         string? scope = null;
         string? redirectUri = null;
         string? nonce = null;  // nonce is optional
+        string? codeChallenge = null;
+        string? codeChallengeMethod = null;
 
         foreach (var entry in entries)
         {
@@ -66,6 +70,12 @@ internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<R
                 case "nonce":
                     nonce = entry.Value;
                     break;
+                case "code_challenge":
+                    codeChallenge = entry.Value;
+                    break;
+                case "code_challenge_method":
+                    codeChallengeMethod = entry.Value;
+                    break;
             }
         }
 
@@ -75,6 +85,14 @@ internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<R
             return null;
         }
 
-        return new AuthorizationCodeBody(accountId, clientId, scope, redirectUri, nonce);
+        return new AuthorizationCodeBody(
+            accountId,
+            clientId,
+            scope,
+            redirectUri,
+            nonce,
+            string.IsNullOrEmpty(codeChallenge) ? null : codeChallenge,
+            string.IsNullOrEmpty(codeChallengeMethod) ? null : codeChallengeMethod
+        );
     }
 }

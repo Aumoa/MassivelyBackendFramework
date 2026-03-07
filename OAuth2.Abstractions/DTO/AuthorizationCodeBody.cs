@@ -5,5 +5,7 @@ public record struct AuthorizationCodeBody(
     string ClientId,
     string Scope,
     string RedirectUri,
-    string? Nonce
+    string? Nonce,
+    string? CodeChallenge = null,
+    string? CodeChallengeMethod = null
     );
