@@ -71,7 +71,7 @@ internal class Jwt : IJwt
             ValidIssuer = m_Issuer,
             ValidateAudience = false,
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.FromSeconds(30)
         };
     }
 

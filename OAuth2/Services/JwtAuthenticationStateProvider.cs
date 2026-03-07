@@ -60,9 +60,9 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                             var identity = new ClaimsIdentity(claims, "JwtAuthType");
                             m_CurrentUser = new ClaimsPrincipal(identity);
                         }
-                        catch (SecurityTokenException)
+                        catch (Exception)
                         {
-                            // Token is invalid or expired; treat as unauthenticated
+                            // Token is invalid, tampered, or expired; treat as unauthenticated and clear the cookie
                             httpContext.Response.Cookies.Delete("id_token", new CookieOptions
                             {
                                 HttpOnly = true,
@@ -101,10 +101,18 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                             {
                                 HttpOnly = true,
                                 Secure = true,
-                                SameSite = SameSiteMode.Strict
+                                SameSite = SameSiteMode.Strict,
+                                Expires = DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)
                             };
                             httpContext.Response.Cookies.Append("access_token", access.Value.AccessToken, cookieOptions);
-                            httpContext.Response.Cookies.Append("refresh_token", access.Value.RefreshToken, cookieOptions);
+                            var refreshCookieOptions = new CookieOptions
+                            {
+                                HttpOnly = true,
+                                Secure = true,
+                                SameSite = SameSiteMode.Strict,
+                                Expires = DateTimeOffset.UtcNow.Add(jwt.RefreshTokenExpiresIn)
+                            };
+                            httpContext.Response.Cookies.Append("refresh_token", access.Value.RefreshToken, refreshCookieOptions);
                             return new AuthenticationState(m_CurrentUser);
                         }
                     }

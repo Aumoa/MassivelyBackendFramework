@@ -85,10 +85,11 @@
             return false;
         }
 
-        // Allow relative paths on the same origin
+        // Allow safe relative paths on the same origin (must start with '/' and not '//')
         if (uri.StartsWith('/') && !uri.StartsWith("//"))
         {
-            return true;
+            // Validate as a relative URI to block encoded slashes or other bypass attempts
+            return Uri.TryCreate(uri, UriKind.Relative, out _);
         }
 
         // Allow only http and https absolute URIs

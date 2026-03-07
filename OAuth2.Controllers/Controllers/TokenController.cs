@@ -69,6 +69,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return false;
         }
 
+        // RFC 7636 specifies ASCII encoding for the code_verifier before hashing
         var hash = SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier));
         var computedChallenge = Convert.ToBase64String(hash)
             .Replace('+', '-').Replace('/', '_').TrimEnd('=');
@@ -162,7 +163,14 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
                 return BadRequest(new { error = "code_verifier_missing" });
             }
 
-            if (!ValidatePkce(request.CodeVerifier, code.Value.CodeChallenge, code.Value.CodeChallengeMethod ?? "S256"))
+            var challengeMethod = code.Value.CodeChallengeMethod;
+            if (string.IsNullOrEmpty(challengeMethod))
+            {
+                logger.LogWarning("Stored code_challenge_method is missing for client: {ClientId}", request.ClientId);
+                return BadRequest(new { error = "invalid_code_verifier" });
+            }
+
+            if (!ValidatePkce(request.CodeVerifier, code.Value.CodeChallenge, challengeMethod))
             {
                 logger.LogWarning("PKCE validation failed for client: {ClientId}", request.ClientId);
                 return BadRequest(new { error = "invalid_code_verifier" });
