@@ -1,38 +1,217 @@
-﻿.container {
+﻿.page-container {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
     gap: 24px;
     width: 100%;
+    max-width: 1100px;
 }
 
-    .container .link-button {
-        align-self: flex-end;
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.page-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.page-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 500;
+    color: #202124;
+    letter-spacing: -0.01em;
+}
+
+.page-subtitle {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #5f6368;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    min-width: unset;
+    border-radius: 4px;
+    background-color: #1a73e8;
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+}
+
+    .btn-primary:hover:not(:disabled) {
+        background-color: #1765cc;
+        box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+        color: #fff;
     }
 
-    .container .clients-list {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        width: 100%;
+    .btn-primary:disabled {
+        background-color: #bdc1c6;
+        box-shadow: none;
+        cursor: not-allowed;
+        color: #fff;
     }
 
-    .container .client-item {
-        width: 100%;
+.btn-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.clients-card {
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #dadce0;
+    overflow: hidden;
+}
+
+.clients-table-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dadce0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #5f6368;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    gap: 0;
+}
+
+.clients-table-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.client-row {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid #f1f3f4;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    gap: 0;
+}
+
+    .client-row:last-child {
+        border-bottom: none;
     }
 
-        .container .client-item table {
-            width: 100%;
-        }
+    .client-row:hover {
+        background-color: #f8f9fa;
+    }
 
-        .container .client-item table th {
-            width: 120px;
-            text-align: left;
-            vertical-align: middle;
-            padding-right: 20px;
-            font-weight: bold;
-        }
+.col-name {
+    flex: 2 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
 
-        .container .client-item table td {
-            padding-right: 20px;
-        }
+.col-type {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.col-id {
+    flex: 2 1 0;
+    min-width: 0;
+}
+
+.col-action {
+    flex: 0 0 32px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.app-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #e8f0fe;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .app-icon .material-symbols-outlined {
+        font-size: 20px;
+        color: #1a73e8;
+    }
+
+.app-name {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: #202124;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.type-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    background-color: #e8f5e9;
+    color: #1e8e3e;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.client-id-text {
+    font-family: 'Roboto Mono', 'Courier New', monospace;
+    font-size: 0.8125rem;
+    color: #5f6368;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
+
+.arrow-icon {
+    font-size: 20px;
+    color: #bdc1c6;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 64px 32px;
+    text-align: center;
+    gap: 12px;
+}
+
+.empty-icon {
+    font-size: 56px;
+    color: #dadce0;
+}
+
+.empty-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #202124;
+}
+
+.empty-subtitle {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #5f6368;
+}

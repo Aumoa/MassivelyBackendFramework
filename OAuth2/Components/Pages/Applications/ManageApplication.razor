@@ -8,9 +8,31 @@
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
-<div class="container">
-    <h4>@(ViewType == ManageApplications.ViewTypes.New ? Strings.NEWCLIENT_TITLE : Strings.MANAGECLIENT_TITLE)</h4>
-    <div class="inner">
+<div class="manage-container">
+    <div class="breadcrumb">
+        <button class="back-button" @onclick="OnBackAsync">
+            <span class="material-symbols-outlined">arrow_back</span>
+        </button>
+        <span class="breadcrumb-separator">
+            <span class="material-symbols-outlined">chevron_right</span>
+        </span>
+        <span class="breadcrumb-current">@(ViewType == ManageApplications.ViewTypes.New ? Strings.NEWCLIENT_TITLE : (m_Name ?? Strings.MANAGECLIENT_TITLE))</span>
+    </div>
+
+    <div class="manage-header">
+        <div class="manage-header-icon">
+            <span class="material-symbols-outlined">app_registration</span>
+        </div>
+        <div class="manage-header-text">
+            <h2 class="manage-title">@(ViewType == ManageApplications.ViewTypes.New ? Strings.NEWCLIENT_TITLE : Strings.MANAGECLIENT_TITLE)</h2>
+            @if (ViewType != ManageApplications.ViewTypes.New && m_Id != null)
+            {
+                <span class="manage-subtitle">@Strings.CLIENTS_CLIENT_SUB_LABEL: <code>@m_Id</code></span>
+            }
+        </div>
+    </div>
+
+    <div class="manage-content">
         <ClientForm @bind-Name="m_Name"
                     Id="@m_Id"
                     IsNewMode="@(ViewType == ManageApplications.ViewTypes.New)"
@@ -102,5 +124,11 @@
             {
             }
         }
+    }
+
+    private Task OnBackAsync()
+    {
+        Nav.NavigateTo("/manage-applications");
+        return Task.CompletedTask;
     }
 }
