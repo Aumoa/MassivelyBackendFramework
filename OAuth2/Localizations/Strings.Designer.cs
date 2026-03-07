@@ -716,5 +716,71 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("REGISTER_FORM_TITLE", resourceCulture);
             }
         }
+        
+        internal static string MANAGE_APPLICATIONS_SUBTITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATIONS_SUBTITLE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATIONS_EMPTY_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATIONS_EMPTY_TITLE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATIONS_EMPTY_SUBTITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATIONS_EMPTY_SUBTITLE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_BACK {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_BACK", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_SETTINGS_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SETTINGS_SECTION", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_REDIRECT_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_REDIRECT_SECTION", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_REDIRECT_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_REDIRECT_SECTION_DESC", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_USERGROUPS_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_USERGROUPS_SECTION", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_USERGROUPS_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_USERGROUPS_SECTION_DESC", resourceCulture);
+            }
+        }
+        
+        internal static string CLIENTFORM_BUTTON_ADD_URI {
+            get {
+                return ResourceManager.GetString("CLIENTFORM_BUTTON_ADD_URI", resourceCulture);
+            }
+        }
+        
+        internal static string CLIENTFORM_BUTTON_CANCEL {
+            get {
+                return ResourceManager.GetString("CLIENTFORM_BUTTON_CANCEL", resourceCulture);
+            }
+        }
     }
 }

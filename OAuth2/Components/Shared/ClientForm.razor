@@ -4,88 +4,124 @@
 @inject IClientUserGroups UserGroups
 @inject NavigationManager Nav
 
-<form @onsubmit="OnSubmit" @onsubmit:preventDefault="false">
-    <table>
-        <tbody>
-            <tr>
-                <th>
-                    @Strings.NEWCLIENT_FORM_LABEL_NAME
-                </th>
-                <td>
-                    @if (IsNewMode)
-                    {
-                        <FloatingInput Type="text" Placeholder="@Strings.NEWCLIENT_FORM_LABEL_NAME" Value="@Name" ValueChanged="@NameChanged" />
-                    }
-                    else
-                    {
-                        @Name
-                    }
-                </td>
-            </tr>
-            <tr>
-                <th>
-                    @Strings.CLIENTFORM_REDIRECT_URIS
-                </th>
-                <td>
-                    <div class="redirect-uris-container">
-                        @for (int i = 0; i < m_RedirectUris.Length; i++)
-                        {
-                            var index = i;
-                            <div class="redirect-uri-row">
-                                <FloatingInput Type="text" Placeholder="https://example.com" Value="@m_RedirectUris[index].Uri" ValueChanged="@(value => UpdateRedirectUri(index, value))" />
-                                <button type="button" class="btn-apply" disabled="@(!m_RedirectUris[index].IsChanged)" @onclick="() => ApplyRedirectUriAsync(index)">@Strings.CLIENTFORM_BUTTON_APPLY</button>
-                                <button type="button" class="btn-remove" @onclick="() => DeleteRedirectUriAsync(index)">@Strings.CLIENTFORM_BUTTON_REMOVE</button>
-                            </div>
-                        }
-                    </div>
-                    <div class="add-button-container">
-                        <button type="button" class="btn-add" @onclick="AddRedirectUriAsync">
-                            @Strings.CLIENTFORM_BUTTON_ADD
-                        </button>
-                    </div>
-                </td>
-            </tr>
-            <tr>
-                <th>
-                    User Groups
-                </th>
-                <td>
-                    <div class="user-groups-container">
-                        @foreach (var userGroups in m_UserGroups.GroupBy(g => g.AccountId))
-                        {
-                            <div class="user-group-section">
-                                <div class="user-id-header">User: @userGroups.Key</div>
-                                @for (int i = 0; i < userGroups.Count(); i++)
-                                {
-                                    var group = userGroups.ElementAt(i);
-                                    var groupIndex = Array.IndexOf(m_UserGroups, group);
-                                    <div class="user-group-row">
-                                        <FloatingInput Type="text" Placeholder="Group name" Value="@m_UserGroups[groupIndex].Group" ValueChanged="@(value => UpdateUserGroup(groupIndex, value))" />
-                                        <button type="button" class="btn-apply" disabled="@(!m_UserGroups[groupIndex].IsChanged)" @onclick="() => ApplyUserGroupAsync(groupIndex)">@Strings.CLIENTFORM_BUTTON_APPLY</button>
-                                        <button type="button" class="btn-remove" @onclick="() => DeleteUserGroupAsync(groupIndex)">@Strings.CLIENTFORM_BUTTON_REMOVE</button>
-                                    </div>
-                                }
-                            </div>
-                        }
-                        <div class="add-user-group-form">
-                            <FloatingInput Type="text" Placeholder="User Sub" @bind-Value="m_NewUserSub" />
-                            <FloatingInput Type="text" Placeholder="Group name" @bind-Value="m_NewGroupName" />
-                            <button type="button" class="btn-add" @onclick="AddUserGroupAsync">
-                                @Strings.CLIENTFORM_BUTTON_ADD
-                            </button>
-                        </div>
-                    </div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+<div class="form-wrapper">
     @if (IsNewMode)
     {
-        <div class="submit-buttons">
-            <button type="submit" disabled="@IsSubmitting">@(IsSubmitting ? Strings.NEWCLIENT_BUTTON_PROCESSING : Strings.NEWCLIENT_BUTTON_REGISTER)</button>
+        <div class="form-section">
+            <div class="section-header">
+                <h3 class="section-title">@Strings.MANAGE_APPLICATION_SETTINGS_SECTION</h3>
+            </div>
+            <div class="section-body">
+                <div class="field-row">
+                    <label class="field-label">@Strings.NEWCLIENT_FORM_LABEL_NAME</label>
+                    <div class="field-input">
+                        <FloatingInput Type="text" Placeholder="@Strings.NEWCLIENT_FORM_LABEL_NAME" Value="@Name" ValueChanged="@NameChanged" />
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="button" class="btn-secondary" @onclick="OnCancelAsync" disabled="@IsSubmitting">@Strings.CLIENTFORM_BUTTON_CANCEL</button>
+            <button type="button" class="btn-primary" @onclick="() => OnSubmit.InvokeAsync()" disabled="@IsSubmitting">
+                @(IsSubmitting ? Strings.NEWCLIENT_BUTTON_PROCESSING : Strings.NEWCLIENT_BUTTON_REGISTER)
+            </button>
         </div>
     }
-</form>
+    else
+    {
+        <div class="form-section">
+            <div class="section-header">
+                <h3 class="section-title">@Strings.MANAGE_APPLICATION_SETTINGS_SECTION</h3>
+            </div>
+            <div class="section-body">
+                <div class="field-row">
+                    <label class="field-label">@Strings.NEWCLIENT_FORM_LABEL_NAME</label>
+                    <div class="field-value">@Name</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-header">
+                <div class="section-header-text">
+                    <h3 class="section-title">@Strings.MANAGE_APPLICATION_REDIRECT_SECTION</h3>
+                    <p class="section-desc">@Strings.MANAGE_APPLICATION_REDIRECT_SECTION_DESC</p>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="redirect-uris-container">
+                    @for (int i = 0; i < m_RedirectUris.Length; i++)
+                    {
+                        var index = i;
+                        <div class="uri-row">
+                            <div class="uri-input-wrap">
+                                <FloatingInput Type="text" Placeholder="https://example.com" Value="@m_RedirectUris[index].Uri" ValueChanged="@(value => UpdateRedirectUri(index, value))" />
+                            </div>
+                            <button type="button" class="btn-icon-action btn-save" disabled="@(!m_RedirectUris[index].IsChanged)" @onclick="() => ApplyRedirectUriAsync(index)" title="@Strings.CLIENTFORM_BUTTON_APPLY">
+                                <span class="material-symbols-outlined">save</span>
+                            </button>
+                            <button type="button" class="btn-icon-action btn-delete" @onclick="() => DeleteRedirectUriAsync(index)" title="@Strings.CLIENTFORM_BUTTON_REMOVE">
+                                <span class="material-symbols-outlined">delete</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+                <div class="section-add-action">
+                    <button type="button" class="btn-text-add" @onclick="AddRedirectUriAsync">
+                        <span class="material-symbols-outlined">add</span>
+                        @Strings.CLIENTFORM_BUTTON_ADD_URI
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-header">
+                <div class="section-header-text">
+                    <h3 class="section-title">@Strings.MANAGE_APPLICATION_USERGROUPS_SECTION</h3>
+                    <p class="section-desc">@Strings.MANAGE_APPLICATION_USERGROUPS_SECTION_DESC</p>
+                </div>
+            </div>
+            <div class="section-body">
+                @foreach (var userGroups in m_UserGroups.GroupBy(g => g.AccountId))
+                {
+                    <div class="user-group-block">
+                        <div class="user-group-account">
+                            <span class="material-symbols-outlined user-icon">person</span>
+                            <span class="user-account-id">@userGroups.Key</span>
+                        </div>
+                        @for (int i = 0; i < userGroups.Count(); i++)
+                        {
+                            var group = userGroups.ElementAt(i);
+                            var groupIndex = Array.IndexOf(m_UserGroups, group);
+                            <div class="uri-row">
+                                <div class="uri-input-wrap">
+                                    <FloatingInput Type="text" Placeholder="Group name" Value="@m_UserGroups[groupIndex].Group" ValueChanged="@(value => UpdateUserGroup(groupIndex, value))" />
+                                </div>
+                                <button type="button" class="btn-icon-action btn-save" disabled="@(!m_UserGroups[groupIndex].IsChanged)" @onclick="() => ApplyUserGroupAsync(groupIndex)" title="@Strings.CLIENTFORM_BUTTON_APPLY">
+                                    <span class="material-symbols-outlined">save</span>
+                                </button>
+                                <button type="button" class="btn-icon-action btn-delete" @onclick="() => DeleteUserGroupAsync(groupIndex)" title="@Strings.CLIENTFORM_BUTTON_REMOVE">
+                                    <span class="material-symbols-outlined">delete</span>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="add-user-group-panel">
+                    <div class="add-user-group-inputs">
+                        <FloatingInput Type="text" Placeholder="User Sub" @bind-Value="m_NewUserSub" />
+                        <FloatingInput Type="text" Placeholder="Group name" @bind-Value="m_NewGroupName" />
+                    </div>
+                    <button type="button" class="btn-text-add" @onclick="AddUserGroupAsync">
+                        <span class="material-symbols-outlined">person_add</span>
+                        @Strings.CLIENTFORM_BUTTON_ADD
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
 
 @code {
     public struct RedirectUri
@@ -280,5 +316,11 @@
                 OriginGroup = g.Group,
                 Group = g.Group
             })];
+    }
+
+    private Task OnCancelAsync()
+    {
+        Nav.NavigateTo("/manage-applications");
+        return Task.CompletedTask;
     }
 }

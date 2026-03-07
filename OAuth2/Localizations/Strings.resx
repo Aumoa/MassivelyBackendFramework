@@ -336,4 +336,37 @@
   <data name="MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE" xml:space="preserve">
     <value>Your picture has been successfully changed. You will be logged out for refresh.</value>
   </data>
+  <data name="MANAGE_APPLICATIONS_SUBTITLE" xml:space="preserve">
+    <value>Manage your OAuth2 client applications</value>
+  </data>
+  <data name="MANAGE_APPLICATIONS_EMPTY_TITLE" xml:space="preserve">
+    <value>No applications yet</value>
+  </data>
+  <data name="MANAGE_APPLICATIONS_EMPTY_SUBTITLE" xml:space="preserve">
+    <value>Create your first client application to get started</value>
+  </data>
+  <data name="MANAGE_APPLICATION_BACK" xml:space="preserve">
+    <value>Applications</value>
+  </data>
+  <data name="MANAGE_APPLICATION_SETTINGS_SECTION" xml:space="preserve">
+    <value>App settings</value>
+  </data>
+  <data name="MANAGE_APPLICATION_REDIRECT_SECTION" xml:space="preserve">
+    <value>Authorized redirect URIs</value>
+  </data>
+  <data name="MANAGE_APPLICATION_REDIRECT_SECTION_DESC" xml:space="preserve">
+    <value>URIs that OAuth2 will redirect to after authorization</value>
+  </data>
+  <data name="MANAGE_APPLICATION_USERGROUPS_SECTION" xml:space="preserve">
+    <value>User groups</value>
+  </data>
+  <data name="MANAGE_APPLICATION_USERGROUPS_SECTION_DESC" xml:space="preserve">
+    <value>Assign users to groups for this application</value>
+  </data>
+  <data name="CLIENTFORM_BUTTON_ADD_URI" xml:space="preserve">
+    <value>Add URI</value>
+  </data>
+  <data name="CLIENTFORM_BUTTON_CANCEL" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
 </root>
