@@ -207,7 +207,7 @@ public partial class Authorize(
                         {
                             var handler = new JwtSecurityTokenHandler();
                         	var validationParams = jwt.GetValidationParameters();
-                        	var principal = handler.ValidateToken(cachedJwt, validationParams, out var validatedToken);
+                        	var principal = handler.ValidateToken(cookie.Value, validationParams, out var validatedToken);
                             var cachedJwt = (JwtSecurityToken)validatedToken;
 
                             var access_token = cachedJwt.Claims.FirstOrDefault(p => p.Type == "access_token")?.Value;
@@ -250,6 +250,11 @@ public partial class Authorize(
 
                             m_CachedJwts.Add(cachedJwt);
                         }
+                        catch (SecurityTokenException e)
+                        {
+                            logger.LogWarning("{Key} token validation failed: {Message}", cookie.Key, e.Message);
+                            DeleteCachedAccount(accountId);
+                        }
                         catch (Exception e)
                         {
                             logger.LogWarning("Failed to export cached jwt token. {Message}", e.Message);
@@ -264,34 +269,6 @@ public partial class Authorize(
                                 SameSite = SameSiteMode.Lax
                             });
                         }
-                    }
-                    catch (SecurityTokenException e)
-                    {
-                        logger.LogWarning("cached_jwt token validation failed: {Message}", e.Message);
-                        m_CachedJwt = null;
-                        httpContext.Response.Cookies.Delete("cached_jwt", new CookieOptions
-                        {
-                            HttpOnly = true,
-                            Secure = true,
-                            SameSite = SameSiteMode.Lax
-                        });
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogWarning("Failed to export cached jwt token. {Message}", e.Message);
-                        m_CachedJwt = null;
-                    }
-
-                    void DeleteCache()
-                    {
-                        m_CachedJwt = null;
-                        httpContext.Response.Cookies.Delete("cached_jwt", new CookieOptions
-                        {
-                            HttpOnly = true,
-                            Secure = true,
-                            SameSite = SameSiteMode.Lax,
-                            Expires = DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)
-                        });
                     }
                 }
             }
