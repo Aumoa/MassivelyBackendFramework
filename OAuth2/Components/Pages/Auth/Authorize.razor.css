@@ -52,7 +52,8 @@
 .cached-container {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    min-width: 300px;
+    gap: 2px;
 }
 
 .cached-account-row {
@@ -60,40 +61,72 @@
     flex-direction: row;
     align-items: center;
     gap: 4px;
+    border-radius: 12px;
+    padding: 2px;
+    transition: background-color 0.15s ease;
+    animation: fade-in 0.25s ease;
 }
 
 .cached-account-button {
     flex: 1;
-    border-radius: 2px;
+    min-width: 0;
+    border-radius: 10px;
     text-align: left;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #222;
 }
 
 .cached-account-remove {
     flex-shrink: 0;
-    border-radius: 2px;
-    padding: 4px;
-    line-height: 1;
+    min-width: unset;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: #bbb;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
     .cached-account-remove .material-symbols-outlined {
-        font-size: 18px;
+        font-size: 16px;
+        line-height: 1;
     }
+
+    .cached-account-remove:not(:disabled):hover {
+        background-color: #fce8e8;
+        color: #c62828;
+    }
+
+.cached-divider {
+    height: 1px;
+    background-color: #eeeeee;
+    margin: 6px 0;
+}
 
 .cached-use-another {
     align-self: flex-end;
-    border-radius: 2px;
+    min-width: unset;
+    font-size: 13px;
+    color: #666;
+    padding: 4px 10px;
+    margin-top: 8px;
 }
 
 .profile-img {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     object-fit: cover;
     border-radius: 50%;
-    border: 1px solid #ccc;
+    border: 1px solid #ddd;
     cursor: pointer;
+    flex-shrink: 0;
 }
 
 @keyframes fade-in {
