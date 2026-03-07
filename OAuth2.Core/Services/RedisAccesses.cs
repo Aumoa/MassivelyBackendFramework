@@ -201,4 +201,27 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
             await task;
         }
     }
+
+    public async ValueTask RevokeAsync(string accessToken, CancellationToken cancellationToken = default)
+    {
+        var db = GetDatabase();
+
+        var accessKey = KeyNames.Access(accessToken);
+        var refreshToken = await db.StringGetAsync(accessKey).WaitAsync(cancellationToken);
+
+        var batch = db.CreateBatch();
+        var accessDeleteTask = batch.KeyDeleteAsync(accessKey);
+        Task? refreshDeleteTask = null;
+        if (!refreshToken.IsNullOrEmpty)
+        {
+            refreshDeleteTask = batch.KeyDeleteAsync(KeyNames.Refresh(refreshToken!));
+        }
+        batch.Execute();
+
+        await accessDeleteTask.WaitAsync(cancellationToken);
+        if (refreshDeleteTask != null)
+        {
+            await refreshDeleteTask.WaitAsync(cancellationToken);
+        }
+    }
 }
