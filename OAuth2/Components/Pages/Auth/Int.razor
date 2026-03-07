@@ -47,12 +47,12 @@
                     .. Jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, claims, null, true)
                 ]);
 
-                httpContext.Response.Cookies.Append("cached_jwt", jwt, new CookieOptions
+                httpContext.Response.Cookies.Append($"cached_jwt_{code.Value.AccountId}", jwt, new CookieOptions
                 {
                     HttpOnly = true,
                     Secure = true,
                     SameSite = SameSiteMode.Lax,
-                    Expires = DateTimeOffset.UtcNow.Add(Jwt.ExpiresIn)
+                    Expires = DateTimeOffset.UtcNow.AddYears(10)
                 });
             }
             catch (Exception e)

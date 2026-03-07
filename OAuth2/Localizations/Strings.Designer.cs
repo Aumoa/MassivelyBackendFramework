@@ -277,6 +277,15 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Remove account과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_REMOVE_CACHED_ACCOUNT {
+            get {
+                return ResourceManager.GetString("LOGIN_REMOVE_CACHED_ACCOUNT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Login to {0}과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_FORM_TITLE {
