@@ -11,6 +11,7 @@ namespace OAuth2.Services;
 internal class Jwt : IJwt
 {
     private readonly SecurityKey m_Key;
+    private readonly RsaSecurityKey m_PublicKey;
     private readonly SigningCredentials m_Credentials;
     private readonly string m_Issuer;
     private readonly TimeSpan m_ExpiresIn;
@@ -30,9 +31,11 @@ internal class Jwt : IJwt
         m_ExpiresIn = options.Value.ExpiresIn;
         m_RefreshTokenExpiresIn = options.Value.RefreshTokenExpiresIn;
 
-        rsa = RSA.Create();
-        rsa.ImportFromPem(File.ReadAllText(options.Value.PublicKeyPath));
-        var rsaParameters = rsa.ExportParameters(false);
+        var rsaPublic = RSA.Create();
+        rsaPublic.ImportFromPem(File.ReadAllText(options.Value.PublicKeyPath));
+        m_PublicKey = new RsaSecurityKey(rsaPublic);
+
+        var rsaParameters = rsaPublic.ExportParameters(false);
         byte[] modulus = rsaParameters.Modulus!;
         byte[] exponent = rsaParameters.Exponent!;
         m_Modulus = Convert.ToBase64String(modulus)
@@ -57,6 +60,20 @@ internal class Jwt : IJwt
     public TimeSpan ExpiresIn => m_ExpiresIn;
 
     public TimeSpan RefreshTokenExpiresIn => m_RefreshTokenExpiresIn;
+
+    public TokenValidationParameters GetValidationParameters()
+    {
+        return new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = m_PublicKey,
+            ValidateIssuer = true,
+            ValidIssuer = m_Issuer,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+    }
 
     public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken)
     {
