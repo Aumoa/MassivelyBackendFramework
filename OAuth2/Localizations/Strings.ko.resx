@@ -336,4 +336,37 @@
   <data name="MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE" xml:space="preserve">
     <value>사진이 성공적으로 변경되었습니다. 갱신을 위해 로그아웃됩니다.</value>
   </data>
+  <data name="MANAGE_APPLICATIONS_SUBTITLE" xml:space="preserve">
+    <value>OAuth2 클라이언트 애플리케이션을 관리합니다</value>
+  </data>
+  <data name="MANAGE_APPLICATIONS_EMPTY_TITLE" xml:space="preserve">
+    <value>아직 애플리케이션이 없습니다</value>
+  </data>
+  <data name="MANAGE_APPLICATIONS_EMPTY_SUBTITLE" xml:space="preserve">
+    <value>첫 번째 클라이언트 애플리케이션을 만들어 시작하세요</value>
+  </data>
+  <data name="MANAGE_APPLICATION_BACK" xml:space="preserve">
+    <value>애플리케이션</value>
+  </data>
+  <data name="MANAGE_APPLICATION_SETTINGS_SECTION" xml:space="preserve">
+    <value>앱 설정</value>
+  </data>
+  <data name="MANAGE_APPLICATION_REDIRECT_SECTION" xml:space="preserve">
+    <value>승인된 리디렉션 URI</value>
+  </data>
+  <data name="MANAGE_APPLICATION_REDIRECT_SECTION_DESC" xml:space="preserve">
+    <value>인증 후 OAuth2가 리디렉션할 URI</value>
+  </data>
+  <data name="MANAGE_APPLICATION_USERGROUPS_SECTION" xml:space="preserve">
+    <value>사용자 그룹</value>
+  </data>
+  <data name="MANAGE_APPLICATION_USERGROUPS_SECTION_DESC" xml:space="preserve">
+    <value>이 애플리케이션에 대한 사용자 그룹을 지정합니다</value>
+  </data>
+  <data name="CLIENTFORM_BUTTON_ADD_URI" xml:space="preserve">
+    <value>URI 추가</value>
+  </data>
+  <data name="CLIENTFORM_BUTTON_CANCEL" xml:space="preserve">
+    <value>취소</value>
+  </data>
 </root>
