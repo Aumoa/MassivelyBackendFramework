@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -59,6 +60,23 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
     }
 
     /// <summary>
+    /// Validates PKCE code_verifier against the stored code_challenge.
+    /// </summary>
+    private static bool ValidatePkce(string codeVerifier, string codeChallenge, string codeChallengeMethod)
+    {
+        if (codeChallengeMethod != "S256")
+        {
+            return false;
+        }
+
+        // RFC 7636 specifies ASCII encoding for the code_verifier before hashing
+        var hash = SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier));
+        var computedChallenge = Convert.ToBase64String(hash)
+            .Replace('+', '-').Replace('/', '_').TrimEnd('=');
+        return computedChallenge == codeChallenge;
+    }
+
+    /// <summary>
     /// Validates the client secret.
     /// </summary>
     private async ValueTask<IActionResult?> ValidateClientSecretAsync(string clientId, string clientSecret, CancellationToken cancellationToken)
@@ -112,11 +130,6 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "client_id_missing" });
         }
 
-        if (string.IsNullOrWhiteSpace(request.ClientSecret))
-        {
-            return BadRequest(new { error = "client_secret_missing" });
-        }
-
         // Verify and remove authorization code (one-time use)
         var code = await authorizationCodes.PopAsync(request.Code, cancellationToken);
         if (code.HasValue == false)
@@ -141,11 +154,48 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "redirect_uri_mismatch" });
         }
 
-        // Validate client secret
-        var validationError = await ValidateClientSecretAsync(request.ClientId, request.ClientSecret, cancellationToken);
-        if (validationError != null)
+        // Validate PKCE if code_challenge was present in the authorization request
+        if (code.Value.CodeChallenge != null)
         {
-            return validationError;
+            if (string.IsNullOrWhiteSpace(request.CodeVerifier))
+            {
+                logger.LogWarning("PKCE code_verifier missing for client: {ClientId}", request.ClientId);
+                return BadRequest(new { error = "code_verifier_missing" });
+            }
+
+            var challengeMethod = code.Value.CodeChallengeMethod;
+            if (string.IsNullOrEmpty(challengeMethod))
+            {
+                logger.LogWarning("Stored code_challenge_method is missing for client: {ClientId}", request.ClientId);
+                return BadRequest(new { error = "invalid_code_verifier" });
+            }
+
+            if (!ValidatePkce(request.CodeVerifier, code.Value.CodeChallenge, challengeMethod))
+            {
+                logger.LogWarning("PKCE validation failed for client: {ClientId}", request.ClientId);
+                return BadRequest(new { error = "invalid_code_verifier" });
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(request.CodeVerifier))
+        {
+            // code_verifier provided but no challenge was stored — reject to prevent downgrade attacks
+            logger.LogWarning("code_verifier provided but no code_challenge was stored for client: {ClientId}", request.ClientId);
+            return BadRequest(new { error = "invalid_code_verifier" });
+        }
+
+        // Validate client secret only when not using PKCE (PKCE serves as client authentication for public clients)
+        if (code.Value.CodeChallenge == null)
+        {
+            if (string.IsNullOrWhiteSpace(request.ClientSecret))
+            {
+                return BadRequest(new { error = "client_secret_missing" });
+            }
+
+            var validationError = await ValidateClientSecretAsync(request.ClientId, request.ClientSecret, cancellationToken);
+            if (validationError != null)
+            {
+                return validationError;
+            }
         }
 
         // Issue tokens

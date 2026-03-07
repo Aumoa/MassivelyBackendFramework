@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.JSInterop;
 using OAuth2.DTO;
 using OAuth2.Localizations;
@@ -80,6 +81,14 @@ public partial class Authorize(
     [SupplyParameterFromQuery(Name = "prompt")]
     public string? Prompt { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "code_challenge")]
+    public string? CodeChallenge { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "code_challenge_method")]
+    public string? CodeChallengeMethod { get; set; }
+
     private List<JwtSecurityToken> m_CachedJwts = [];
     private bool m_ShowLoginForm = false;
 
@@ -131,6 +140,16 @@ public partial class Authorize(
                 return;
             }
 
+            // Validate PKCE parameters when code_challenge is provided
+            if (!string.IsNullOrEmpty(CodeChallenge))
+            {
+                if (CodeChallengeMethod != "S256")
+                {
+                    Error(Strings.ERRORS_BAD_REQUEST);
+                    return;
+                }
+            }
+
             // hosting service
             if (ClientId == hostOptions.Value.ClientId)
             {
@@ -146,12 +165,6 @@ public partial class Authorize(
             }
             else
             {
-                // TODO: Support openid-conformance
-                if (ClientId == "kwU lD6MR5dXMTEJ9DwrBfBFtUUO6hNWv7sleWGZ1ww=")
-                {
-                    ClientId = "kwU+lD6MR5dXMTEJ9DwrBfBFtUUO6hNWv7sleWGZ1ww=";
-                }
-
                 var targetClient = await clients.GetClientAsync(ClientId);
                 if (targetClient == null)
                 {
@@ -193,7 +206,9 @@ public partial class Authorize(
                         try
                         {
                             var handler = new JwtSecurityTokenHandler();
-                            var cachedJwt = handler.ReadJwtToken(cookie.Value);
+                        	var validationParams = jwt.GetValidationParameters();
+                        	var principal = handler.ValidateToken(cachedJwt, validationParams, out var validatedToken);
+                            var cachedJwt = (JwtSecurityToken)validatedToken;
 
                             var access_token = cachedJwt.Claims.FirstOrDefault(p => p.Type == "access_token")?.Value;
                             if (access_token == null)
@@ -249,6 +264,34 @@ public partial class Authorize(
                                 SameSite = SameSiteMode.Lax
                             });
                         }
+                    }
+                    catch (SecurityTokenException e)
+                    {
+                        logger.LogWarning("cached_jwt token validation failed: {Message}", e.Message);
+                        m_CachedJwt = null;
+                        httpContext.Response.Cookies.Delete("cached_jwt", new CookieOptions
+                        {
+                            HttpOnly = true,
+                            Secure = true,
+                            SameSite = SameSiteMode.Lax
+                        });
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogWarning("Failed to export cached jwt token. {Message}", e.Message);
+                        m_CachedJwt = null;
+                    }
+
+                    void DeleteCache()
+                    {
+                        m_CachedJwt = null;
+                        httpContext.Response.Cookies.Delete("cached_jwt", new CookieOptions
+                        {
+                            HttpOnly = true,
+                            Secure = true,
+                            SameSite = SameSiteMode.Lax,
+                            Expires = DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)
+                        });
                     }
                 }
             }
@@ -409,7 +452,7 @@ public partial class Authorize(
 
         if (ResponseType == "code")
         {
-            var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, ClientId, Scope, RedirectUri, Nonce));
+            var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, ClientId, Scope, RedirectUri, Nonce, CodeChallenge, CodeChallengeMethod));
             query.Add("code", code);
         }
         else if (ResponseType == "token")
@@ -469,3 +512,4 @@ public partial class Authorize(
         return Task.CompletedTask;
     }
 }
+

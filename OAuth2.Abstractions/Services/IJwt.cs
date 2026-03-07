@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
 using OAuth2.DTO;
 
 namespace OAuth2.Services;
@@ -14,4 +15,5 @@ public interface IJwt
 
     Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken);
     string Issue(string audience, params Claim[] claims);
+    TokenValidationParameters GetValidationParameters();
 }

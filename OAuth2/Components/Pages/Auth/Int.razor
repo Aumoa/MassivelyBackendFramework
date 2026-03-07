@@ -32,6 +32,14 @@
             return;
         }
 
+        // Validate the redirect_uri to prevent open redirect attacks.
+        // Only allow http/https URIs or relative paths on the same origin.
+        if (!IsValidRedirectUri(RedirectUri))
+        {
+            Error(Strings.ERRORS_INVALID_REDIRECT_URI);
+            return;
+        }
+
         var httpContext = HttpContextAccessor.HttpContext;
         if (httpContext != null)
         {
@@ -68,5 +76,28 @@
         {
             Nav.NavigateTo($"/error?error={Uri.EscapeDataString(message)}");
         }
+    }
+
+    private static bool IsValidRedirectUri(string uri)
+    {
+        if (string.IsNullOrWhiteSpace(uri))
+        {
+            return false;
+        }
+
+        // Allow safe relative paths on the same origin (must start with '/' and not '//')
+        if (uri.StartsWith('/') && !uri.StartsWith("//"))
+        {
+            // Validate as a relative URI to block encoded slashes or other bypass attempts
+            return Uri.TryCreate(uri, UriKind.Relative, out _);
+        }
+
+        // Allow only http and https absolute URIs
+        if (Uri.TryCreate(uri, UriKind.Absolute, out var parsedUri))
+        {
+            return parsedUri.Scheme == Uri.UriSchemeHttp || parsedUri.Scheme == Uri.UriSchemeHttps;
+        }
+
+        return false;
     }
 }

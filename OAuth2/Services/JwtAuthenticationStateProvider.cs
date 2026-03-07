@@ -1,6 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.IdentityModel.Tokens;
 
 namespace OAuth2.Services;
 
@@ -49,12 +50,26 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                     var jwtToken = httpContext.Request.Cookies["id_token"];
                     if (!string.IsNullOrEmpty(jwtToken))
                     {
-                        var handler = new JwtSecurityTokenHandler();
-                        var token = handler.ReadJwtToken(jwtToken);
-                        var claims = token.Claims.ToList();
-                        var identity = new ClaimsIdentity(claims, "JwtAuthType");
-                        var principal = new ClaimsPrincipal(identity);
-                        m_CurrentUser = principal;
+                        try
+                        {
+                            var handler = new JwtSecurityTokenHandler();
+                            var validationParams = jwt.GetValidationParameters();
+                            var principal = handler.ValidateToken(jwtToken, validationParams, out var validatedToken);
+                            var token = (JwtSecurityToken)validatedToken;
+                            var claims = token.Claims.ToList();
+                            var identity = new ClaimsIdentity(claims, "JwtAuthType");
+                            m_CurrentUser = new ClaimsPrincipal(identity);
+                        }
+                        catch (Exception)
+                        {
+                            // Token is invalid, tampered, or expired; treat as unauthenticated and clear the cookie
+                            httpContext.Response.Cookies.Delete("id_token", new CookieOptions
+                            {
+                                HttpOnly = true,
+                                Secure = true,
+                                SameSite = SameSiteMode.Strict
+                            });
+                        }
                     }
                 }
 
@@ -82,8 +97,22 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                         var httpContext = accessor.HttpContext;
                         if (httpContext != null)
                         {
-                            httpContext.Response.Cookies.Append("access_token", access.Value.AccessToken);
-                            httpContext.Response.Cookies.Append("refresh_token", access.Value.RefreshToken);
+                            var cookieOptions = new CookieOptions
+                            {
+                                HttpOnly = true,
+                                Secure = true,
+                                SameSite = SameSiteMode.Strict,
+                                Expires = DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)
+                            };
+                            httpContext.Response.Cookies.Append("access_token", access.Value.AccessToken, cookieOptions);
+                            var refreshCookieOptions = new CookieOptions
+                            {
+                                HttpOnly = true,
+                                Secure = true,
+                                SameSite = SameSiteMode.Strict,
+                                Expires = DateTimeOffset.UtcNow.Add(jwt.RefreshTokenExpiresIn)
+                            };
+                            httpContext.Response.Cookies.Append("refresh_token", access.Value.RefreshToken, refreshCookieOptions);
                             return new AuthenticationState(m_CurrentUser);
                         }
                     }
