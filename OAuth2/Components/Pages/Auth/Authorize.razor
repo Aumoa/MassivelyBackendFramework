@@ -22,7 +22,7 @@
                                     @string.Format(Strings.LOGIN_CONTINUE_WITH_CACHED_ID, id)
                                 </span>
                             </button>
-                            <button class="cached-account-remove" @onclick="() => RemoveCachedAccount(id)" title="@Strings.LOGIN_REMOVE_CACHED_ACCOUNT">
+                            <button class="cached-account-remove" @onclick="() => RemoveCachedAccountAsync(id)" title="@Strings.LOGIN_REMOVE_CACHED_ACCOUNT">
                                 <span class="material-symbols-outlined">close</span>
                             </button>
                         </div>

@@ -225,6 +225,9 @@
   <data name="LOGIN_REMOVE_CACHED_ACCOUNT" xml:space="preserve">
     <value>Remove account</value>
   </data>
+  <data name="LOGIN_REMOVE_CACHED_ACCOUNT_CONFIRM" xml:space="preserve">
+    <value>Are you sure you want to remove the '{0}' account?</value>
+  </data>
   <data name="NAVMENU_LABEL_MANAGE_APPLICATIONS" xml:space="preserve">
     <value>Manage Applications</value>
   </data>

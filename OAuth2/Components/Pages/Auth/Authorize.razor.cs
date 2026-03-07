@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
+using Microsoft.JSInterop;
 using OAuth2.DTO;
 using OAuth2.Localizations;
 using OAuth2.Services;
@@ -24,7 +25,8 @@ public partial class Authorize(
     IHttpContextAccessor accessor,
     ILogger<Authorize> logger,
     ScopedSemaphore semaphore,
-    IJwt jwt)
+    IJwt jwt,
+    IJSRuntime js)
 {
     private enum RenderStates
     {
@@ -384,8 +386,14 @@ public partial class Authorize(
         StateHasChanged();
     }
 
-    private void RemoveCachedAccount(string id)
+    private async Task RemoveCachedAccountAsync(string id)
     {
+        var confirmed = await js.InvokeAsync<bool>("confirm", string.Format(Strings.LOGIN_REMOVE_CACHED_ACCOUNT_CONFIRM, id));
+        if (!confirmed)
+        {
+            return;
+        }
+
         var currentUri = new Uri(nav.Uri);
         nav.NavigateTo($"/authorize/remove-cached-account?id={Uri.EscapeDataString(id)}&return_url={Uri.EscapeDataString(currentUri.PathAndQuery)}", forceLoad: true);
     }

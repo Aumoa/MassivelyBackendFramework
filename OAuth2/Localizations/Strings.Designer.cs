@@ -286,6 +286,15 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Are you sure you want to remove the '{0}' account?과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_REMOVE_CACHED_ACCOUNT_CONFIRM {
+            get {
+                return ResourceManager.GetString("LOGIN_REMOVE_CACHED_ACCOUNT_CONFIRM", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Login to {0}과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_FORM_TITLE {
