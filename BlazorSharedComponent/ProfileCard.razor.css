@@ -171,15 +171,18 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 2px;
+    padding: 0;
+    width: 14px;
+    height: 14px;
     background: transparent;
     border: none;
-    border-radius: 4px;
+    border-radius: 3px;
     cursor: pointer;
     color: #bbb;
     transition: color 0.2s, background 0.2s;
     flex-shrink: 0;
     line-height: 1;
+    overflow: hidden;
 }
 
     .copy-sub-btn:hover {
@@ -196,5 +199,6 @@
     }
 
     .copy-sub-btn .material-symbols-outlined {
-        font-size: 14px;
+        font-size: 12px;
+        line-height: 1;
     }
