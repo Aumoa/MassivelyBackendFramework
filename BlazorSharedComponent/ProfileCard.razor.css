@@ -172,6 +172,7 @@
     align-items: center;
     justify-content: center;
     padding: 0;
+    min-width: 0;
     width: 14px;
     height: 14px;
     background: transparent;
@@ -182,7 +183,6 @@
     transition: color 0.2s, background 0.2s;
     flex-shrink: 0;
     line-height: 1;
-    overflow: hidden;
 }
 
     .copy-sub-btn:hover {

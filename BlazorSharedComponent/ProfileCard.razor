@@ -34,7 +34,7 @@
                 <span class="material-symbols-outlined">manage_accounts</span>
                 <span>@Strings.PROFILECARD_MANAGE_ACCOUNT</span>
             </button>
-            <button onclick="@OnClick_Logout">
+            <button @onclick="OnClick_Logout">
                 <span class="material-symbols-outlined">logout</span>
                 <span>@Strings.PROFILECARD_LOGOUT</span>
             </button>
@@ -145,7 +145,7 @@
 
     private async Task OnClick_ManageAccountAsync()
     {
-        await JS.InvokeVoidAsync("window.open", "https://accounts.ayla.r-e.kr", "_blank", "noopener,noreferrer");
+        await JS.InvokeVoidAsync("openExternalUrl", "https://accounts.ayla.r-e.kr");
     }
 
     private void OnClick_Logout()
