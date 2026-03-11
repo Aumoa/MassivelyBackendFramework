@@ -34,10 +34,10 @@
         }
     </div>
     <div class="dlg-footer">
-        <button class="btn-ghost" @onclick="OnCancelAsync" disabled="@m_IsSubmitting">
+        <button @onclick="OnCancelAsync" class="btn-ghost" disabled="@m_IsSubmitting">
             @Strings.MANAGEACCOUNTS_CHANGE_CANCEL
         </button>
-        <button class="btn-primary" @onclick="OnConfirmAsync" disabled="@m_IsSubmitting">
+        <button @onclick="OnConfirmAsync" class="btn-primary" disabled="@m_IsSubmitting">
             @Strings.MANAGEACCOUNTS_PICTURE_CHANGE
         </button>
     </div>
@@ -76,6 +76,15 @@
         if (Auth.Picture == m_NewPictureUri)
         {
             m_Error = Strings.MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE;
+            return;
+        }
+
+        // Validate that the picture URI is a safe absolute http/https URL
+        if (!string.IsNullOrEmpty(m_NewPictureUri) &&
+            !(Uri.TryCreate(m_NewPictureUri, UriKind.Absolute, out var parsedUri) &&
+              (parsedUri.Scheme == Uri.UriSchemeHttp || parsedUri.Scheme == Uri.UriSchemeHttps)))
+        {
+            m_Error = Strings.MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL;
             return;
         }
 

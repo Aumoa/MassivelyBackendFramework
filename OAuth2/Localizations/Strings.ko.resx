@@ -390,6 +390,9 @@
   <data name="MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE" xml:space="preserve">
     <value>변경 내용이 없습니다.</value>
   </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL" xml:space="preserve">
+    <value>사진 Uri는 올바른 http 또는 https URL이어야 합니다.</value>
+  </data>
   <data name="ERROR_COMMON_AUTHENTICATION_EXPIRED" xml:space="preserve">
     <value>인증이 만료되었습니다.</value>
   </data>

@@ -390,6 +390,9 @@
   <data name="MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE" xml:space="preserve">
     <value>No changes.</value>
   </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL" xml:space="preserve">
+    <value>Picture URI must be a valid http or https URL.</value>
+  </data>
   <data name="ERROR_COMMON_AUTHENTICATION_EXPIRED" xml:space="preserve">
     <value>Authentication has expired.</value>
   </data>

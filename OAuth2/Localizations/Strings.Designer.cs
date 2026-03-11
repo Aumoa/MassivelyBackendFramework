@@ -601,6 +601,15 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Picture URI must be a valid http or https URL.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Your picture has been successfully changed. You will be logged out for refresh.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE {
