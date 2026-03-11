@@ -132,4 +132,29 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
     public string? Name => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Name)?.Value;
     public string? Email => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email)?.Value;
     public string? Picture => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Picture)?.Value;
+    public string? GivenName => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.GivenName)?.Value;
+    public string? FamilyName => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.FamilyName)?.Value;
+    public string? Nickname => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Nickname)?.Value;
+    public string? PreferredUsername => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.PreferredUsername)?.Value;
+    public string? Website => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Website)?.Value;
+    public string? Gender => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Gender)?.Value;
+    public string? Birthdate => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Birthdate)?.Value;
+    public string? ZoneInfo => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.ZoneInfo)?.Value;
+    public string? Locale => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Locale)?.Value;
+    public bool? EmailVerified
+    {
+        get
+        {
+            var value = m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.EmailVerified)?.Value;
+            return bool.TryParse(value, out var result) ? result : null;
+        }
+    }
+    public DateTimeOffset? UpdatedAt
+    {
+        get
+        {
+            var value = m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.UpdatedAt)?.Value;
+            return long.TryParse(value, out var seconds) ? DateTimeOffset.FromUnixTimeSeconds(seconds) : null;
+        }
+    }
 }

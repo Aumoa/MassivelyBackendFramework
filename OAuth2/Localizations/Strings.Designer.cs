@@ -800,5 +800,113 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("CLIENTFORM_BUTTON_CANCEL", resourceCulture);
             }
         }
+        
+        internal static string MANAGEACCOUNTS_PAGE_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PAGE_TITLE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_SECTION_PROFILE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_PROFILE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_SECTION_ACCOUNT {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_ACCOUNT", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_SECTION_SECURITY {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_SECURITY", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_NAME {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_NAME", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_EMAIL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_EMAIL", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_GIVEN_NAME {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_GIVEN_NAME", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_FAMILY_NAME {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_FAMILY_NAME", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_NICKNAME {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_NICKNAME", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_PREFERRED_USERNAME {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_PREFERRED_USERNAME", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_WEBSITE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_WEBSITE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_GENDER {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_GENDER", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_BIRTHDATE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_BIRTHDATE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_LOCALE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_LOCALE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_ZONEINFO {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_ZONEINFO", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_HEAD_UPDATEDAT {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_UPDATEDAT", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_VALUE_EMAIL_VERIFIED {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_VALUE_EMAIL_VERIFIED", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGEACCOUNTS_VALUE_EMAIL_NOT_VERIFIED {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_VALUE_EMAIL_NOT_VERIFIED", resourceCulture);
+            }
+        }
     }
 }

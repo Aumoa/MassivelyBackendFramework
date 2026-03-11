@@ -4,29 +4,174 @@
 @layout AuthorizedLayout
 @inject JwtAuthenticationStateProvider Auth
 
-<table>
-    <tr>
-        <th>@Strings.MANAGEACCOUNTS_HEAD_SUB</th>
-        <td>@Auth.Sub</td>
-    </tr>
-    <tr>
-        <th>@Strings.MANAGEACCOUNTS_HEAD_PASSWORD</th>
-        <td>
-            <span class="link-button" @onclick="OnChangePasswordAsync">
-                @Strings.MANAGEACCOUNTS_PASSWORD_CHANGE
-            </span>
-        </td>
-    </tr>
-    <tr>
-        <th>@Strings.MANAGEACCOUNTS_HEAD_PICTURE</th>
-        <td>
-            <img src="@Auth.Picture" style="max-width: 64px; max-height: 64px;" />
-            <span class="link-button" @onclick="OnChangePictureAsync">
-                @Strings.MANAGEACCOUNTS_PICTURE_CHANGE
-            </span>
-        </td>
-    </tr>
-</table>
+<div class="account-container">
+    <div class="page-header">
+        <div class="header-icon">
+            <span class="material-symbols-outlined">manage_accounts</span>
+        </div>
+        <div class="header-text">
+            <h2 class="page-title">@Strings.MANAGEACCOUNTS_PAGE_TITLE</h2>
+            @if (Auth.Email != null)
+            {
+                <p class="page-subtitle">@Auth.Email</p>
+            }
+        </div>
+    </div>
+
+    <div class="info-section">
+        <div class="section-header">
+            <span class="section-title">@Strings.MANAGEACCOUNTS_SECTION_PROFILE</span>
+        </div>
+        <div class="info-card">
+            <div class="info-row picture-row-container">
+                <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_PICTURE</div>
+                <div class="info-value">
+                    <div class="picture-action-row">
+                        <img src="@Auth.Picture" alt="Profile picture" class="profile-img"
+                             onerror="this.src='https://assets.ayla.r-e.kr/img/profile.png';" />
+                        <span class="link-button" @onclick="OnChangePictureAsync">
+                            @Strings.MANAGEACCOUNTS_PICTURE_CHANGE
+                        </span>
+                    </div>
+                </div>
+            </div>
+            @if (Auth.Name != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_NAME</div>
+                    <div class="info-value">@Auth.Name</div>
+                </div>
+            }
+            @if (Auth.GivenName != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_GIVEN_NAME</div>
+                    <div class="info-value">@Auth.GivenName</div>
+                </div>
+            }
+            @if (Auth.FamilyName != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_FAMILY_NAME</div>
+                    <div class="info-value">@Auth.FamilyName</div>
+                </div>
+            }
+            @if (Auth.Nickname != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_NICKNAME</div>
+                    <div class="info-value">@Auth.Nickname</div>
+                </div>
+            }
+            @if (Auth.PreferredUsername != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_PREFERRED_USERNAME</div>
+                    <div class="info-value"><code class="code-value">@Auth.PreferredUsername</code></div>
+                </div>
+            }
+            @if (Auth.Website != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_WEBSITE</div>
+                    <div class="info-value">
+                        @if (IsSafeUrl(Auth.Website))
+                        {
+                            <a href="@Auth.Website" target="_blank" rel="noopener noreferrer">@Auth.Website</a>
+                        }
+                        else
+                        {
+                            @Auth.Website
+                        }
+                    </div>
+                </div>
+            }
+            @if (Auth.Gender != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_GENDER</div>
+                    <div class="info-value">@Auth.Gender</div>
+                </div>
+            }
+            @if (Auth.Birthdate != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_BIRTHDATE</div>
+                    <div class="info-value">@Auth.Birthdate</div>
+                </div>
+            }
+            @if (Auth.Locale != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_LOCALE</div>
+                    <div class="info-value">@Auth.Locale</div>
+                </div>
+            }
+            @if (Auth.ZoneInfo != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_ZONEINFO</div>
+                    <div class="info-value">@Auth.ZoneInfo</div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="info-section">
+        <div class="section-header">
+            <span class="section-title">@Strings.MANAGEACCOUNTS_SECTION_ACCOUNT</span>
+        </div>
+        <div class="info-card">
+            <div class="info-row">
+                <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_SUB</div>
+                <div class="info-value"><code class="code-value">@Auth.Sub</code></div>
+            </div>
+            @if (Auth.Email != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_EMAIL</div>
+                    <div class="info-value email-row">
+                        <span>@Auth.Email</span>
+                        @if (Auth.EmailVerified == true)
+                        {
+                            <span class="badge badge-verified">
+                                <span class="material-symbols-outlined badge-icon">verified</span>
+                                @Strings.MANAGEACCOUNTS_VALUE_EMAIL_VERIFIED
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge badge-unverified">@Strings.MANAGEACCOUNTS_VALUE_EMAIL_NOT_VERIFIED</span>
+                        }
+                    </div>
+                </div>
+            }
+            @if (Auth.UpdatedAt != null)
+            {
+                <div class="info-row">
+                    <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_UPDATEDAT</div>
+                    <div class="info-value">@FormatDateTime(Auth.UpdatedAt.Value)</div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="info-section">
+        <div class="section-header">
+            <span class="section-title">@Strings.MANAGEACCOUNTS_SECTION_SECURITY</span>
+        </div>
+        <div class="info-card">
+            <div class="info-row">
+                <div class="info-label">@Strings.MANAGEACCOUNTS_HEAD_PASSWORD</div>
+                <div class="info-value">
+                    <span class="link-button" @onclick="OnChangePasswordAsync">
+                        @Strings.MANAGEACCOUNTS_PASSWORD_CHANGE
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <DlgChangePassword @ref="m_DlgChangePassword" />
 <DlgChangePicture @ref="m_DlgChangePicture" />
@@ -43,5 +188,22 @@
     private async Task OnChangePictureAsync()
     {
         await m_DlgChangePicture.ShowAsync();
+    }
+
+    private static bool IsSafeUrl(string url)
+    {
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+               (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+    }
+
+    private string FormatDateTime(DateTimeOffset value)
+    {
+        var local = value.ToLocalTime();
+        if (!string.IsNullOrEmpty(Auth.Locale) &&
+            System.Globalization.CultureInfo.GetCultureInfo(Auth.Locale) is { } culture)
+        {
+            return local.ToString("G", culture);
+        }
+        return local.ToString("G", System.Globalization.CultureInfo.CurrentCulture);
     }
 }

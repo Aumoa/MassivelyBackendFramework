@@ -174,8 +174,62 @@
   <data name="LOGIN_VALIDATION_ERROR_EMAIL_ALREADY_EXISTS" xml:space="preserve">
     <value>이메일이 이미 등록되어 있습니다.</value>
   </data>
+  <data name="MANAGEACCOUNTS_PAGE_TITLE" xml:space="preserve">
+    <value>내 계정</value>
+  </data>
+  <data name="MANAGEACCOUNTS_SECTION_PROFILE" xml:space="preserve">
+    <value>프로필</value>
+  </data>
+  <data name="MANAGEACCOUNTS_SECTION_ACCOUNT" xml:space="preserve">
+    <value>계정</value>
+  </data>
+  <data name="MANAGEACCOUNTS_SECTION_SECURITY" xml:space="preserve">
+    <value>보안</value>
+  </data>
   <data name="MANAGEACCOUNTS_HEAD_SUB" xml:space="preserve">
     <value>유저 식별자</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_NAME" xml:space="preserve">
+    <value>표시 이름</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_EMAIL" xml:space="preserve">
+    <value>이메일</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_GIVEN_NAME" xml:space="preserve">
+    <value>이름</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_FAMILY_NAME" xml:space="preserve">
+    <value>성</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_NICKNAME" xml:space="preserve">
+    <value>닉네임</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_PREFERRED_USERNAME" xml:space="preserve">
+    <value>선호하는 사용자 이름</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_WEBSITE" xml:space="preserve">
+    <value>웹사이트</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_GENDER" xml:space="preserve">
+    <value>성별</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_BIRTHDATE" xml:space="preserve">
+    <value>생년월일</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_LOCALE" xml:space="preserve">
+    <value>로케일</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_ZONEINFO" xml:space="preserve">
+    <value>시간대</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_UPDATEDAT" xml:space="preserve">
+    <value>마지막 업데이트</value>
+  </data>
+  <data name="MANAGEACCOUNTS_VALUE_EMAIL_VERIFIED" xml:space="preserve">
+    <value>인증됨</value>
+  </data>
+  <data name="MANAGEACCOUNTS_VALUE_EMAIL_NOT_VERIFIED" xml:space="preserve">
+    <value>미인증</value>
   </data>
   <data name="NAVMENU_LABEL_MANAGE_MYACCOUNT" xml:space="preserve">
     <value>내 계정 관리</value>
