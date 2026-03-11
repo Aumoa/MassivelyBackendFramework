@@ -22,7 +22,7 @@
                 <p class="user-info-email">@m_Email</p>
                 <div class="sub-row">
                     <span class="user-info-sub">@m_ShortSub</span>
-                    <button class="copy-sub-btn @(m_SubCopied ? "copied" : "")" @onclick="OnClick_CopySubAsync" title="@(m_SubCopied ? Strings.PROFILECARD_COPY_SUB_COPIED : Strings.PROFILECARD_COPY_SUB)">
+                    <button class="copy-sub-btn @(m_SubCopied ? "copied" : "")" onclick="@OnClick_CopySubAsync" title="@(m_SubCopied ? Strings.PROFILECARD_COPY_SUB_COPIED : Strings.PROFILECARD_COPY_SUB)">
                         <span class="material-symbols-outlined">@(m_SubCopied ? "check" : "content_copy")</span>
                     </button>
                 </div>
@@ -30,11 +30,11 @@
         </div>
         <hr />
         <div class="functions">
-            <button @onclick="OnClick_ManageAccountAsync">
+            <button onclick="@OnClick_ManageAccountAsync">
                 <span class="material-symbols-outlined">manage_accounts</span>
                 <span>@Strings.PROFILECARD_MANAGE_ACCOUNT</span>
             </button>
-            <button @onclick="OnClick_Logout">
+            <button onclick="@OnClick_Logout">
                 <span class="material-symbols-outlined">logout</span>
                 <span>@Strings.PROFILECARD_LOGOUT</span>
             </button>
