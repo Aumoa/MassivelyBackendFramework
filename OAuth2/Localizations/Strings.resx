@@ -174,8 +174,62 @@
   <data name="LOGIN_VALIDATION_ERROR_EMAIL_ALREADY_EXISTS" xml:space="preserve">
     <value>The ID or email is already in use.</value>
   </data>
+  <data name="MANAGEACCOUNTS_PAGE_TITLE" xml:space="preserve">
+    <value>My Account</value>
+  </data>
+  <data name="MANAGEACCOUNTS_SECTION_PROFILE" xml:space="preserve">
+    <value>Profile</value>
+  </data>
+  <data name="MANAGEACCOUNTS_SECTION_ACCOUNT" xml:space="preserve">
+    <value>Account</value>
+  </data>
+  <data name="MANAGEACCOUNTS_SECTION_SECURITY" xml:space="preserve">
+    <value>Security</value>
+  </data>
   <data name="MANAGEACCOUNTS_HEAD_SUB" xml:space="preserve">
     <value>User Identifier</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_NAME" xml:space="preserve">
+    <value>Display Name</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_EMAIL" xml:space="preserve">
+    <value>Email</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_GIVEN_NAME" xml:space="preserve">
+    <value>Given Name</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_FAMILY_NAME" xml:space="preserve">
+    <value>Family Name</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_NICKNAME" xml:space="preserve">
+    <value>Nickname</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_PREFERRED_USERNAME" xml:space="preserve">
+    <value>Preferred Username</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_WEBSITE" xml:space="preserve">
+    <value>Website</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_GENDER" xml:space="preserve">
+    <value>Gender</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_BIRTHDATE" xml:space="preserve">
+    <value>Birthdate</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_LOCALE" xml:space="preserve">
+    <value>Locale</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_ZONEINFO" xml:space="preserve">
+    <value>Time Zone</value>
+  </data>
+  <data name="MANAGEACCOUNTS_HEAD_UPDATEDAT" xml:space="preserve">
+    <value>Last Updated</value>
+  </data>
+  <data name="MANAGEACCOUNTS_VALUE_EMAIL_VERIFIED" xml:space="preserve">
+    <value>Verified</value>
+  </data>
+  <data name="MANAGEACCOUNTS_VALUE_EMAIL_NOT_VERIFIED" xml:space="preserve">
+    <value>Not Verified</value>
   </data>
   <data name="NAVMENU_LABEL_MANAGE_MYACCOUNT" xml:space="preserve">
     <value>Manage My Account</value>
@@ -335,6 +389,9 @@
   </data>
   <data name="MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE" xml:space="preserve">
     <value>No changes.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL" xml:space="preserve">
+    <value>Picture URI must be a valid http or https URL.</value>
   </data>
   <data name="ERROR_COMMON_AUTHENTICATION_EXPIRED" xml:space="preserve">
     <value>Authentication has expired.</value>
