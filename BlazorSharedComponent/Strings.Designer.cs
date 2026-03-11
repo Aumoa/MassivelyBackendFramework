@@ -68,5 +68,32 @@ namespace BlazorSharedComponent {
                 return ResourceManager.GetString("PROFILECARD_LOGOUT", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Copy Sub과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string PROFILECARD_COPY_SUB {
+            get {
+                return ResourceManager.GetString("PROFILECARD_COPY_SUB", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Copied!과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string PROFILECARD_COPY_SUB_COPIED {
+            get {
+                return ResourceManager.GetString("PROFILECARD_COPY_SUB_COPIED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Manage Account과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string PROFILECARD_MANAGE_ACCOUNT {
+            get {
+                return ResourceManager.GetString("PROFILECARD_MANAGE_ACCOUNT", resourceCulture);
+            }
+        }
     }
 }

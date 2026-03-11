@@ -1,7 +1,9 @@
 ﻿@using System.IdentityModel.Tokens.Jwt
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
 @inject AuthenticationStateProvider Auth
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 @implements IDisposable
 
 @if (!IsAuthenticated)
@@ -18,11 +20,20 @@
             <div class="informations">
                 <p class="user-info-name">@m_Name</p>
                 <p class="user-info-email">@m_Email</p>
-                <p class="user-info-sub">@m_ShortSub</p>
+                <div class="sub-row">
+                    <span class="user-info-sub">@m_ShortSub</span>
+                    <button class="copy-sub-btn @(m_SubCopied ? "copied" : "")" onclick="@OnClick_CopySubAsync" title="@(m_SubCopied ? Strings.PROFILECARD_COPY_SUB_COPIED : Strings.PROFILECARD_COPY_SUB)">
+                        <span class="material-symbols-outlined">@(m_SubCopied ? "check" : "content_copy")</span>
+                    </button>
+                </div>
             </div>
         </div>
         <hr />
         <div class="functions">
+            <button onclick="@OnClick_ManageAccountAsync">
+                <span class="material-symbols-outlined">manage_accounts</span>
+                <span>@Strings.PROFILECARD_MANAGE_ACCOUNT</span>
+            </button>
             <button onclick="@OnClick_Logout">
                 <span class="material-symbols-outlined">logout</span>
                 <span>@Strings.PROFILECARD_LOGOUT</span>
@@ -42,6 +53,7 @@
     private string m_Email = string.Empty;
     private string m_Picture = string.Empty;
     private string m_ShortSub = string.Empty;
+    private bool m_SubCopied;
 
     protected override Task OnInitializedAsync()
     {
@@ -96,7 +108,44 @@
     public void Dispose()
     {
         Auth.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+        m_CopySubCts?.Cancel();
+        m_CopySubCts?.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    private CancellationTokenSource? m_CopySubCts;
+
+    private async Task OnClick_CopySubAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", m_Sub);
+
+            m_CopySubCts?.Cancel();
+            m_CopySubCts = new CancellationTokenSource();
+            var cts = m_CopySubCts;
+
+            m_SubCopied = true;
+            StateHasChanged();
+
+            await Task.Delay(1500, cts.Token);
+
+            m_SubCopied = false;
+            StateHasChanged();
+        }
+        catch (TaskCanceledException)
+        {
+            // another copy was triggered; ignore
+        }
+        catch
+        {
+            // clipboard access may be unavailable in some contexts
+        }
+    }
+
+    private async Task OnClick_ManageAccountAsync()
+    {
+        await JS.InvokeVoidAsync("openExternalUrl", "https://accounts.ayla.r-e.kr");
     }
 
     private void OnClick_Logout()
