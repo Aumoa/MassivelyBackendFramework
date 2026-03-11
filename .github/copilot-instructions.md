@@ -28,3 +28,9 @@ This project adheres to a clean, modern, and user-centric design language inspir
 
 ## 4. Usage Instructions for Copilot
 When asked to create or modify UI components, act as a Senior UX Engineer. Reference this global design system and ensure the generated code aligns with the "clean and modern" aesthetic. If a request conflicts with these guidelines, provide a suggestion that improves consistency. For example, if asked to create a form with left-aligned labels, suggest changing to top-aligned labels and explain the rationale based on the design principles outlined above. Always aim to enhance the user experience while adhering to the established standards.
+
+## 5. Blazor Implementation Standards
+- **Event Handling:** Always use the Razor directive syntax @on{EVENT} (e.g., @onclick="HandleClick") instead of the HTML attribute syntax onclick="@HandleClick".
+- **Component Naming:** Use PascalCase for all component files and C# method names to maintain .NET naming conventions.
+- **Event Handler Prefix:** Prefix private event handler methods with On (e.g., OnLogoutClick, OnSaveSubmit) for better code traceability.
+- **Directive Precedence:** Place Blazor-specific directives (e.g., @ref, @bind, @onclick) at the beginning of the element tag, before standard HTML attributes, to improve scannability.

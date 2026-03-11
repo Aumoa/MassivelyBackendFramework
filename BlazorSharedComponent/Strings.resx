@@ -120,4 +120,13 @@
   <data name="PROFILECARD_LOGOUT" xml:space="preserve">
     <value>Logout</value>
   </data>
+  <data name="PROFILECARD_COPY_SUB" xml:space="preserve">
+    <value>Copy Sub</value>
+  </data>
+  <data name="PROFILECARD_COPY_SUB_COPIED" xml:space="preserve">
+    <value>Copied!</value>
+  </data>
+  <data name="PROFILECARD_MANAGE_ACCOUNT" xml:space="preserve">
+    <value>Manage Account</value>
+  </data>
 </root>
