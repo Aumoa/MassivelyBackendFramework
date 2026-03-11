@@ -7,51 +7,102 @@
 @inject NavigationManager Nav
 
 <Dialog @ref="m_Ref">
-    <h5 style="font-weight: bold;">
-        @Strings.MANAGEACCOUNTS_PICTURE_CHANGE_TITLE
-    </h5>
-    <p>
-        <span>@Strings.MANAGEACCOUNTS_PICTURE_URI</span>
-        <input type="text" @bind-value="m_NewPictureUri" />
-        <span class="link-button" @onclick="OnConfirmAsync">
+    <div class="dlg-header">
+        <div class="dlg-header-icon">
+            <span class="material-symbols-outlined">account_circle</span>
+        </div>
+        <div class="dlg-header-text">
+            <h2 class="dlg-title">@Strings.MANAGEACCOUNTS_PICTURE_CHANGE_TITLE</h2>
+        </div>
+    </div>
+    <hr class="dlg-divider" />
+    <div class="dlg-body">
+        <div class="preview-container">
+            <img src="@m_NewPictureUri" alt="Profile preview" class="preview-img"
+                 onerror="this.src='@kFallbackPictureUrl';" />
+        </div>
+        <FloatingInput Placeholder="@Strings.MANAGEACCOUNTS_PICTURE_URI"
+                       Value="@m_NewPictureUri"
+                       ValueChanged="@((v) => { m_NewPictureUri = v; m_Error = string.Empty; })"
+                       HasError="@(!string.IsNullOrEmpty(m_Error))" />
+        @if (!string.IsNullOrEmpty(m_Error))
+        {
+            <div class="dlg-error">
+                <span class="material-symbols-outlined dlg-error-icon">error</span>
+                <span>@m_Error</span>
+            </div>
+        }
+    </div>
+    <div class="dlg-footer">
+        <button class="btn-ghost" @onclick="OnCancelAsync" disabled="@m_IsSubmitting">
+            @Strings.MANAGEACCOUNTS_CHANGE_CANCEL
+        </button>
+        <button class="btn-primary" @onclick="OnConfirmAsync" disabled="@m_IsSubmitting">
             @Strings.MANAGEACCOUNTS_PICTURE_CHANGE
-        </span>
-    </p>
-    <img src="@m_NewPictureUri" />
+        </button>
+    </div>
 </Dialog>
 
 @code {
     private Dialog m_Ref = null!;
     private string? m_NewPictureUri;
+    private string m_Error = string.Empty;
+    private bool m_IsSubmitting;
+
+    private const string kFallbackPictureUrl = "https://assets.ayla.r-e.kr/img/profile.png";
 
     public async Task ShowAsync()
     {
         m_NewPictureUri = Auth.Picture;
+        m_Error = string.Empty;
+        m_IsSubmitting = false;
         await m_Ref.ShowAsync();
+    }
+
+    private async Task OnCancelAsync()
+    {
+        await m_Ref.CloseAsync();
     }
 
     private async Task OnConfirmAsync()
     {
+        if (m_IsSubmitting)
+        {
+            return;
+        }
+
+        m_Error = string.Empty;
+
         if (Auth.Picture == m_NewPictureUri)
         {
-            await JS.InvokeVoidAsync("alert", Strings.MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE);
-            await m_Ref.CloseAsync();
+            m_Error = Strings.MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE;
             return;
         }
 
-        var verified = await Accesses.VerifyAsync(Auth.AccessToken ?? string.Empty);
-        if (verified.HasValue == false || verified.Value.Id != Auth.Id)
+        m_IsSubmitting = true;
+        StateHasChanged();
+
+        try
         {
-            await JS.InvokeVoidAsync("alert", Strings.ERROR_COMMON_AUTHENTICATION_EXPIRED);
+            var verified = await Accesses.VerifyAsync(Auth.AccessToken ?? string.Empty);
+            if (verified.HasValue == false || verified.Value.Id != Auth.Id)
+            {
+                await JS.InvokeVoidAsync("alert", Strings.ERROR_COMMON_AUTHENTICATION_EXPIRED);
+                Nav.NavigateTo("/auth/logout", forceLoad: true);
+                return;
+            }
+
+            var accountId = Auth.Id;
+            const string kClaimName = "picture";
+            await AccountClaims.SetUniqueClaimAsync(accountId, kClaimName, m_NewPictureUri ?? string.Empty);
+
+            await JS.InvokeVoidAsync("alert", Strings.MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE);
             Nav.NavigateTo("/auth/logout", forceLoad: true);
-            return;
         }
-
-        var accountId = Auth.Id;
-        const string kClaimName = "picture";
-        await AccountClaims.SetUniqueClaimAsync(accountId, kClaimName, m_NewPictureUri ?? string.Empty);
-
-        await JS.InvokeVoidAsync("alert", Strings.MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE);
-        Nav.NavigateTo("/auth/logout", forceLoad: true);
+        finally
+        {
+            m_IsSubmitting = false;
+            StateHasChanged();
+        }
     }
 }

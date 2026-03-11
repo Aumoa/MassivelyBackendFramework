@@ -28,7 +28,7 @@
                 <div class="info-value">
                     <div class="picture-action-row">
                         <img src="@Auth.Picture" alt="Profile picture" class="profile-img"
-                             onerror="this.src='https://assets.ayla.r-e.kr/img/profile.png';" />
+                             onerror="this.src='@kFallbackPictureUrl';" />
                         <span class="link-button" @onclick="OnChangePictureAsync">
                             @Strings.MANAGEACCOUNTS_PICTURE_CHANGE
                         </span>
@@ -177,6 +177,8 @@
 <DlgChangePicture @ref="m_DlgChangePicture" />
 
 @code {
+    private const string kFallbackPictureUrl = "https://assets.ayla.r-e.kr/img/profile.png";
+
     private DlgChangePassword m_DlgChangePassword = null!;
     private DlgChangePicture m_DlgChangePicture = null!;
 
