@@ -2,15 +2,15 @@
 @rendermode InteractiveServer
 @inject IJSRuntime JS
 
-<PageTitle>AI Chat</PageTitle>
+<PageTitle>@Strings.CHAT_PAGE_TITLE</PageTitle>
 
 <div class="chat-page">
     <div class="messages-area" id="messages-area">
         <div class="messages-inner">
             <div class="welcome-message">
                 <span class="material-symbols-outlined welcome-icon">smart_toy</span>
-                <h2>무엇을 도와드릴까요?</h2>
-                <p>Ollama에 연결된 AI와 대화를 시작하세요.</p>
+                <h2>@Strings.CHAT_WELCOME_TITLE</h2>
+                <p>@Strings.CHAT_WELCOME_SUBTITLE</p>
             </div>
         </div>
     </div>
@@ -22,16 +22,16 @@
                       @bind:event="oninput"
                       @onkeydown="OnInputKeyDown"
                       class="chat-input"
-                      placeholder="메시지를 입력하세요..."
+                      placeholder="@Strings.CHAT_INPUT_PLACEHOLDER"
                       rows="1"></textarea>
             <button @onclick="OnSendClick"
                     class="send-btn"
                     disabled="@string.IsNullOrWhiteSpace(m_InputText)"
-                    title="전송">
+                    title="@Strings.CHAT_SEND_BUTTON_TITLE">
                 <span class="material-symbols-outlined">send</span>
             </button>
         </div>
-        <p class="input-hint">AI가 실수를 할 수 있으니 중요한 정보는 직접 확인하세요.</p>
+        <p class="input-hint">@Strings.CHAT_INPUT_HINT</p>
     </div>
 </div>
 
