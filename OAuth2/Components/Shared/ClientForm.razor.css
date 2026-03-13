@@ -194,6 +194,12 @@
     font-family: 'Roboto Mono', 'Courier New', monospace;
 }
 
+.user-account-sub {
+    font-size: 0.75rem;
+    color: #80868b;
+    font-family: 'Roboto Mono', 'Courier New', monospace;
+}
+
 .add-user-group-panel {
     display: flex;
     flex-direction: column;
@@ -215,6 +221,18 @@
         flex: 1 1 0;
         min-width: 0;
     }
+
+.add-user-group-error {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8125rem;
+    color: #d93025;
+}
+
+.add-user-group-error-icon {
+    font-size: 16px;
+}
 
 .form-actions {
     display: flex;

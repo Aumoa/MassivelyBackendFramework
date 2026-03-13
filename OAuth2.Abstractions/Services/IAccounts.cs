@@ -11,4 +11,5 @@ public interface IAccounts
     ValueTask<bool> VerifyAsync(string sub, string verifyCode, CancellationToken cancellationToken = default);
     ValueTask<RawAccount?> GetRawAccountAsync(string id, CancellationToken cancellationToken = default);
     ValueTask<bool> ChangePasswordAsync(string sub, string previousPassword, string newPassword, CancellationToken cancellationToken = default);
+    ValueTask<string?> ResolveSubAsync(string identifier, CancellationToken cancellationToken = default);
 }
