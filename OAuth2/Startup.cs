@@ -1,3 +1,4 @@
+using ASPNETUtility;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -7,7 +8,6 @@ using OAuth2.Extensions;
 using OAuth2.Options;
 using OAuth2.Services;
 using OAuth2.SQL.Migration;
-using OAuth2.Utility;
 using SQLMigration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -153,6 +153,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.Run();
+
+return;
 
 async ValueTask StartMigrationAsync(CancellationToken cancellationToken)
 {

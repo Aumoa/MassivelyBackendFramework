@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
@@ -12,6 +12,7 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\ASPNETUtility\ASPNETUtility.csproj" />
     <ProjectReference Include="..\BlazorSharedComponent\BlazorSharedComponent.csproj" />
     <ProjectReference Include="..\OAuth2.Controllers\OAuth2.Controllers.csproj" />
     <ProjectReference Include="..\OAuth2.SQL\OAuth2.SQL.csproj" />
