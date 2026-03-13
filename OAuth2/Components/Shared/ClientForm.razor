@@ -2,6 +2,7 @@
 @using OAuth2.Services
 @inject IClientClaims Claims
 @inject IClientUserGroups UserGroups
+@inject IAccounts Accounts
 @inject NavigationManager Nav
 
 <div class="form-wrapper">
@@ -110,10 +111,17 @@
                 }
                 <div class="add-user-group-panel">
                     <div class="add-user-group-inputs">
-                        <FloatingInput Type="text" Placeholder="User Sub" @bind-Value="m_NewUserSub" />
-                        <FloatingInput Type="text" Placeholder="Group name" @bind-Value="m_NewGroupName" />
+                        <FloatingInput @bind-Value="m_NewUserIdentifier" HasError="@m_HasNewUserError" Type="text" Placeholder="User ID / Email / Sub" />
+                        <FloatingInput @bind-Value="m_NewGroupName" Type="text" Placeholder="Group name" />
                     </div>
-                    <button type="button" class="btn-text-add" @onclick="AddUserGroupAsync">
+                    @if (!string.IsNullOrEmpty(m_NewUserErrorMessage))
+                    {
+                        <div class="add-user-group-error">
+                            <span class="material-symbols-outlined add-user-group-error-icon">error</span>
+                            <span>@m_NewUserErrorMessage</span>
+                        </div>
+                    }
+                    <button @onclick="AddUserGroupAsync" type="button" class="btn-text-add">
                         <span class="material-symbols-outlined">person_add</span>
                         @Strings.CLIENTFORM_BUTTON_ADD
                     </button>
@@ -163,8 +171,10 @@
 
     private RedirectUri[] m_RedirectUris = [];
     private UserGroupItem[] m_UserGroups = [];
-    private string? m_NewUserSub;
+    private string? m_NewUserIdentifier;
     private string? m_NewGroupName;
+    private bool m_HasNewUserError;
+    private string? m_NewUserErrorMessage;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -248,13 +258,24 @@
 
     public async Task AddUserGroupAsync()
     {
-        if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(m_NewUserSub) || string.IsNullOrWhiteSpace(m_NewGroupName))
+        if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(m_NewUserIdentifier) || string.IsNullOrWhiteSpace(m_NewGroupName))
         {
             return;
         }
 
-        await UserGroups.AddClientUserGroupAsync(Id, m_NewUserSub.Trim(), m_NewGroupName.Trim());
-        m_NewUserSub = null;
+        m_HasNewUserError = false;
+        m_NewUserErrorMessage = null;
+
+        var sub = await Accounts.ResolveSubAsync(m_NewUserIdentifier.Trim());
+        if (sub == null)
+        {
+            m_HasNewUserError = true;
+            m_NewUserErrorMessage = Strings.CLIENTFORM_ERROR_USER_NOT_FOUND;
+            return;
+        }
+
+        await UserGroups.AddClientUserGroupAsync(Id, sub, m_NewGroupName.Trim());
+        m_NewUserIdentifier = null;
         m_NewGroupName = null;
         await RefreshUserGroupsAsync(Id);
     }

@@ -216,6 +216,18 @@
         min-width: 0;
     }
 
+.add-user-group-error {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8125rem;
+    color: #d93025;
+}
+
+.add-user-group-error-icon {
+    font-size: 16px;
+}
+
 .form-actions {
     display: flex;
     justify-content: flex-end;

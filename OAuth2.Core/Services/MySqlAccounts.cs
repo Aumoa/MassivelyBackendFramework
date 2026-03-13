@@ -118,6 +118,22 @@ internal class MySqlAccounts(IOptions<MySqlOptions> options) : MySqlDbContext(op
         };
     }
 
+    public async ValueTask<string?> ResolveSubAsync(string identifier, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(identifier);
+
+        using var connection = GetConnection();
+
+        const string QUERY = @"
+            SELECT `sub` FROM `account`
+            WHERE `id` = @identifier OR `email` = @identifier OR `sub` = @identifier
+            ORDER BY CASE WHEN `id` = @identifier THEN 0 WHEN `email` = @identifier THEN 1 ELSE 2 END
+            LIMIT 1";
+
+        var command = new CommandDefinition(QUERY, new { identifier }, cancellationToken: cancellationToken);
+        return await connection.QueryFirstOrDefaultAsync<string?>(command);
+    }
+
     public async ValueTask<bool> ChangePasswordAsync(string sub, string previousPassword, string newPassword, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sub);

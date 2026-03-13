@@ -917,5 +917,11 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("MANAGEACCOUNTS_VALUE_EMAIL_NOT_VERIFIED", resourceCulture);
             }
         }
+        
+        internal static string CLIENTFORM_ERROR_USER_NOT_FOUND {
+            get {
+                return ResourceManager.GetString("CLIENTFORM_ERROR_USER_NOT_FOUND", resourceCulture);
+            }
+        }
     }
 }
