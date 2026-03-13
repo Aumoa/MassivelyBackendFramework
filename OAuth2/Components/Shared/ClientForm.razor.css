@@ -99,7 +99,7 @@
     height: 36px;
     min-width: unset;
     padding: 0;
-    border-radius: 50%;
+    border-radius: 4px;
     border: none;
     background: transparent;
     cursor: pointer;

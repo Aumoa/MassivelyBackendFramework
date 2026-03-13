@@ -432,6 +432,12 @@
   <data name="CLIENTFORM_BUTTON_CANCEL" xml:space="preserve">
     <value>Cancel</value>
   </data>
+  <data name="MANAGE_APPLICATION_DELETE_CONFIRM" xml:space="preserve">
+    <value>Are you sure you want to delete this application? The application will be removed from your list.</value>
+  </data>
+  <data name="MANAGE_APPLICATION_DELETE_BUTTON" xml:space="preserve">
+    <value>Delete application</value>
+  </data>
   <data name="CLIENTFORM_ERROR_USER_NOT_FOUND" xml:space="preserve">
     <value>User not found. Please enter a valid user ID, email, or sub.</value>
   </data>
