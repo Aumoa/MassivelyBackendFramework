@@ -86,10 +86,12 @@
             <div class="section-body">
                 @foreach (var userGroups in m_UserGroups.GroupBy(g => g.AccountId))
                 {
+                    var firstItem = userGroups.First();
                     <div class="user-group-block">
                         <div class="user-group-account">
                             <span class="material-symbols-outlined user-icon">person</span>
-                            <span class="user-account-id">@userGroups.Key</span>
+                            <span class="user-account-id">@firstItem.AccountLoginId</span>
+                            <span class="user-account-sub">@firstItem.AccountId</span>
                         </div>
                         @for (int i = 0; i < userGroups.Count(); i++)
                         {
@@ -145,6 +147,7 @@
     {
         public long Id { get; set; }
         public string AccountId { get; set; }
+        public string AccountLoginId { get; set; }
         public string OriginGroup { get; set; }
         public string Group { get; set; }
 
@@ -258,13 +261,13 @@
 
     public async Task AddUserGroupAsync()
     {
+        m_HasNewUserError = false;
+        m_NewUserErrorMessage = null;
+
         if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(m_NewUserIdentifier) || string.IsNullOrWhiteSpace(m_NewGroupName))
         {
             return;
         }
-
-        m_HasNewUserError = false;
-        m_NewUserErrorMessage = null;
 
         var sub = await Accounts.ResolveSubAsync(m_NewUserIdentifier.Trim());
         if (sub == null)
@@ -334,6 +337,7 @@
             {
                 Id = g.Id,
                 AccountId = g.AccountId,
+                AccountLoginId = g.AccountLoginId,
                 OriginGroup = g.Group,
                 Group = g.Group
             })];

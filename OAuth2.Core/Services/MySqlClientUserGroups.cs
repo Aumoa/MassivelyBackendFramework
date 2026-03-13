@@ -37,10 +37,11 @@ internal class MySqlClientUserGroups(IOptions<MySqlOptions> options) : MySqlDbCo
         using var connection = GetConnection();
 
         const string QUERY = @"
-            SELECT `id`, `client_id` AS `clientId`, `account_id` AS `accountId`, `group`, `created_at` AS `createdAt`, `removed_at` AS `removedAt`
-            FROM `client_user_group`
-            WHERE `client_id` = @clientId AND `removed_at` IS NULL
-            ORDER BY `account_id`, `group`";
+            SELECT cug.`id`, cug.`client_id` AS `clientId`, cug.`account_id` AS `accountId`, COALESCE(a.`id`, cug.`account_id`) AS `accountLoginId`, cug.`group`, cug.`created_at` AS `createdAt`, cug.`removed_at` AS `removedAt`
+            FROM `client_user_group` cug
+            LEFT JOIN `account` a ON a.`sub` = cug.`account_id`
+            WHERE cug.`client_id` = @clientId AND cug.`removed_at` IS NULL
+            ORDER BY cug.`account_id`, cug.`group`";
         
         var command = new CommandDefinition(QUERY, new { clientId }, cancellationToken: cancellationToken);
         var result = await connection.QueryAsync<ClientUserGroup>(command);

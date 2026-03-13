@@ -194,6 +194,12 @@
     font-family: 'Roboto Mono', 'Courier New', monospace;
 }
 
+.user-account-sub {
+    font-size: 0.75rem;
+    color: #80868b;
+    font-family: 'Roboto Mono', 'Courier New', monospace;
+}
+
 .add-user-group-panel {
     display: flex;
     flex-direction: column;
