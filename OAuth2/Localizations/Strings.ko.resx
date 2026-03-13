@@ -432,4 +432,10 @@
   <data name="CLIENTFORM_BUTTON_CANCEL" xml:space="preserve">
     <value>취소</value>
   </data>
+  <data name="MANAGE_APPLICATION_DELETE_CONFIRM" xml:space="preserve">
+    <value>정말로 이 애플리케이션을 삭제하시겠습니까? 애플리케이션이 목록에서 제거됩니다.</value>
+  </data>
+  <data name="MANAGE_APPLICATION_DELETE_BUTTON" xml:space="preserve">
+    <value>애플리케이션 삭제</value>
+  </data>
 </root>

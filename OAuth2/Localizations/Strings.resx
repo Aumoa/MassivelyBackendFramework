@@ -432,4 +432,10 @@
   <data name="CLIENTFORM_BUTTON_CANCEL" xml:space="preserve">
     <value>Cancel</value>
   </data>
+  <data name="MANAGE_APPLICATION_DELETE_CONFIRM" xml:space="preserve">
+    <value>Are you sure you want to delete this application? The application will be removed from your list.</value>
+  </data>
+  <data name="MANAGE_APPLICATION_DELETE_BUTTON" xml:space="preserve">
+    <value>Delete application</value>
+  </data>
 </root>

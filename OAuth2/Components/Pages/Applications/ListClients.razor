@@ -1,9 +1,11 @@
 ﻿@using OAuth2.DTO
+@using OAuth2.Localizations
 @using OAuth2.Services
 @using OAuth2.Utility
 @inject IClients Clients
 @inject JwtAuthenticationStateProvider Auth
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <div class="page-container">
     <div class="page-header">
@@ -50,6 +52,9 @@
                             <span class="client-id-text" title="@client.Id">@client.Id</span>
                         </div>
                         <div class="col-action">
+                            <button @onclick:stopPropagation="true" @onclick="() => OnDeleteClientAsync(client.Id)" class="btn-delete-client" title="@Strings.MANAGE_APPLICATION_DELETE_BUTTON">
+                                <span class="material-symbols-outlined">delete</span>
+                            </button>
                             <span class="material-symbols-outlined arrow-icon">chevron_right</span>
                         </div>
                     </div>
@@ -88,5 +93,26 @@
     {
         Nav.NavigateWithQuery(("view_type", "modify"), ("id", id));
         return Task.CompletedTask;
+    }
+
+    private async Task OnDeleteClientAsync(string id)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", Strings.MANAGE_APPLICATION_DELETE_CONFIRM);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await Clients.RemoveClientAsync(id);
+
+        var sub = Auth.Sub;
+        if (sub == null)
+        {
+            Nav.NavigateTo("/error");
+            return;
+        }
+
+        m_Clients = await Clients.GetClientsAsync(sub);
+        StateHasChanged();
     }
 }

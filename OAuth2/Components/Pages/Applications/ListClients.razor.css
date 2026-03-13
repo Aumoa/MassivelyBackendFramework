@@ -136,6 +136,7 @@
     display: flex;
     justify-content: flex-end;
     align-items: center;
+    gap: 4px;
 }
 
 .app-icon {
@@ -187,6 +188,30 @@
     font-size: 20px;
     color: #bdc1c6;
 }
+
+.btn-delete-client {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #5f6368;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
+}
+
+    .btn-delete-client:hover {
+        background-color: #fce8e6;
+        color: #d93025;
+    }
+
+    .btn-delete-client .material-symbols-outlined {
+        font-size: 18px;
+    }
 
 .empty-state {
     display: flex;

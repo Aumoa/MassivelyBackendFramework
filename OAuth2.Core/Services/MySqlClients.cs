@@ -71,4 +71,13 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
 
         return secret;
     }
+
+    public async ValueTask RemoveClientAsync(string clientId, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = "UPDATE `client` SET `removed_at` = NOW() WHERE `id` = @clientId AND `removed_at` IS NULL";
+        var command = new CommandDefinition(QUERY, new { clientId }, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
+    }
 }
