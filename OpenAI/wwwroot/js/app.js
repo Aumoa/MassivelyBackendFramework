@@ -1,0 +1,23 @@
+window.getUserLocale = () => {
+    return [navigator.language, Intl.DateTimeFormat().resolvedOptions().timeZone];
+};
+
+window.openExternalUrl = (url) => {
+    if (typeof url !== 'string' || !url.startsWith('https://')) return;
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+};
+
+window.attachChatInput = (element) => {
+    if (!element) return;
+    element.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+        }
+    });
+};

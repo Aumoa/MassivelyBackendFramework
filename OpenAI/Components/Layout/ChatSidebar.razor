@@ -1,0 +1,26 @@
+﻿<div class="sidebar-container">
+    <div class="sidebar-header">
+        <span class="app-title">@Strings.APP_TITLE</span>
+    </div>
+
+    <button @onclick="OnNewChatClick" class="new-chat-btn">
+        <span class="material-symbols-outlined">add</span>
+        @Strings.SIDEBAR_NEW_CHAT
+    </button>
+
+    <div class="chat-history">
+        <div class="history-section-label">@Strings.SIDEBAR_HISTORY_RECENT</div>
+        <div class="chat-history-item active">
+            <span class="material-symbols-outlined chat-icon">chat_bubble</span>
+            <span class="chat-title">@Strings.SIDEBAR_DEFAULT_CHAT_TITLE</span>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    private void OnNewChatClick()
+    {
+        // TODO: create a new chat session
+    }
+}

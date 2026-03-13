@@ -6,6 +6,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
+
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    string[] supportedCultures = ["en", "ko"];
+    options.SetDefaultCulture("en")
+           .AddSupportedCultures(supportedCultures)
+           .AddSupportedUICultures(supportedCultures);
+});
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddAuthentication();
+builder.Services.AddAuthorization();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -17,6 +31,9 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+app.UseRequestLocalization();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseAntiforgery();
 
