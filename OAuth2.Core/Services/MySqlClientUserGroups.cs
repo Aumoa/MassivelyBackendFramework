@@ -11,7 +11,11 @@ internal class MySqlClientUserGroups(IOptions<MySqlOptions> options) : MySqlDbCo
     {
         using var connection = GetConnection();
 
-        const string QUERY1 = "SELECT `group`, `created_at` AS `createdAt` FROM `client_user_group` WHERE `client_id` = @id AND `account_id` = @accountId AND `removed_at` IS NULL";
+        const string QUERY1 = @"
+            SELECT cug.`group`, cug.`created_at` AS `createdAt`
+            FROM `client_user_group` cug
+            INNER JOIN `client` c ON c.`id` = cug.`client_id` AND c.`removed_at` IS NULL
+            WHERE cug.`client_id` = @id AND cug.`account_id` = @accountId AND cug.`removed_at` IS NULL";
         var command = new CommandDefinition(QUERY1, new { id, accountId }, cancellationToken: cancellationToken);
         (string group, DateTime createdAt)[] result = [.. await connection.QueryAsync<(string group, DateTime createdAt)>(command)];
         if (result.Length == 0)

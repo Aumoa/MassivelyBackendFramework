@@ -810,6 +810,18 @@ namespace OAuth2.Localizations {
             }
         }
         
+        internal static string MANAGE_APPLICATION_DELETE_CONFIRM {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_DELETE_CONFIRM", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_DELETE_BUTTON {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_DELETE_BUTTON", resourceCulture);
+            }
+        }
+        
         internal static string MANAGEACCOUNTS_PAGE_TITLE {
             get {
                 return ResourceManager.GetString("MANAGEACCOUNTS_PAGE_TITLE", resourceCulture);

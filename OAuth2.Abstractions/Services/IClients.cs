@@ -8,4 +8,5 @@ public interface IClients
     ValueTask<ClientInfo?> GetClientAsync(string clientId, CancellationToken cancellationToken = default);
     ValueTask<ClientInfo[]> GetClientsAsync(string ownerId, CancellationToken cancellationToken = default);
     ValueTask<string> NewClientSecretAsync(string clientId, CancellationToken cancellationToken = default);
+    ValueTask RemoveClientAsync(string clientId, CancellationToken cancellationToken = default);
 }
