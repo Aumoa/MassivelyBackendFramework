@@ -12,10 +12,10 @@ internal class MySqlClientUserGroups(IOptions<MySqlOptions> options) : MySqlDbCo
         using var connection = GetConnection();
 
         const string QUERY1 = @"
-            SELECT cug.`group`, cug.`created_at` AS `createdAt`
-            FROM `client_user_group` cug
-            INNER JOIN `client` c ON c.`id` = cug.`client_id` AND c.`removed_at` IS NULL
-            WHERE cug.`client_id` = @id AND cug.`account_id` = @accountId AND cug.`removed_at` IS NULL";
+            SELECT `cug`.`group`, `cug`.`created_at` AS `createdAt`
+            FROM `client_user_group` `cug`
+            INNER JOIN `client` `c` ON `c`.`id` = `cug`.`client_id` AND `c`.`removed_at` IS NULL
+            WHERE `cug`.`client_id` = @id AND `cug`.`account_id` = @accountId AND `cug`.`removed_at` IS NULL";
         var command = new CommandDefinition(QUERY1, new { id, accountId }, cancellationToken: cancellationToken);
         (string group, DateTime createdAt)[] result = [.. await connection.QueryAsync<(string group, DateTime createdAt)>(command)];
         if (result.Length == 0)
@@ -37,11 +37,11 @@ internal class MySqlClientUserGroups(IOptions<MySqlOptions> options) : MySqlDbCo
         using var connection = GetConnection();
 
         const string QUERY = @"
-            SELECT cug.`id`, cug.`client_id` AS `clientId`, cug.`account_id` AS `accountId`, COALESCE(a.`id`, cug.`account_id`) AS `accountLoginId`, cug.`group`, cug.`created_at` AS `createdAt`, cug.`removed_at` AS `removedAt`
-            FROM `client_user_group` cug
-            LEFT JOIN `account` a ON a.`sub` = cug.`account_id`
-            WHERE cug.`client_id` = @clientId AND cug.`removed_at` IS NULL
-            ORDER BY cug.`account_id`, cug.`group`";
+            SELECT `cug`.`id`, `cug`.`client_id` AS `clientId`, `cug`.`account_id` AS `accountId`, COALESCE(`a`.`id`, `cug`.`account_id`) AS `accountLoginId`, `cug`.`group`, `cug`.`created_at` AS `createdAt`, `cug`.`removed_at` AS `removedAt`
+            FROM `client_user_group` `cug`
+            LEFT JOIN `account` `a` ON `a`.`sub` = `cug`.`account_id`
+            WHERE `cug`.`client_id` = @clientId AND `cug`.`removed_at` IS NULL
+            ORDER BY `cug`.`account_id`, `cug`.`group`";
         
         var command = new CommandDefinition(QUERY, new { clientId }, cancellationToken: cancellationToken);
         var result = await connection.QueryAsync<ClientUserGroup>(command);
