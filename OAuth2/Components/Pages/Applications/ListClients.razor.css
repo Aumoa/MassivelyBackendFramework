@@ -132,7 +132,7 @@
 }
 
 .col-action {
-    flex: 0 0 32px;
+    flex: 0 0 60px;
     display: flex;
     justify-content: flex-end;
     align-items: center;
@@ -195,8 +195,10 @@
     justify-content: center;
     width: 32px;
     height: 32px;
+    min-width: unset;
+    padding: 0;
     border: none;
-    border-radius: 50%;
+    border-radius: 4px;
     background: transparent;
     color: #5f6368;
     cursor: pointer;

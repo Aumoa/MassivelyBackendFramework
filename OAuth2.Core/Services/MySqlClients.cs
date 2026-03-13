@@ -75,9 +75,22 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
     public async ValueTask RemoveClientAsync(string clientId, CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
+        await connection.OpenAsync(cancellationToken);
 
-        const string QUERY = "UPDATE `client` SET `removed_at` = NOW() WHERE `id` = @clientId AND `removed_at` IS NULL";
-        var command = new CommandDefinition(QUERY, new { clientId }, cancellationToken: cancellationToken);
+        await using var tx = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+
+        const string QUERY_CLIENT = "UPDATE `client` SET `removed_at` = NOW() WHERE `id` = @clientId AND `removed_at` IS NULL";
+        var command = new CommandDefinition(QUERY_CLIENT, new { clientId }, tx, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);
+
+        const string QUERY_CLAIMS = "UPDATE `client_claim` SET `removed_at` = NOW() WHERE `client_id` = @clientId AND `removed_at` IS NULL";
+        command = new CommandDefinition(QUERY_CLAIMS, new { clientId }, tx, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
+
+        const string QUERY_GROUPS = "UPDATE `client_user_group` SET `removed_at` = NOW() WHERE `client_id` = @clientId AND `removed_at` IS NULL";
+        command = new CommandDefinition(QUERY_GROUPS, new { clientId }, tx, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
+
+        await tx.CommitAsync(cancellationToken);
     }
 }
