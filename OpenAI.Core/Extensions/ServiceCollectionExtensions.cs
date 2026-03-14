@@ -9,8 +9,10 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddOllamaAI(this IServiceCollection s, IConfiguration config)
     {
+        s.Configure<OllamaOptions>(config.GetRequiredSection("Ollama"));
         s.Configure<MySqlOptions>(config.GetRequiredSection("MySql"));
 
+        s.AddHttpClient<OllamaAIMessenger>();
         s.AddSingleton<IAIMessenger, OllamaAIMessenger>();
         s.AddTransient<IChatRepository, MySqlChatRepository>();
         return s;
