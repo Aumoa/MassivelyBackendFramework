@@ -127,7 +127,7 @@
     <value>How can I help you?</value>
   </data>
   <data name="CHAT_WELCOME_SUBTITLE" xml:space="preserve">
-    <value>Start a conversation with the AI connected to Ollama.</value>
+    <value>Start a conversation with our AI assistant.</value>
   </data>
   <data name="CHAT_INPUT_PLACEHOLDER" xml:space="preserve">
     <value>Type a message...</value>
@@ -160,9 +160,9 @@
     <value>Welcome back</value>
   </data>
   <data name="LOGIN_PAGE_SUBTITLE" xml:space="preserve">
-    <value>Log in to continue to ChatGPT</value>
+    <value>Log in to continue</value>
   </data>
   <data name="LOGIN_PAGE_BUTTON" xml:space="preserve">
-    <value>Continue with OpenAI</value>
+    <value>Continue</value>
   </data>
 </root>

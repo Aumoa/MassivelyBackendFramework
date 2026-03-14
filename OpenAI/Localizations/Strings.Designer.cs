@@ -106,7 +106,7 @@ namespace OpenAI.Localizations {
         }
         
         /// <summary>
-        ///   Start a conversation with the AI connected to Ollama.과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Start a conversation with our AI assistant.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string CHAT_WELCOME_SUBTITLE {
             get {
@@ -187,7 +187,7 @@ namespace OpenAI.Localizations {
         }
         
         /// <summary>
-        ///   Log in to continue to ChatGPT과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Log in to continue과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_PAGE_SUBTITLE {
             get {
@@ -196,7 +196,7 @@ namespace OpenAI.Localizations {
         }
         
         /// <summary>
-        ///   Continue with OpenAI과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Continue과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_PAGE_BUTTON {
             get {
