@@ -1,4 +1,6 @@
 ﻿@inherits LayoutComponentBase
+@inject ChatStateService ChatState
+@implements IDisposable
 
 <AuthorizeView>
     <Authorized>
@@ -16,7 +18,7 @@
                     <span class="conversation-title">
                         <AuthorizeView Roles="admin" Context="ConversationTitle">
                             <Authorized>
-                                @Strings.TOPBAR_DEFAULT_CONVERSATION_TITLE
+                                @(ChatState.CurrentSession?.Chat.ConversationTopics ?? Strings.TOPBAR_DEFAULT_CONVERSATION_TITLE)
                             </Authorized>
                         </AuthorizeView>
                     </span>
@@ -46,3 +48,20 @@
     <a href="." class="reload">@Strings.ERROR_RELOAD</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        ChatState.OnChange += OnChatStateChanged;
+    }
+
+    public void Dispose()
+    {
+        ChatState.OnChange -= OnChatStateChanged;
+    }
+
+    private void OnChatStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+}

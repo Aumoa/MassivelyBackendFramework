@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
 using OpenAI.Components;
 using OpenAI.Extensions;
+using OpenAI.Services;
 using OpenIDConnect.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +18,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
 
 builder.Services.AddOllamaAI(builder.Configuration);
+builder.Services.AddScoped<ChatStateService>();
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
