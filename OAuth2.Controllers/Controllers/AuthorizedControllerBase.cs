@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using OAuth2.DTO;
 using OAuth2.Services;
 
@@ -6,6 +7,8 @@ namespace OAuth2.Controllers;
 
 public class AuthorizedControllerBase(IAccesses accesses) : ControllerBase
 {
+    private const string ApiKeyPrefix = "mbf_";
+
     protected async ValueTask<IActionResult> VerifiedAsync(Func<Access, ValueTask<IActionResult>> body, string? accessToken, CancellationToken cancellationToken)
     {
         var token = Request.Headers.Authorization.ToString();
@@ -24,12 +27,56 @@ public class AuthorizedControllerBase(IAccesses accesses) : ControllerBase
             return Unauthorized("Authorization header is not included.");
         }
 
-        var access = await accesses.VerifyAsync(token, cancellationToken);
+        Access? access;
+
+        if (token.StartsWith(ApiKeyPrefix))
+        {
+            access = await ResolveApiKeyAccessAsync(token, cancellationToken);
+        }
+        else
+        {
+            access = await accesses.VerifyAsync(token, cancellationToken);
+        }
+
         if (access.HasValue == false)
         {
             return Unauthorized("access_token is expired.");
         }
 
         return await body(access.Value);
+    }
+
+    private async ValueTask<Access?> ResolveApiKeyAccessAsync(string apiKey, CancellationToken cancellationToken)
+    {
+        var apiKeys = HttpContext.RequestServices.GetRequiredService<IApiKeys>();
+        var apiKeyInfo = await apiKeys.VerifyApiKeyAsync(apiKey, cancellationToken);
+        if (!apiKeyInfo.HasValue)
+        {
+            return null;
+        }
+
+        var clients = HttpContext.RequestServices.GetRequiredService<IClients>();
+        var clientInfo = await clients.GetClientAsync(apiKeyInfo.Value.ClientId, cancellationToken);
+        if (!clientInfo.HasValue)
+        {
+            return null;
+        }
+
+        var accounts = HttpContext.RequestServices.GetRequiredService<IAccounts>();
+        var rawAccount = await accounts.GetRawAccountAsync(clientInfo.Value.OwnerId, cancellationToken);
+        if (!rawAccount.HasValue)
+        {
+            return null;
+        }
+
+        return new Access
+        {
+            Id = clientInfo.Value.OwnerId,
+            Sub = rawAccount.Value.Sub,
+            AccessToken = apiKey,
+            RefreshToken = string.Empty,
+            Scope = "all",
+            ClientId = apiKeyInfo.Value.ClientId
+        };
     }
 }

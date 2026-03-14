@@ -13,5 +13,6 @@ public partial class Scripts : IScripts
         yield return new _4__Add_email_verify();
         yield return new _5__Add_client_user_group();
         yield return new _6__Fix_client_user_group_unique_constraint();
+        yield return new _7__Add_api_key();
     }
 }
