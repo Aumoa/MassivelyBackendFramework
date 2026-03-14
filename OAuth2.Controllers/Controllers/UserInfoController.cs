@@ -13,7 +13,7 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
 {
     [HttpGet]
     [HttpPost]
-    public async ValueTask<IActionResult> GetAsync([FromForm] UserInfoRequest request, CancellationToken cancellationToken)
+    public async ValueTask<IActionResult> GetAsync(CancellationToken cancellationToken)
     {
         return await VerifiedAsync(async access =>
         {
@@ -21,7 +21,7 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
             AccountClaim[] accountClaims = [.. await claims.GetClaimsAsync(access.Id, cancellationToken), .. await groups.GetClientUserGroupsAsync(access.ClientId, access.Sub)];
             var scopedClaims = jwt.ConfigureClaims(rawAccount, access.Scope, accountClaims, null, false);
             return Ok(scopedClaims.ToDictionary(c => c.Type, c => GetClaimValue(c)));
-        }, request.AccessToken, cancellationToken);
+        }, null, cancellationToken);
 
         static object? GetClaimValue(Claim claim)
         {
