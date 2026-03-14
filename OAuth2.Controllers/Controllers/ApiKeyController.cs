@@ -19,12 +19,7 @@ public class ApiKeyController(IApiKeys apiKeys, IClients clients, IAccesses acce
                 return NotFound(new { error = "client_not_found" });
             }
 
-            if (client.Value.OwnerId != access.Id)
-            {
-                return Forbid();
-            }
-
-            var apiKey = await apiKeys.CreateApiKeyAsync(request.ClientId, request.Name, cancellationToken);
+            var apiKey = await apiKeys.CreateApiKeyAsync(access.Id, request.ClientId, request.Name, cancellationToken);
             return Ok(new CreateApiKeyResponse { ApiKey = apiKey });
         }, null, cancellationToken);
     }
@@ -40,12 +35,7 @@ public class ApiKeyController(IApiKeys apiKeys, IClients clients, IAccesses acce
                 return NotFound(new { error = "client_not_found" });
             }
 
-            if (client.Value.OwnerId != access.Id)
-            {
-                return Forbid();
-            }
-
-            var keys = await apiKeys.GetApiKeysAsync(clientId, cancellationToken);
+            var keys = await apiKeys.GetApiKeysAsync(access.Id, clientId, cancellationToken);
             return Ok(keys);
         }, null, cancellationToken);
     }
@@ -61,8 +51,7 @@ public class ApiKeyController(IApiKeys apiKeys, IClients clients, IAccesses acce
                 return NotFound(new { error = "api_key_not_found" });
             }
 
-            var client = await clients.GetClientAsync(apiKeyInfo.Value.ClientId, cancellationToken);
-            if (!client.HasValue || client.Value.OwnerId != access.Id)
+            if (apiKeyInfo.Value.AccountId != access.Id)
             {
                 return Forbid();
             }

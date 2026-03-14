@@ -55,21 +55,8 @@ public class AuthorizedControllerBase(IAccesses accesses) : ControllerBase
             return null;
         }
 
-        var clients = HttpContext.RequestServices.GetRequiredService<IClients>();
-        var clientInfo = await clients.GetClientAsync(apiKeyInfo.Value.ClientId, cancellationToken);
-        if (!clientInfo.HasValue)
-        {
-            return null;
-        }
-
         var accounts = HttpContext.RequestServices.GetRequiredService<IAccounts>();
-        var accountId = await accounts.GetIdFromSubAsync(clientInfo.Value.OwnerId, cancellationToken);
-        if (string.IsNullOrEmpty(accountId))
-        {
-            return null;
-        }
-
-        var rawAccount = await accounts.GetRawAccountAsync(accountId, cancellationToken);
+        var rawAccount = await accounts.GetRawAccountAsync(apiKeyInfo.Value.AccountId, cancellationToken);
         if (!rawAccount.HasValue)
         {
             return null;
@@ -77,7 +64,7 @@ public class AuthorizedControllerBase(IAccesses accesses) : ControllerBase
 
         return new Access
         {
-            Id = accountId,
+            Id = apiKeyInfo.Value.AccountId,
             Sub = rawAccount.Value.Sub,
             AccessToken = apiKey,
             RefreshToken = string.Empty,

@@ -6,6 +6,7 @@
 @inject IAccounts Accounts
 @inject IClients Clients
 @inject IApiKeys ApiKeys
+@inject JwtAuthenticationStateProvider Auth
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
@@ -496,7 +497,14 @@
 
     private async ValueTask RefreshApiKeysAsync(string id)
     {
-        m_ApiKeys = await ApiKeys.GetApiKeysAsync(id);
+        var accountId = Auth.Id;
+        if (string.IsNullOrEmpty(accountId))
+        {
+            m_ApiKeys = [];
+            return;
+        }
+
+        m_ApiKeys = await ApiKeys.GetApiKeysAsync(accountId, id);
     }
 
     private async Task OnAddApiKeyAsync()
@@ -506,7 +514,13 @@
             return;
         }
 
-        var apiKey = await ApiKeys.CreateApiKeyAsync(Id, m_NewApiKeyName.Trim());
+        var accountId = Auth.Id;
+        if (string.IsNullOrEmpty(accountId))
+        {
+            return;
+        }
+
+        var apiKey = await ApiKeys.CreateApiKeyAsync(accountId, Id, m_NewApiKeyName.Trim());
         m_NewApiKeyName = null;
         await RefreshApiKeysAsync(Id);
         await m_DlgNewApiKey.ShowAsync(apiKey);
