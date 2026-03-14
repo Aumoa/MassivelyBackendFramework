@@ -176,5 +176,32 @@ namespace OpenAI.Localizations {
                 return ResourceManager.GetString("TOPBAR_DEFAULT_CONVERSATION_TITLE", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Welcome back과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_PAGE_TITLE {
+            get {
+                return ResourceManager.GetString("LOGIN_PAGE_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Log in to continue to ChatGPT과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_PAGE_SUBTITLE {
+            get {
+                return ResourceManager.GetString("LOGIN_PAGE_SUBTITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Continue with OpenAI과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_PAGE_BUTTON {
+            get {
+                return ResourceManager.GetString("LOGIN_PAGE_BUTTON", resourceCulture);
+            }
+        }
     }
 }

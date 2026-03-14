@@ -156,4 +156,13 @@
   <data name="ERROR_RELOAD" xml:space="preserve">
     <value>Reload</value>
   </data>
+  <data name="LOGIN_PAGE_TITLE" xml:space="preserve">
+    <value>Welcome back</value>
+  </data>
+  <data name="LOGIN_PAGE_SUBTITLE" xml:space="preserve">
+    <value>Log in to continue to ChatGPT</value>
+  </data>
+  <data name="LOGIN_PAGE_BUTTON" xml:space="preserve">
+    <value>Continue with OpenAI</value>
+  </data>
 </root>
