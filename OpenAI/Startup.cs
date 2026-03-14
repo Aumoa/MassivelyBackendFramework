@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using OpenAI.Components;
+using OpenAI.Extensions;
 using OpenIDConnect.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,8 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
+
+builder.Services.AddOllamaAI(builder.Configuration);
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
