@@ -127,7 +127,7 @@
     <value>How can I help you?</value>
   </data>
   <data name="CHAT_WELCOME_SUBTITLE" xml:space="preserve">
-    <value>Start a conversation with the AI connected to Ollama.</value>
+    <value>Start a conversation with our AI assistant.</value>
   </data>
   <data name="CHAT_INPUT_PLACEHOLDER" xml:space="preserve">
     <value>Type a message...</value>
@@ -155,5 +155,20 @@
   </data>
   <data name="ERROR_RELOAD" xml:space="preserve">
     <value>Reload</value>
+  </data>
+  <data name="LOGIN_PAGE_TITLE" xml:space="preserve">
+    <value>Welcome back</value>
+  </data>
+  <data name="LOGIN_PAGE_SUBTITLE" xml:space="preserve">
+    <value>Log in to continue</value>
+  </data>
+  <data name="LOGIN_PAGE_BUTTON" xml:space="preserve">
+    <value>Continue</value>
+  </data>
+  <data name="ERROR_PERMISSION_DENIED" xml:space="preserve">
+    <value>Permission Denied.</value>
+  </data>
+  <data name="ERROR_PERMISSION_DENIED_DESCRIPTION" xml:space="preserve">
+    <value>Please contact an administrator to request '{0}' permission.</value>
   </data>
 </root>

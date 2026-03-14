@@ -1,0 +1,74 @@
+.login-card {
+    width: 100%;
+    max-width: 400px;
+    background-color: var(--login-card-bg);
+    border: 1px solid var(--login-card-border);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+.login-logo {
+    color: var(--login-logo-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+}
+
+.login-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+    text-align: center;
+    letter-spacing: -0.01em;
+}
+
+.login-subtitle {
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    margin: 0;
+    text-align: center;
+    line-height: 1.5;
+}
+
+.login-btn {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #ffffff;
+    background-color: #10a37f;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    letter-spacing: 0.01em;
+}
+
+    .login-btn:hover {
+        background-color: #0d9070;
+        box-shadow: 0 2px 8px rgba(16, 163, 127, 0.35);
+    }
+
+    .login-btn:active {
+        background-color: #0b8060;
+    }
+
+    .login-btn:focus-visible {
+        outline: 2px solid #10a37f;
+        outline-offset: 2px;
+    }
+
+@media (max-width: 480px) {
+    .login-card {
+        border-radius: 12px;
+        padding: 2rem 1.25rem;
+    }
+}
