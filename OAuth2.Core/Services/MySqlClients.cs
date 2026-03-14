@@ -72,6 +72,26 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
         return secret;
     }
 
+    public async ValueTask<ClientSecretInfo[]> GetClientSecretsAsync(string clientId, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = "SELECT `id`, `client_id` AS `ClientId`, `created_at` AS `CreatedAt` FROM `client_claim` WHERE `client_id` = @clientId AND `removed_at` IS NULL AND `name` = 'secret' ORDER BY `created_at` ASC";
+        var command = new CommandDefinition(QUERY, new { clientId }, cancellationToken: cancellationToken);
+        var results = await connection.QueryAsync<ClientSecretInfo>(command);
+
+        return [.. results];
+    }
+
+    public async ValueTask RemoveClientSecretAsync(long secretId, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = "UPDATE `client_claim` SET `removed_at` = NOW() WHERE `id` = @secretId AND `name` = 'secret' AND `removed_at` IS NULL";
+        var command = new CommandDefinition(QUERY, new { secretId }, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
+    }
+
     public async ValueTask RemoveClientAsync(string clientId, CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();

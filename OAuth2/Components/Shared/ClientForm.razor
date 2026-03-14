@@ -1,9 +1,12 @@
 @using OAuth2.Localizations
 @using OAuth2.Services
+@using OAuth2.DTO
 @inject IClientClaims Claims
 @inject IClientUserGroups UserGroups
 @inject IAccounts Accounts
+@inject IClients Clients
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <div class="form-wrapper">
     @if (IsNewMode)
@@ -130,8 +133,51 @@
                 </div>
             </div>
         </div>
+
+        <div class="form-section">
+            <div class="section-header">
+                <div class="section-header-text">
+                    <h3 class="section-title">@Strings.MANAGE_APPLICATION_SECRETS_SECTION</h3>
+                    <p class="section-desc">@Strings.MANAGE_APPLICATION_SECRETS_SECTION_DESC</p>
+                </div>
+                <button @onclick="OnAddSecretAsync" type="button" class="btn-text-add secrets-add-btn">
+                    <span class="material-symbols-outlined">add</span>
+                    @Strings.MANAGE_APPLICATION_SECRETS_NEW_BUTTON
+                </button>
+            </div>
+            <div class="section-body">
+                @if (m_Secrets.Length == 0)
+                {
+                    <div class="secrets-empty">
+                        <span class="material-symbols-outlined secrets-empty-icon">key_off</span>
+                        <span class="secrets-empty-text">@Strings.MANAGE_APPLICATION_SECRETS_EMPTY</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="secrets-list">
+                        @foreach (var secret in m_Secrets)
+                        {
+                            var secretId = secret.Id;
+                            <div class="secret-row">
+                                <span class="material-symbols-outlined secret-key-icon">key</span>
+                                <div class="secret-meta">
+                                    <span class="secret-id">••••••••••••••••</span>
+                                    <span class="secret-created">@Strings.MANAGE_APPLICATION_SECRETS_CREATED_AT: @secret.CreatedAt.ToString("yyyy-MM-dd HH:mm")</span>
+                                </div>
+                                <button @onclick="() => RemoveSecretAsync(secretId)" type="button" class="btn-icon-action btn-delete" title="@Strings.MANAGE_APPLICATION_SECRETS_REMOVE">
+                                    <span class="material-symbols-outlined">delete</span>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
     }
 </div>
+
+<DlgNewClientSecret @ref="m_DlgNewSecret" OnClose="OnNewSecretDialogClosedAsync" />
 
 @code {
     public struct RedirectUri
@@ -174,6 +220,8 @@
 
     private RedirectUri[] m_RedirectUris = [];
     private UserGroupItem[] m_UserGroups = [];
+    private ClientSecretInfo[] m_Secrets = [];
+    private DlgNewClientSecret m_DlgNewSecret = null!;
     private string? m_NewUserIdentifier;
     private string? m_NewGroupName;
     private bool m_HasNewUserError;
@@ -188,6 +236,7 @@
 
         await RefreshRedirectUrisAsync(Id);
         await RefreshUserGroupsAsync(Id);
+        await RefreshSecretsAsync(Id);
     }
 
     public async Task AddRedirectUriAsync()
@@ -347,5 +396,49 @@
     {
         Nav.NavigateTo("/manage-applications");
         return Task.CompletedTask;
+    }
+
+    private async ValueTask RefreshSecretsAsync(string id)
+    {
+        m_Secrets = await Clients.GetClientSecretsAsync(id);
+    }
+
+    private async Task OnAddSecretAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        var secret = await Clients.NewClientSecretAsync(Id);
+        await RefreshSecretsAsync(Id);
+        await m_DlgNewSecret.ShowAsync(secret);
+    }
+
+    private async Task OnNewSecretDialogClosedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Id))
+        {
+            await RefreshSecretsAsync(Id);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task RemoveSecretAsync(long secretId)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>("confirm", Strings.MANAGE_APPLICATION_SECRETS_REMOVE_CONFIRM);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await Clients.RemoveClientSecretAsync(secretId);
+        await RefreshSecretsAsync(Id);
     }
 }
