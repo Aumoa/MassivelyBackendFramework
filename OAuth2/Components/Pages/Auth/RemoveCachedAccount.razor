@@ -15,7 +15,7 @@
     protected override void OnParametersSet()
     {
         var httpContext = HttpContextAccessor.HttpContext;
-        if (httpContext != null && !string.IsNullOrEmpty(Id))
+        if (httpContext != null && !string.IsNullOrEmpty(Id) && !httpContext.Response.HasStarted)
         {
             httpContext.Response.Cookies.Delete($"cached_jwt_{Id}", new CookieOptions
             {

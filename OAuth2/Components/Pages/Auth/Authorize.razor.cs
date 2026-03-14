@@ -237,13 +237,16 @@ public partial class Authorize(
                                 var except = cachedJwt.Claims.Where(p => p.Type is not ("access_token" or "refresh_token"));
                                 var newCachedJwt = jwt.Issue(hostOptions.Value.ClientId, [.. except, new Claim("access_token", newAccess.Value.AccessToken), new Claim("refresh_token", newAccess.Value.RefreshToken)]);
 
-                                httpContext.Response.Cookies.Append($"cached_jwt_{accountId}", newCachedJwt, new CookieOptions
+                                if (!httpContext.Response.HasStarted)
                                 {
-                                    HttpOnly = true,
-                                    Secure = true,
-                                    SameSite = SameSiteMode.Lax,
-                                    Expires = DateTimeOffset.UtcNow.AddYears(10)
-                                });
+                                    httpContext.Response.Cookies.Append($"cached_jwt_{accountId}", newCachedJwt, new CookieOptions
+                                    {
+                                        HttpOnly = true,
+                                        Secure = true,
+                                        SameSite = SameSiteMode.Lax,
+                                        Expires = DateTimeOffset.UtcNow.AddYears(10)
+                                    });
+                                }
 
                                 cachedJwt = handler.ReadJwtToken(newCachedJwt);
                             }
@@ -262,12 +265,15 @@ public partial class Authorize(
 
                         void DeleteCachedAccount(string id)
                         {
-                            httpContext.Response.Cookies.Delete($"cached_jwt_{id}", new CookieOptions
+                            if (!httpContext.Response.HasStarted)
                             {
-                                HttpOnly = true,
-                                Secure = true,
-                                SameSite = SameSiteMode.Lax
-                            });
+                                httpContext.Response.Cookies.Delete($"cached_jwt_{id}", new CookieOptions
+                                {
+                                    HttpOnly = true,
+                                    Secure = true,
+                                    SameSite = SameSiteMode.Lax
+                                });
+                            }
                         }
                     }
                 }

@@ -20,24 +20,29 @@
             throw new InvalidOperationException();
         }
 
+        // Read from request cookies before the response guard; request cookies are always available.
         var accessToken = httpContext.Request.Cookies["access_token"];
 
-        var cookieOptions = new CookieOptions
+        if (!httpContext.Response.HasStarted)
         {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict
-        };
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict
+            };
 
-        httpContext.Response.Cookies.Delete("id_token", cookieOptions);
-        httpContext.Response.Cookies.Delete("access_token", cookieOptions);
-        httpContext.Response.Cookies.Delete("refresh_token", cookieOptions);
-        httpContext.Response.Cookies.Delete("id", cookieOptions);
+            httpContext.Response.Cookies.Delete("id_token", cookieOptions);
+            httpContext.Response.Cookies.Delete("access_token", cookieOptions);
+            httpContext.Response.Cookies.Delete("refresh_token", cookieOptions);
+            httpContext.Response.Cookies.Delete("id", cookieOptions);
+        }
 
         if (!string.IsNullOrEmpty(accessToken))
         {
             try
             {
+                // Server-side revocation proceeds regardless of whether response cookies could be deleted.
                 await Accesses.RevokeAsync(accessToken);
             }
             catch
