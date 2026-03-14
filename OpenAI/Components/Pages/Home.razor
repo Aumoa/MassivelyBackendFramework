@@ -2,7 +2,9 @@
 @rendermode InteractiveServer
 @inject IJSRuntime JS
 @inject IAIMessenger AIMessenger
+@inject IChatRepository ChatRepository
 @inject ChatStateService ChatState
+@inject AuthenticationStateProvider AuthStateProvider
 @implements IDisposable
 
 <PageTitle>@Strings.CHAT_PAGE_TITLE</PageTitle>
@@ -73,6 +75,17 @@
         ChatState.OnChange += OnChatStateChanged;
     }
 
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst("sub")?.Value
+            ?? authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!string.IsNullOrEmpty(userId))
+        {
+            await ChatState.InitializeAsync(userId);
+        }
+    }
+
     public void Dispose()
     {
         ChatState.OnChange -= OnChatStateChanged;
@@ -92,6 +105,14 @@
         }
     }
 
+    private async Task<string> GetUserIdAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirst("sub")?.Value
+            ?? authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? throw new InvalidOperationException("User is not authenticated.");
+    }
+
     private async Task OnSendClickAsync()
     {
         var text = m_InputText.Trim();
@@ -102,21 +123,23 @@
         m_IsStreaming = true;
         m_Cts = new CancellationTokenSource();
 
+        ChatSession? currentSession = null;
+        ChatMessage? assistantMessage = null;
+
         try
         {
             if (ChatState.CurrentSession == null)
             {
+                var userId = await GetUserIdAsync();
                 var topics = await AIMessenger.GenerateConversationTopicsAsync(text, m_Cts.Token);
-                var chat = await AIMessenger.CreateChatAsync(topics, m_Cts.Token);
-                var session = new ChatSession(chat);
-                ChatState.AddSession(session);
+                await ChatState.CreateSessionAsync(userId, topics, m_Cts.Token);
             }
 
-            var currentSession = ChatState.CurrentSession!;
+            currentSession = ChatState.CurrentSession!;
 
             currentSession.Messages.Add(new ChatMessage { IsUser = true, Content = text });
 
-            var assistantMessage = new ChatMessage { IsUser = false, Content = string.Empty };
+            assistantMessage = new ChatMessage { IsUser = false, Content = string.Empty };
             currentSession.Messages.Add(assistantMessage);
 
             StateHasChanged();
@@ -131,10 +154,19 @@
         }
         catch (OperationCanceledException)
         {
-            // User cancelled — no action needed
+            // User cancelled — fall through to persist whatever was received
         }
         finally
         {
+            if (currentSession != null && assistantMessage != null)
+            {
+                await ChatRepository.AddMessageAsync(currentSession.SessionId, true, text);
+                if (!string.IsNullOrEmpty(assistantMessage.Content))
+                {
+                    await ChatRepository.AddMessageAsync(currentSession.SessionId, false, assistantMessage.Content);
+                }
+            }
+
             m_IsStreaming = false;
             m_Cts?.Dispose();
             m_Cts = null;
@@ -151,7 +183,7 @@
     {
         if (e.Key == "Enter" && !e.ShiftKey)
         {
-            _ = OnSendClickAsync();
+            _ = InvokeAsync(OnSendClickAsync);
         }
     }
 }

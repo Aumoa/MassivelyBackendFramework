@@ -12,6 +12,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="MySql.Data" Version="9.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OpenAI.Abstractions\OpenAI.Abstractions.csproj" />
   </ItemGroup>
 

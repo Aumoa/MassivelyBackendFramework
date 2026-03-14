@@ -1,8 +1,13 @@
+using ASPNETUtility;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Options;
 using OpenAI.Components;
 using OpenAI.Extensions;
+using OpenAI.Options;
 using OpenAI.Services;
+using OpenAI.SQL.Migration;
 using OpenIDConnect.Extensions;
+using SQLMigration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -68,4 +73,19 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+if (app.Environment.IsDevelopment())
+{
+    await StartMigrationAsync(app.Lifetime.ApplicationStopping);
+}
+
 app.Run();
+
+return;
+
+async ValueTask StartMigrationAsync(CancellationToken cancellationToken)
+{
+    var options = app.Services.GetRequiredService<IOptions<MySqlOptions>>();
+    var scripts = new Scripts();
+    var logger = new LoggerTextWriter(app.Logger);
+    await Executor.RunAsync(options.Value.ConnectionString, options.Value.Database, [.. scripts.GetScripts()], logger, cancellationToken);
+}
