@@ -441,4 +441,40 @@
   <data name="CLIENTFORM_ERROR_USER_NOT_FOUND" xml:space="preserve">
     <value>User not found. Please enter a valid user ID, email, or sub.</value>
   </data>
+  <data name="MANAGE_APPLICATION_SECRETS_SECTION" xml:space="preserve">
+    <value>Client Secrets</value>
+  </data>
+  <data name="MANAGE_APPLICATION_SECRETS_SECTION_DESC" xml:space="preserve">
+    <value>Manage client secrets for authentication. Secrets are stored securely and cannot be viewed after creation.</value>
+  </data>
+  <data name="MANAGE_APPLICATION_SECRETS_NEW_BUTTON" xml:space="preserve">
+    <value>New Secret</value>
+  </data>
+  <data name="MANAGE_APPLICATION_SECRETS_CREATED_AT" xml:space="preserve">
+    <value>Created</value>
+  </data>
+  <data name="MANAGE_APPLICATION_SECRETS_REMOVE" xml:space="preserve">
+    <value>Remove secret</value>
+  </data>
+  <data name="MANAGE_APPLICATION_SECRETS_REMOVE_CONFIRM" xml:space="preserve">
+    <value>Are you sure you want to remove this secret? Any applications using it will lose access.</value>
+  </data>
+  <data name="MANAGE_APPLICATION_NEWSECRET_TITLE" xml:space="preserve">
+    <value>Save your client secret</value>
+  </data>
+  <data name="MANAGE_APPLICATION_NEWSECRET_WARNING" xml:space="preserve">
+    <value>This is the only time this secret will be shown. Copy it now and store it securely — you won't be able to retrieve it again.</value>
+  </data>
+  <data name="MANAGE_APPLICATION_NEWSECRET_SECRET_LABEL" xml:space="preserve">
+    <value>Client Secret</value>
+  </data>
+  <data name="MANAGE_APPLICATION_NEWSECRET_COPY" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="MANAGE_APPLICATION_NEWSECRET_COPIED" xml:space="preserve">
+    <value>Copied!</value>
+  </data>
+  <data name="MANAGE_APPLICATION_NEWSECRET_CLOSE" xml:space="preserve">
+    <value>I've saved my secret</value>
+  </data>
 </root>
