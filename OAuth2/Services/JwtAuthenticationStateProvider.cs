@@ -1,10 +1,12 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Options;
 
 namespace OAuth2.Services;
 
-public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAccesses accesses, IJwt jwt, ScopedSemaphore sem) : AuthenticationStateProvider
+public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAccesses accesses, IJwt jwt, ScopedSemaphore sem, NavigationManager nav) : AuthenticationStateProvider
 {
     private ClaimsPrincipal? m_CurrentUser;
 
@@ -61,13 +63,8 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                         }
                         catch (Exception)
                         {
-                            // Token is invalid, tampered, or expired; treat as unauthenticated and clear the cookie
-                            httpContext.Response.Cookies.Delete("id_token", new CookieOptions
-                            {
-                                HttpOnly = true,
-                                Secure = true,
-                                SameSite = SameSiteMode.Strict
-                            });
+                            nav.NavigateTo("/auth/logout");
+                            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
                         }
                     }
                 }
