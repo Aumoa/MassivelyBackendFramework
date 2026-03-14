@@ -942,6 +942,12 @@ namespace OAuth2.Localizations {
             }
         }
         
+        internal static string MANAGE_APPLICATION_SECRETS_EMPTY {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_EMPTY", resourceCulture);
+            }
+        }
+        
         internal static string MANAGE_APPLICATION_SECRETS_SECTION_DESC {
             get {
                 return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_SECTION_DESC", resourceCulture);

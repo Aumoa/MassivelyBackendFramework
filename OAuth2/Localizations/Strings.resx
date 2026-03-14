@@ -444,6 +444,9 @@
   <data name="MANAGE_APPLICATION_SECRETS_SECTION" xml:space="preserve">
     <value>Client Secrets</value>
   </data>
+  <data name="MANAGE_APPLICATION_SECRETS_EMPTY" xml:space="preserve">
+    <value>No secrets yet. Create a new secret to authenticate your application.</value>
+  </data>
   <data name="MANAGE_APPLICATION_SECRETS_SECTION_DESC" xml:space="preserve">
     <value>Manage client secrets for authentication. Secrets are stored securely and cannot be viewed after creation.</value>
   </data>

@@ -140,7 +140,7 @@
                     <h3 class="section-title">@Strings.MANAGE_APPLICATION_SECRETS_SECTION</h3>
                     <p class="section-desc">@Strings.MANAGE_APPLICATION_SECRETS_SECTION_DESC</p>
                 </div>
-                <button type="button" class="btn-text-add secrets-add-btn" @onclick="OnAddSecretAsync">
+                <button @onclick="OnAddSecretAsync" type="button" class="btn-text-add secrets-add-btn">
                     <span class="material-symbols-outlined">add</span>
                     @Strings.MANAGE_APPLICATION_SECRETS_NEW_BUTTON
                 </button>
@@ -150,7 +150,7 @@
                 {
                     <div class="secrets-empty">
                         <span class="material-symbols-outlined secrets-empty-icon">key_off</span>
-                        <span class="secrets-empty-text">@Strings.MANAGE_APPLICATION_SECRETS_SECTION</span>
+                        <span class="secrets-empty-text">@Strings.MANAGE_APPLICATION_SECRETS_EMPTY</span>
                     </div>
                 }
                 else
@@ -165,7 +165,7 @@
                                     <span class="secret-id">••••••••••••••••</span>
                                     <span class="secret-created">@Strings.MANAGE_APPLICATION_SECRETS_CREATED_AT: @secret.CreatedAt.ToString("yyyy-MM-dd HH:mm")</span>
                                 </div>
-                                <button type="button" class="btn-icon-action btn-delete" @onclick="() => RemoveSecretAsync(secretId)" title="@Strings.MANAGE_APPLICATION_SECRETS_REMOVE">
+                                <button @onclick="() => RemoveSecretAsync(secretId)" type="button" class="btn-icon-action btn-delete" title="@Strings.MANAGE_APPLICATION_SECRETS_REMOVE">
                                     <span class="material-symbols-outlined">delete</span>
                                 </button>
                             </div>
