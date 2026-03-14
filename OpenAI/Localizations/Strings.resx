@@ -171,4 +171,7 @@
   <data name="ERROR_PERMISSION_DENIED_DESCRIPTION" xml:space="preserve">
     <value>Please contact an administrator to request '{0}' permission.</value>
   </data>
+  <data name="CHAT_STOP_BUTTON_TITLE" xml:space="preserve">
+    <value>Stop</value>
+  </data>
 </root>

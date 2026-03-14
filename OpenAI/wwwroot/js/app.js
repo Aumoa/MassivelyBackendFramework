@@ -13,6 +13,11 @@ window.openExternalUrl = (url) => {
     document.body.removeChild(a);
 };
 
+window.scrollToBottom = (elementId) => {
+    const el = document.getElementById(elementId);
+    if (el) el.scrollTop = el.scrollHeight;
+};
+
 window.attachChatInput = (element) => {
     if (!element) return;
     element.addEventListener('keydown', (e) => {

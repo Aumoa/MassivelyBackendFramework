@@ -171,4 +171,7 @@
   <data name="ERROR_PERMISSION_DENIED_DESCRIPTION" xml:space="preserve">
     <value>관리자에게 '{0}' 권한을 요청하세요.</value>
   </data>
+  <data name="CHAT_STOP_BUTTON_TITLE" xml:space="preserve">
+    <value>중지</value>
+  </data>
 </root>
