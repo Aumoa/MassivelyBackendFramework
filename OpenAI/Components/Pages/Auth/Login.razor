@@ -1,0 +1,18 @@
+﻿@page "/auth/login"
+@using OpenIDConnect
+@layout LoginLayout
+@inject NavigationManager Nav
+@inject IAuthenticationStateProvider AuthState
+
+<button @onclick="OnClickLoginAsync">
+    Login
+</button>
+
+@code {
+    private Task OnClickLoginAsync()
+    {
+        var redirectUri = Nav.BaseUri + "auth/redirect";
+        Nav.NavigateTo(AuthState.GenerateLoginUri(redirectUri, "all"));
+        return Task.CompletedTask;
+    }
+}

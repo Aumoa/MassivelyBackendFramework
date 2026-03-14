@@ -70,29 +70,11 @@ namespace OpenAI.Localizations {
         }
         
         /// <summary>
-        ///   AI Chat과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   AI can make mistakes. Please verify important information yourself.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
-        internal static string CHAT_PAGE_TITLE {
+        internal static string CHAT_INPUT_HINT {
             get {
-                return ResourceManager.GetString("CHAT_PAGE_TITLE", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   How can I help you?과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string CHAT_WELCOME_TITLE {
-            get {
-                return ResourceManager.GetString("CHAT_WELCOME_TITLE", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Start a conversation with the AI connected to Ollama.과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string CHAT_WELCOME_SUBTITLE {
-            get {
-                return ResourceManager.GetString("CHAT_WELCOME_SUBTITLE", resourceCulture);
+                return ResourceManager.GetString("CHAT_INPUT_HINT", resourceCulture);
             }
         }
         
@@ -106,6 +88,15 @@ namespace OpenAI.Localizations {
         }
         
         /// <summary>
+        ///   AI Chat과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CHAT_PAGE_TITLE {
+            get {
+                return ResourceManager.GetString("CHAT_PAGE_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Send과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string CHAT_SEND_BUTTON_TITLE {
@@ -115,20 +106,47 @@ namespace OpenAI.Localizations {
         }
         
         /// <summary>
-        ///   AI can make mistakes. Please verify important information yourself.과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Start a conversation with the AI connected to Ollama.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
-        internal static string CHAT_INPUT_HINT {
+        internal static string CHAT_WELCOME_SUBTITLE {
             get {
-                return ResourceManager.GetString("CHAT_INPUT_HINT", resourceCulture);
+                return ResourceManager.GetString("CHAT_WELCOME_SUBTITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   How can I help you?과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CHAT_WELCOME_TITLE {
+            get {
+                return ResourceManager.GetString("CHAT_WELCOME_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Reload과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERROR_RELOAD {
+            get {
+                return ResourceManager.GetString("ERROR_RELOAD", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   An unhandled error has occurred.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERROR_UNHANDLED {
+            get {
+                return ResourceManager.GetString("ERROR_UNHANDLED", resourceCulture);
             }
         }
         
         /// <summary>
         ///   New chat과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
-        internal static string SIDEBAR_NEW_CHAT {
+        internal static string SIDEBAR_DEFAULT_CHAT_TITLE {
             get {
-                return ResourceManager.GetString("SIDEBAR_NEW_CHAT", resourceCulture);
+                return ResourceManager.GetString("SIDEBAR_DEFAULT_CHAT_TITLE", resourceCulture);
             }
         }
         
@@ -144,9 +162,9 @@ namespace OpenAI.Localizations {
         /// <summary>
         ///   New chat과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
-        internal static string SIDEBAR_DEFAULT_CHAT_TITLE {
+        internal static string SIDEBAR_NEW_CHAT {
             get {
-                return ResourceManager.GetString("SIDEBAR_DEFAULT_CHAT_TITLE", resourceCulture);
+                return ResourceManager.GetString("SIDEBAR_NEW_CHAT", resourceCulture);
             }
         }
         
@@ -156,24 +174,6 @@ namespace OpenAI.Localizations {
         internal static string TOPBAR_DEFAULT_CONVERSATION_TITLE {
             get {
                 return ResourceManager.GetString("TOPBAR_DEFAULT_CONVERSATION_TITLE", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   An unhandled error has occurred.과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string ERROR_UNHANDLED {
-            get {
-                return ResourceManager.GetString("ERROR_UNHANDLED", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Reload과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string ERROR_RELOAD {
-            get {
-                return ResourceManager.GetString("ERROR_RELOAD", resourceCulture);
             }
         }
     }

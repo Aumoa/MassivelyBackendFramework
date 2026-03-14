@@ -1,21 +1,28 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <ChatSidebar />
-    </div>
+<AuthorizeView>
+    <Authorized>
+        <div class="page">
+            <div class="sidebar">
+                <ChatSidebar />
+            </div>
 
-    <main>
-        <div class="top-row px-4">
-            <span class="conversation-title">@Strings.TOPBAR_DEFAULT_CONVERSATION_TITLE</span>
-            <ProfileCard />
+            <main>
+                <div class="top-row px-4">
+                    <span class="conversation-title">@Strings.TOPBAR_DEFAULT_CONVERSATION_TITLE</span>
+                    <ProfileCard />
+                </div>
+
+                <article class="content">
+                    @Body
+                </article>
+            </main>
         </div>
-
-        <article class="content">
-            @Body
-        </article>
-    </main>
-</div>
+    </Authorized>
+    <NotAuthorized>
+        <RedirectToLogin />
+    </NotAuthorized>
+</AuthorizeView>
 
 <div id="blazor-error-ui" data-nosnippet>
     @Strings.ERROR_UNHANDLED

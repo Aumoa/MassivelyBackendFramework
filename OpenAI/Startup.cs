@@ -1,4 +1,5 @@
 using OpenAI.Components;
+using OpenIDConnect.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,7 +18,10 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
 });
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddAuthentication();
+builder.Services.AddOpenIDConnect(builder.Configuration);
+
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options => options.Audience = "openai");
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -29,6 +33,7 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 app.UseRequestLocalization();
