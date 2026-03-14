@@ -208,7 +208,8 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
             }
             catch (Exception e)
             {
-                logger.LogWarning("Failed to export cached jwt token. {Message}", e.Message);
+                logger.LogWarning("Failed to process cached jwt token. {Message}", e.Message);
+                DeleteCachedAccount(accountId);
             }
 
             void DeleteCachedAccount(string id)
