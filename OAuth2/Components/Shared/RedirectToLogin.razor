@@ -4,10 +4,13 @@
 @inject IOptions<HostOptions> HostOptions
 
 @code {
-    protected override void OnInitialized()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var clientId = Uri.EscapeDataString(HostOptions.Value.ClientId);
-        var redirectUri = Uri.EscapeDataString($"{Nav.BaseUri}redirect");
-        Nav.NavigateTo($"/authorize?client_id={clientId}&redirect_uri={redirectUri}&response_type=code&scope=all");
+        if (firstRender)
+        {
+            var clientId = Uri.EscapeDataString(HostOptions.Value.ClientId);
+            var redirectUri = Uri.EscapeDataString($"{Nav.BaseUri}redirect");
+            Nav.NavigateTo($"/authorize?client_id={clientId}&redirect_uri={redirectUri}&response_type=code&scope=all", forceLoad: true);
+        }
     }
 }
