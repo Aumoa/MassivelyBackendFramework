@@ -5,6 +5,7 @@
 @inject IClientUserGroups UserGroups
 @inject IAccounts Accounts
 @inject IClients Clients
+@inject IApiKeys ApiKeys
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 
@@ -174,10 +175,57 @@
                 }
             </div>
         </div>
+
+        <div class="form-section">
+            <div class="section-header">
+                <div class="section-header-text">
+                    <h3 class="section-title">@Strings.MANAGE_APPLICATION_APIKEYS_SECTION</h3>
+                    <p class="section-desc">@Strings.MANAGE_APPLICATION_APIKEYS_SECTION_DESC</p>
+                </div>
+            </div>
+            <div class="section-body">
+                @if (m_ApiKeys.Length == 0)
+                {
+                    <div class="secrets-empty">
+                        <span class="material-symbols-outlined secrets-empty-icon">vpn_key_off</span>
+                        <span class="secrets-empty-text">@Strings.MANAGE_APPLICATION_APIKEYS_EMPTY</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="secrets-list">
+                        @foreach (var apiKey in m_ApiKeys)
+                        {
+                            var apiKeyId = apiKey.Id;
+                            <div class="secret-row">
+                                <span class="material-symbols-outlined secret-key-icon">vpn_key</span>
+                                <div class="secret-meta">
+                                    <span class="secret-id">@apiKey.Name</span>
+                                    <span class="secret-created">@Strings.MANAGE_APPLICATION_APIKEYS_CREATED_AT: @apiKey.CreatedAt.ToString("yyyy-MM-dd HH:mm")</span>
+                                </div>
+                                <button @onclick="() => RemoveApiKeyAsync(apiKeyId)" type="button" class="btn-icon-action btn-delete" title="@Strings.MANAGE_APPLICATION_APIKEYS_REMOVE">
+                                    <span class="material-symbols-outlined">delete</span>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="add-api-key-panel">
+                    <div class="add-api-key-inputs">
+                        <FloatingInput @bind-Value="m_NewApiKeyName" Type="text" Placeholder="@Strings.MANAGE_APPLICATION_APIKEYS_NAME_PLACEHOLDER" />
+                    </div>
+                    <button @onclick="OnAddApiKeyAsync" type="button" class="btn-text-add">
+                        <span class="material-symbols-outlined">add</span>
+                        @Strings.MANAGE_APPLICATION_APIKEYS_NEW_BUTTON
+                    </button>
+                </div>
+            </div>
+        </div>
     }
 </div>
 
 <DlgNewClientSecret @ref="m_DlgNewSecret" OnClose="OnNewSecretDialogClosedAsync" />
+<DlgNewApiKey @ref="m_DlgNewApiKey" OnClose="OnNewApiKeyDialogClosedAsync" />
 
 @code {
     public struct RedirectUri
@@ -221,11 +269,14 @@
     private RedirectUri[] m_RedirectUris = [];
     private UserGroupItem[] m_UserGroups = [];
     private ClientSecretInfo[] m_Secrets = [];
+    private ApiKeyInfo[] m_ApiKeys = [];
     private DlgNewClientSecret m_DlgNewSecret = null!;
+    private DlgNewApiKey m_DlgNewApiKey = null!;
     private string? m_NewUserIdentifier;
     private string? m_NewGroupName;
     private bool m_HasNewUserError;
     private string? m_NewUserErrorMessage;
+    private string? m_NewApiKeyName;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -237,6 +288,7 @@
         await RefreshRedirectUrisAsync(Id);
         await RefreshUserGroupsAsync(Id);
         await RefreshSecretsAsync(Id);
+        await RefreshApiKeysAsync(Id);
     }
 
     public async Task AddRedirectUriAsync()
@@ -440,5 +492,50 @@
 
         await Clients.RemoveClientSecretAsync(secretId);
         await RefreshSecretsAsync(Id);
+    }
+
+    private async ValueTask RefreshApiKeysAsync(string id)
+    {
+        m_ApiKeys = await ApiKeys.GetApiKeysAsync(id);
+    }
+
+    private async Task OnAddApiKeyAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(m_NewApiKeyName))
+        {
+            return;
+        }
+
+        var apiKey = await ApiKeys.CreateApiKeyAsync(Id, m_NewApiKeyName.Trim());
+        m_NewApiKeyName = null;
+        await RefreshApiKeysAsync(Id);
+        await m_DlgNewApiKey.ShowAsync(apiKey);
+    }
+
+    private async Task OnNewApiKeyDialogClosedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Id))
+        {
+            await RefreshApiKeysAsync(Id);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task RemoveApiKeyAsync(long apiKeyId)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        var confirmed = await JS.InvokeAsync<bool>("confirm", Strings.MANAGE_APPLICATION_APIKEYS_REMOVE_CONFIRM);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await ApiKeys.RemoveApiKeyAsync(apiKeyId);
+        await RefreshApiKeysAsync(Id);
     }
 }
