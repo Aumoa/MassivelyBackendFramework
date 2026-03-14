@@ -124,6 +124,24 @@ namespace OpenAI.Localizations {
         }
         
         /// <summary>
+        ///   Permission Denied.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERROR_PERMISSION_DENIED {
+            get {
+                return ResourceManager.GetString("ERROR_PERMISSION_DENIED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Please contact an administrator to request &apos;{0}&apos; permission.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERROR_PERMISSION_DENIED_DESCRIPTION {
+            get {
+                return ResourceManager.GetString("ERROR_PERMISSION_DENIED_DESCRIPTION", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Reload과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string ERROR_RELOAD {
@@ -138,6 +156,33 @@ namespace OpenAI.Localizations {
         internal static string ERROR_UNHANDLED {
             get {
                 return ResourceManager.GetString("ERROR_UNHANDLED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Continue과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_PAGE_BUTTON {
+            get {
+                return ResourceManager.GetString("LOGIN_PAGE_BUTTON", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Log in to continue과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_PAGE_SUBTITLE {
+            get {
+                return ResourceManager.GetString("LOGIN_PAGE_SUBTITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Welcome back과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_PAGE_TITLE {
+            get {
+                return ResourceManager.GetString("LOGIN_PAGE_TITLE", resourceCulture);
             }
         }
         
@@ -174,33 +219,6 @@ namespace OpenAI.Localizations {
         internal static string TOPBAR_DEFAULT_CONVERSATION_TITLE {
             get {
                 return ResourceManager.GetString("TOPBAR_DEFAULT_CONVERSATION_TITLE", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Welcome back과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string LOGIN_PAGE_TITLE {
-            get {
-                return ResourceManager.GetString("LOGIN_PAGE_TITLE", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Log in to continue과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string LOGIN_PAGE_SUBTITLE {
-            get {
-                return ResourceManager.GetString("LOGIN_PAGE_SUBTITLE", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Continue과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string LOGIN_PAGE_BUTTON {
-            get {
-                return ResourceManager.GetString("LOGIN_PAGE_BUTTON", resourceCulture);
             }
         }
     }

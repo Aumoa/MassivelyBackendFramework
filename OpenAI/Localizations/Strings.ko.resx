@@ -165,4 +165,10 @@
   <data name="LOGIN_PAGE_BUTTON" xml:space="preserve">
     <value>계속하기</value>
   </data>
+  <data name="ERROR_PERMISSION_DENIED" xml:space="preserve">
+    <value>권한이 부족합니다.</value>
+  </data>
+  <data name="ERROR_PERMISSION_DENIED_DESCRIPTION" xml:space="preserve">
+    <value>관리자에게 '{0}' 권한을 요청하세요.</value>
+  </data>
 </root>

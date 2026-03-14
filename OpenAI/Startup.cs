@@ -4,6 +4,11 @@ using OpenIDConnect.Extensions;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.WriteIndented = true;
+    });
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -42,6 +47,7 @@ app.UseAuthorization();
 
 app.UseAntiforgery();
 
+app.MapControllers();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
