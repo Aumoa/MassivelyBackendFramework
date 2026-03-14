@@ -935,5 +935,83 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("CLIENTFORM_ERROR_USER_NOT_FOUND", resourceCulture);
             }
         }
+        
+        internal static string MANAGE_APPLICATION_SECRETS_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_SECTION", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_SECRETS_EMPTY {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_EMPTY", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_SECRETS_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_SECTION_DESC", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_SECRETS_NEW_BUTTON {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_NEW_BUTTON", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_SECRETS_CREATED_AT {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_CREATED_AT", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_SECRETS_REMOVE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_REMOVE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_SECRETS_REMOVE_CONFIRM {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_REMOVE_CONFIRM", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWSECRET_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_TITLE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWSECRET_WARNING {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_WARNING", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWSECRET_SECRET_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_SECRET_LABEL", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWSECRET_COPY {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_COPY", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWSECRET_COPIED {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_COPIED", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWSECRET_CLOSE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_CLOSE", resourceCulture);
+            }
+        }
     }
 }

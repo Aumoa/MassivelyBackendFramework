@@ -41,12 +41,15 @@
     </div>
 </div>
 
+<DlgNewClientSecret @ref="m_DlgNewSecret" OnClose="OnNewSecretDialogClosedAsync" />
+
 @code {
     private IJSObjectReference? m_Module;
     private string? m_Name;
     private string? m_Id;
-    private string[] m_Secrets = [];
     private bool m_IsSubmitting = false;
+    private DlgNewClientSecret m_DlgNewSecret = null!;
+    private string? m_PendingNavigate;
 
     [Parameter]
     public ManageApplications.ViewTypes ViewType { get; set; }
@@ -66,11 +69,18 @@
     {
         if (string.IsNullOrEmpty(ClientId) == false)
         {
+            var sub = Auth.Sub;
             var client = await Clients.GetClientAsync(ClientId);
-            if (client.HasValue)
+            // Security: verify the client belongs to the authenticated user
+            if (client.HasValue && client.Value.OwnerId == sub)
             {
                 m_Name = client.Value.Name;
                 m_Id = client.Value.Id;
+            }
+            else
+            {
+                // Client not found or does not belong to the current user
+                Nav.NavigateTo("/manage-applications");
             }
         }
         else
@@ -100,9 +110,10 @@
         {
             var clientId = await Clients.AddClientAsync(m_Name, Auth.Sub, []);
             var secret = await Clients.NewClientSecretAsync(clientId);
-            
-            // 등록 완료 후 목록 페이지로 돌아가기
-            Nav.NavigateTo("/manage-applications", forceLoad: false);
+
+            // Show the secret dialog before navigating away so the user can copy it
+            m_PendingNavigate = "/manage-applications";
+            await m_DlgNewSecret.ShowAsync(secret);
         }
         catch
         {
@@ -110,6 +121,18 @@
             StateHasChanged();
             throw;
         }
+    }
+
+    private Task OnNewSecretDialogClosedAsync()
+    {
+        if (m_PendingNavigate != null)
+        {
+            var url = m_PendingNavigate;
+            m_PendingNavigate = null;
+            Nav.NavigateTo(url, forceLoad: false);
+        }
+
+        return Task.CompletedTask;
     }
 
     public async ValueTask DisposeAsync()

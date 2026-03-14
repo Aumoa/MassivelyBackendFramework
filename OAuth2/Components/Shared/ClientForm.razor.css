@@ -298,3 +298,63 @@
         border-color: #e8eaed;
         cursor: not-allowed;
     }
+
+.secrets-add-btn {
+    flex-shrink: 0;
+    align-self: center;
+}
+
+.secrets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.secret-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #e8eaed;
+    border-radius: 6px;
+}
+
+.secret-key-icon {
+    font-size: 20px;
+    color: #5f6368;
+    flex-shrink: 0;
+}
+
+.secret-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.secret-id {
+    font-family: 'Roboto Mono', 'Courier New', monospace;
+    font-size: 0.8125rem;
+    color: #202124;
+    letter-spacing: 0.1em;
+}
+
+.secret-created {
+    font-size: 0.75rem;
+    color: #80868b;
+}
+
+.secrets-empty {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px;
+    color: #80868b;
+    font-size: 0.875rem;
+}
+
+.secrets-empty-icon {
+    font-size: 20px;
+}
