@@ -57,7 +57,13 @@ internal class OllamaAIChat : IAIChat
             }
         };
 
-        using var response = await m_Http.PostAsJsonAsync(m_Options.Uri + "/api/chat", request, cancellationToken);
+        var inputContent = JsonContent.Create(request);
+        var requestMessage = new HttpRequestMessage(HttpMethod.Post, m_Options.Uri + "/api/chat")
+        {
+            Content = inputContent
+        };
+
+        using var response = await m_Http.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);

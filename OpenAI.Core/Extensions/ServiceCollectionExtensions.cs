@@ -1,5 +1,7 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Dapper;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenAI.DapperUtility;
 using OpenAI.Options;
 using OpenAI.Services;
 
@@ -15,6 +17,8 @@ public static class ServiceCollectionExtensions
         s.AddHttpClient<OllamaAIMessenger>();
         s.AddSingleton<IAIMessenger, OllamaAIMessenger>();
         s.AddTransient<IChatRepository, MySqlChatRepository>();
+
+        SqlMapper.AddTypeHandler(new MessageRoleHandler());
         return s;
     }
 }
