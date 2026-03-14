@@ -6,6 +6,7 @@
 @inject ChatStateService ChatState
 @inject AuthenticationStateProvider AuthStateProvider
 @implements IDisposable
+@using Markdig
 
 <PageTitle>@Strings.CHAT_PAGE_TITLE</PageTitle>
 
@@ -25,7 +26,16 @@
                 foreach (var msg in ChatState.CurrentSession.Messages.Where(m => m.Role != MessageRole.Summary))
                 {
                     <div class="chat-message @(msg.IsUser ? "user" : "assistant")">
-                        <div class="message-bubble">@msg.Content</div>
+                        <div class="message-bubble">
+                            @if (msg.IsUser)
+                            {
+                                @msg.Content
+                            }
+                            else
+                            {
+                                @((MarkupString)ConvertMarkdownToHtml(msg.Content))
+                            }
+                        </div>
                     </div>
                 }
             }
@@ -237,5 +247,15 @@
         {
             _ = InvokeAsync(OnSendClickAsync);
         }
+    }
+
+    private static readonly MarkdownPipeline s_MarkdownPipeline =
+        new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml().Build();
+
+    private static string ConvertMarkdownToHtml(string? markdown)
+    {
+        if (string.IsNullOrEmpty(markdown))
+            return string.Empty;
+        return Markdown.ToHtml(markdown, s_MarkdownPipeline);
     }
 }
