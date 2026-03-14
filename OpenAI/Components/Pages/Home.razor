@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @rendermode InteractiveServer
 @inject IJSRuntime JS
 @inject IAIMessenger AIMessenger
@@ -12,7 +12,7 @@
 <div class="chat-page">
     <div class="messages-area" id="messages-area">
         <div class="messages-inner">
-            @if (ChatState.CurrentSession == null || ChatState.CurrentSession.Messages.Count == 0)
+            @if (ChatState.CurrentSession == null || !ChatState.CurrentSession.Messages.Any(m => m.Role != MessageRole.Summary))
             {
                 <div class="welcome-message">
                     <span class="material-symbols-outlined welcome-icon">smart_toy</span>
@@ -22,7 +22,7 @@
             }
             else
             {
-                foreach (var msg in ChatState.CurrentSession.Messages)
+                foreach (var msg in ChatState.CurrentSession.Messages.Where(m => m.Role != MessageRole.Summary))
                 {
                     <div class="chat-message @(msg.IsUser ? "user" : "assistant")">
                         <div class="message-bubble">@msg.Content</div>
@@ -65,6 +65,9 @@
 </div>
 
 @code {
+    private const int SUMMARIZE_THRESHOLD = 15;
+    private const int SUMMARIZE_KEEP_LAST = 2;
+
     private string m_InputText = string.Empty;
     private ElementReference m_TextareaRef;
     private bool m_IsStreaming;
@@ -124,6 +127,7 @@
         m_Cts = new CancellationTokenSource();
 
         ChatSession? currentSession = null;
+        ChatMessage? userMessage = null;
         ChatMessage? assistantMessage = null;
 
         try
@@ -137,15 +141,21 @@
 
             currentSession = ChatState.CurrentSession!;
 
-            currentSession.Messages.Add(new ChatMessage { IsUser = true, Content = text });
+            // Capture history BEFORE adding the new messages
+            var history = currentSession.Messages
+                .Select(m => new ChatHistoryMessage(m.Role, m.Content))
+                .ToList();
 
-            assistantMessage = new ChatMessage { IsUser = false, Content = string.Empty };
+            userMessage = new ChatMessage { Role = MessageRole.User, Content = text };
+            currentSession.Messages.Add(userMessage);
+
+            assistantMessage = new ChatMessage { Role = MessageRole.Assistant, Content = string.Empty };
             currentSession.Messages.Add(assistantMessage);
 
             StateHasChanged();
             await JS.InvokeVoidAsync("scrollToBottom", "messages-area");
 
-            await foreach (var chunk in currentSession.Chat.AddChatAsync(text, m_Cts.Token))
+            await foreach (var chunk in currentSession.Chat.AddChatAsync(history, text, m_Cts.Token))
             {
                 assistantMessage.Content += chunk;
                 StateHasChanged();
@@ -158,13 +168,18 @@
         }
         finally
         {
-            if (currentSession != null && assistantMessage != null)
+            if (currentSession != null && userMessage != null && assistantMessage != null)
             {
-                await ChatRepository.AddMessageAsync(currentSession.SessionId, true, text);
+                userMessage.DbId = await ChatRepository.AddMessageAsync(
+                    currentSession.SessionId, MessageRole.User, text);
+
                 if (!string.IsNullOrEmpty(assistantMessage.Content))
                 {
-                    await ChatRepository.AddMessageAsync(currentSession.SessionId, false, assistantMessage.Content);
+                    assistantMessage.DbId = await ChatRepository.AddMessageAsync(
+                        currentSession.SessionId, MessageRole.Assistant, assistantMessage.Content);
                 }
+
+                await CheckAndSummarizeAsync(currentSession);
             }
 
             m_IsStreaming = false;
@@ -172,6 +187,43 @@
             m_Cts = null;
             StateHasChanged();
         }
+    }
+
+    private async Task CheckAndSummarizeAsync(ChatSession session)
+    {
+        var regularMessages = session.Messages
+            .Where(m => m.Role != MessageRole.Summary)
+            .ToList();
+
+        if (regularMessages.Count < SUMMARIZE_THRESHOLD)
+            return;
+
+        // Summarize oldest (count - SUMMARIZE_KEEP_LAST) messages, keep the last few
+        int toSummarizeCount = regularMessages.Count - SUMMARIZE_KEEP_LAST;
+        var toSummarize = regularMessages.Take(toSummarizeCount).ToList();
+        var historyForSummary = toSummarize
+            .Select(m => new ChatHistoryMessage(m.Role, m.Content))
+            .ToList();
+
+        var summaryContent = await session.Chat.SummarizeAsync(historyForSummary);
+
+        var idsToDelete = toSummarize
+            .Where(m => m.DbId.HasValue)
+            .Select(m => m.DbId.GetValueOrDefault());
+
+        var summaryDbId = await ChatRepository.ReplaceWithSummaryAsync(
+            session.SessionId, idsToDelete, summaryContent);
+
+        // Update in-memory list: remove summarized messages, insert summary at front
+        foreach (var msg in toSummarize)
+            session.Messages.Remove(msg);
+
+        session.Messages.Insert(0, new ChatMessage
+        {
+            Role = MessageRole.Summary,
+            Content = summaryContent,
+            DbId = summaryDbId
+        });
     }
 
     private void OnStopClick()

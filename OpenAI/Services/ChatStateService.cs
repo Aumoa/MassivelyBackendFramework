@@ -4,20 +4,20 @@ namespace OpenAI.Services;
 
 public class ChatStateService(IChatRepository chatRepository, IAIMessenger aiMessenger)
 {
-    private readonly List<ChatSession> _sessions = [];
-    private bool _initialized;
+    private readonly List<ChatSession> m_Sessions = [];
+    private bool m_Initialized;
 
-    public IReadOnlyList<ChatSession> Sessions => _sessions;
+    public IReadOnlyList<ChatSession> Sessions => m_Sessions;
     public ChatSession? CurrentSession { get; private set; }
 
     public event Action? OnChange;
 
     public async Task InitializeAsync(string userId, CancellationToken cancellationToken = default)
     {
-        if (_initialized)
+        if (m_Initialized)
             return;
 
-        _initialized = true;
+        m_Initialized = true;
 
         var dbSessions = await chatRepository.GetSessionsAsync(userId, cancellationToken);
         foreach (var dbSession in dbSessions)
@@ -27,9 +27,9 @@ public class ChatStateService(IChatRepository chatRepository, IAIMessenger aiMes
             var session = new ChatSession(dbSession.Id, chat);
             foreach (var msg in dbMessages)
             {
-                session.Messages.Add(new ChatMessage { IsUser = msg.IsUser, Content = msg.Content });
+                session.Messages.Add(new ChatMessage { Role = msg.Role, Content = msg.Content, DbId = msg.Id });
             }
-            _sessions.Add(session);
+            m_Sessions.Add(session);
         }
 
         NotifyStateChanged();
@@ -40,7 +40,7 @@ public class ChatStateService(IChatRepository chatRepository, IAIMessenger aiMes
         var sessionId = await chatRepository.CreateSessionAsync(userId, topic, cancellationToken);
         var chat = await aiMessenger.CreateChatAsync(topic, cancellationToken);
         var session = new ChatSession(sessionId, chat);
-        _sessions.Insert(0, session);
+        m_Sessions.Insert(0, session);
         CurrentSession = session;
         NotifyStateChanged();
         return session;

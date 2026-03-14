@@ -1,4 +1,5 @@
-﻿using Dapper;
+﻿using System.Data;
+using Dapper;
 using Microsoft.Extensions.Options;
 using OpenAI.Options;
 
@@ -31,18 +32,43 @@ internal class MySqlChatRepository(IOptions<MySqlOptions> options) : MySqlDbCont
     {
         using var connection = GetConnection();
 
-        const string QUERY = "SELECT `id`, `session_id` AS `SessionId`, `is_user` AS `IsUser`, `content`, `created_at` AS `CreatedAt` FROM `chat_message` WHERE `session_id` = @sessionId ORDER BY `created_at` ASC, `id` ASC";
+        const string QUERY = "SELECT `id`, `session_id` AS `SessionId`, `role` AS `Role`, `content`, `created_at` AS `CreatedAt` FROM `chat_message` WHERE `session_id` = @sessionId ORDER BY `created_at` ASC, `id` ASC";
         var command = new CommandDefinition(QUERY, new { sessionId }, cancellationToken: cancellationToken);
         var results = await connection.QueryAsync<ChatMessageData>(command);
         return [.. results];
     }
 
-    public async ValueTask AddMessageAsync(string sessionId, bool isUser, string content, CancellationToken cancellationToken = default)
+    public async ValueTask<long> AddMessageAsync(string sessionId, MessageRole role, string content, CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
+        await connection.OpenAsync(cancellationToken);
 
-        const string QUERY = "INSERT INTO `chat_message` (`session_id`, `is_user`, `content`) VALUES(@sessionId, @isUser, @content)";
-        var command = new CommandDefinition(QUERY, new { sessionId, isUser = isUser ? 1 : 0, content }, cancellationToken: cancellationToken);
+        const string QUERY = "INSERT INTO `chat_message` (`session_id`, `role`, `content`) VALUES(@sessionId, @role, @content)";
+        var command = new CommandDefinition(QUERY, new { sessionId, role = (int)role, content }, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);
+        return await connection.ExecuteScalarAsync<long>(new CommandDefinition("SELECT LAST_INSERT_ID()", cancellationToken: cancellationToken));
+    }
+
+    public async ValueTask<long> ReplaceWithSummaryAsync(string sessionId, IEnumerable<long> messageIds, string summaryContent, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+        await connection.OpenAsync(cancellationToken);
+        await using var tx = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+
+        var ids = messageIds.ToArray();
+        if (ids.Length > 0)
+        {
+            const string DELETE_QUERY = "DELETE FROM `chat_message` WHERE `id` IN @ids";
+            var deleteCommand = new CommandDefinition(DELETE_QUERY, new { ids }, tx, cancellationToken: cancellationToken);
+            await connection.ExecuteAsync(deleteCommand);
+        }
+
+        const string INSERT_QUERY = "INSERT INTO `chat_message` (`session_id`, `role`, `content`) VALUES(@sessionId, @role, @content)";
+        var insertCommand = new CommandDefinition(INSERT_QUERY, new { sessionId, role = (int)MessageRole.Summary, content = summaryContent }, tx, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(insertCommand);
+
+        long newId = await connection.ExecuteScalarAsync<long>(new CommandDefinition("SELECT LAST_INSERT_ID()", tx, cancellationToken: cancellationToken));
+        await tx.CommitAsync(cancellationToken);
+        return newId;
     }
 }

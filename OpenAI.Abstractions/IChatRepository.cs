@@ -2,7 +2,7 @@
 
 public record ChatSessionData(string Id, string UserId, string Topic, DateTime CreatedAt);
 
-public record ChatMessageData(long Id, string SessionId, bool IsUser, string Content, DateTime CreatedAt);
+public record ChatMessageData(long Id, string SessionId, MessageRole Role, string Content, DateTime CreatedAt);
 
 public interface IChatRepository
 {
@@ -12,5 +12,7 @@ public interface IChatRepository
 
     ValueTask<IReadOnlyList<ChatMessageData>> GetMessagesAsync(string sessionId, CancellationToken cancellationToken = default);
 
-    ValueTask AddMessageAsync(string sessionId, bool isUser, string content, CancellationToken cancellationToken = default);
+    ValueTask<long> AddMessageAsync(string sessionId, MessageRole role, string content, CancellationToken cancellationToken = default);
+
+    ValueTask<long> ReplaceWithSummaryAsync(string sessionId, IEnumerable<long> messageIds, string summaryContent, CancellationToken cancellationToken = default);
 }
