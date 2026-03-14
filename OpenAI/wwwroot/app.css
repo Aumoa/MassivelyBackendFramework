@@ -17,6 +17,10 @@
     --user-bubble-bg: #1a73e8;
     --user-bubble-text: #ffffff;
     --assistant-bubble-bg: #f1f3f4;
+    --login-bg: #f7f7f8;
+    --login-card-bg: #ffffff;
+    --login-card-border: #e5e5e5;
+    --login-logo-color: #000000;
 }
 
 /* =============================================
@@ -39,6 +43,10 @@
         --user-bubble-bg: #1a3a5c;
         --user-bubble-text: #e3e3e3;
         --assistant-bubble-bg: #282a2d;
+        --login-bg: #0d0d0d;
+        --login-card-bg: #212121;
+        --login-card-border: #2f2f2f;
+        --login-logo-color: #ffffff;
     }
 }
 

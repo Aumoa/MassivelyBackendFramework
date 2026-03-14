@@ -4,17 +4,34 @@
     <Authorized>
         <div class="page">
             <div class="sidebar">
-                <ChatSidebar />
+                <AuthorizeView Roles="admin" Context="Sidebar">
+                    <Authorized>
+                        <ChatSidebar />
+                    </Authorized>
+                </AuthorizeView>
             </div>
 
             <main>
                 <div class="top-row px-4">
-                    <span class="conversation-title">@Strings.TOPBAR_DEFAULT_CONVERSATION_TITLE</span>
+                    <span class="conversation-title">
+                        <AuthorizeView Roles="admin" Context="ConversationTitle">
+                            <Authorized>
+                                @Strings.TOPBAR_DEFAULT_CONVERSATION_TITLE
+                            </Authorized>
+                        </AuthorizeView>
+                    </span>
                     <ProfileCard />
                 </div>
 
                 <article class="content">
-                    @Body
+                    <AuthorizeView Roles="admin" Context="Content">
+                        <Authorized>
+                            @Body
+                        </Authorized>
+                        <NotAuthorized>
+                            <ErrorView ErrorTextBody="@Strings.ERROR_PERMISSION_DENIED" ErrorText="@string.Format(Strings.ERROR_PERMISSION_DENIED_DESCRIPTION, "admin")" />
+                        </NotAuthorized>
+                    </AuthorizeView>
                 </article>
             </main>
         </div>

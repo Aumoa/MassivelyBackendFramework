@@ -1,9 +1,15 @@
+using Microsoft.AspNetCore.DataProtection;
 using OpenAI.Components;
 using OpenIDConnect.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.WriteIndented = true;
+    });
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -16,6 +22,16 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
            .AddSupportedCultures(supportedCultures)
            .AddSupportedUICultures(supportedCultures);
 });
+
+var dataProtection = builder.Configuration.GetSection("DataProtection");
+if (dataProtection.Exists())
+{
+    var keyPath = dataProtection.GetValue<string>("KeyPath")
+        ?? throw new InvalidOperationException("DataProtection:KeyPath is not configured.");
+    builder.Services.AddDataProtection()
+        .PersistKeysToFileSystem(new DirectoryInfo(keyPath))
+        .SetApplicationName("OpenAI");
+}
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenIDConnect(builder.Configuration);
@@ -42,6 +58,7 @@ app.UseAuthorization();
 
 app.UseAntiforgery();
 
+app.MapControllers();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

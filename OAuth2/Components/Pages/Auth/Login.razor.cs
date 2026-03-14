@@ -1,5 +1,4 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using BlazorSharedComponent;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -14,18 +13,15 @@ using HostOptions = OAuth2.Options.HostOptions;
 
 namespace OAuth2.Components.Pages.Auth;
 
-public partial class Authorize(
+public partial class Login(
     IAccounts accounts,
     IAccountClaims accountClaims,
     IAccesses accesses,
     IAuthorizationCodes authorizationCodes,
     IOptions<HostOptions> hostOptions,
-    IClients clients,
-    IClientClaims clientClaims,
     NavigationManager nav,
     IHttpContextAccessor accessor,
-    ILogger<Authorize> logger,
-    ScopedSemaphore semaphore,
+    ILogger<Login> logger,
     IJwt jwt,
     IJSRuntime js)
 {
@@ -37,9 +33,9 @@ public partial class Authorize(
 
     private readonly struct RequestScope : IDisposable
     {
-        private readonly Authorize m_Component;
+        private readonly Login m_Component;
 
-        public RequestScope(Authorize component)
+        public RequestScope(Login component)
         {
             m_Component = component;
             Interlocked.Increment(ref component.m_Requesting);
@@ -89,7 +85,11 @@ public partial class Authorize(
     [SupplyParameterFromQuery(Name = "code_challenge_method")]
     public string? CodeChallengeMethod { get; set; }
 
-    private List<JwtSecurityToken> m_CachedJwts = [];
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "client_name")]
+    public string ClientName { get; set; } = null!;
+
+    private readonly List<JwtSecurityToken> m_CachedJwts = [];
     private bool m_ShowLoginForm = false;
 
     public bool HasCachedAccounts => m_CachedJwts.Count > 0;
@@ -100,10 +100,7 @@ public partial class Authorize(
     public static string GetCachedPicture(JwtSecurityToken jwt) =>
         jwt.Claims.FirstOrDefault(p => p.Type == JwtRegisteredClaimNames.Picture)?.Value ?? string.Empty;
 
-    public bool HasParametersSet { get; private set; }
-
     private RenderStates m_RenderState = RenderStates.Id;
-    private string m_ClientName = string.Empty;
     private string m_ID = string.Empty;
     private string m_Password = string.Empty;
     private int m_Requesting = 0;
@@ -117,191 +114,78 @@ public partial class Authorize(
     private bool CanSubmit => string.IsNullOrEmpty(m_ID) == false;
     private bool Requesting => m_Requesting > 0;
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnInitializedAsync()
     {
-        await semaphore.WaitAsync();
+        if (string.IsNullOrWhiteSpace(ResponseType) || string.IsNullOrWhiteSpace(RedirectUri) ||
+            string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope) ||
+            string.IsNullOrWhiteSpace(ClientName))
+        {
+            Error(Strings.ERRORS_BAD_REQUEST);
+            return;
+        }
+
+        if (Prompt == "login")
+        {
+            return;
+        }
 
         try
         {
-            if (string.IsNullOrEmpty(m_ClientName) == false)
+            var httpContext = accessor.HttpContext;
+            if (httpContext != null)
             {
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(ResponseType) || string.IsNullOrWhiteSpace(RedirectUri) || string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope))
-            {
-                Error(Strings.ERRORS_BAD_REQUEST);
-                return;
-            }
-
-            if (ResponseType is not ("code" or "token"))
-            {
-                Error(Strings.ERRORS_UNSUPPORTED_RESPONSE_TYPE);
-                return;
-            }
-
-            // Validate PKCE parameters when code_challenge is provided
-            if (!string.IsNullOrEmpty(CodeChallenge))
-            {
-                if (CodeChallengeMethod != "S256")
+                const string CachedJwtPrefix = "cached_jwt_";
+                foreach (var cookie in httpContext.Request.Cookies)
                 {
-                    Error(Strings.ERRORS_BAD_REQUEST);
-                    return;
-                }
-            }
-
-            // hosting service
-            if (ClientId == hostOptions.Value.ClientId)
-            {
-                if (RedirectUri == hostOptions.Value.Uri + "/redirect")
-                {
-                    m_ClientName = "OAuth2";
-                }
-                else
-                {
-                    Error(Strings.ERRORS_INVALID_REDIRECT_URI);
-                    return;
-                }
-            }
-            else
-            {
-                var targetClient = await clients.GetClientAsync(ClientId);
-                if (targetClient == null)
-                {
-                    Error(Strings.ERRORS_INVALID_CLIENT_ID);
-                    return;
-                }
-
-                var claims = await clientClaims.GetClaimsAsync(ClientId);
-                var allowedUris = claims.Where(p => p.Name == "redirect_uri");
-                if (allowedUris.Any(p => p.Value == RedirectUri) == false)
-                {
-                    Error(Strings.ERRORS_INVALID_REDIRECT_URI);
-                    return;
-                }
-
-                m_ClientName = targetClient.Value.Name;
-            }
-
-            if (Prompt == "login")
-            {
-                // does not use cached login
-                return;
-            }
-
-            try
-            {
-                var httpContext = accessor.HttpContext;
-                if (httpContext != null)
-                {
-                    const string CachedJwtPrefix = "cached_jwt_";
-                    foreach (var cookie in httpContext.Request.Cookies)
+                    if (!cookie.Key.StartsWith(CachedJwtPrefix, StringComparison.Ordinal))
                     {
-                        if (!cookie.Key.StartsWith(CachedJwtPrefix, StringComparison.Ordinal))
-                        {
-                            continue;
-                        }
+                        continue;
+                    }
 
-                        var accountId = cookie.Key[CachedJwtPrefix.Length..];
-                        try
-                        {
-                            var handler = new JwtSecurityTokenHandler();
-                        	var validationParams = jwt.GetValidationParameters();
-                        	var principal = handler.ValidateToken(cookie.Value, validationParams, out var validatedToken);
-                            var cachedJwt = (JwtSecurityToken)validatedToken;
-
-                            var access_token = cachedJwt.Claims.FirstOrDefault(p => p.Type == "access_token")?.Value;
-                            if (access_token == null)
-                            {
-                                DeleteCachedAccount(accountId);
-                                continue;
-                            }
-
-                            var verified = await accesses.VerifyAsync(access_token);
-                            if (verified == null)
-                            {
-                                var refresh_token = cachedJwt.Claims.FirstOrDefault(p => p.Type == "refresh_token")?.Value;
-                                if (refresh_token == null)
-                                {
-                                    DeleteCachedAccount(accountId);
-                                    continue;
-                                }
-
-                                var newAccess = await accesses.RefreshAccessAsync(refresh_token, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn);
-                                if (newAccess.HasValue == false)
-                                {
-                                    DeleteCachedAccount(accountId);
-                                    continue;
-                                }
-
-                                var except = cachedJwt.Claims.Where(p => p.Type is not ("access_token" or "refresh_token"));
-                                var newCachedJwt = jwt.Issue(hostOptions.Value.ClientId, [.. except, new Claim("access_token", newAccess.Value.AccessToken), new Claim("refresh_token", newAccess.Value.RefreshToken)]);
-
-                                httpContext.Response.Cookies.Append($"cached_jwt_{accountId}", newCachedJwt, new CookieOptions
-                                {
-                                    HttpOnly = true,
-                                    Secure = true,
-                                    SameSite = SameSiteMode.Lax,
-                                    Expires = DateTimeOffset.UtcNow.AddYears(10)
-                                });
-
-                                cachedJwt = handler.ReadJwtToken(newCachedJwt);
-                            }
-
-                            m_CachedJwts.Add(cachedJwt);
-                        }
-                        catch (SecurityTokenException e)
-                        {
-                            logger.LogWarning("{Key} token validation failed: {Message}", cookie.Key, e.Message);
-                            DeleteCachedAccount(accountId);
-                        }
-                        catch (Exception e)
-                        {
-                            logger.LogWarning("Failed to export cached jwt token. {Message}", e.Message);
-                        }
-
-                        void DeleteCachedAccount(string id)
-                        {
-                            httpContext.Response.Cookies.Delete($"cached_jwt_{id}", new CookieOptions
-                            {
-                                HttpOnly = true,
-                                Secure = true,
-                                SameSite = SameSiteMode.Lax
-                            });
-                        }
+                    var accountId = cookie.Key[CachedJwtPrefix.Length..];
+                    try
+                    {
+                        var handler = new JwtSecurityTokenHandler();
+                        var validationParams = jwt.GetValidationParameters();
+                        var principal = handler.ValidateToken(cookie.Value, validationParams, out var validatedToken);
+                        var cachedJwt = (JwtSecurityToken)validatedToken;
+                        m_CachedJwts.Add(cachedJwt);
+                    }
+                    catch (SecurityTokenException e)
+                    {
+                        logger.LogWarning("{Key} token validation failed: {Message}", cookie.Key, e.Message);
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogWarning("Failed to export cached jwt token. {Message}", e.Message);
                     }
                 }
-            }
-            finally
-            {
-                if (Prompt == "none")
-                {
-                    if (m_CachedJwts.Count > 0)
-                    {
-                        await ContinueWithCachedAsync(m_CachedJwts[0]);
-                    }
-                    else
-                    {
-                        ContinueWithLoginRequiredAsync();
-                    }
-                }
-                else
-                {
-                    StateHasChanged();
-                }
-            }
-
-            return;
-
-            void Error(string message)
-            {
-                nav.NavigateTo($"/error?error={Uri.EscapeDataString(message)}");
             }
         }
         finally
         {
-            HasParametersSet = true;
-            semaphore.Release();
+            if (Prompt == "none")
+            {
+                if (m_CachedJwts.Count > 0)
+                {
+                    await ContinueWithCachedAsync(m_CachedJwts[0]);
+                }
+                else
+                {
+                    ContinueWithLoginRequiredAsync();
+                }
+            }
+            else
+            {
+                StateHasChanged();
+            }
+        }
+
+        return;
+
+        void Error(string message)
+        {
+            nav.NavigateTo($"/error?error={Uri.EscapeDataString(message)}");
         }
     }
 
