@@ -1,4 +1,5 @@
 ﻿@inject ChatStateService ChatState
+@inject IJSRuntime JS
 @implements IDisposable
 
 <div class="sidebar-container">
@@ -22,6 +23,12 @@
                      class="chat-history-item @(isActive ? "active" : "")">
                     <span class="material-symbols-outlined chat-icon">chat_bubble</span>
                     <span class="chat-title">@session.Chat.ConversationTopics</span>
+                    <button @onclick:stopPropagation="true"
+                            @onclick="() => OnDeleteSessionClickAsync(session)"
+                            title="@Strings.SIDEBAR_DELETE_CHAT_TITLE"
+                            class="delete-session-btn">
+                        <span class="material-symbols-outlined">delete</span>
+                    </button>
                 </div>
             }
         }
@@ -53,5 +60,16 @@
     private void OnSessionClick(ChatSession session)
     {
         ChatState.SelectSession(session);
+    }
+
+    private async Task OnDeleteSessionClickAsync(ChatSession session)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", Strings.SIDEBAR_DELETE_CHAT_CONFIRM);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await ChatState.RemoveSessionAsync(session);
     }
 }

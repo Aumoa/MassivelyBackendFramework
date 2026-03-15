@@ -174,4 +174,10 @@
   <data name="CHAT_STOP_BUTTON_TITLE" xml:space="preserve">
     <value>중지</value>
   </data>
+  <data name="SIDEBAR_DELETE_CHAT_CONFIRM" xml:space="preserve">
+    <value>이 대화를 삭제하시겠습니까?</value>
+  </data>
+  <data name="SIDEBAR_DELETE_CHAT_TITLE" xml:space="preserve">
+    <value>대화 삭제</value>
+  </data>
 </root>

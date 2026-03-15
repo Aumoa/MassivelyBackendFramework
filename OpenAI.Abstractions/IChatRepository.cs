@@ -15,4 +15,6 @@ public interface IChatRepository
     ValueTask<long> AddMessageAsync(string sessionId, MessageRole role, string content, CancellationToken cancellationToken = default);
 
     ValueTask<long> ReplaceWithSummaryAsync(string sessionId, IEnumerable<long> messageIds, string summaryContent, CancellationToken cancellationToken = default);
+
+    ValueTask RemoveSessionAsync(string sessionId, CancellationToken cancellationToken = default);
 }

@@ -52,6 +52,17 @@ public class ChatStateService(IChatRepository chatRepository, IAIMessenger aiMes
         NotifyStateChanged();
     }
 
+    public async Task RemoveSessionAsync(ChatSession session, CancellationToken cancellationToken = default)
+    {
+        await chatRepository.RemoveSessionAsync(session.SessionId, cancellationToken);
+        m_Sessions.Remove(session);
+        if (CurrentSession == session)
+        {
+            CurrentSession = null;
+        }
+        NotifyStateChanged();
+    }
+
     public void SelectSession(ChatSession session)
     {
         CurrentSession = session;
