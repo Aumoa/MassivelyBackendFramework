@@ -1,4 +1,7 @@
-﻿<div class="sidebar-container">
+﻿@inject ChatStateService ChatState
+@implements IDisposable
+
+<div class="sidebar-container">
     <div class="sidebar-header">
         <span class="app-title">@Strings.APP_TITLE</span>
     </div>
@@ -9,18 +12,46 @@
     </button>
 
     <div class="chat-history">
-        <div class="history-section-label">@Strings.SIDEBAR_HISTORY_RECENT</div>
-        <div class="chat-history-item active">
-            <span class="material-symbols-outlined chat-icon">chat_bubble</span>
-            <span class="chat-title">@Strings.SIDEBAR_DEFAULT_CHAT_TITLE</span>
-        </div>
+        @if (ChatState.Sessions.Count > 0)
+        {
+            <div class="history-section-label">@Strings.SIDEBAR_HISTORY_RECENT</div>
+            foreach (var session in ChatState.Sessions)
+            {
+                var isActive = session == ChatState.CurrentSession;
+                <div @onclick="() => OnSessionClick(session)"
+                     class="chat-history-item @(isActive ? "active" : "")">
+                    <span class="material-symbols-outlined chat-icon">chat_bubble</span>
+                    <span class="chat-title">@session.Chat.ConversationTopics</span>
+                </div>
+            }
+        }
     </div>
 </div>
 
 
 @code {
+    protected override void OnInitialized()
+    {
+        ChatState.OnChange += OnChatStateChanged;
+    }
+
+    public void Dispose()
+    {
+        ChatState.OnChange -= OnChatStateChanged;
+    }
+
+    private void OnChatStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
     private void OnNewChatClick()
     {
-        // TODO: create a new chat session
+        ChatState.StartNewSession();
+    }
+
+    private void OnSessionClick(ChatSession session)
+    {
+        ChatState.SelectSession(session);
     }
 }

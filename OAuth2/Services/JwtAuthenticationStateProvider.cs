@@ -1,12 +1,10 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.Extensions.Options;
 
 namespace OAuth2.Services;
 
-public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAccesses accesses, IJwt jwt, ScopedSemaphore sem, NavigationManager nav) : AuthenticationStateProvider
+public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAccesses accesses, IJwt jwt, ScopedSemaphore sem) : AuthenticationStateProvider
 {
     private ClaimsPrincipal? m_CurrentUser;
 
@@ -63,8 +61,28 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                         }
                         catch (Exception)
                         {
-                            nav.NavigateTo("/auth/logout");
-                            return new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()));
+                            // Navigating to /auth/logout here would cause an infinite redirect loop
+                            // during SSR prerendering: GetAuthenticationStateAsync is called for every
+                            // page (including /auth/logout itself), so nav.NavigateTo("/auth/logout")
+                            // would redirect to /auth/logout repeatedly, hitting ERR_TOO_MANY_REDIRECTS.
+                            // Instead, delete the stale cookies inline and return anonymous state.
+                            // The page's own layout (<RedirectToLogin />) will handle sending the user
+                            // to the login page.
+                            m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
+                            if (httpContext != null && !httpContext.Response.HasStarted)
+                            {
+                                var cookieOptions = new CookieOptions
+                                {
+                                    HttpOnly = true,
+                                    Secure = true,
+                                    SameSite = SameSiteMode.Strict
+                                };
+                                httpContext.Response.Cookies.Delete("id_token", cookieOptions);
+                                httpContext.Response.Cookies.Delete("access_token", cookieOptions);
+                                httpContext.Response.Cookies.Delete("refresh_token", cookieOptions);
+                                httpContext.Response.Cookies.Delete("id", cookieOptions);
+                            }
+                            return new AuthenticationState(m_CurrentUser);
                         }
                     }
                 }
