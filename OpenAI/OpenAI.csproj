@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ASPNETUtility\ASPNETUtility.csproj" />
     <ProjectReference Include="..\BlazorSharedComponent\BlazorSharedComponent.csproj" />
+    <ProjectReference Include="..\OpenAI.Controllers\OpenAI.Controllers.csproj" />
     <ProjectReference Include="..\OpenAI.Core\OpenAI.Core.csproj" />
     <ProjectReference Include="..\OpenAI.SQL\OpenAI.SQL.csproj" />
     <ProjectReference Include="..\OpenIDConnect.Core\OpenIDConnect.Core.csproj" />

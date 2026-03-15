@@ -7,28 +7,14 @@
 
 ## 인증 (Authentication)
 
-모든 API 요청에는 관리자 인증이 필요합니다. 다음 두 가지 방법 중 하나를 사용하세요.
+모든 API 요청에는 인증이 필요합니다. OAuth2 클라이언트를 통해 발급받은 `access_token`을 사용하세요.
 
-### 방법 1: Bearer 토큰 (access_token)
+### Bearer 토큰 (access_token)
 
 OAuth2 서비스에서 발급받은 `access_token`을 `Authorization` 헤더에 포함합니다.
 
 ```http
 Authorization: Bearer <access_token>
-```
-
-### 방법 2: Admin API Key
-
-서버의 `appsettings.json`에서 `Ollama:AdminApiKey`로 설정한 값을 Bearer 토큰으로 사용하거나, 쿼리 파라미터로 전달합니다.
-
-```http
-Authorization: Bearer <AdminApiKey>
-```
-
-또는 쿼리 파라미터:
-
-```
-POST /api/chat?access_token=<AdminApiKey>
 ```
 
 ### 인증 실패 시 응답
@@ -165,11 +151,11 @@ Content-Type: application/json
 
 ## curl 호출 예시
 
-### API Key를 이용한 `/api/chat` 스트리밍 호출
+### access_token을 이용한 `/api/chat` 스트리밍 호출
 
 ```bash
 curl -X POST https://<서비스_주소>/api/chat \
-  -H "Authorization: Bearer MY_ADMIN_API_KEY" \
+  -H "Authorization: Bearer MY_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gemma2:27b",
@@ -191,18 +177,6 @@ curl -X POST https://<서비스_주소>/api/generate \
   }'
 ```
 
-### 쿼리 파라미터로 API Key 전달
-
-```bash
-curl -X POST "https://<서비스_주소>/api/chat?access_token=MY_ADMIN_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gemma2:27b",
-    "messages": [{"role": "user", "content": "안녕하세요!"}],
-    "stream": false
-  }'
-```
-
 ---
 
 ## 서버 설정
@@ -214,10 +188,7 @@ curl -X POST "https://<서비스_주소>/api/chat?access_token=MY_ADMIN_API_KEY"
   "Ollama": {
     "Uri": "http://localhost:11434",
     "GenerateTopicsModel": "llama3.1:8b",
-    "ChatModel": "gemma2:27b",
-    "AdminApiKey": "여기에_비밀_API_키를_입력하세요"
+    "ChatModel": "gemma2:27b"
   }
 }
 ```
-
-`AdminApiKey`를 비워두면 API Key 인증이 비활성화되며, JWT `access_token`으로만 인증할 수 있습니다.
