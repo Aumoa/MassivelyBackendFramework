@@ -68,7 +68,7 @@ internal class TokenRefreshService(
                     Secure = httpContext.Request.IsHttps,
                     SameSite = SameSiteMode.Lax,
                     Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddHours(1)
+                    Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn)
                 });
             }
 

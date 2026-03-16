@@ -169,7 +169,7 @@ internal class JwtAuthenticationStateProvider(
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
                     Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddHours(1)
+                    Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn)
                 });
             }
 
