@@ -181,7 +181,9 @@ internal class JwtAuthenticationStateProvider(
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
                     Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddDays(30)
+                    Expires = tokenResponse.RefreshExpiresIn > 0
+                        ? DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn.Value)
+                        : DateTimeOffset.UtcNow.AddDays(30)
                 });
             }
 

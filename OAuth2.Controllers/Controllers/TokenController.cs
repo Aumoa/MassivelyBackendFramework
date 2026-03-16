@@ -223,6 +223,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
             Scope = access.Scope,
             RefreshToken = access.RefreshToken,
+            RefreshExpiresIn = (int)jwt.RefreshTokenExpiresIn.TotalSeconds,
             IdToken = idToken
         };
 
@@ -306,6 +307,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
             Scope = newAccess.Value.Scope,
             RefreshToken = newAccess.Value.RefreshToken,
+            RefreshExpiresIn = (int)jwt.RefreshTokenExpiresIn.TotalSeconds,
             IdToken = idToken
         };
 
