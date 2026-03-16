@@ -1,6 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.IdentityModel.Tokens;
 
 namespace OAuth2.Services;
 
@@ -52,7 +53,13 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                         try
                         {
                             var handler = new JwtSecurityTokenHandler();
+
+                            // Validate JWT without lifetime validation.
+                            // The actual session validity is determined by the access_token
+                            // and refresh_token stored in Redis, not by the JWT expiration.
                             var validationParams = jwt.GetValidationParameters();
+                            validationParams.ValidateLifetime = false;
+
                             var principal = handler.ValidateToken(jwtToken, validationParams, out var validatedToken);
                             var token = (JwtSecurityToken)validatedToken;
                             var claims = token.Claims.ToList();
@@ -61,13 +68,7 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                         }
                         catch (Exception)
                         {
-                            // Navigating to /auth/logout here would cause an infinite redirect loop
-                            // during SSR prerendering: GetAuthenticationStateAsync is called for every
-                            // page (including /auth/logout itself), so nav.NavigateTo("/auth/logout")
-                            // would redirect to /auth/logout repeatedly, hitting ERR_TOO_MANY_REDIRECTS.
-                            // Instead, delete the stale cookies inline and return anonymous state.
-                            // The page's own layout (<RedirectToLogin />) will handle sending the user
-                            // to the login page.
+                            // JWT is cryptographically invalid (not just expired) - clear cookies
                             m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
                             if (httpContext != null && !httpContext.Response.HasStarted)
                             {
@@ -90,7 +91,7 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                 m_CurrentUser ??= new ClaimsPrincipal(new ClaimsIdentity());
             }
 
-            if (m_CurrentUser != null)
+            if (m_CurrentUser?.Identity?.IsAuthenticated == true)
             {
                 var at = AccessToken;
                 if (string.IsNullOrEmpty(at) == false)
@@ -131,10 +132,12 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                         }
                     }
                 }
+
+                // Both access_token and refresh_token are invalid; clear session
+                m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
             }
 
-            m_CurrentUser ??= new ClaimsPrincipal();
-            return new AuthenticationState(m_CurrentUser);
+            return new AuthenticationState(m_CurrentUser ?? new ClaimsPrincipal());
         }
         finally
         {

@@ -12,20 +12,20 @@ internal class TokenRefreshService(
     ILogger<TokenRefreshService> logger,
     HttpClient httpClient)
 {
-    public async Task<bool> TryRefreshTokenAsync(CancellationToken cancellationToken = default)
+    public async Task<TokenResponse?> TryRefreshTokenAsync(CancellationToken cancellationToken = default)
     {
         var httpContext = httpContextAccessor.HttpContext;
         if (httpContext == null)
         {
             logger.LogWarning("HttpContext is null, cannot refresh token");
-            return false;
+            return null;
         }
 
         var refreshToken = httpContext.Request.Cookies["refresh_token"];
         if (string.IsNullOrEmpty(refreshToken))
         {
             logger.LogInformation("No refresh token found");
-            return false;
+            return null;
         }
 
         try
@@ -49,25 +49,28 @@ internal class TokenRefreshService(
                 // Refresh token invalid, delete cookies
                 httpContext.Response.Cookies.Delete("id_token");
                 httpContext.Response.Cookies.Delete("refresh_token");
-                return false;
+                return null;
             }
 
             var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken);
-            if (tokenResponse?.IdToken == null)
+            if (tokenResponse == null)
             {
-                logger.LogError("Token response is null or missing IdToken");
-                return false;
+                logger.LogError("Token response is null");
+                return null;
             }
 
-            // Update cookies with new tokens
-            httpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
+            // Update cookies with new tokens for subsequent requests
+            if (!string.IsNullOrEmpty(tokenResponse.IdToken))
             {
-                HttpOnly = true,
-                Secure = httpContext.Request.IsHttps,
-                SameSite = SameSiteMode.Lax,
-                Path = "/",
-                Expires = DateTimeOffset.UtcNow.AddHours(1)
-            });
+                httpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = httpContext.Request.IsHttps,
+                    SameSite = SameSiteMode.Lax,
+                    Path = "/",
+                    Expires = DateTimeOffset.UtcNow.AddHours(1)
+                });
+            }
 
             if (!string.IsNullOrEmpty(tokenResponse.RefreshToken))
             {
@@ -82,12 +85,12 @@ internal class TokenRefreshService(
             }
 
             logger.LogTrace("Token refreshed successfully");
-            return true;
+            return tokenResponse;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error refreshing token");
-            return false;
+            return null;
         }
     }
 }
