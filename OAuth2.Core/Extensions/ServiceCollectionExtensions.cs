@@ -20,13 +20,10 @@ public static class ServiceCollectionExtensions
         s.AddTransient<IClientClaims, MySqlClientClaims>();
         s.AddTransient<IClientUserGroups, MySqlClientUserGroups>();
 
-        s.AddSingleton<RedisAccesses>();
-        s.AddHostedService(p => p.GetRequiredService<RedisAccesses>());
-        s.AddSingleton<IAccesses, RedisAccesses>(p => p.GetRequiredService<RedisAccesses>());
-
-        s.AddSingleton<RedisAuthorizationCodes>();
-        s.AddHostedService(p => p.GetRequiredService<RedisAuthorizationCodes>());
-        s.AddSingleton<IAuthorizationCodes, RedisAuthorizationCodes>(p => p.GetRequiredService<RedisAuthorizationCodes>());
+        s.AddSingleton<RedisConnection>();
+        s.AddHostedService(p => p.GetRequiredService<RedisConnection>());
+        s.AddTransient<IAccesses, RedisAccesses>();
+        s.AddTransient<IAuthorizationCodes, RedisAuthorizationCodes>();
 
         s.AddSingleton<IJwt, Jwt>();
         

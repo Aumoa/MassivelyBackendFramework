@@ -1,17 +1,18 @@
 ﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using OAuth2.Options;
 using StackExchange.Redis;
 
 namespace OAuth2.Services;
 
-internal class RedisConnection(RedisOptions options) : IHostedService, IDisposable, IAsyncDisposable
+internal class RedisConnection(IOptions<RedisOptions> options) : IHostedService, IDisposable, IAsyncDisposable
 {
     private bool m_Disposed;
     private ConnectionMultiplexer m_Multiplexer = null!;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        m_Multiplexer = await ConnectionMultiplexer.ConnectAsync(options.ConnectionString).WaitAsync(cancellationToken);
+        m_Multiplexer = await ConnectionMultiplexer.ConnectAsync(options.Value.ConnectionString).WaitAsync(cancellationToken);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -58,6 +59,6 @@ internal class RedisConnection(RedisOptions options) : IHostedService, IDisposab
     public IDatabase GetDatabase()
     {
         ObjectDisposedException.ThrowIf(m_Disposed, this);
-        return m_Multiplexer.GetDatabase(options.DbIndex);
+        return m_Multiplexer.GetDatabase(options.Value.DbIndex);
     }
 }

@@ -1,14 +1,12 @@
 ﻿using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using OAuth2.DTO;
 using OAuth2.Misc;
-using OAuth2.Options;
 using StackExchange.Redis;
 
 namespace OAuth2.Services;
 
-internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccesses> logger) : RedisConnection(options.Value), IAccesses
+internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses> logger) : IAccesses
 {
     private static readonly RedisValue[] Fields =
     [
@@ -21,7 +19,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
 
     public async ValueTask<Access> WriteAccessAsync(string id, string sub, string scope, string clientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default)
     {
-        var db = GetDatabase();
+        var db = multiplexer.GetDatabase();
 
         // Read the current generation for this sub so the token can be invalidated later
         var genValue = await db.StringGetAsync(KeyNames.UserGen(sub)).WaitAsync(cancellationToken);
@@ -63,7 +61,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
 
     public async ValueTask<Access?> VerifyAsync(string accessToken, CancellationToken cancellationToken = default)
     {
-        var db = GetDatabase();
+        var db = multiplexer.GetDatabase();
 
         var accessKey = KeyNames.Access(accessToken);
         var refreshToken = await db.StringGetAsync(accessKey).WaitAsync(cancellationToken);
@@ -115,7 +113,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
 
     public async ValueTask<Access?> VerifyRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
-        var db = GetDatabase();
+        var db = multiplexer.GetDatabase();
         var refreshKey = KeyNames.Refresh(refreshToken);
         
         logger.LogDebug("Verifying refresh token");
@@ -180,7 +178,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
 
     public async ValueTask<Access?> RefreshAccessAsync(string refreshToken, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default)
     {
-        var db = GetDatabase();
+        var db = multiplexer.GetDatabase();
         var refreshKey = KeyNames.Refresh(refreshToken);
 
         // Read all needed fields in one call, including gen
@@ -254,7 +252,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
 
     public async ValueTask RevokeAsync(string accessToken, CancellationToken cancellationToken = default)
     {
-        var db = GetDatabase();
+        var db = multiplexer.GetDatabase();
 
         var accessKey = KeyNames.Access(accessToken);
         var refreshToken = await db.StringGetAsync(accessKey).WaitAsync(cancellationToken);
@@ -277,7 +275,7 @@ internal class RedisAccesses(IOptions<RedisOptions> options, ILogger<RedisAccess
 
     public async ValueTask InvalidateAllTokensAsync(string sub, CancellationToken cancellationToken = default)
     {
-        var db = GetDatabase();
+        var db = multiplexer.GetDatabase();
         var userGenKey = KeyNames.UserGen(sub);
 
         // Increment the generation counter. Any existing token (access or refresh) that
