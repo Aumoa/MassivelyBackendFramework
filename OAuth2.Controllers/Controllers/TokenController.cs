@@ -11,7 +11,7 @@ namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/token")]
-public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IClientUserGroups groups, IOptions<HostOptions> hostOptions, ILogger<TokenController> logger) : ControllerBase
+public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IClientUserGroups groups, IOptions<HostOptions> hostOptions, IApiKeys apiKeys, ILogger<TokenController> logger) : ControllerBase
 {
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] TokenRequest request, CancellationToken cancellationToken)
@@ -22,6 +22,8 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
                 return await HandleAuthorizeCodeAsync(request, cancellationToken);
             case "refresh_token":
                 return await HandleRefreshTokenAsync(request, cancellationToken);
+            case "api_key":
+                return await HandleApiKeyAsync(request, cancellationToken);
             default:
                 return BadRequest(new { error = "unsupported_grant_type" });
         }
@@ -206,29 +208,10 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "account_not_found" });
         }
 
-        var access = await accesses.WriteAccessAsync(code.Value.AccountId, rawAccount.Value.Sub, code.Value.Scope, code.Value.ClientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken);
-        var claims = await accountClaims.GetClaimsAsync(code.Value.AccountId, cancellationToken);
-        var groupsClaim = await groups.GetClientUserGroupsAsync(request.ClientId, rawAccount.Value.Sub, cancellationToken);
-
-        string? idToken = null;
-        if (code.Value.Scope.Split(' ').Any(p => p is "openid" or "all"))
-        {
-            idToken = jwt.Issue(code.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, code.Value.Scope, [.. claims, .. groupsClaim], code.Value.Nonce, true));
-        }
-
-        var response = new TokenResponse
-        {
-            AccessToken = access.AccessToken,
-            TokenType = "Bearer",
-            ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
-            Scope = access.Scope,
-            RefreshToken = access.RefreshToken,
-            RefreshExpiresIn = (int)jwt.RefreshTokenExpiresIn.TotalSeconds,
-            IdToken = idToken
-        };
+        var tokenResponse = await GenerateTokenResponseAsync(code.Value.AccountId, rawAccount.Value, code.Value.ClientId, code.Value.Scope, code.Value.Nonce, cancellationToken);
 
         logger.LogInformation("Token issued successfully for client: {ClientId}, account: {AccountId}", request.ClientId, code.Value.AccountId);
-        return Ok(response);
+        return Ok(tokenResponse);
     }
 
     private async ValueTask<IActionResult> HandleRefreshTokenAsync(TokenRequest request, CancellationToken cancellationToken)
@@ -313,5 +296,65 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
 
         logger.LogInformation("Token refreshed successfully for client: {ClientId}, account: {AccountId}", request.ClientId, newAccess.Value.Id);
         return Ok(response);
+    }
+
+    private async ValueTask<IActionResult> HandleApiKeyAsync(TokenRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.Code))
+        {
+            return BadRequest(new { error = "invalid_request", error_description = "code is required" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ClientId))
+        {
+            return BadRequest(new { error = "invalid_request", error_description = "client_id is required" });
+        }
+
+        var apiKey = request.Code;
+        var apiKeyInfo = await apiKeys.VerifyApiKeyAsync(apiKey, cancellationToken);
+        if (!apiKeyInfo.HasValue)
+        {
+            return BadRequest(new { error = "api_key_not_exists" });
+        }
+
+        var accountId = apiKeyInfo.Value.AccountId;
+
+        var rawAccount = await accounts.GetRawAccountAsync(accountId, cancellationToken);
+        if (!rawAccount.HasValue)
+        {
+            return BadRequest(new { error = "invalid_grant", error_description = "associated account not found" });
+        }
+
+        const string scope = "all";
+
+        var tokenResponse = await GenerateTokenResponseAsync(accountId, rawAccount.Value, request.ClientId, scope, null, cancellationToken);
+
+        logger.LogInformation("Token issued successfully for client: {ClientId}, account: {AccountId} using API key.", request.ClientId, accountId);
+        return Ok(tokenResponse);
+    }
+
+    private async ValueTask<TokenResponse> GenerateTokenResponseAsync(string accountId, RawAccount rawAccount, string clientId, string scope, string? nonce, CancellationToken cancellationToken)
+    {
+        var sub = rawAccount.Sub;
+        var access = await accesses.WriteAccessAsync(accountId, sub, scope, clientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken);
+        var claims = await accountClaims.GetClaimsAsync(accountId, cancellationToken);
+        var groupsClaim = await groups.GetClientUserGroupsAsync(clientId, sub, cancellationToken);
+
+        string? idToken = null;
+        if (scope.Split(' ').Any(p => p is "openid" or "all"))
+        {
+            idToken = jwt.Issue(clientId, jwt.ConfigureClaims(rawAccount, scope, [.. claims, .. groupsClaim], null, true));
+        }
+
+        return new TokenResponse
+        {
+            AccessToken = access.AccessToken,
+            TokenType = "Bearer",
+            ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
+            Scope = access.Scope,
+            RefreshToken = access.RefreshToken,
+            RefreshExpiresIn = (int)jwt.RefreshTokenExpiresIn.TotalSeconds,
+            IdToken = idToken
+        };
     }
 }
