@@ -75,7 +75,6 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
                 if (string.IsNullOrWhiteSpace(line))
                     continue;
 
-                Console.Write(line);
                 var chunk = JsonSerializer.Deserialize<OllamaChatResponse>(line);
                 if (chunk != null)
                 {
