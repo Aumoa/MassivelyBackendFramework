@@ -31,6 +31,14 @@
                             {
                                 @msg.Content
                             }
+                            else if (msg == m_StreamingMessage && string.IsNullOrEmpty(msg.Content))
+                            {
+                                <div class="typing-indicator">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
+                            }
                             else
                             {
                                 @((MarkupString)ConvertMarkdownToHtml(msg.Content))
@@ -81,6 +89,7 @@
     private string m_InputText = string.Empty;
     private ElementReference m_TextareaRef;
     private bool m_IsStreaming;
+    private ChatMessage? m_StreamingMessage;
     private CancellationTokenSource? m_Cts;
 
     protected override void OnInitialized()
@@ -161,6 +170,7 @@
 
             assistantMessage = new ChatMessage { Role = MessageRole.Assistant, Content = string.Empty };
             currentSession.Messages.Add(assistantMessage);
+            m_StreamingMessage = assistantMessage;
 
             StateHasChanged();
             await JS.InvokeVoidAsync("scrollToBottom", "messages-area");
@@ -193,6 +203,7 @@
             }
 
             m_IsStreaming = false;
+            m_StreamingMessage = null;
             m_Cts?.Dispose();
             m_Cts = null;
             StateHasChanged();
