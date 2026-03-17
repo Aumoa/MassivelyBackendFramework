@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
     {
         s.Configure<OllamaOptions>(config.GetRequiredSection("Ollama"));
         s.Configure<MySqlOptions>(config.GetRequiredSection("MySql"));
+        s.Configure<StableDiffusionOptions>(config.GetRequiredSection("StableDiffusion"));
 
         s.AddHttpClient<OllamaAIMessenger>();
         s.AddSingleton<IAIMessenger, OllamaAIMessenger>();
