@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Net.Http.Json;
+﻿using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -13,7 +12,8 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
 {
     private const string CHAT_SYSTEM_PROMPT =
         "당신은 사용자에게 도움을 주는 친절하고 전문적인 AI 어시스턴트입니다. 당신의 답변은 명확하고 간결하며, 필요할 때 논리적인 구조(목록, 강조 등)를 사용하세요. " +
-        "사용자가 별도의 요구를 하지 않는 한, 불필요한 서론이나 사과는 생략하고 즉시 핵심 내용부터 답변하세요. 사용자의 질문 의도를 파악하여 적절한 깊이의 정보를 제공하세요.";
+        "사용자가 별도의 요구를 하지 않는 한, 불필요한 서론이나 사과는 생략하고 즉시 핵심 내용부터 답변하세요. 사용자의 질문 의도를 파악하여 적절한 깊이의 정보를 제공하세요. " +
+        "이미지를 생성할 때, 도구 설명에 있는 권장 태그들을 활용하여 사용자의 아이디어를 한 폭의 예술 작품처럼 상세하게 묘사하세요.";
 
     private const string SUMMARIZE_SYSTEM_PROMPT =
         "당신은 대화 내용을 간결하고 명확하게 요약하는 전문 요약가입니다. 아래 대화 내용을 읽고, 대화의 핵심 주제, 논의된 주요 내용, 그리고 결정된 사항(Action Items)을 중심으로 정리하세요.\n\n" +
@@ -27,7 +27,7 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
 
     public string ConversationTopics => conversationTopics;
 
-    public async IAsyncEnumerable<string> AddChatAsync(
+    public async IAsyncEnumerable<ChunkedResponse> AddChatAsync(
         IReadOnlyList<ChatHistoryMessage> history,
         string message,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -67,7 +67,7 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
             using var reader = new StreamReader(stream);
 
             List<OllamaToolCall> toolCalls = [];
-            List<Task<(string id, object? result)>> toolCallsResults = [];
+            List<IAsyncEnumerable<(string id, ChunkedResponse? result)>> toolCallsResults = [];
 
             string? line;
             while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
@@ -82,7 +82,11 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
                     {
                         if (chunk.Message.Content is { Length: > 0 } content)
                         {
-                            yield return content;
+                            yield return new ChunkedResponse
+                            {
+                                Type = ChunkedResponse.Types.Message,
+                                Content = content
+                            };
                         }
 
                         if (chunk.Message.ToolCalls != null)
@@ -104,20 +108,44 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
 
             if (toolCallsResults.Count > 0)
             {
-                var toolResults = await Task.WhenAll(toolCallsResults);
                 messages.Add(new OllamaChatMessage
                 {
                     Role = "assistant",
                     ToolCalls = [.. toolCalls]
                 });
-                foreach (var (id, result) in toolResults)
+
+                foreach (var asyncEnumerable in toolCallsResults)
                 {
-                    messages.Add(new OllamaChatMessage
+                    await foreach (var (callId, chunkedResponse) in asyncEnumerable)
                     {
-                        Role = "tool",
-                        Content = JsonSerializer.Serialize(result),
-                        ToolCallId = id
-                    });
+                        if (chunkedResponse != null)
+                        {
+                            yield return chunkedResponse;
+
+                            if (chunkedResponse.Type == ChunkedResponse.Types.ToolResult)
+                            {
+                                messages.Add(new OllamaChatMessage
+                                {
+                                    Role = "tool",
+                                    Content = chunkedResponse.Content,
+                                    ToolCallId = callId
+                                });
+
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            messages.Add(new OllamaChatMessage
+                            {
+                                Role = "tool",
+                                Content = JsonSerializer.Serialize(new { status = "error" }),
+                                ToolCallId = callId
+                            });
+
+                            break;
+                        }
+                    }
                 }
             }
             else
@@ -128,12 +156,13 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
 
         yield break;
 
-        async Task<(string id, object? result)> CallAsync(OllamaToolCall call)
+        async IAsyncEnumerable<(string id, ChunkedResponse?)> CallAsync(OllamaToolCall call)
         {
             var function = tools.FindFunction(call.Function.Name);
             if (function == null)
             {
-                return (call.Id, null);
+                yield return (call.Id, null);
+                yield break;
             }
 
             int count = function.Parameters.Length;
@@ -162,8 +191,13 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
                 arguments[^1] = cancellationToken;
             }
 
-            var result = await function.Invocable(arguments);
-            return (call.Id, result);
+            await foreach (var chunkedResponse in function.Invocable(arguments))
+            {
+                if (chunkedResponse.Type == ChunkedResponse.Types.ToolContent)
+                {
+                    yield return (call.Id, chunkedResponse);
+                }
+            }
         }
     }
 

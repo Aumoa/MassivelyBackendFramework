@@ -23,9 +23,9 @@ internal class ToolsProvider
             var targetMethods = type.GetMethods().Where(m => m.GetCustomAttribute<ToolFunctionAttribute>() != null);
             foreach (var targetMethod in targetMethods)
             {
-                if (targetMethod.ReturnType != typeof(Task<object>))
+                if (targetMethod.ReturnType != typeof(IAsyncEnumerable<ChunkedResponse>))
                 {
-                    throw new InvalidOperationException($"Method {targetMethod.Name} in type {type.FullName} is marked with ToolFunctionAttribute but does not return Task<object>.");
+                    throw new InvalidOperationException($"Method {targetMethod.Name} in type {type.FullName} is marked with ToolFunctionAttribute but does not return IAsyncEnumerable<ChunkedResponse>.");
                 }
 
                 var parameters = targetMethod.GetParameters();
@@ -57,10 +57,10 @@ internal class ToolsProvider
                 var toolFunctionDescription = new ToolFunctionDescription
                 {
                     Name = toolFunctionAttribute.Name,
-                    Invocable = async (args) =>
+                    Invocable = args =>
                     {
                         var instance = sp.GetRequiredService(type);
-                        return await (Task<object>)targetMethod.Invoke(instance, args)!;
+                        return (IAsyncEnumerable<ChunkedResponse>)targetMethod.Invoke(instance, args)!;
                     },
                     Description = toolFunctionAttribute.Description ?? string.Empty,
                     Parameters = [.. parameterInfos],

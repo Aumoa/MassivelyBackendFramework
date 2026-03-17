@@ -203,11 +203,35 @@
             StateHasChanged();
             await JS.InvokeVoidAsync("scrollToBottom", "messages-area");
 
+            var messagesAppend = string.Empty;
+            var currentToolState = string.Empty;
             await foreach (var chunk in currentSession.Chat.AddChatAsync(history, text, m_Cts.Token))
             {
-                assistantMessage.Content += chunk;
+                switch (chunk.Type)
+                {
+                    case ChunkedResponse.Types.Message:
+                        messagesAppend += chunk.Content;
+                        assistantMessage.Content = messagesAppend + currentToolState;
+                        break;
+                    case ChunkedResponse.Types.ToolContent:
+                        currentToolState = chunk.Content;
+                        assistantMessage.Content = messagesAppend + currentToolState;
+                        break;
+                    case ChunkedResponse.Types.ToolResult:
+                        messagesAppend += currentToolState;
+                        currentToolState = string.Empty;
+                        assistantMessage.Content = messagesAppend;
+                        break;
+                }
+
                 StateHasChanged();
                 await JS.InvokeVoidAsync("scrollToBottom", "messages-area");
+            }
+
+            if (!string.IsNullOrEmpty(currentToolState))
+            {
+                assistantMessage.Content = messagesAppend + currentToolState;
+                StateHasChanged();
             }
         }
         catch (OperationCanceledException)
@@ -290,7 +314,11 @@
     }
 
     private static readonly MarkdownPipeline s_MarkdownPipeline =
-        new MarkdownPipelineBuilder().UseAdvancedExtensions().DisableHtml().Build();
+        new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .DisableHtml()
+        .UseGenericAttributes()
+        .Build();
 
     private static string ConvertMarkdownToHtml(string? markdown)
     {

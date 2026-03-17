@@ -24,7 +24,7 @@ internal record ToolFunctionDescription
 
     public required string Name { get; init; }
 
-    public required Func<object?[]?, Task<object>> Invocable { get; init; }
+    public required Func<object?[]?, IAsyncEnumerable<ChunkedResponse>> Invocable { get; init; }
 
     public required string Description { get; init; }
 
