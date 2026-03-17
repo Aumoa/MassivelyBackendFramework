@@ -15,11 +15,29 @@
         <div class="messages-inner">
             @if (ChatState.CurrentSession == null || !ChatState.CurrentSession.Messages.Any(m => m.Role != MessageRole.Summary))
             {
-                <div class="welcome-message">
-                    <span class="material-symbols-outlined welcome-icon">smart_toy</span>
-                    <h2>@Strings.CHAT_WELCOME_TITLE</h2>
-                    <p>@Strings.CHAT_WELCOME_SUBTITLE</p>
-                </div>
+                @if (m_PendingUserText != null)
+                {
+                    <div class="chat-message user">
+                        <div class="message-bubble">@m_PendingUserText</div>
+                    </div>
+                    <div class="chat-message assistant">
+                        <div class="message-bubble">
+                            <div class="typing-indicator">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="welcome-message">
+                        <span class="material-symbols-outlined welcome-icon">smart_toy</span>
+                        <h2>@Strings.CHAT_WELCOME_TITLE</h2>
+                        <p>@Strings.CHAT_WELCOME_SUBTITLE</p>
+                    </div>
+                }
             }
             else
             {
@@ -30,6 +48,14 @@
                             @if (msg.IsUser)
                             {
                                 @msg.Content
+                            }
+                            else if (msg == m_StreamingMessage && string.IsNullOrWhiteSpace(msg.Content))
+                            {
+                                <div class="typing-indicator">
+                                    <span></span>
+                                    <span></span>
+                                    <span></span>
+                                </div>
                             }
                             else
                             {
@@ -81,6 +107,8 @@
     private string m_InputText = string.Empty;
     private ElementReference m_TextareaRef;
     private bool m_IsStreaming;
+    private ChatMessage? m_StreamingMessage;
+    private string? m_PendingUserText;
     private CancellationTokenSource? m_Cts;
 
     protected override void OnInitialized()
@@ -144,6 +172,12 @@
         {
             if (ChatState.CurrentSession == null)
             {
+                // Show the user's message and typing indicator immediately,
+                // before the (potentially slow) topic-generation call.
+                m_PendingUserText = text;
+                StateHasChanged();
+                await JS.InvokeVoidAsync("scrollToBottom", "messages-area");
+
                 var userId = await GetUserIdAsync();
                 var topics = await AIMessenger.GenerateConversationTopicsAsync(text, m_Cts.Token);
                 await ChatState.CreateSessionAsync(userId, topics, m_Cts.Token);
@@ -161,6 +195,10 @@
 
             assistantMessage = new ChatMessage { Role = MessageRole.Assistant, Content = string.Empty };
             currentSession.Messages.Add(assistantMessage);
+            m_StreamingMessage = assistantMessage;
+
+            // Session messages are now in place; clear the pending preview to avoid duplication.
+            m_PendingUserText = null;
 
             StateHasChanged();
             await JS.InvokeVoidAsync("scrollToBottom", "messages-area");
@@ -193,6 +231,8 @@
             }
 
             m_IsStreaming = false;
+            m_StreamingMessage = null;
+            m_PendingUserText = null;
             m_Cts?.Dispose();
             m_Cts = null;
             StateHasChanged();
