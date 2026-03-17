@@ -1,18 +1,16 @@
 ﻿using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using OAuth2.DTO;
 using OAuth2.Misc;
-using OAuth2.Options;
 using StackExchange.Redis;
 
 namespace OAuth2.Services;
 
-internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<RedisAuthorizationCodes> logger) : RedisConnection(options.Value), IAuthorizationCodes
+internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<RedisAuthorizationCodes> logger) : IAuthorizationCodes
 {
     public async ValueTask<string> PushAsync(AuthorizationCodeBody body, CancellationToken cancellationToken = default)
     {
-        var db = GetDatabase();
+        var db = multiplexer.GetDatabase();
         var code = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var codeKey = KeyNames.AuthorizationCode(code);
 
@@ -33,7 +31,7 @@ internal class RedisAuthorizationCodes(IOptions<RedisOptions> options, ILogger<R
 
     public async ValueTask<AuthorizationCodeBody?> PopAsync(string code, CancellationToken cancellationToken = default)
     {
-        var db = GetDatabase();
+        var db = multiplexer.GetDatabase();
         var codeKey = KeyNames.AuthorizationCode(code);
         var entries = await db.HashGetAllAsync(codeKey).WaitAsync(cancellationToken);
         if (entries.Length == 0)
