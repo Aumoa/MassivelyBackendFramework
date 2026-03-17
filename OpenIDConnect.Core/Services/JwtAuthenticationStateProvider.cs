@@ -64,14 +64,14 @@ internal class JwtAuthenticationStateProvider(
             // Convert ValidTo to UTC for proper comparison
             var tokenExpiryUtc = token.ValidTo.ToUniversalTime();
             var now = DateTime.UtcNow;
-            var bufferTime = now.AddSeconds(30);
+            var bufferTime = now.AddSeconds(1);
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
                 logger.LogDebug("Token expiry check - ValidTo: {ValidTo} (UTC: {ValidToUtc}), Now: {Now}, Buffer: {Buffer}", token.ValidTo, tokenExpiryUtc, now, bufferTime);
             }
 
-            // Check if token is expired or near expiration (30 second buffer)
+            // Check if token is expired or near expiration (1 second buffer)
             if (tokenExpiryUtc < bufferTime)
             {
                 var timeRemaining = tokenExpiryUtc - now;
