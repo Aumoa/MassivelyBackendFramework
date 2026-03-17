@@ -174,4 +174,10 @@
   <data name="CHAT_STOP_BUTTON_TITLE" xml:space="preserve">
     <value>Stop</value>
   </data>
+  <data name="SIDEBAR_DELETE_CHAT_CONFIRM" xml:space="preserve">
+    <value>Are you sure you want to delete this conversation?</value>
+  </data>
+  <data name="SIDEBAR_DELETE_CHAT_TITLE" xml:space="preserve">
+    <value>Delete conversation</value>
+  </data>
 </root>

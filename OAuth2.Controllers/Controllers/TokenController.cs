@@ -86,7 +86,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             if (clientSecret != hostOptions.Value.Secret)
             {
                 logger.LogWarning("Client secret validation failed for internal client: {ClientId}", clientId);
-                return BadRequest(new { error = "invalid_client_secret" });
+                return BadRequest(new { error = "invalid_client", error_description = "client authentication failed" });
             }
         }
         else
@@ -95,20 +95,20 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             if (cclaims.Length == 0)
             {
                 logger.LogWarning("Client not found: {ClientId}", clientId);
-                return BadRequest(new { error = "invalid_client_id" });
+                return BadRequest(new { error = "invalid_client", error_description = "client_id is unknown" });
             }
 
             var secret = cclaims.FirstOrDefault(p => p.Name == "secret").Value ?? string.Empty;
             if (string.IsNullOrEmpty(secret))
             {
                 logger.LogWarning("Client secret not configured: {ClientId}", clientId);
-                return BadRequest(new { error = "invalid_client_id" });
+                return BadRequest(new { error = "invalid_client", error_description = "client secret is not configured" });
             }
 
             if (PasswordHasher.Verify(clientSecret, secret) == false)
             {
                 logger.LogWarning("Client secret verification failed: {ClientId}", clientId);
-                return BadRequest(new { error = "invalid_client_secret" });
+                return BadRequest(new { error = "invalid_client", error_description = "client authentication failed" });
             }
         }
 
@@ -223,6 +223,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
             Scope = access.Scope,
             RefreshToken = access.RefreshToken,
+            RefreshExpiresIn = (int)jwt.RefreshTokenExpiresIn.TotalSeconds,
             IdToken = idToken
         };
 
@@ -234,7 +235,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
     {
         if (string.IsNullOrWhiteSpace(request.RefreshToken))
         {
-            return BadRequest(new { error = "refresh_token_missing" });
+            return BadRequest(new { error = "invalid_request", error_description = "refresh_token is required" });
         }
 
         // Parse Basic authentication header
@@ -242,12 +243,12 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
 
         if (string.IsNullOrWhiteSpace(request.ClientId))
         {
-            return BadRequest(new { error = "client_id_missing" });
+            return BadRequest(new { error = "invalid_request", error_description = "client_id is required" });
         }
 
         if (string.IsNullOrWhiteSpace(request.ClientSecret))
         {
-            return BadRequest(new { error = "client_secret_missing" });
+            return BadRequest(new { error = "invalid_request", error_description = "client_secret is required" });
         }
 
         // Step 1: Query refresh token information without refreshing it yet
@@ -256,7 +257,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         if (!oldAccess.HasValue)
         {
             logger.LogWarning("Invalid or expired refresh token");
-            return BadRequest(new { error = "invalid_refresh_token" });
+            return BadRequest(new { error = "invalid_grant", error_description = "refresh_token is invalid or expired" });
         }
 
         // Step 2: Verify Client ID match
@@ -264,7 +265,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         {
             logger.LogWarning("Client ID mismatch in refresh token. Token ClientId: {TokenClientId}, Request ClientId: {RequestClientId}", 
                 oldAccess.Value.ClientId, request.ClientId);
-            return BadRequest(new { error = "invalid_client" });
+            return BadRequest(new { error = "invalid_grant", error_description = "client_id does not match the original token" });
         }
 
         // Step 3: Validate client secret
@@ -279,26 +280,18 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         if (newAccess.HasValue == false)
         {
             logger.LogWarning("Failed to refresh access token");
-            return BadRequest(new { error = "invalid_refresh_token" });
+            return BadRequest(new { error = "invalid_grant", error_description = "refresh_token is invalid or expired" });
         }
 
-        // Retrieve token information
-        var access = await accesses.VerifyAsync(newAccess.Value.AccessToken, cancellationToken);
-        if (!access.HasValue)
-        {
-            logger.LogError("Newly created access token verification failed");
-            return StatusCode(500, new { error = "internal_server_error" });
-        }
-
-        var rawAccount = await accounts.GetRawAccountAsync(access.Value.Id, cancellationToken);
+        var rawAccount = await accounts.GetRawAccountAsync(newAccess.Value.Id, cancellationToken);
         if (!rawAccount.HasValue)
         {
-            logger.LogError("Account not found: {AccountId}", access.Value.Id);
-            return BadRequest(new { error = "account_not_found" });
+            logger.LogError("Account not found: {AccountId}", newAccess.Value.Id);
+            return BadRequest(new { error = "invalid_grant", error_description = "associated account not found" });
         }
 
-        var claims = await accountClaims.GetClaimsAsync(access.Value.Id, cancellationToken);
-        var groupsClaim = await groups.GetClientUserGroupsAsync(request.ClientId, access.Value.Sub, cancellationToken);
+        var claims = await accountClaims.GetClaimsAsync(newAccess.Value.Id, cancellationToken);
+        var groupsClaim = await groups.GetClientUserGroupsAsync(request.ClientId, newAccess.Value.Sub, cancellationToken);
 
         // Issue IdToken only when openid scope is present
         string? idToken = null;
@@ -314,10 +307,11 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
             Scope = newAccess.Value.Scope,
             RefreshToken = newAccess.Value.RefreshToken,
+            RefreshExpiresIn = (int)jwt.RefreshTokenExpiresIn.TotalSeconds,
             IdToken = idToken
         };
 
-        logger.LogInformation("Token refreshed successfully for client: {ClientId}, account: {AccountId}", request.ClientId, access.Value.Id);
+        logger.LogInformation("Token refreshed successfully for client: {ClientId}, account: {AccountId}", request.ClientId, newAccess.Value.Id);
         return Ok(response);
     }
 }

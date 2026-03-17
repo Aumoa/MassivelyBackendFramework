@@ -35,10 +35,25 @@ internal class JwtAuthenticationStateProvider(
         }
 
         var jwtToken = httpContext.Request.Cookies["id_token"];
+
+        // If id_token is missing but refresh_token exists, attempt refresh
         if (string.IsNullOrWhiteSpace(jwtToken))
         {
-            m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
-            return new AuthenticationState(m_CurrentUser);
+            var refreshToken = httpContext.Request.Cookies["refresh_token"];
+            if (!string.IsNullOrEmpty(refreshToken))
+            {
+                var tokenResponse = await tokenRefreshService.TryRefreshTokenAsync();
+                if (tokenResponse?.IdToken != null)
+                {
+                    jwtToken = tokenResponse.IdToken;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(jwtToken))
+            {
+                m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
+                return new AuthenticationState(m_CurrentUser);
+            }
         }
 
         try
@@ -56,7 +71,7 @@ internal class JwtAuthenticationStateProvider(
                 logger.LogDebug("Token expiry check - ValidTo: {ValidTo} (UTC: {ValidToUtc}), Now: {Now}, Buffer: {Buffer}", token.ValidTo, tokenExpiryUtc, now, bufferTime);
             }
 
-            // Check if token is expired or near expiration (1 minute buffer)
+            // Check if token is expired or near expiration (30 second buffer)
             if (tokenExpiryUtc < bufferTime)
             {
                 var timeRemaining = tokenExpiryUtc - now;
@@ -65,25 +80,16 @@ internal class JwtAuthenticationStateProvider(
                     logger.LogTrace("JWT token expired or near expiration (remaining: {TimeRemaining}), attempting refresh", timeRemaining);
                 }
 
-                // Try to refresh token
-                var refreshed = await tokenRefreshService.TryRefreshTokenAsync();
-                if (refreshed)
+                // Try to refresh token - use the returned TokenResponse directly
+                // instead of re-reading from Request.Cookies (which contains stale values)
+                var tokenResponse = await tokenRefreshService.TryRefreshTokenAsync();
+                if (tokenResponse?.IdToken != null)
                 {
-                    // Re-read the new token
-                    jwtToken = httpContext.Request.Cookies["id_token"];
-                    if (!string.IsNullOrEmpty(jwtToken))
+                    jwtToken = tokenResponse.IdToken;
+                    token = handler.ReadJwtToken(jwtToken);
+                    if (logger.IsEnabled(LogLevel.Trace))
                     {
-                        token = handler.ReadJwtToken(jwtToken);
-                        if (logger.IsEnabled(LogLevel.Trace))
-                        {
-                            logger.LogTrace("Token refreshed successfully, new expiry: {ValidTo}", token.ValidTo);
-                        }
-                    }
-                    else
-                    {
-                        logger.LogWarning("Token refresh succeeded but no new token found in cookie");
-                        m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
-                        return new AuthenticationState(m_CurrentUser);
+                        logger.LogTrace("Token refreshed successfully, new expiry: {ValidTo}", token.ValidTo);
                     }
                 }
                 else
@@ -163,7 +169,7 @@ internal class JwtAuthenticationStateProvider(
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
                     Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddHours(1)
+                    Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn)
                 });
             }
 
@@ -175,7 +181,7 @@ internal class JwtAuthenticationStateProvider(
                     Secure = true,
                     SameSite = SameSiteMode.Strict,
                     Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddDays(30)
+                    Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn)
                 });
             }
 

@@ -94,4 +94,32 @@
 .chat-history-item .chat-title {
     overflow: hidden;
     text-overflow: ellipsis;
+    flex: 1;
+}
+
+.delete-session-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 2px;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: color 0.15s, background 0.15s;
+}
+
+.delete-session-btn .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.delete-session-btn:hover {
+    color: var(--text-primary);
+    background: var(--border-color);
+}
+
+.chat-history-item:hover .delete-session-btn {
+    display: flex;
 }

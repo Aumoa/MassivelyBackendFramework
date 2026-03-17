@@ -230,5 +230,23 @@ namespace OpenAI.Localizations {
                 return ResourceManager.GetString("TOPBAR_DEFAULT_CONVERSATION_TITLE", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Are you sure you want to delete this conversation?과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string SIDEBAR_DELETE_CHAT_CONFIRM {
+            get {
+                return ResourceManager.GetString("SIDEBAR_DELETE_CHAT_CONFIRM", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Delete conversation과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string SIDEBAR_DELETE_CHAT_TITLE {
+            get {
+                return ResourceManager.GetString("SIDEBAR_DELETE_CHAT_TITLE", resourceCulture);
+            }
+        }
     }
 }
