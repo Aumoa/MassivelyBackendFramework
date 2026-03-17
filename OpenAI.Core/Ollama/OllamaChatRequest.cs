@@ -1,15 +1,7 @@
 ﻿using System.Text.Json.Serialization;
+using OpenAI.Tools;
 
 namespace OpenAI.Ollama;
-
-internal record OllamaChatMessage
-{
-    [JsonPropertyName("role")]
-    public required string Role { get; init; }
-
-    [JsonPropertyName("content")]
-    public required string Content { get; init; }
-}
 
 internal record OllamaChatRequest
 {
@@ -19,24 +11,26 @@ internal record OllamaChatRequest
     [JsonPropertyName("messages")]
     public required OllamaChatMessage[] Messages { get; init; }
 
+    [JsonPropertyName("tools")]
+    public OllamaTool[]? Tools { get; init; }
+
     [JsonPropertyName("stream")]
     public bool Stream { get; init; } = true;
 
     [JsonPropertyName("options")]
     public OllamaChatOptions? Options { get; init; }
-}
 
-internal record OllamaChatOptions
-{
-    [JsonPropertyName("temperature")]
-    public double Temperature { get; init; }
-
-    [JsonPropertyName("top_p")]
-    public double TopP { get; init; }
-
-    [JsonPropertyName("num_ctx")]
-    public int NumCtx { get; init; }
-
-    [JsonPropertyName("repeat_penalty")]
-    public double RepeatPenalty { get; init; }
+    public static OllamaTool[] CreateFrom(IReadOnlyCollection<ToolFunctionDescription> toolFunctions)
+    {
+        return [.. toolFunctions.Select(tf => new OllamaTool
+        {
+            Type = "function",
+            Function = new OllamaFunction
+            {
+                Name = tf.Name,
+                Description = tf.Description,
+                Parameters = OllamaFaceParameters.CreateFrom(tf.Parameters)
+            }
+        })];
+    }
 }

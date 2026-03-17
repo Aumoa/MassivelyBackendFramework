@@ -2,7 +2,7 @@
 
 namespace OpenAI.Ollama;
 
-internal record GenerateResponse
+internal record OllamaGenerateResponse
 {
     [JsonPropertyName("response")]
     public required string Response { get; init; }

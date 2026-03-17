@@ -10,9 +10,3 @@ internal record OllamaChatResponse
     [JsonPropertyName("done")]
     public bool Done { get; init; }
 }
-
-internal record OllamaChatResponseMessage
-{
-    [JsonPropertyName("content")]
-    public string Content { get; init; } = string.Empty;
-}

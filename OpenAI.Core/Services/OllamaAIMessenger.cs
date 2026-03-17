@@ -1,25 +1,17 @@
 ﻿using System.Net.Http.Json;
 using Microsoft.Extensions.Options;
 using OpenAI.Ollama;
+using OpenAI.Tools;
 
 namespace OpenAI.Services;
 
-internal class OllamaAIMessenger : IAIMessenger
+internal class OllamaAIMessenger(IOptions<OllamaOptions> options, HttpClient http, ToolsProvider tools) : IAIMessenger
 {
-    private readonly IOptions<OllamaOptions> m_Options;
-    private readonly HttpClient m_Http;
-
-    public OllamaAIMessenger(IOptions<OllamaOptions> options, HttpClient http)
-    {
-        m_Options = options;
-        m_Http = http;
-    }
-
     public async ValueTask<string> GenerateConversationTopicsAsync(string message, CancellationToken cancellationToken = default)
     {
-        var response = await m_Http.PostAsJsonAsync(m_Options.Value.Uri + "/api/generate", new
+        var response = await http.PostAsJsonAsync(options.Value.Uri + "/api/generate", new
         {
-            model = m_Options.Value.GenerateTopicsModel,
+            model = options.Value.GenerateTopicsModel,
             prompt = message,
             stream = false,
             system = @"
@@ -40,7 +32,7 @@ API 키 발급 방법 확인
             }
         }, cancellationToken);
         response.EnsureSuccessStatusCode();
-        var generateResponse = await response.Content.ReadFromJsonAsync<GenerateResponse>(cancellationToken)
+        var generateResponse = await response.Content.ReadFromJsonAsync<OllamaGenerateResponse>(cancellationToken)
             ?? throw new InvalidOperationException("Failed to deserialize the response from Ollama API.");
 
         return generateResponse.Response;
@@ -48,6 +40,6 @@ API 키 발급 방법 확인
 
     public ValueTask<IAIChat> CreateChatAsync(string conversationTopics, CancellationToken cancellationToken = default)
     {
-        return ValueTask.FromResult<IAIChat>(new OllamaAIChat(conversationTopics, m_Options.Value, m_Http));
+        return ValueTask.FromResult<IAIChat>(new OllamaAIChat(conversationTopics, options.Value, http, tools));
     }
 }
