@@ -522,4 +522,28 @@
   <data name="MANAGE_APPLICATION_APIKEYS_NAME_PLACEHOLDER" xml:space="preserve">
     <value>Key name (e.g. Production)</value>
   </data>
+  <data name="MANAGEACCOUNTS_SECTION_APIKEYS" xml:space="preserve">
+    <value>API Keys</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_SECTION_DESC" xml:space="preserve">
+    <value>Manage personal API keys for programmatic access. Keys are stored securely and cannot be viewed after creation.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER" xml:space="preserve">
+    <value>Allowed client ID (leave empty for all clients)</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER" xml:space="preserve">
+    <value>Allowed scope (leave empty for all scopes)</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL" xml:space="preserve">
+    <value>Client</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_SCOPE_LABEL" xml:space="preserve">
+    <value>Scope</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_ALL_CLIENTS" xml:space="preserve">
+    <value>All clients</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_ALL_SCOPES" xml:space="preserve">
+    <value>All scopes</value>
+  </data>
 </root>

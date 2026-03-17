@@ -1097,5 +1097,53 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_NAME_PLACEHOLDER", resourceCulture);
             }
         }
+
+        internal static string MANAGEACCOUNTS_SECTION_APIKEYS {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_APIKEYS", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SECTION_DESC", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_SCOPE_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SCOPE_LABEL", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_ALL_CLIENTS {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_ALL_CLIENTS", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_ALL_SCOPES {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_ALL_SCOPES", resourceCulture);
+            }
+        }
     }
 }

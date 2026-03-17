@@ -314,7 +314,14 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         var apiKeyInfo = await apiKeys.VerifyApiKeyAsync(apiKey, cancellationToken);
         if (!apiKeyInfo.HasValue)
         {
-            return BadRequest(new { error = "api_key_not_exists" });
+            return BadRequest(new { error = "invalid_grant", error_description = "api_key is invalid or does not exist" });
+        }
+
+        // Validate client restriction: if the key is restricted to a specific client, enforce it
+        if (apiKeyInfo.Value.AllowedClientId != null && apiKeyInfo.Value.AllowedClientId != request.ClientId)
+        {
+            logger.LogWarning("API key client restriction violated. Allowed: {Allowed}, Requested: {Requested}", apiKeyInfo.Value.AllowedClientId, request.ClientId);
+            return BadRequest(new { error = "invalid_grant", error_description = "api_key is not allowed for this client" });
         }
 
         var accountId = apiKeyInfo.Value.AccountId;
@@ -325,7 +332,8 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_grant", error_description = "associated account not found" });
         }
 
-        const string scope = "all";
+        // Use the scope defined on the API key; fall back to "all" if unrestricted
+        var scope = apiKeyInfo.Value.AllowedScope ?? "all";
 
         var tokenResponse = await GenerateTokenResponseAsync(accountId, rawAccount.Value, request.ClientId, scope, null, cancellationToken);
 
@@ -343,7 +351,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         string? idToken = null;
         if (scope.Split(' ').Any(p => p is "openid" or "all"))
         {
-            idToken = jwt.Issue(clientId, jwt.ConfigureClaims(rawAccount, scope, [.. claims, .. groupsClaim], null, true));
+            idToken = jwt.Issue(clientId, jwt.ConfigureClaims(rawAccount, scope, [.. claims, .. groupsClaim], nonce, true));
         }
 
         return new TokenResponse

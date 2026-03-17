@@ -6,36 +6,24 @@ namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/apikey")]
-public class ApiKeyController(IApiKeys apiKeys, IClients clients, IAccesses accesses) : AuthorizedControllerBase(accesses)
+public class ApiKeyController(IApiKeys apiKeys, IAccesses accesses) : AuthorizedControllerBase(accesses)
 {
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] CreateApiKeyRequest request, CancellationToken cancellationToken)
     {
         return await VerifiedAsync(async access =>
         {
-            var client = await clients.GetClientAsync(request.ClientId, cancellationToken);
-            if (!client.HasValue)
-            {
-                return NotFound(new { error = "client_not_found" });
-            }
-
-            var apiKey = await apiKeys.CreateApiKeyAsync(access.Id, request.ClientId, request.Name, cancellationToken);
+            var apiKey = await apiKeys.CreateApiKeyAsync(access.Id, request.AllowedClientId, request.AllowedScope, request.Name, cancellationToken);
             return Ok(new CreateApiKeyResponse { ApiKey = apiKey });
         }, null, cancellationToken);
     }
 
-    [HttpGet("{clientId}")]
-    public async ValueTask<IActionResult> GetAsync(string clientId, CancellationToken cancellationToken)
+    [HttpGet]
+    public async ValueTask<IActionResult> GetAsync(CancellationToken cancellationToken)
     {
         return await VerifiedAsync(async access =>
         {
-            var client = await clients.GetClientAsync(clientId, cancellationToken);
-            if (!client.HasValue)
-            {
-                return NotFound(new { error = "client_not_found" });
-            }
-
-            var keys = await apiKeys.GetApiKeysAsync(access.Id, clientId, cancellationToken);
+            var keys = await apiKeys.GetApiKeysAsync(access.Id, cancellationToken);
             return Ok(keys);
         }, null, cancellationToken);
     }

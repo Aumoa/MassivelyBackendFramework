@@ -522,4 +522,28 @@
   <data name="MANAGE_APPLICATION_APIKEYS_NAME_PLACEHOLDER" xml:space="preserve">
     <value>키 이름 (예: 프로덕션)</value>
   </data>
+  <data name="MANAGEACCOUNTS_SECTION_APIKEYS" xml:space="preserve">
+    <value>API 키</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_SECTION_DESC" xml:space="preserve">
+    <value>프로그래밍 방식 접근을 위한 개인 API 키를 관리합니다. 키는 안전하게 저장되며 생성 후에는 내용을 확인할 수 없습니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER" xml:space="preserve">
+    <value>허용할 클라이언트 ID (비우면 모든 클라이언트 허용)</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER" xml:space="preserve">
+    <value>허용할 스코프 (비우면 모든 스코프 허용)</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL" xml:space="preserve">
+    <value>클라이언트</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_SCOPE_LABEL" xml:space="preserve">
+    <value>스코프</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_ALL_CLIENTS" xml:space="preserve">
+    <value>모든 클라이언트</value>
+  </data>
+  <data name="MANAGEACCOUNTS_APIKEYS_ALL_SCOPES" xml:space="preserve">
+    <value>모든 스코프</value>
+  </data>
 </root>

@@ -11,7 +11,7 @@ internal class MySqlApiKeys(IOptions<MySqlOptions> options) : MySqlDbContext(opt
     private const string ApiKeyPrefix = "mbf_";
     private const int KeyPrefixLength = 8;
 
-    public async ValueTask<string> CreateApiKeyAsync(string accountId, string clientId, string name, CancellationToken cancellationToken = default)
+    public async ValueTask<string> CreateApiKeyAsync(string accountId, string? allowedClientId, string? allowedScope, string name, CancellationToken cancellationToken = default)
     {
         var randomBytes = RandomNumberGenerator.GetBytes(32);
         var keyBody = Convert.ToBase64String(randomBytes)
@@ -23,18 +23,18 @@ internal class MySqlApiKeys(IOptions<MySqlOptions> options) : MySqlDbContext(opt
         var keyHash = PasswordHasher.Hash(apiKey);
 
         using var connection = GetConnection();
-        const string QUERY = "INSERT INTO `client_api_key` (`account_id`, `client_id`, `name`, `key_prefix`, `key_hash`) VALUES (@accountId, @clientId, @name, @keyPrefix, @keyHash)";
-        var command = new CommandDefinition(QUERY, new { accountId, clientId, name, keyPrefix, keyHash }, cancellationToken: cancellationToken);
+        const string QUERY = "INSERT INTO `client_api_key` (`account_id`, `name`, `key_prefix`, `key_hash`, `allowed_client_id`, `allowed_scope`) VALUES (@accountId, @name, @keyPrefix, @keyHash, @allowedClientId, @allowedScope)";
+        var command = new CommandDefinition(QUERY, new { accountId, name, keyPrefix, keyHash, allowedClientId, allowedScope }, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);
 
         return apiKey;
     }
 
-    public async ValueTask<ApiKeyInfo[]> GetApiKeysAsync(string accountId, string clientId, CancellationToken cancellationToken = default)
+    public async ValueTask<ApiKeyInfo[]> GetApiKeysAsync(string accountId, CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
-        const string QUERY = "SELECT `id`, `account_id` AS `AccountId`, `client_id` AS `ClientId`, `name`, `created_at` AS `CreatedAt` FROM `client_api_key` WHERE `account_id` = @accountId AND `client_id` = @clientId AND `removed_at` IS NULL ORDER BY `created_at` ASC";
-        var command = new CommandDefinition(QUERY, new { accountId, clientId }, cancellationToken: cancellationToken);
+        const string QUERY = "SELECT `id`, `account_id` AS `AccountId`, `allowed_client_id` AS `AllowedClientId`, `allowed_scope` AS `AllowedScope`, `name`, `created_at` AS `CreatedAt` FROM `client_api_key` WHERE `account_id` = @accountId AND `removed_at` IS NULL ORDER BY `created_at` ASC";
+        var command = new CommandDefinition(QUERY, new { accountId }, cancellationToken: cancellationToken);
         var results = await connection.QueryAsync<ApiKeyInfo>(command);
         return [.. results];
     }
@@ -42,7 +42,7 @@ internal class MySqlApiKeys(IOptions<MySqlOptions> options) : MySqlDbContext(opt
     public async ValueTask<ApiKeyInfo?> GetApiKeyAsync(long id, CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
-        const string QUERY = "SELECT `id`, `account_id` AS `AccountId`, `client_id` AS `ClientId`, `name`, `created_at` AS `CreatedAt` FROM `client_api_key` WHERE `id` = @id AND `removed_at` IS NULL";
+        const string QUERY = "SELECT `id`, `account_id` AS `AccountId`, `allowed_client_id` AS `AllowedClientId`, `allowed_scope` AS `AllowedScope`, `name`, `created_at` AS `CreatedAt` FROM `client_api_key` WHERE `id` = @id AND `removed_at` IS NULL";
         var command = new CommandDefinition(QUERY, new { id }, cancellationToken: cancellationToken);
         var result = await connection.QuerySingleOrDefaultAsync<ApiKeyInfo>(command);
         if (result == default)
@@ -77,7 +77,7 @@ internal class MySqlApiKeys(IOptions<MySqlOptions> options) : MySqlDbContext(opt
         var keyPrefix = keyBody[..KeyPrefixLength];
 
         using var connection = GetConnection();
-        const string QUERY = "SELECT `id`, `account_id` AS `AccountId`, `client_id` AS `ClientId`, `name`, `key_hash` AS `KeyHash`, `created_at` AS `CreatedAt` FROM `client_api_key` WHERE `key_prefix` = @keyPrefix AND `removed_at` IS NULL";
+        const string QUERY = "SELECT `id`, `account_id` AS `AccountId`, `allowed_client_id` AS `AllowedClientId`, `allowed_scope` AS `AllowedScope`, `name`, `key_hash` AS `KeyHash`, `created_at` AS `CreatedAt` FROM `client_api_key` WHERE `key_prefix` = @keyPrefix AND `removed_at` IS NULL";
         var command = new CommandDefinition(QUERY, new { keyPrefix }, cancellationToken: cancellationToken);
         var results = await connection.QueryAsync<ApiKeyRecord>(command);
 
@@ -85,12 +85,12 @@ internal class MySqlApiKeys(IOptions<MySqlOptions> options) : MySqlDbContext(opt
         {
             if (PasswordHasher.Verify(apiKey, result.KeyHash))
             {
-                return new ApiKeyInfo(result.Id, result.AccountId, result.ClientId, result.Name, result.CreatedAt);
+                return new ApiKeyInfo(result.Id, result.AccountId, result.AllowedClientId, result.AllowedScope, result.Name, result.CreatedAt);
             }
         }
 
         return null;
     }
 
-    private record struct ApiKeyRecord(long Id, string AccountId, string ClientId, string Name, string KeyHash, DateTime CreatedAt);
+    private record struct ApiKeyRecord(long Id, string AccountId, string? AllowedClientId, string? AllowedScope, string Name, string KeyHash, DateTime CreatedAt);
 }

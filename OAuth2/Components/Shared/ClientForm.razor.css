@@ -358,18 +358,3 @@
 .secrets-empty-icon {
     font-size: 20px;
 }
-
-.add-api-key-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 16px;
-    background-color: #f1f3f4;
-    border-radius: 8px;
-    border: 1px dashed #bdc1c6;
-    max-width: 600px;
-}
-
-.add-api-key-inputs {
-    width: 100%;
-}
