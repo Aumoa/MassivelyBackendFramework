@@ -11,6 +11,9 @@ namespace OpenAI.Tools;
 
 internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger<StableDiffusion> logger) : IHostedService
 {
+    private const int ImageWidth = 512;
+    private const int ImageHeight = 512;
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         return Task.CompletedTask;
@@ -33,10 +36,10 @@ internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger
         public int Steps { get; set; } = 20;
 
         [JsonPropertyName("width")]
-        public int Width { get; set; } = 512;
+        public int Width { get; set; } = ImageWidth;
 
         [JsonPropertyName("height")]
-        public int Height { get; set; } = 512;
+        public int Height { get; set; } = ImageHeight;
 
         [JsonPropertyName("batch_size")]
         public int BatchSize = 1;
@@ -150,39 +153,37 @@ internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger
                 progressResponse = await resposne.Content.ReadFromJsonAsync<ProgressResponse>(cancellationToken);
                 if (progressResponse != null)
                 {
+                    int step = progressResponse.State?.SamplingStep ?? 0;
+                    int totalSteps = progressResponse.State?.SamplingSteps ?? 0;
+
+                    if (progressResponse.CurrentImage != null)
+                    {
+                        string filePath;
+                        if (imageCreated != null)
+                        {
+                            filePath = Path.Combine("StableDiffusion", "GeneratedImages", imageCreated);
+                            if (File.Exists(filePath))
+                            {
+                                File.Delete(filePath);
+                            }
+                        }
+
+                        imageCreated = $"{imageIndex++}_{fileName}";
+                        filePath = Path.Combine("StableDiffusion", "GeneratedImages", imageCreated);
+                        await SaveAsFileAsync(filePath, progressResponse.CurrentImage);
+                        skipIterations = 5;
+                    }
+
+                    string? previewUri = imageCreated != null
+                        ? $"/stable-diffusion/generated/{imageCreated}"
+                        : null;
+
                     yield = new ChunkedResponse
                     {
                         Type = ChunkedResponse.Types.ToolContent,
-                        Content = $"Generating image: {progressResponse.Progress * 100:0.00}%",
+                        Content = previewUri != null ? $"![Image]({previewUri}){{width={ImageWidth} height={ImageHeight}}}" : null,
+                        Hint = new ImageGenerationHint(progressResponse.Progress * 100, step, totalSteps),
                     };
-
-                    if (progressResponse.State != null)
-                    {
-                        if (progressResponse.CurrentImage != null)
-                        {
-                            string filePath;
-                            if (imageCreated != null)
-                            {
-                                filePath = Path.Combine("StableDiffusion", "GeneratedImages", imageCreated);
-                                if (File.Exists(filePath))
-                                {
-                                    File.Delete(filePath);
-                                }
-                            }
-
-                            imageCreated = $"{imageIndex++}_{fileName}";
-                            filePath = Path.Combine("StableDiffusion", "GeneratedImages", imageCreated);
-                            await SaveAsFileAsync(filePath, progressResponse.CurrentImage);
-                            skipIterations = 5;
-                        }
-
-                        yield.Content += $" ({progressResponse.State.SamplingStep}/{progressResponse.State.SamplingSteps})";
-                        if (imageCreated != null)
-                        {
-                            string imageUri = $"/stable-diffusion/generated/{imageCreated}";
-                            yield.Content = $"![Image]({imageUri}){{width=512 height=512}}\n\n{yield.Content}";
-                        }
-                    }
                 }
             }
             catch
@@ -209,7 +210,7 @@ internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger
             };
             if (imageCreated != null)
             {
-                yield.Content = $"![Image]({imageCreated}){{width=512 height=512}}\n\n{yield.Content}";
+                yield.Content = $"![Image]({imageCreated}){{width={ImageWidth} height={ImageHeight}}}\n\n{yield.Content}";
             }
 
             yield return yield;
@@ -244,7 +245,7 @@ internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger
             yield return new ChunkedResponse
             {
                 Type = ChunkedResponse.Types.ToolContent,
-                Content = $"![Image]({imageUri}){{width=512 height=512}}",
+                Content = $"![Image]({imageUri}){{width={ImageWidth} height={ImageHeight}}}",
             };
 
             yield return new ChunkedResponse
@@ -254,8 +255,8 @@ internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger
                 {
                     status = "success",
                     image_uri = imageUri,
-                    width = 512,
-                    height = 512
+                    width = ImageWidth,
+                    height = ImageHeight
                 })
             };
         }

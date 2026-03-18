@@ -57,6 +57,29 @@
                                     <span></span>
                                 </div>
                             }
+                            else if (msg == m_StreamingMessage && m_CurrentHint is ImageGenerationHint imgHint)
+                            {
+                                @if (!string.IsNullOrEmpty(msg.Content))
+                                {
+                                    @((MarkupString)ConvertMarkdownToHtml(msg.Content))
+                                }
+                                <div class="image-gen-progress">
+                                    <div class="image-gen-header">
+                                        <span class="material-symbols-outlined image-gen-icon">auto_awesome</span>
+                                        <span class="image-gen-title">이미지 생성 중...</span>
+                                    </div>
+                                    <div class="image-gen-bar-track">
+                                        <div class="image-gen-bar-fill" style="width: @($"{Math.Clamp(imgHint.Progress, 0, 100):F1}")%"></div>
+                                    </div>
+                                    <div class="image-gen-details">
+                                        <span>@($"{imgHint.Progress:F1}%")</span>
+                                        @if (imgHint.TotalSteps > 0)
+                                        {
+                                            <span>· @imgHint.Step / @imgHint.TotalSteps 스텝</span>
+                                        }
+                                    </div>
+                                </div>
+                            }
                             else
                             {
                                 @((MarkupString)ConvertMarkdownToHtml(msg.Content))
@@ -110,6 +133,9 @@
     private ChatMessage? m_StreamingMessage;
     private string? m_PendingUserText;
     private CancellationTokenSource? m_Cts;
+
+    // Generic hint from the currently active tool (null when no tool is running)
+    private ToolHint? m_CurrentHint;
 
     protected override void OnInitialized()
     {
@@ -214,10 +240,12 @@
                         assistantMessage.Content = messagesAppend + currentToolState;
                         break;
                     case ChunkedResponse.Types.ToolContent:
-                        currentToolState = chunk.Content;
+                        currentToolState = chunk.Content ?? string.Empty;
+                        m_CurrentHint = chunk.Hint;
                         assistantMessage.Content = messagesAppend + currentToolState;
                         break;
                     case ChunkedResponse.Types.ToolResult:
+                        m_CurrentHint = null;
                         messagesAppend += currentToolState;
                         currentToolState = string.Empty;
                         assistantMessage.Content = messagesAppend;
@@ -257,6 +285,7 @@
             m_IsStreaming = false;
             m_StreamingMessage = null;
             m_PendingUserText = null;
+            m_CurrentHint = null;
             m_Cts?.Dispose();
             m_Cts = null;
             StateHasChanged();
