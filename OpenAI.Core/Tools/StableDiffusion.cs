@@ -9,7 +9,7 @@ using OpenAI.Options;
 
 namespace OpenAI.Tools;
 
-internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger<StableDiffusion> logger) : IHostedService
+internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger<StableDiffusion> logger, HttpClient http) : IHostedService
 {
     private const int ImageWidth = 512;
     private const int ImageHeight = 512;
@@ -114,10 +114,6 @@ internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger
         string negativePrompt,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var client = new HttpClient();
-        client.BaseAddress = new Uri(options.Value.Uri);
-        client.Timeout = TimeSpan.FromMinutes(5);
-
         if (logger.IsEnabled(LogLevel.Trace))
         {
             logger.LogTrace("prompt: {prompt}", prompt);
@@ -135,7 +131,7 @@ internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger
             DesnoisingStrength = 0.7
         };
 
-        var generateTask = client.PostAsJsonAsync("/sdapi/v1/txt2img", payload, cancellationToken);
+        var generateTask = http.PostAsJsonAsync("/sdapi/v1/txt2img", payload, cancellationToken);
         string fileName = $"{Guid.NewGuid()}.png";
         string? imageCreated = null;
 
@@ -143,12 +139,12 @@ internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger
         int imageIndex = 0;
         while (!generateTask.IsCompleted)
         {
-            ProgressResponse? progressResponse = null;
+            ProgressResponse? progressResponse;
             ChunkedResponse? yield = null;
             try
             {
                 bool skipCurrentImage = --skipIterations >= 0;
-                var resposne = await client.GetAsync($"/sdapi/v1/progress?skip_current_image={skipCurrentImage.ToString().ToLower()}", cancellationToken);
+                var resposne = await http.GetAsync($"/sdapi/v1/progress?skip_current_image={skipCurrentImage.ToString().ToLower()}", cancellationToken);
                 resposne.EnsureSuccessStatusCode();
                 progressResponse = await resposne.Content.ReadFromJsonAsync<ProgressResponse>(cancellationToken);
                 if (progressResponse != null)
@@ -193,7 +189,6 @@ internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger
             if (yield != null)
             {
                 yield return yield;
-                yield = null;
             }
 
             await Task.WhenAny(Task.Delay(TimeSpan.FromSeconds(1), cancellationToken), generateTask);
