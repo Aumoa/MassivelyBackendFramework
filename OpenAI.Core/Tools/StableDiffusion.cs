@@ -4,12 +4,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using OpenAI.Options;
 
 namespace OpenAI.Tools;
 
-internal class StableDiffusion(IOptions<StableDiffusionOptions> options, ILogger<StableDiffusion> logger, HttpClient http) : IHostedService
+internal class StableDiffusion(ILogger<StableDiffusion> logger, HttpClient http) : IHostedService
 {
     private const int ImageWidth = 512;
     private const int ImageHeight = 512;
