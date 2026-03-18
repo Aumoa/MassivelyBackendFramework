@@ -166,7 +166,7 @@ internal class JwtAuthenticationStateProvider(
 
             using var content = new FormUrlEncodedContent(formData);
             using var response = await http.PostAsync(options.Value.Uri + "/api/v1/token", content, cancellationToken);
-            if (response.IsSuccessStatusCode)
+            if (response.IsSuccessStatusCode == false)
             {
                 if (logger.IsEnabled(LogLevel.Information))
                 {
