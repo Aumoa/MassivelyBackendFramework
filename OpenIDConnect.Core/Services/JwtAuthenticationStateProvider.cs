@@ -1,4 +1,5 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
@@ -165,7 +166,27 @@ internal class JwtAuthenticationStateProvider(
 
             using var content = new FormUrlEncodedContent(formData);
             using var response = await http.PostAsync(options.Value.Uri + "/api/v1/token", content, cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (response.IsSuccessStatusCode)
+            {
+                if (logger.IsEnabled(LogLevel.Information))
+                {
+                    logger.LogInformation("Failed to exchange authorization code for tokens. Status code: {StatusCode}", response.StatusCode);
+                    if (response.StatusCode == HttpStatusCode.BadRequest)
+                    {
+                        try
+                        {
+                            var s = await response.Content.ReadAsStringAsync(cancellationToken);
+                            logger.LogInformation("Token endpoint response: {Response}", s);
+                        }
+                        catch
+                        {
+                        }
+                    }
+                }
+
+                m_LastSuccessfullyCode = null;
+                return;
+            }
 
             var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken)
                 ?? throw new InvalidOperationException("Failed to parse token response");
