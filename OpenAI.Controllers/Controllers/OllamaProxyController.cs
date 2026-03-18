@@ -1,21 +1,21 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
 namespace OpenAI.Controllers;
 
 [ApiController]
+[Route("api/v1/ollama")]
 [Authorize]
 public class OllamaProxyController(IOptions<OllamaOptions> ollamaOptions, IHttpClientFactory httpClientFactory) : ControllerBase
 {
-    [HttpPost("/api/chat")]
+    [HttpPost("chat")]
     public async Task PostChatAsync(CancellationToken cancellationToken)
     {
         await ProxyToOllamaAsync("/api/chat", cancellationToken);
     }
 
-    [HttpPost("/api/generate")]
+    [HttpPost("generate")]
     public async Task PostGenerateAsync(CancellationToken cancellationToken)
     {
         await ProxyToOllamaAsync("/api/generate", cancellationToken);

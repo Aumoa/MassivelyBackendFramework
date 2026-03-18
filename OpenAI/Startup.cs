@@ -6,10 +6,12 @@ using OpenAI.Extensions;
 using OpenAI.Options;
 using OpenAI.Services;
 using OpenAI.SQL.Migration;
+using OpenIDConnect;
 using OpenIDConnect.Extensions;
 using SQLMigration;
 
 var builder = WebApplication.CreateBuilder(args);
+WebApplication? app = null;
 
 // Add services to the container.
 builder.Services.AddControllers()
@@ -47,10 +49,44 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenIDConnect(builder.Configuration);
 
 builder.Services.AddAuthentication("Bearer")
-    .AddJwtBearer("Bearer", options => options.Audience = "openai");
+    .AddJwtBearer("Bearer", options =>
+    {
+        var oidcOptions = builder.Configuration.GetRequiredSection("OIDC").Get<OIDCOptions>()
+            ?? throw new InvalidOperationException("OIDC section is not properly configured.");
+        options.Audience = oidcOptions.ClientId;
+        options.Authority = oidcOptions.Uri;
+        options.RequireHttpsMetadata = true;
+
+        options.Events = new()
+        {
+            OnMessageReceived = ctx =>
+            {
+                if (ctx.Token is null && ctx.Request.Headers.TryGetValue("Authorization", out var authHeader))
+                {
+                    string? idToken = authHeader;
+                    if (!string.IsNullOrEmpty(idToken) && idToken.StartsWith("Bearer "))
+                    {
+                        idToken = idToken["Bearer".Length..].Trim();
+                        ctx.Token = idToken;
+                    }
+                }
+
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = ctx =>
+            {
+                var l = app?.Logger;
+                if (l?.IsEnabled(LogLevel.Information) == true)
+                {
+                    l.LogInformation("Authentication failed: {Message}", ctx.Exception.Message);
+                }
+                return Task.CompletedTask;
+            }
+        };
+    });
 builder.Services.AddAuthorization();
 
-var app = builder.Build();
+app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

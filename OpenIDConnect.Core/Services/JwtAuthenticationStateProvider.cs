@@ -35,6 +35,14 @@ internal class JwtAuthenticationStateProvider(
         }
 
         var jwtToken = httpContext.Request.Cookies["id_token"];
+        if (string.IsNullOrEmpty(jwtToken))
+        {
+            var authHeader = httpContext.Request.Headers.Authorization.ToString();
+            if (authHeader?.StartsWith("Bearer") == true)
+            {
+                jwtToken = authHeader["Bearer".Length..].Trim();
+            }
+        }
 
         // If id_token is missing but refresh_token exists, attempt refresh
         if (string.IsNullOrWhiteSpace(jwtToken))

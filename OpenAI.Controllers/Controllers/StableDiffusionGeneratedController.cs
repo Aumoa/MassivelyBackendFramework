@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
-namespace OpenAI.Controllers.Controllers;
+namespace OpenAI.Controllers;
 
 [ApiController]
 [Route("stable-diffusion/generated")]
+[Authorize]
 public class StableDiffusionGeneratedController : ControllerBase
 {
     [HttpGet("{imageName}")]
