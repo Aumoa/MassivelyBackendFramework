@@ -118,6 +118,17 @@ internal class MySqlAccounts(IOptions<MySqlOptions> options) : MySqlDbContext(op
         };
     }
 
+    public async ValueTask<string?> GetIdFromSubAsync(string sub, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY1 = "SELECT `id` FROM `account` WHERE `sub` = @sub";
+
+        var command = new CommandDefinition(QUERY1, new { sub }, cancellationToken: cancellationToken);
+        var id = await connection.QuerySingleOrDefaultAsync<string?>(command);
+        return id;
+    }
+
     public async ValueTask<string?> ResolveSubAsync(string identifier, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(identifier);

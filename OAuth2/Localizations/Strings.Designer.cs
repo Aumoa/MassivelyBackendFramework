@@ -1013,5 +1013,137 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_CLOSE", resourceCulture);
             }
         }
+        
+        internal static string MANAGE_APPLICATION_APIKEYS_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_SECTION", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_APIKEYS_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_SECTION_DESC", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_APIKEYS_NEW_BUTTON {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_NEW_BUTTON", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_APIKEYS_EMPTY {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_EMPTY", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_APIKEYS_CREATED_AT {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_CREATED_AT", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_APIKEYS_REMOVE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_REMOVE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_APIKEYS_REMOVE_CONFIRM {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_REMOVE_CONFIRM", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_TITLE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_WARNING {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_WARNING", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_KEY_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_KEY_LABEL", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_COPY {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_COPY", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_COPIED {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_COPIED", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_CLOSE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_CLOSE", resourceCulture);
+            }
+        }
+        
+        internal static string MANAGE_APPLICATION_APIKEYS_NAME_PLACEHOLDER {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_NAME_PLACEHOLDER", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_SECTION_APIKEYS {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_APIKEYS", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SECTION_DESC", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_SCOPE_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SCOPE_LABEL", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_ALL_CLIENTS {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_ALL_CLIENTS", resourceCulture);
+            }
+        }
+
+        internal static string MANAGEACCOUNTS_APIKEYS_ALL_SCOPES {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_ALL_SCOPES", resourceCulture);
+            }
+        }
     }
 }

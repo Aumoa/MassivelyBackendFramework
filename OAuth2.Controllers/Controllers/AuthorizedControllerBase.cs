@@ -25,6 +25,7 @@ public class AuthorizedControllerBase(IAccesses accesses) : ControllerBase
         }
 
         var access = await accesses.VerifyAsync(token, cancellationToken);
+
         if (access.HasValue == false)
         {
             return Unauthorized("access_token is expired.");
