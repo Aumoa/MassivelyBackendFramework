@@ -348,3 +348,79 @@
         opacity: 1;
     }
 }
+
+/* Image generation progress */
+.image-gen-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 0;
+    min-width: 220px;
+}
+
+.image-gen-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent);
+}
+
+.image-gen-icon {
+    font-size: 18px;
+    animation: image-gen-pulse 1.5s ease-in-out infinite;
+}
+
+.image-gen-title {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.image-gen-bar-track {
+    height: 6px;
+    background: var(--border-color);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.image-gen-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.6s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.image-gen-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -60%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    animation: image-gen-shimmer 1.5s ease-in-out infinite;
+}
+
+.image-gen-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
+@keyframes image-gen-pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.55;
+        transform: scale(0.88);
+    }
+}
+
+@keyframes image-gen-shimmer {
+    0% { left: -60%; }
+    100% { left: 110%; }
+}

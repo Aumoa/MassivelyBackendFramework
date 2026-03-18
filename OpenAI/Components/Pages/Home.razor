@@ -7,6 +7,8 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @implements IDisposable
 @using Markdig
+@using System.Globalization
+@using System.Text.RegularExpressions
 
 <PageTitle>@Strings.CHAT_PAGE_TITLE</PageTitle>
 
@@ -55,6 +57,29 @@
                                     <span></span>
                                     <span></span>
                                     <span></span>
+                                </div>
+                            }
+                            else if (msg == m_StreamingMessage && m_IsGeneratingImage)
+                            {
+                                @if (!string.IsNullOrEmpty(m_ImagePriorContent))
+                                {
+                                    @((MarkupString)ConvertMarkdownToHtml(m_ImagePriorContent))
+                                }
+                                <div class="image-gen-progress">
+                                    <div class="image-gen-header">
+                                        <span class="material-symbols-outlined image-gen-icon">auto_awesome</span>
+                                        <span class="image-gen-title">이미지 생성 중...</span>
+                                    </div>
+                                    <div class="image-gen-bar-track">
+                                        <div class="image-gen-bar-fill" style="width: @(m_ImageProgress.ToString("F1", CultureInfo.InvariantCulture))%"></div>
+                                    </div>
+                                    <div class="image-gen-details">
+                                        <span>@($"{m_ImageProgress:F1}%")</span>
+                                        @if (m_ImageTotalSteps > 0)
+                                        {
+                                            <span>· @m_ImageStep / @m_ImageTotalSteps 스텝</span>
+                                        }
+                                    </div>
                                 </div>
                             }
                             else
@@ -110,6 +135,16 @@
     private ChatMessage? m_StreamingMessage;
     private string? m_PendingUserText;
     private CancellationTokenSource? m_Cts;
+
+    // Image generation progress state
+    private bool m_IsGeneratingImage;
+    private double m_ImageProgress;
+    private int m_ImageStep;
+    private int m_ImageTotalSteps;
+    private string m_ImagePriorContent = string.Empty;
+
+    private static readonly Regex s_GeneratingImageRegex =
+        new(@"Generating image: (\d+(?:\.\d+)?)%(?:\s*\((\d+)/(\d+)\))?", RegexOptions.Compiled);
 
     protected override void OnInitialized()
     {
@@ -216,8 +251,10 @@
                     case ChunkedResponse.Types.ToolContent:
                         currentToolState = chunk.Content;
                         assistantMessage.Content = messagesAppend + currentToolState;
+                        UpdateImageGenerationState(currentToolState, messagesAppend);
                         break;
                     case ChunkedResponse.Types.ToolResult:
+                        m_IsGeneratingImage = false;
                         messagesAppend += currentToolState;
                         currentToolState = string.Empty;
                         assistantMessage.Content = messagesAppend;
@@ -257,6 +294,8 @@
             m_IsStreaming = false;
             m_StreamingMessage = null;
             m_PendingUserText = null;
+            m_IsGeneratingImage = false;
+            m_ImagePriorContent = string.Empty;
             m_Cts?.Dispose();
             m_Cts = null;
             StateHasChanged();
@@ -325,5 +364,29 @@
         if (string.IsNullOrEmpty(markdown))
             return string.Empty;
         return Markdown.ToHtml(markdown, s_MarkdownPipeline);
+    }
+
+    private void UpdateImageGenerationState(string? toolContent, string priorText)
+    {
+        if (toolContent is null)
+        {
+            m_IsGeneratingImage = false;
+            return;
+        }
+
+        var match = s_GeneratingImageRegex.Match(toolContent);
+        if (!match.Success)
+        {
+            m_IsGeneratingImage = false;
+            return;
+        }
+
+        m_IsGeneratingImage = true;
+        m_ImageProgress = double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var pct) ? pct : 0;
+        m_ImageStep = match.Groups[2].Success && int.TryParse(match.Groups[2].Value, out var step) ? step : 0;
+        m_ImageTotalSteps = match.Groups[3].Success && int.TryParse(match.Groups[3].Value, out var total) ? total : 0;
+        m_ImagePriorContent = match.Index <= toolContent.Length
+            ? (priorText + toolContent[..match.Index]).TrimEnd()
+            : priorText.TrimEnd();
     }
 }
