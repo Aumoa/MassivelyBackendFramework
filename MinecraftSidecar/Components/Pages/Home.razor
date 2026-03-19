@@ -4,7 +4,7 @@
 @inject IConfiguration Configuration
 @implements IDisposable
 
-<PageTitle>@Strings.APP_TITLE - Dashboard</PageTitle>
+<PageTitle>@Strings.APP_TITLE - @Strings.DASHBOARD_TITLE</PageTitle>
 
 <div class="container-fluid mt-4">
     <div class="row">
@@ -13,14 +13,14 @@
                 <div>
                     <h1>
                         <span class="material-symbols-outlined" style="vertical-align: middle;">dashboard</span>
-                        Dashboard
+                        @Strings.DASHBOARD_TITLE
                     </h1>
-                    <p class="lead">Minecraft Server Management Dashboard</p>
+                    <p class="lead">@Strings.DASHBOARD_SUBTITLE</p>
                 </div>
                 <div>
                     <button class="btn btn-outline-primary" @onclick="RefreshStatus">
                         <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">refresh</span>
-                        Refresh
+                        @Strings.BUTTON_REFRESH
                     </button>
                 </div>
             </div>
@@ -33,17 +33,17 @@
                 <div class="card-body">
                     <h5 class="card-title">
                         <span class="material-symbols-outlined">dns</span>
-                        Server Status
+                        @Strings.DASHBOARD_CARD_SERVER_STATUS
                     </h5>
                     <p class="card-text">
                         @if (isChecking)
                         {
-                            <span class="badge bg-secondary">Checking...</span>
+                            <span class="badge bg-secondary">@Strings.DASHBOARD_STATUS_CHECKING</span>
                         }
                         else
                         {
                             <span class="badge @(isServerRunning ? "bg-success" : "bg-danger")">
-                                @(isServerRunning ? "Running" : "Stopped")
+                                @(isServerRunning ? Strings.DASHBOARD_STATUS_RUNNING : Strings.DASHBOARD_STATUS_STOPPED)
                             </span>
                         }
                     </p>
@@ -59,7 +59,7 @@
                 <div class="card-body">
                     <h5 class="card-title">
                         <span class="material-symbols-outlined">group</span>
-                        Players Online
+                        @Strings.DASHBOARD_CARD_PLAYERS_ONLINE
                     </h5>
                     <p class="card-text">@playersOnline / @maxPlayers</p>
                 </div>
@@ -70,7 +70,7 @@
                 <div class="card-body">
                     <h5 class="card-title">
                         <span class="material-symbols-outlined">memory</span>
-                        Server Performance
+                        @Strings.DASHBOARD_CARD_SERVER_PERFORMANCE
                     </h5>
                     <p class="card-text">
                         @if (serverTps > 0)
@@ -97,7 +97,7 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    <h5>Performance History</h5>
+                    <h5>@Strings.DASHBOARD_CARD_PERFORMANCE_HISTORY</h5>
                 </div>
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center">
@@ -107,7 +107,7 @@
                         }
                     </div>
                     <div class="text-center mt-2">
-                        <small class="text-muted">Last 20 samples (Green: Good, Yellow: Fair, Red: Poor)</small>
+                        <small class="text-muted">@Strings.DASHBOARD_PERFORMANCE_CAPTION</small>
                     </div>
                 </div>
             </div>
@@ -132,7 +132,7 @@
     {
         await CheckServerStatus();
 
-        // 5ÃÊ¸¶´Ù ¼­¹ö »óÅÂ È®ÀÎ
+        // 5ï¿½Ê¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
         _timer = new System.Threading.Timer(async _ =>
         {
             await InvokeAsync(async () =>
@@ -155,12 +155,12 @@
 
         try
         {
-            // RCON ¼³Á¤ °¡Á®¿À±â
+            // RCON ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             var rconSettings = Configuration.GetSection("RCON");
             var host = rconSettings.GetValue<string>("Host") ?? "127.0.0.1";
             var port = rconSettings.GetValue<int>("Port");
 
-            // ÀÌ¹Ì ¿¬°áµÇ¾î ÀÖÁö ¾Ê´Ù¸é ¿¬°á ½Ãµµ
+            // ï¿½Ì¹ï¿½ ï¿½ï¿½ï¿½ï¿½Ç¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê´Ù¸ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ãµï¿½
             if (!RconClient.IsConnected)
             {
                 statusMessage = $"Unable to connect to {host}:{port}";
@@ -170,14 +170,14 @@
                 return;
             }
 
-            // ¼­¹ö Á¤º¸ Á¶È¸
+            // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¸
             try
             {
-                // list ¸í·ÉÀ¸·Î ÇÃ·¹ÀÌ¾î ¼ö È®ÀÎ
+                // list ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ È®ï¿½ï¿½
                 var listResponse = await RconClient.SendCommandAsync("list");
                 ParsePlayerList(listResponse);
                 
-                // TPS ÃøÁ¤ ½Ãµµ
+                // TPS ï¿½ï¿½ï¿½ï¿½ ï¿½Ãµï¿½
                 await MeasureTps();
                 
                 isServerRunning = true;
@@ -185,7 +185,7 @@
             }
             catch (Exception ex)
             {
-                // ¸í·É ½ÇÆÐ ½Ã ¿¬°á ÇØÁ¦ ¹× Àç½Ãµµ
+                // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Ãµï¿½
                 isServerRunning = false;
                 statusMessage = $"Command failed: {ex.Message}";
                 playersOnline = 0;
@@ -210,7 +210,7 @@
     {
         try
         {
-            // ¹æ¹ý 1: /tps ¸í·É¾î ½Ãµµ (Spigot/Paper)
+            // ï¿½ï¿½ï¿½ 1: /tps ï¿½ï¿½ï¿½É¾ï¿½ ï¿½Ãµï¿½ (Spigot/Paper)
             try
             {
                 var tpsResponse = await RconClient.SendCommandAsync("tps");
@@ -223,7 +223,7 @@
             }
             catch { }
 
-            // ¹æ¹ý 2: °ÔÀÓ ½Ã°£ ±â¹Ý °è»ê (¹Ù´Ò¶ó ¼­¹ö)
+            // ï¿½ï¿½ï¿½ 2: ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ (ï¿½Ù´Ò¶ï¿½ ï¿½ï¿½ï¿½ï¿½)
             var currentTime = DateTime.UtcNow;
             var gameTimeResponse = await RconClient.SendCommandAsync("time query gametime");
             
@@ -256,7 +256,7 @@
             }
             else
             {
-                // TPS¸¦ ÃøÁ¤ÇÒ ¼ö ¾ø´Â °æ¿ì - ¼­¹ö ÀÀ´äÀÌ ÀÖÀ¸¹Ç·Î 20.0À¸·Î °¡Á¤
+                // TPSï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ - ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ 20.0ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
                 serverTps = 20.0;
                 tpsMessage = "Estimated (no TPS data available)";
             }
@@ -270,7 +270,7 @@
 
     private void ParseTpsCommand(string response)
     {
-        // "TPS from last 1m, 5m, 15m: 20.0, 20.0, 20.0" Çü½Ä ÆÄ½Ì
+        // "TPS from last 1m, 5m, 15m: 20.0, 20.0, 20.0" ï¿½ï¿½ï¿½ï¿½ ï¿½Ä½ï¿½
         var parts = response.Split(':');
         if (parts.Length >= 2)
         {
@@ -289,7 +289,7 @@
 
     private long ParseGameTime(string response)
     {
-        // "The time is 12345" Çü½Ä¿¡¼­ ¼ýÀÚ ÃßÃâ
+        // "The time is 12345" ï¿½ï¿½ï¿½Ä¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         var parts = response.Split(' ');
         for (int i = 0; i < parts.Length; i++)
         {
@@ -303,7 +303,7 @@
 
     private void ParsePlayerList(string response)
     {
-        // "There are 0 of a max of 20 players online:" Çü½Ä ÆÄ½Ì
+        // "There are 0 of a max of 20 players online:" ï¿½ï¿½ï¿½ï¿½ ï¿½Ä½ï¿½
         if (response.Contains("players online"))
         {
             var parts = response.Split(' ');
