@@ -1,0 +1,48 @@
+﻿@inherits LayoutComponentBase
+
+<AuthorizeView>
+    <Authorized>
+        <div class="page">
+            <div class="sidebar">
+                <NavMenu Title="@Strings.APP_TITLE" Items="Items" />
+            </div>
+
+            <main>
+                <div class="top-row px-4">
+                    <div class="ms-auto d-flex align-items-center">
+                        <ProfileCard />
+                    </div>
+                </div>
+
+                <article class="content px-4">
+                    <AuthorizeView Roles="admin" Context="Admin">
+                        <Authorized>
+                            @Body
+                        </Authorized>
+                        <NotAuthorized>
+                            <ErrorView ErrorTextBody="@Strings.ERROR_PERMISSION_DENIED" ErrorText="@string.Format(Strings.ERROR_PERMISSION_DENIED_DESCRIPTION, "Administrator")" />
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </article>
+            </main>
+        </div>
+
+        <div id="blazor-error-ui">
+            An unhandled error has occurred.
+            <a href="" class="reload">Reload</a>
+            <a class="dismiss">🗙</a>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <RedirectToLogin />
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private static readonly NavMenu.NavMenuItem[] Items =
+    [
+        new(Strings.NAVMENU_LABEL_DASHBOARD, "dashboard", "/", true),
+        new(Strings.NAVMENU_LABEL_SERVER_CONSOLE, "terminal", "/console", true),
+        new(Strings.NAVMENU_LABEL_PLAYERS, "group", "/players", true)
+    ];
+}

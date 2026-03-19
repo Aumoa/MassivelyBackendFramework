@@ -1,0 +1,19 @@
+@using Microsoft.Extensions.Options
+@using MinecraftSidecar.Options
+@using OpenIDConnect
+@inject NavigationManager Nav
+@inject IAuthenticationStateProvider Auth
+@layout NotAuthorizedLayout
+
+@code {
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Auth.NavigateToLogin(Nav, "auth/redirect", "all");
+            return Task.CompletedTask;
+        }
+
+        return base.OnAfterRenderAsync(firstRender);
+    }
+}

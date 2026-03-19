@@ -1,0 +1,185 @@
+@page "/players"
+@rendermode InteractiveServer
+@inject RCONClient RconClient
+@inject IConfiguration Configuration
+@implements IDisposable
+
+<PageTitle>@Strings.APP_TITLE - Players</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>
+                    <span class="material-symbols-outlined" style="vertical-align: middle;">group</span>
+                    Online Players
+                </h1>
+                <div>
+                    <button class="btn btn-outline-primary" @onclick="RefreshPlayers">
+                        <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">refresh</span>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    @if (isLoading)
+                    {
+                        <div class="text-center p-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading players...</p>
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-warning" role="alert">
+                            @errorMessage
+                        </div>
+                    }
+                    else
+                    {
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Player Name</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (players.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="2" class="text-center text-muted">No players online</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var player in players)
+                                    {
+                                        <tr>
+                                            <td>@player</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-warning" @onclick="() => KickPlayer(player)">
+                                                    <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">logout</span>
+                                                    Kick
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<string> players = new();
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+    private System.Threading.Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPlayers();
+
+        // 5초마다 플레이어 목록 갱신
+        _timer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadPlayers();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    private async Task RefreshPlayers()
+    {
+        await LoadPlayers();
+    }
+
+    private async Task LoadPlayers()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            // RCON 연결 확인
+            if (!RconClient.IsConnected)
+            {
+                return;
+            }
+
+            // list 명령으로 플레이어 목록 가져오기
+            var response = await RconClient.SendCommandAsync("list");
+            ParsePlayerList(response);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading players: {ex.Message}";
+            players.Clear();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ParsePlayerList(string response)
+    {
+        players.Clear();
+        
+        // "There are 2 of a max of 20 players online: Player1, Player2" 형식 파싱
+        if (response.Contains("players online:"))
+        {
+            var colonIndex = response.IndexOf(':');
+            if (colonIndex >= 0 && colonIndex < response.Length - 1)
+            {
+                var playerList = response.Substring(colonIndex + 1).Trim();
+                if (!string.IsNullOrWhiteSpace(playerList))
+                {
+                    var playerNames = playerList.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                    players.AddRange(playerNames.Select(p => p.Trim()));
+                }
+            }
+        }
+    }
+
+    private async Task KickPlayer(string playerName)
+    {
+        if (!RconClient.IsConnected)
+        {
+            errorMessage = "Not connected to RCON server";
+            return;
+        }
+
+        try
+        {
+            await RconClient.SendCommandAsync($"kick {playerName}");
+            await LoadPlayers(); // 목록 새로고침
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to kick player: {ex.Message}";
+        }
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -231,5 +232,13 @@ internal class JwtAuthenticationStateProvider(
     {
         m_CurrentUser = null;
         NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+    }
+
+    public void NavigateToLogin(NavigationManager navigation, string redirectRelativeUri, string scope)
+    {
+        var clientId = Uri.EscapeDataString(options.Value.ClientId);
+        var redirectUri = Uri.EscapeDataString(navigation.BaseUri + redirectRelativeUri);
+        scope = Uri.EscapeDataString(scope);
+        navigation.NavigateTo($"{options.Value.Uri}/authorize?client_id={clientId}&redirect_uri={redirectUri}&response_type=code&scope={scope}");
     }
 }

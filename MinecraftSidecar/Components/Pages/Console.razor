@@ -1,0 +1,140 @@
+@page "/console"
+@rendermode InteractiveServer
+@inject RCONClient RconClient
+@inject IConfiguration Configuration
+@implements IDisposable
+
+<PageTitle>@Strings.APP_TITLE - Console</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>
+                    <span class="material-symbols-outlined" style="vertical-align: middle;">terminal</span>
+                    Server Console
+                </h1>
+                <div>
+                    @if (RconClient.IsConnected)
+                    {
+                        <span class="badge bg-success">Connected</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">Disconnected</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="console-output" style="background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 4px; min-height: 400px; max-height: 600px; font-family: 'Consolas', monospace; overflow-y: auto;">
+                        @foreach (var log in consoleOutput)
+                        {
+                            <p style="margin: 0; padding: 2px 0;">@log</p>
+                        }
+                    </div>
+                    <div class="console-input mt-3">
+                        <div class="input-group">
+                            <span class="input-group-text">></span>
+                            <input type="text" 
+                                   class="form-control" 
+                                   placeholder="Enter command..." 
+                                   @bind="commandInput" 
+                                   @bind:event="oninput" 
+                                   @onkeypress="OnKeyPress"
+                                   disabled="@(!RconClient.IsConnected)" />
+                            <button class="btn btn-primary" @onclick="SendCommand" disabled="@(!RconClient.IsConnected)">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<string> consoleOutput = new()
+    {
+        "[INFO] Console initialized",
+        "[INFO] Connect to RCON server to send commands"
+    };
+
+    private string commandInput = string.Empty;
+
+    protected override Task OnInitializedAsync()
+    {
+        RconClient.Connected += OnConnected;
+        RconClient.Disconnected += OnDisconnected;
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        RconClient.Connected -= OnConnected;
+        RconClient.Disconnected -= OnDisconnected;
+        GC.SuppressFinalize(this);
+    }
+
+    private void OnConnected()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnDisconnected()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SendCommand()
+    {
+        if (!string.IsNullOrWhiteSpace(commandInput) && RconClient.IsConnected)
+        {
+            consoleOutput.Add($"> {commandInput}");
+            
+            try
+            {
+                var response = await RconClient.SendCommandAsync(commandInput);
+                
+                if (!string.IsNullOrWhiteSpace(response))
+                {
+                    // 여러 줄 응답 처리
+                    var lines = response.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines)
+                    {
+                        consoleOutput.Add($"  {line.Trim()}");
+                    }
+                }
+                else
+                {
+                    consoleOutput.Add("  [Command executed successfully]");
+                }
+            }
+            catch (Exception ex)
+            {
+                consoleOutput.Add($"[ERROR] Command failed: {ex.Message}");
+                
+                // 연결이 끊어진 경우
+                if (!RconClient.IsConnected)
+                {
+                    consoleOutput.Add("[ERROR] Connection lost. Please reconnect.");
+                }
+            }
+            
+            commandInput = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendCommand();
+        }
+    }
+}

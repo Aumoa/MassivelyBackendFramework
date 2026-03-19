@@ -13,7 +13,7 @@
         <div class="nav-item px-3">
             @foreach (var item in Items)
             {
-                <NavLink class="nav-link" href="@item.Href" Match="NavLinkMatch.Prefix">
+                <NavLink class="nav-link" href="@item.Href" Match="@(item.Exactly ? NavLinkMatch.All : NavLinkMatch.Prefix)">
                     <span class="material-symbols-outlined" aria-hidden="true">@item.Icon</span>
                     <span style="margin-left: 4px;">@item.Text</span>
                 </NavLink>
@@ -23,7 +23,7 @@
 </div>
 
 @code {
-    public record struct NavMenuItem(string Text, string Icon, string Href);
+    public record struct NavMenuItem(string Text, string Icon, string Href, bool Exactly);
 
     [Parameter]
     public string Title { get; set; } = string.Empty;

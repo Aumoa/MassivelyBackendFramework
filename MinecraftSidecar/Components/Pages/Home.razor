@@ -1,0 +1,341 @@
+@page "/"
+@rendermode InteractiveServer
+@inject RCONClient RconClient
+@inject IConfiguration Configuration
+@implements IDisposable
+
+<PageTitle>@Strings.APP_TITLE - Dashboard</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1>
+                        <span class="material-symbols-outlined" style="vertical-align: middle;">dashboard</span>
+                        Dashboard
+                    </h1>
+                    <p class="lead">Minecraft Server Management Dashboard</p>
+                </div>
+                <div>
+                    <button class="btn btn-outline-primary" @onclick="RefreshStatus">
+                        <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">refresh</span>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <span class="material-symbols-outlined">dns</span>
+                        Server Status
+                    </h5>
+                    <p class="card-text">
+                        @if (isChecking)
+                        {
+                            <span class="badge bg-secondary">Checking...</span>
+                        }
+                        else
+                        {
+                            <span class="badge @(isServerRunning ? "bg-success" : "bg-danger")">
+                                @(isServerRunning ? "Running" : "Stopped")
+                            </span>
+                        }
+                    </p>
+                    @if (!string.IsNullOrEmpty(statusMessage))
+                    {
+                        <small class="text-muted">@statusMessage</small>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <span class="material-symbols-outlined">group</span>
+                        Players Online
+                    </h5>
+                    <p class="card-text">@playersOnline / @maxPlayers</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <span class="material-symbols-outlined">memory</span>
+                        Server Performance
+                    </h5>
+                    <p class="card-text">
+                        @if (serverTps > 0)
+                        {
+                            <span class="badge @GetTpsBadgeClass()">
+                                TPS: @serverTps.ToString("F1")
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">N/A</span>
+                        }
+                    </p>
+                    @if (!string.IsNullOrEmpty(tpsMessage))
+                    {
+                        <small class="text-muted">@tpsMessage</small>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Performance History</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        @foreach (var tpsEntry in tpsHistory.TakeLast(20))
+                        {
+                            <div style="width: 4%; height: 100px; background: linear-gradient(to top, @GetTpsColor(tpsEntry.Tps) 0%, @GetTpsColor(tpsEntry.Tps) @((tpsEntry.Tps / 20.0 * 100))%, transparent @((tpsEntry.Tps / 20.0 * 100))%); border-radius: 2px;" title="@tpsEntry.Timestamp.ToString("HH:mm:ss") - TPS: @tpsEntry.Tps.ToString("F1")"></div>
+                        }
+                    </div>
+                    <div class="text-center mt-2">
+                        <small class="text-muted">Last 20 samples (Green: Good, Yellow: Fair, Red: Poor)</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isServerRunning = false;
+    private bool isChecking = false;
+    private int playersOnline = 0;
+    private int maxPlayers = 20;
+    private double serverTps = 0.0;
+    private string statusMessage = string.Empty;
+    private string tpsMessage = string.Empty;
+    private System.Threading.Timer? _timer;
+    private List<TpsEntry> tpsHistory = new();
+    private DateTime? lastGameTimeCheck = null;
+    private long? lastGameTime = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckServerStatus();
+
+        // 5초마다 서버 상태 확인
+        _timer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await CheckServerStatus();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    private async Task RefreshStatus()
+    {
+        await CheckServerStatus();
+    }
+
+    private async Task CheckServerStatus()
+    {
+        isChecking = true;
+        StateHasChanged();
+
+        try
+        {
+            // RCON 설정 가져오기
+            var rconSettings = Configuration.GetSection("RCON");
+            var host = rconSettings.GetValue<string>("Host") ?? "127.0.0.1";
+            var port = rconSettings.GetValue<int>("Port");
+
+            // 이미 연결되어 있지 않다면 연결 시도
+            if (!RconClient.IsConnected)
+            {
+                statusMessage = $"Unable to connect to {host}:{port}";
+                playersOnline = 0;
+                serverTps = 0.0;
+                tpsMessage = "Server offline";
+                return;
+            }
+
+            // 서버 정보 조회
+            try
+            {
+                // list 명령으로 플레이어 수 확인
+                var listResponse = await RconClient.SendCommandAsync("list");
+                ParsePlayerList(listResponse);
+                
+                // TPS 측정 시도
+                await MeasureTps();
+                
+                isServerRunning = true;
+                statusMessage = $"Connected to {host}:{port}";
+            }
+            catch (Exception ex)
+            {
+                // 명령 실패 시 연결 해제 및 재시도
+                isServerRunning = false;
+                statusMessage = $"Command failed: {ex.Message}";
+                playersOnline = 0;
+                serverTps = 0.0;
+            }
+        }
+        catch (Exception ex)
+        {
+            isServerRunning = false;
+            statusMessage = $"Error: {ex.Message}";
+            playersOnline = 0;
+            serverTps = 0.0;
+        }
+        finally
+        {
+            isChecking = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task MeasureTps()
+    {
+        try
+        {
+            // 방법 1: /tps 명령어 시도 (Spigot/Paper)
+            try
+            {
+                var tpsResponse = await RconClient.SendCommandAsync("tps");
+                if (!tpsResponse.Contains("Unknown command") && !tpsResponse.Contains("Unknown or incomplete command"))
+                {
+                    ParseTpsCommand(tpsResponse);
+                    tpsMessage = "Using /tps command";
+                    return;
+                }
+            }
+            catch { }
+
+            // 방법 2: 게임 시간 기반 계산 (바닐라 서버)
+            var currentTime = DateTime.UtcNow;
+            var gameTimeResponse = await RconClient.SendCommandAsync("time query gametime");
+            
+            if (gameTimeResponse.Contains("The time is"))
+            {
+                var gameTime = ParseGameTime(gameTimeResponse);
+                
+                if (lastGameTime.HasValue && lastGameTimeCheck.HasValue)
+                {
+                    var timeDiff = (currentTime - lastGameTimeCheck.Value).TotalSeconds;
+                    var tickDiff = gameTime - lastGameTime.Value;
+                    
+                    if (timeDiff > 0)
+                    {
+                        var calculatedTps = tickDiff / timeDiff;
+                        serverTps = Math.Min(20.0, Math.Max(0, calculatedTps));
+                        
+                        tpsHistory.Add(new TpsEntry(currentTime, serverTps));
+                        if (tpsHistory.Count > 50)
+                        {
+                            tpsHistory.RemoveAt(0);
+                        }
+                        
+                        tpsMessage = "Calculated from game time";
+                    }
+                }
+                
+                lastGameTime = gameTime;
+                lastGameTimeCheck = currentTime;
+            }
+            else
+            {
+                // TPS를 측정할 수 없는 경우 - 서버 응답이 있으므로 20.0으로 가정
+                serverTps = 20.0;
+                tpsMessage = "Estimated (no TPS data available)";
+            }
+        }
+        catch (Exception ex)
+        {
+            tpsMessage = $"TPS check failed: {ex.Message}";
+            serverTps = 0.0;
+        }
+    }
+
+    private void ParseTpsCommand(string response)
+    {
+        // "TPS from last 1m, 5m, 15m: 20.0, 20.0, 20.0" 형식 파싱
+        var parts = response.Split(':');
+        if (parts.Length >= 2)
+        {
+            var tpsValues = parts[1].Split(',');
+            if (tpsValues.Length > 0 && double.TryParse(tpsValues[0].Trim(), out var tps))
+            {
+                serverTps = tps;
+                tpsHistory.Add(new TpsEntry(DateTime.UtcNow, serverTps));
+                if (tpsHistory.Count > 50)
+                {
+                    tpsHistory.RemoveAt(0);
+                }
+            }
+        }
+    }
+
+    private long ParseGameTime(string response)
+    {
+        // "The time is 12345" 형식에서 숫자 추출
+        var parts = response.Split(' ');
+        for (int i = 0; i < parts.Length; i++)
+        {
+            if (long.TryParse(parts[i], out var time))
+            {
+                return time;
+            }
+        }
+        return 0;
+    }
+
+    private void ParsePlayerList(string response)
+    {
+        // "There are 0 of a max of 20 players online:" 형식 파싱
+        if (response.Contains("players online"))
+        {
+            var parts = response.Split(' ');
+            if (parts.Length >= 3 && int.TryParse(parts[2], out var online))
+            {
+                playersOnline = online;
+            }
+            if (parts.Length >= 7 && int.TryParse(parts[6], out var max))
+            {
+                maxPlayers = max;
+            }
+        }
+    }
+
+    private string GetTpsBadgeClass()
+    {
+        if (serverTps >= 19.5) return "bg-success";
+        if (serverTps >= 18.0) return "bg-warning";
+        return "bg-danger";
+    }
+
+    private string GetTpsColor(double tps)
+    {
+        if (tps >= 19.5) return "#28a745"; // Green
+        if (tps >= 18.0) return "#ffc107"; // Yellow
+        return "#dc3545"; // Red
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+
+    private record TpsEntry(DateTime Timestamp, double Tps);
+}

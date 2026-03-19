@@ -39,6 +39,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenIDConnect.Abstractions"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenIDConnect.Core", "OpenIDConnect.Core\OpenIDConnect.Core.csproj", "{BB25AE2F-E7DD-4D94-AC62-5EB50BB6FC6A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MinecraftSidecar", "MinecraftSidecar\MinecraftSidecar.csproj", "{2BAF4A3E-B45B-1B78-CA3E-EA0FE16500D2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -105,6 +107,10 @@ Global
 		{BB25AE2F-E7DD-4D94-AC62-5EB50BB6FC6A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BB25AE2F-E7DD-4D94-AC62-5EB50BB6FC6A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BB25AE2F-E7DD-4D94-AC62-5EB50BB6FC6A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2BAF4A3E-B45B-1B78-CA3E-EA0FE16500D2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2BAF4A3E-B45B-1B78-CA3E-EA0FE16500D2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2BAF4A3E-B45B-1B78-CA3E-EA0FE16500D2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2BAF4A3E-B45B-1B78-CA3E-EA0FE16500D2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -125,6 +131,7 @@ Global
 		{22BF2495-33A2-4BAF-B6BE-B98E38FC985C} = {71FF9D2E-1C8B-423C-8A73-C8513FBD1E9E}
 		{CE756A5A-AB90-4B0E-A0E1-28CC35632A7C} = {C8D5274F-AC00-46C7-1F8D-E88E81087A52}
 		{BB25AE2F-E7DD-4D94-AC62-5EB50BB6FC6A} = {C8D5274F-AC00-46C7-1F8D-E88E81087A52}
+		{2BAF4A3E-B45B-1B78-CA3E-EA0FE16500D2} = {E90F7EFD-FAD3-4219-8CA7-4D115A9E288B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AA50FDB1-B30B-44CD-90FC-E31B5B3C7AAA}
