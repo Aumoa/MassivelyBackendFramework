@@ -90,6 +90,10 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
                 logger.LogWarning("Client secret validation failed for internal client: {ClientId}", clientId);
                 return BadRequest(new { error = "invalid_client", error_description = "client authentication failed" });
             }
+            else
+            {
+                return null;
+            }
         }
         else
         {
@@ -100,21 +104,24 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
                 return BadRequest(new { error = "invalid_client", error_description = "client_id is unknown" });
             }
 
-            var secret = cclaims.FirstOrDefault(p => p.Name == "secret").Value ?? string.Empty;
-            if (string.IsNullOrEmpty(secret))
+            string[] secrets = [.. cclaims.Where(p => p.Name == "secret").Select(c => c.Value)];
+            if (secrets.Length == 0)
             {
                 logger.LogWarning("Client secret not configured: {ClientId}", clientId);
                 return BadRequest(new { error = "invalid_client", error_description = "client secret is not configured" });
             }
 
-            if (PasswordHasher.Verify(clientSecret, secret) == false)
+            foreach (var secret in secrets)
             {
-                logger.LogWarning("Client secret verification failed: {ClientId}", clientId);
-                return BadRequest(new { error = "invalid_client", error_description = "client authentication failed" });
+                if (PasswordHasher.Verify(clientSecret, secret))
+                {
+                    return null;
+                }
             }
-        }
 
-        return null;
+            logger.LogWarning("Client secret verification failed: {ClientId}", clientId);
+            return BadRequest(new { error = "invalid_client", error_description = "client authentication failed" });
+        }
     }
 
     private async ValueTask<IActionResult> HandleAuthorizeCodeAsync(TokenRequest request, CancellationToken cancellationToken)
