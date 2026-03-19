@@ -70,6 +70,213 @@ namespace MinecraftSidecar.Localizations {
         }
         
         /// <summary>
+        ///   Refresh과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string BUTTON_REFRESH {
+            get {
+                return ResourceManager.GetString("BUTTON_REFRESH", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Send과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CONSOLE_BUTTON_SEND {
+            get {
+                return ResourceManager.GetString("CONSOLE_BUTTON_SEND", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Enter command...과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CONSOLE_INPUT_PLACEHOLDER {
+            get {
+                return ResourceManager.GetString("CONSOLE_INPUT_PLACEHOLDER", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   [ERROR] Command failed: {0}과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CONSOLE_LOG_COMMAND_FAILED {
+            get {
+                return ResourceManager.GetString("CONSOLE_LOG_COMMAND_FAILED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   [Command executed successfully]과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CONSOLE_LOG_COMMAND_SUCCESS {
+            get {
+                return ResourceManager.GetString("CONSOLE_LOG_COMMAND_SUCCESS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   [INFO] Connect to RCON server to send commands과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CONSOLE_LOG_CONNECT_HINT {
+            get {
+                return ResourceManager.GetString("CONSOLE_LOG_CONNECT_HINT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   [ERROR] Connection lost. Please reconnect.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CONSOLE_LOG_CONNECTION_LOST {
+            get {
+                return ResourceManager.GetString("CONSOLE_LOG_CONNECTION_LOST", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   [INFO] Console initialized과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CONSOLE_LOG_INITIALIZED {
+            get {
+                return ResourceManager.GetString("CONSOLE_LOG_INITIALIZED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Connected과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CONSOLE_STATUS_CONNECTED {
+            get {
+                return ResourceManager.GetString("CONSOLE_STATUS_CONNECTED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Disconnected과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CONSOLE_STATUS_DISCONNECTED {
+            get {
+                return ResourceManager.GetString("CONSOLE_STATUS_DISCONNECTED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Server Console과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CONSOLE_TITLE {
+            get {
+                return ResourceManager.GetString("CONSOLE_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Performance History과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string DASHBOARD_CARD_PERFORMANCE_HISTORY {
+            get {
+                return ResourceManager.GetString("DASHBOARD_CARD_PERFORMANCE_HISTORY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Players Online과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string DASHBOARD_CARD_PLAYERS_ONLINE {
+            get {
+                return ResourceManager.GetString("DASHBOARD_CARD_PLAYERS_ONLINE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Server Performance과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string DASHBOARD_CARD_SERVER_PERFORMANCE {
+            get {
+                return ResourceManager.GetString("DASHBOARD_CARD_SERVER_PERFORMANCE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Server Status과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string DASHBOARD_CARD_SERVER_STATUS {
+            get {
+                return ResourceManager.GetString("DASHBOARD_CARD_SERVER_STATUS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Last 20 samples (Green: Good, Yellow: Fair, Red: Poor)과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string DASHBOARD_PERFORMANCE_CAPTION {
+            get {
+                return ResourceManager.GetString("DASHBOARD_PERFORMANCE_CAPTION", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Checking...과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string DASHBOARD_STATUS_CHECKING {
+            get {
+                return ResourceManager.GetString("DASHBOARD_STATUS_CHECKING", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Running과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string DASHBOARD_STATUS_RUNNING {
+            get {
+                return ResourceManager.GetString("DASHBOARD_STATUS_RUNNING", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Stopped과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string DASHBOARD_STATUS_STOPPED {
+            get {
+                return ResourceManager.GetString("DASHBOARD_STATUS_STOPPED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Minecraft Server Management Dashboard과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string DASHBOARD_SUBTITLE {
+            get {
+                return ResourceManager.GetString("DASHBOARD_SUBTITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Dashboard과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string DASHBOARD_TITLE {
+            get {
+                return ResourceManager.GetString("DASHBOARD_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   An error occurred while processing your request.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERROR_PAGE_MESSAGE {
+            get {
+                return ResourceManager.GetString("ERROR_PAGE_MESSAGE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Error과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERROR_PAGE_TITLE {
+            get {
+                return ResourceManager.GetString("ERROR_PAGE_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Permission Denied.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string ERROR_PERMISSION_DENIED {
@@ -84,6 +291,33 @@ namespace MinecraftSidecar.Localizations {
         internal static string ERROR_PERMISSION_DENIED_DESCRIPTION {
             get {
                 return ResourceManager.GetString("ERROR_PERMISSION_DENIED_DESCRIPTION", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Reload과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERROR_RELOAD {
+            get {
+                return ResourceManager.GetString("ERROR_RELOAD", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   An unhandled error has occurred.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ERROR_UNHANDLED {
+            get {
+                return ResourceManager.GetString("ERROR_UNHANDLED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Loading...과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOADING {
+            get {
+                return ResourceManager.GetString("LOADING", resourceCulture);
             }
         }
         
@@ -111,6 +345,60 @@ namespace MinecraftSidecar.Localizations {
         internal static string NAVMENU_LABEL_SERVER_CONSOLE {
             get {
                 return ResourceManager.GetString("NAVMENU_LABEL_SERVER_CONSOLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Kick과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string PLAYERS_BUTTON_KICK {
+            get {
+                return ResourceManager.GetString("PLAYERS_BUTTON_KICK", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   No players online과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string PLAYERS_EMPTY {
+            get {
+                return ResourceManager.GetString("PLAYERS_EMPTY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Loading players...과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string PLAYERS_LOADING {
+            get {
+                return ResourceManager.GetString("PLAYERS_LOADING", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Actions과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string PLAYERS_TABLE_ACTIONS {
+            get {
+                return ResourceManager.GetString("PLAYERS_TABLE_ACTIONS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Player Name과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string PLAYERS_TABLE_NAME {
+            get {
+                return ResourceManager.GetString("PLAYERS_TABLE_NAME", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Online Players과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string PLAYERS_TITLE {
+            get {
+                return ResourceManager.GetString("PLAYERS_TITLE", resourceCulture);
             }
         }
     }

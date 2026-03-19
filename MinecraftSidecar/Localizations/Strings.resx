@@ -120,11 +120,89 @@
   <data name="APP_TITLE" xml:space="preserve">
     <value>Minecraft Sidecar</value>
   </data>
+  <data name="BUTTON_REFRESH" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="CONSOLE_BUTTON_SEND" xml:space="preserve">
+    <value>Send</value>
+  </data>
+  <data name="CONSOLE_INPUT_PLACEHOLDER" xml:space="preserve">
+    <value>Enter command...</value>
+  </data>
+  <data name="CONSOLE_LOG_COMMAND_FAILED" xml:space="preserve">
+    <value>[ERROR] Command failed: {0}</value>
+  </data>
+  <data name="CONSOLE_LOG_COMMAND_SUCCESS" xml:space="preserve">
+    <value>[Command executed successfully]</value>
+  </data>
+  <data name="CONSOLE_LOG_CONNECT_HINT" xml:space="preserve">
+    <value>[INFO] Connect to RCON server to send commands</value>
+  </data>
+  <data name="CONSOLE_LOG_CONNECTION_LOST" xml:space="preserve">
+    <value>[ERROR] Connection lost. Please reconnect.</value>
+  </data>
+  <data name="CONSOLE_LOG_INITIALIZED" xml:space="preserve">
+    <value>[INFO] Console initialized</value>
+  </data>
+  <data name="CONSOLE_STATUS_CONNECTED" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="CONSOLE_STATUS_DISCONNECTED" xml:space="preserve">
+    <value>Disconnected</value>
+  </data>
+  <data name="CONSOLE_TITLE" xml:space="preserve">
+    <value>Server Console</value>
+  </data>
+  <data name="DASHBOARD_CARD_PERFORMANCE_HISTORY" xml:space="preserve">
+    <value>Performance History</value>
+  </data>
+  <data name="DASHBOARD_CARD_PLAYERS_ONLINE" xml:space="preserve">
+    <value>Players Online</value>
+  </data>
+  <data name="DASHBOARD_CARD_SERVER_PERFORMANCE" xml:space="preserve">
+    <value>Server Performance</value>
+  </data>
+  <data name="DASHBOARD_CARD_SERVER_STATUS" xml:space="preserve">
+    <value>Server Status</value>
+  </data>
+  <data name="DASHBOARD_PERFORMANCE_CAPTION" xml:space="preserve">
+    <value>Last 20 samples (Green: Good, Yellow: Fair, Red: Poor)</value>
+  </data>
+  <data name="DASHBOARD_STATUS_CHECKING" xml:space="preserve">
+    <value>Checking...</value>
+  </data>
+  <data name="DASHBOARD_STATUS_RUNNING" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="DASHBOARD_STATUS_STOPPED" xml:space="preserve">
+    <value>Stopped</value>
+  </data>
+  <data name="DASHBOARD_SUBTITLE" xml:space="preserve">
+    <value>Minecraft Server Management Dashboard</value>
+  </data>
+  <data name="DASHBOARD_TITLE" xml:space="preserve">
+    <value>Dashboard</value>
+  </data>
+  <data name="ERROR_PAGE_MESSAGE" xml:space="preserve">
+    <value>An error occurred while processing your request.</value>
+  </data>
+  <data name="ERROR_PAGE_TITLE" xml:space="preserve">
+    <value>Error</value>
+  </data>
   <data name="ERROR_PERMISSION_DENIED" xml:space="preserve">
     <value>Permission Denied.</value>
   </data>
   <data name="ERROR_PERMISSION_DENIED_DESCRIPTION" xml:space="preserve">
     <value>Please contact an administrator to request '{0}' permission.</value>
+  </data>
+  <data name="ERROR_RELOAD" xml:space="preserve">
+    <value>Reload</value>
+  </data>
+  <data name="ERROR_UNHANDLED" xml:space="preserve">
+    <value>An unhandled error has occurred.</value>
+  </data>
+  <data name="LOADING" xml:space="preserve">
+    <value>Loading...</value>
   </data>
   <data name="NAVMENU_LABEL_DASHBOARD" xml:space="preserve">
     <value>Dashboard</value>
@@ -134,5 +212,23 @@
   </data>
   <data name="NAVMENU_LABEL_SERVER_CONSOLE" xml:space="preserve">
     <value>Terminal</value>
+  </data>
+  <data name="PLAYERS_BUTTON_KICK" xml:space="preserve">
+    <value>Kick</value>
+  </data>
+  <data name="PLAYERS_EMPTY" xml:space="preserve">
+    <value>No players online</value>
+  </data>
+  <data name="PLAYERS_LOADING" xml:space="preserve">
+    <value>Loading players...</value>
+  </data>
+  <data name="PLAYERS_TABLE_ACTIONS" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="PLAYERS_TABLE_NAME" xml:space="preserve">
+    <value>Player Name</value>
+  </data>
+  <data name="PLAYERS_TITLE" xml:space="preserve">
+    <value>Online Players</value>
   </data>
 </root>

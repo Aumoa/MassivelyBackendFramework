@@ -4,7 +4,7 @@
 @inject IConfiguration Configuration
 @implements IDisposable
 
-<PageTitle>@Strings.APP_TITLE - Players</PageTitle>
+<PageTitle>@Strings.APP_TITLE - @Strings.PLAYERS_TITLE</PageTitle>
 
 <div class="container-fluid mt-4">
     <div class="row">
@@ -12,12 +12,12 @@
             <div class="d-flex justify-content-between align-items-center">
                 <h1>
                     <span class="material-symbols-outlined" style="vertical-align: middle;">group</span>
-                    Online Players
+                    @Strings.PLAYERS_TITLE
                 </h1>
                 <div>
                     <button class="btn btn-outline-primary" @onclick="RefreshPlayers">
                         <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">refresh</span>
-                        Refresh
+                        @Strings.BUTTON_REFRESH
                     </button>
                 </div>
             </div>
@@ -32,9 +32,9 @@
                     {
                         <div class="text-center p-4">
                             <div class="spinner-border" role="status">
-                                <span class="visually-hidden">Loading...</span>
+                                <span class="visually-hidden">@Strings.LOADING</span>
                             </div>
-                            <p class="mt-2">Loading players...</p>
+                            <p class="mt-2">@Strings.PLAYERS_LOADING</p>
                         </div>
                     }
                     else if (!string.IsNullOrEmpty(errorMessage))
@@ -48,15 +48,15 @@
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>Player Name</th>
-                                    <th>Actions</th>
+                                    <th>@Strings.PLAYERS_TABLE_NAME</th>
+                                    <th>@Strings.PLAYERS_TABLE_ACTIONS</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @if (players.Count == 0)
                                 {
                                     <tr>
-                                        <td colspan="2" class="text-center text-muted">No players online</td>
+                                        <td colspan="2" class="text-center text-muted">@Strings.PLAYERS_EMPTY</td>
                                     </tr>
                                 }
                                 else
@@ -68,7 +68,7 @@
                                             <td>
                                                 <button class="btn btn-sm btn-warning" @onclick="() => KickPlayer(player)">
                                                     <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">logout</span>
-                                                    Kick
+                                                    @Strings.PLAYERS_BUTTON_KICK
                                                 </button>
                                             </td>
                                         </tr>
@@ -93,7 +93,7 @@
     {
         await LoadPlayers();
 
-        // 5ÃÊ¸¶´Ù ÇÃ·¹ÀÌ¾î ¸ñ·Ï °»½Å
+        // 5ï¿½Ê¸ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         _timer = new System.Threading.Timer(async _ =>
         {
             await InvokeAsync(async () =>
@@ -117,13 +117,13 @@
 
         try
         {
-            // RCON ¿¬°á È®ÀÎ
+            // RCON ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
             if (!RconClient.IsConnected)
             {
                 return;
             }
 
-            // list ¸í·ÉÀ¸·Î ÇÃ·¹ÀÌ¾î ¸ñ·Ï °¡Á®¿À±â
+            // list ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             var response = await RconClient.SendCommandAsync("list");
             ParsePlayerList(response);
         }
@@ -143,7 +143,7 @@
     {
         players.Clear();
         
-        // "There are 2 of a max of 20 players online: Player1, Player2" Çü½Ä ÆÄ½Ì
+        // "There are 2 of a max of 20 players online: Player1, Player2" ï¿½ï¿½ï¿½ï¿½ ï¿½Ä½ï¿½
         if (response.Contains("players online:"))
         {
             var colonIndex = response.IndexOf(':');
@@ -170,7 +170,7 @@
         try
         {
             await RconClient.SendCommandAsync($"kick {playerName}");
-            await LoadPlayers(); // ¸ñ·Ï »õ·Î°íÄ§
+            await LoadPlayers(); // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Î°ï¿½Ä§
         }
         catch (Exception ex)
         {
