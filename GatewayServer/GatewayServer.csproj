@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ASPNETUtility\ASPNETUtility.csproj" />
+    <ProjectReference Include="..\GatewayServer.Core\GatewayServer.Core.csproj" />
+    <ProjectReference Include="..\GatewayServer.SQL\GatewayServer.SQL.csproj" />
+  </ItemGroup>
+
+</Project>
