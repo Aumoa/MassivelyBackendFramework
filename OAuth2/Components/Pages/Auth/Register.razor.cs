@@ -14,7 +14,8 @@ public partial class Register(
     IAccountClaims accountClaims,
     NavigationManager nav,
     IJSRuntime js,
-    EmailVerify emailVerify)
+    EmailVerify emailVerify,
+    ILogger<Register> logger)
 {
     private readonly struct RequestScope : IDisposable
     {
@@ -132,7 +133,19 @@ public partial class Register(
             var sub = await accounts.AddAsync(m_ID, m_Password, m_Name, m_Email, verifyCode);
             await accountClaims.AddClaimAsync(m_ID, JwtRegisteredClaimNames.Locale, locale[0]);
             await accountClaims.AddClaimAsync(m_ID, JwtRegisteredClaimNames.ZoneInfo, locale[1]);
-            await emailVerify.SendAsync(sub, verifyCode, new MailAddress(m_Email));
+            try
+            {
+                await emailVerify.SendAsync(sub, verifyCode, new MailAddress(m_Email));
+            }
+            catch (Exception e)
+            {
+                if (logger.IsEnabled(LogLevel.Critical))
+                {
+                    logger.LogCritical(e, "Failed to send email verify mail for user {UserID} with email {Email}.", m_ID, m_Email);
+                }
+
+                throw;
+            }
 
             if (string.IsNullOrEmpty(ReturnUrl) == false
                 && ReturnUrl.StartsWith('/')
@@ -144,7 +157,7 @@ public partial class Register(
         }
         catch (Exception)
         {
-            m_ErrorMessageId = Strings.LOGIN_VALIDATION_ERROR_EMAIL_ALREADY_EXISTS;
+            m_ErrorMessageEmail = Strings.LOGIN_VALIDATION_ERROR_EMAIL_ALREADY_EXISTS;
         }
         finally
         {

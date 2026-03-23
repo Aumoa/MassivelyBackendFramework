@@ -2,13 +2,11 @@
 
 public record EmailVerifyOptions
 {
-    public required string UserId { get; set; }
+    public required string AccessKey { get; set; }
 
-    public required string Secret { get; set; }
+    public required string SecretKey { get; set; }
 
-    public required string Sender { get; set; }
+    public required string Region { get; set; }
 
-    public required string Host { get; set; }
-
-    public int Port { get; set; } = 587;
+    public required string SenderAddress { get; set; }
 }
