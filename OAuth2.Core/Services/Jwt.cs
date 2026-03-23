@@ -190,7 +190,9 @@ internal class Jwt : IJwt
                     if (claimNames.TryGetValue(JwtRegisteredClaimNames.FamilyName, out var familyName))
                     {
                         idTokenClaims.Add(new Claim(JwtRegisteredClaimNames.FamilyName, familyName, ClaimValueTypes.String));
-                        idTokenClaims.Add(new Claim("last_name", familyName, ClaimValueTypes.String));  // for backward compatibility
+                        // for backward compatibility
+                        idTokenClaims.Add(new Claim("last_name", familyName, ClaimValueTypes.String));
+                        idTokenClaims.Add(new Claim("lastName", familyName, ClaimValueTypes.String));
                     }
                     break;
                 default:
