@@ -186,13 +186,6 @@ internal class Jwt : IJwt
                     var updatedAt = (DateTimeOffset)accountClaims.Select(p => p.CreatedAt).Append(account.CreatedAt).Max();
                     idTokenClaims.Add(new Claim(JwtRegisteredClaimNames.UpdatedAt, updatedAt.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
                     break;
-                case JwtRegisteredClaimNames.FamilyName:
-                    if (claimNames.TryGetValue(JwtRegisteredClaimNames.FamilyName, out var familyName))
-                    {
-                        idTokenClaims.Add(new Claim(JwtRegisteredClaimNames.FamilyName, familyName, ClaimValueTypes.String));
-                        idTokenClaims.Add(new Claim("last_name", familyName, ClaimValueTypes.String));  // for backward compatibility
-                    }
-                    break;
                 default:
                     if (claimNames.TryGetValue(expectedClaim, out var value))
                     {
