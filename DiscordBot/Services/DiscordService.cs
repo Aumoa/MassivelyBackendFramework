@@ -75,6 +75,7 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
 
         IDisposable? typingState = message.Channel.EnterTypingState();
         string thinkingTicker = "";
+        List<string> toolNames = [];
         try
         {
             await foreach (var responseMessage in channel.AddAsync(message.Author, message.Content, toolsProvider))
@@ -82,6 +83,11 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
                 totalReasoning += responseMessage.Thinking;
                 totalMessage += responseMessage.Content;
                 hasModify = true;
+
+                if (!string.IsNullOrEmpty(responseMessage.ToolName))
+                {
+                    toolNames.Add(responseMessage.ToolName);
+                }
 
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
@@ -104,6 +110,11 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
                 {
                     currentMessage = $"*Thinking{thinkingTicker}*";
                     thinkingTicker += "\\*";
+
+                    if (toolNames.Count > 0)
+                    {
+                        currentMessage += "\n" + string.Join("\n", toolNames.Select(t => $"🔧 *{t}*"));
+                    }
                 }
                 else
                 {

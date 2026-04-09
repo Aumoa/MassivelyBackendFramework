@@ -176,6 +176,13 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
 
                         foreach (var toolCall in toolCalls)
                         {
+                            yield return new ChatResponseChunk
+                            {
+                                Content = "",
+                                Thinking = "",
+                                ToolName = toolCall.Function.Name
+                            };
+
                             var function = toolsProvider.FindFunction(toolCall.Function.Name);
                             if (function != null)
                             {
