@@ -70,7 +70,10 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         DateTime? lastEditTime = default;
         bool hasModify = false;
         List<Task> emojiTasks = [];
-        var discordTools = new DiscordTools(m_Socket.CurrentUser, message);
+
+        using var scope = scopeFactory.CreateScope();
+        var chatLogRepository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
+        var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository);
         var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools);
 
         IDisposable? typingState = message.Channel.EnterTypingState();

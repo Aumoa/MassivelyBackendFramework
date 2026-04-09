@@ -83,7 +83,8 @@ public class ToolsProvider
                                throw new InvalidOperationException($"Parameter {parameter.Name} in method {targetMethod.Name} has unsupported type {parameter.ParameterType.FullName}."),
                         Description = toolParameterInfo?.Description ?? string.Empty,
                         IsRequired = !parameter.IsOptional,
-                        Enum = parameter.ParameterType.IsEnum ? System.Enum.GetNames(parameter.ParameterType) : null
+                        Enum = parameter.ParameterType.IsEnum ? System.Enum.GetNames(parameter.ParameterType) : null,
+                        DefaultValue = parameter.IsOptional ? parameter.DefaultValue : null
                     });
                 }
 

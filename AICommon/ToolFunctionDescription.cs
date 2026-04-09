@@ -23,6 +23,8 @@ public record ToolFunctionDescription
         public required bool IsRequired { get; init; }
 
         public required string[]? Enum { get; init; }
+
+        public object? DefaultValue { get; init; }
     }
 
     public required string Name { get; init; }
@@ -51,6 +53,10 @@ public record ToolFunctionDescription
                     SimpleType.Boolean => value.GetBoolean(),
                     _ => null
                 };
+            }
+            else
+            {
+                args[i] = Parameters[i].DefaultValue;
             }
         }
 
