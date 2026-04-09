@@ -152,6 +152,11 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
             typingState?.Dispose();
             typingState = null;
 
+            if (!string.IsNullOrEmpty(totalMessage))
+            {
+                await SaveChatLogAsync(message.Channel.Id.ToString(), m_Socket.CurrentUser.Id.ToString(), totalMessage);
+            }
+
             if (sentMessage != null)
             {
                 try
@@ -168,11 +173,6 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         if (logger.IsEnabled(LogLevel.Information))
         {
             logger.LogInformation("Response: {message}", totalMessage);
-        }
-
-        if (!string.IsNullOrEmpty(totalMessage))
-        {
-            await SaveChatLogAsync(message.Channel.Id.ToString(), m_Socket.CurrentUser.Id.ToString(), totalMessage);
         }
 
         await channel.TrySummarizeAsync();
