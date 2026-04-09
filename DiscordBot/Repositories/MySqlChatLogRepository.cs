@@ -28,7 +28,7 @@ VALUES(@channelId, @userId, @content)";
         using var connection = GetConnection();
 
         var queryBuilder = new System.Text.StringBuilder(@"
-SELECT `id`, `channel_id`, `user_id`, `content`, `created_at`
+SELECT `id` AS Id, `channel_id` AS ChannelId, `user_id` AS UserId, `content` AS Content, `created_at` AS CreatedAt
 FROM `chat_log`
 WHERE `channel_id` = @channelId");
 
