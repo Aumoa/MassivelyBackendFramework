@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
-public class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory) : IHostedService, IAsyncDisposable
+public class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory) : IHostedService, IAsyncDisposable
 {
     public record Configuration
     {
@@ -76,12 +76,35 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository);
         var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools);
 
+        List<string>? imageData = null;
+        var imageAttachments = message.Attachments
+            .Where(a => a.ContentType?.StartsWith("image/") == true)
+            .ToList();
+
+        if (imageAttachments.Count > 0)
+        {
+            imageData = [];
+            using var httpClient = httpClientFactory.CreateClient();
+            foreach (var attachment in imageAttachments)
+            {
+                try
+                {
+                    var bytes = await httpClient.GetByteArrayAsync(attachment.Url);
+                    imageData.Add(Convert.ToBase64String(bytes));
+                }
+                catch (Exception e)
+                {
+                    logger.LogError(e, "Failed to download attachment: {url}", attachment.Url);
+                }
+            }
+        }
+
         IDisposable? typingState = message.Channel.EnterTypingState();
         string thinkingTicker = "";
         List<string> toolNames = [];
         try
         {
-            await foreach (var responseMessage in channel.AddAsync(message.Author, message.Content, toolsProvider))
+            await foreach (var responseMessage in channel.AddAsync(message.Author, message.Content, toolsProvider, imageData))
             {
                 totalReasoning += responseMessage.Thinking;
                 totalMessage += responseMessage.Content;

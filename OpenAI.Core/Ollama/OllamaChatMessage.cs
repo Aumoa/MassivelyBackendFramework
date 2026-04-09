@@ -10,6 +10,10 @@ internal record OllamaChatMessage
     [JsonPropertyName("content")]
     public string? Content { get; init; }
 
+    [JsonPropertyName("images")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string[]? Images { get; init; }
+
     [JsonPropertyName("tool_calls")]
     public OllamaToolCall[]? ToolCalls { get; init; }
 

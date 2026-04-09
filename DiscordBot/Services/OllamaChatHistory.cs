@@ -38,6 +38,10 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
         [JsonPropertyName("thinking")]
         public string Thinking { get; set; } = "";
 
+        [JsonPropertyName("images")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string[]? Images { get; set; }
+
         [JsonPropertyName("tool_calls")]
         public ToolCall[] ToolCalls { get; set; } = [];
 
@@ -92,7 +96,7 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
         })];
     }
 
-    public async IAsyncEnumerable<ChatResponseChunk> AddAsync(IUser author, string prompt, ToolsProvider toolsProvider, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ChatResponseChunk> AddAsync(IUser author, string prompt, ToolsProvider toolsProvider, IReadOnlyList<string>? images = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (author.IsBot)
         {
@@ -118,7 +122,8 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
             {
                 Role = "user",
                 Content = $"[{DateTimeOffset.UtcNow}]({author.Username}님의 메시지): {prompt}",
-                Thinking = ""
+                Thinking = "",
+                Images = images?.Count > 0 ? [.. images] : null
             };
 
             IAsyncEnumerable<ChatResponseChunk> messages;
