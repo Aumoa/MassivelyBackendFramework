@@ -1,4 +1,5 @@
 ﻿using AI;
+using AI.Providers.Ollama;
 using Dapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +19,15 @@ public static class ServiceCollectionExtensions
         s.Configure<MySqlOptions>(config.GetRequiredSection("MySql"));
         s.Configure<StableDiffusionOptions>(config.GetRequiredSection("StableDiffusion"));
 
-        s.AddHttpClient<OllamaAIMessenger>();
+        s.Configure<OllamaChatClientOptions>(config.GetRequiredSection("Ollama"));
+        s.AddHttpClient();
+        s.AddSingleton<IChatClient>(sp =>
+        {
+            var factory = sp.GetRequiredService<IHttpClientFactory>();
+            var chatOptions = sp.GetRequiredService<IOptions<OllamaChatClientOptions>>();
+            return new OllamaChatClient(factory.CreateClient(), chatOptions);
+        });
+
         s.AddSingleton<IAIMessenger, OllamaAIMessenger>();
         s.AddTransient<IChatRepository, MySqlChatRepository>();
 

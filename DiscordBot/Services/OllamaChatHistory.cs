@@ -1,100 +1,14 @@
 ﻿using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using AI;
 using Discord;
 
 namespace DiscordBot.Services;
 
-public class OllamaChatHistory(ILogger logger, OllamaService.Configuration options, HttpClient http)
+public class OllamaChatHistory(ILogger logger, OllamaService.Configuration options, IChatClient chatClient)
 {
-    private record FunctionCall
-    {
-        [JsonPropertyName("name")]
-        public required string Name { get; set; }
-
-        [JsonPropertyName("arguments")]
-        public required JsonElement Arguments { get; set; }
-    }
-
-    private record ToolCall
-    {
-        [JsonPropertyName("id")]
-        public required string Id { get; set; }
-
-        [JsonPropertyName("function")]
-        public required FunctionCall Function { get; set; }
-    }
-
-    private record ChatMessage
-    {
-        [JsonPropertyName("role")]
-        public required string Role { get; set; }
-
-        [JsonPropertyName("content")]
-        public required string Content { get; set; }
-
-        [JsonPropertyName("thinking")]
-        public string Thinking { get; set; } = "";
-
-        [JsonPropertyName("images")]
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string[]? Images { get; set; }
-
-        [JsonPropertyName("tool_calls")]
-        public ToolCall[] ToolCalls { get; set; } = [];
-
-        [JsonPropertyName("tool_call_id")]
-        public string? ToolCallId { get; set; }
-    }
-
-    private record OllamaChatResponse
-    {
-        [JsonPropertyName("message")]
-        public required ChatMessage Message { get; set; }
-    }
-
-    private record OllamaGenerateResponse
-    {
-        [JsonPropertyName("response")]
-        public required string Response { get; set; }
-    }
-
     private readonly List<ChatMessage> m_Messages = [];
     private readonly SemaphoreSlim m_Semaphore = new(1);
-
-    private static object[] CreateOllamaTools(IReadOnlyCollection<ToolFunctionDescription> functions)
-    {
-        return [.. functions.Select(f => new
-        {
-            type = "function",
-            function = new
-            {
-                name = f.Name,
-                description = f.Description,
-                parameters = new
-                {
-                    type = "object",
-                    properties = f.Parameters.ToDictionary(
-                        p => p.Name,
-                        p => (object)new
-                        {
-                            type = p.Type switch
-                            {
-                                ToolFunctionDescription.SimpleType.String => "string",
-                                ToolFunctionDescription.SimpleType.Number => "number",
-                                ToolFunctionDescription.SimpleType.Integer => "integer",
-                                ToolFunctionDescription.SimpleType.Boolean => "boolean",
-                                _ => "string"
-                            },
-                            description = p.Description
-                        }),
-                    required = f.Parameters.Where(p => p.IsRequired).Select(p => p.Name).ToArray()
-                }
-            }
-        })];
-    }
 
     public async IAsyncEnumerable<ChatResponseChunk> AddAsync(IUser author, string prompt, ToolsProvider toolsProvider, IReadOnlyList<string>? images = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -106,92 +20,85 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
         await m_Semaphore.WaitAsync(cancellationToken);
         try
         {
-            IEnumerable<ChatMessage> recentHistory = [];
+            List<ChatMessage> recentHistory = [];
             if (!string.IsNullOrWhiteSpace(options.Persona))
             {
-                recentHistory = recentHistory.Append(new ChatMessage
+                recentHistory.Add(new ChatMessage
                 {
-                    Role = "system",
-                    Content = options.Persona,
-                    Thinking = ""
+                    Role = ChatRole.System,
+                    Content = options.Persona
                 });
             }
 
-            recentHistory = recentHistory.Concat(m_Messages);
+            recentHistory.AddRange(m_Messages);
+
             var userMessage = new ChatMessage
             {
-                Role = "user",
+                Role = ChatRole.User,
                 Content = $"[{DateTimeOffset.UtcNow}]({author.Username}님의 메시지): {prompt}",
-                Thinking = "",
-                Images = images?.Count > 0 ? [.. images] : null
+                Images = images
             };
 
-            IAsyncEnumerable<ChatResponseChunk> messages;
-            List<ToolCall> toolCalls = [];
+            List<ChatToolCall> toolCalls = [];
             List<ChatMessage> messagesAppend = [userMessage];
 
             while (true)
             {
-                var ollamaTools = CreateOllamaTools(toolsProvider.GetToolFunctions());
-                var json = JsonSerializer.Serialize(new
+                var allMessages = recentHistory.Concat(messagesAppend).ToList();
+                var chatOptions = new ChatCompletionOptions
                 {
-                    model = options.Model,
-                    messages = recentHistory.Concat(messagesAppend),
-                    tools = ollamaTools,
-                    stream = true,
-                    keep_alive = options.KeepAlive,
-                    options = new
+                    Model = options.Model,
+                    Temperature = 0.7f,
+                    ContextLength = 8192
+                };
+                var toolFunctions = toolsProvider.GetToolFunctions();
+                IReadOnlyList<ToolFunctionDescription>? toolList = toolFunctions.Count > 0 ? [.. toolFunctions] : null;
+
+                string content = string.Empty;
+
+                await foreach (var chunk in chatClient.ChatAsync(allMessages, chatOptions, toolList, cancellationToken))
+                {
+                    content += chunk.Content;
+
+                    if (!string.IsNullOrEmpty(chunk.Content) || !string.IsNullOrEmpty(chunk.Thinking))
                     {
-                        num_ctx = 8192,
-                        temperature = 0.7
+                        yield return new ChatResponseChunk
+                        {
+                            Content = chunk.Content,
+                            Thinking = chunk.Thinking
+                        };
                     }
-                });
 
-                using var content = new StringContent(json, Encoding.UTF8, "application/json");
-                try
-                {
-                    var request = new HttpRequestMessage(HttpMethod.Post, options.Uri + "/api/chat")
+                    if (chunk.ToolCalls != null)
                     {
-                        Content = content
-                    };
-                    var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                    var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                    messages = HandleResponseChunksAsync(stream, toolCalls, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    messages = Default($"응답을 생성하는 중 오류가 발생했습니다: {ex.Message}");
+                        toolCalls.AddRange(chunk.ToolCalls);
+                    }
                 }
 
-                await foreach (var message in messages)
+                messagesAppend.Add(new ChatMessage
                 {
-                    yield return message;
-                }
+                    Role = ChatRole.Assistant,
+                    Content = content,
+                    ToolCalls = toolCalls.Count > 0 ? [.. toolCalls] : null
+                });
 
                 if (toolCalls.Count > 0)
                 {
                     try
                     {
-                        messagesAppend.Add(new ChatMessage
-                        {
-                            Role = "assistant",
-                            Content = "",
-                            ToolCalls = [.. toolCalls]
-                        });
-
                         foreach (var toolCall in toolCalls)
                         {
                             yield return new ChatResponseChunk
                             {
                                 Content = "",
                                 Thinking = "",
-                                ToolName = toolCall.Function.Name
+                                ToolName = toolCall.FunctionName
                             };
 
-                            var function = toolsProvider.FindFunction(toolCall.Function.Name);
+                            var function = toolsProvider.FindFunction(toolCall.FunctionName);
                             if (function != null)
                             {
-                                var args = function.BuildArguments(toolCall.Function.Arguments, cancellationToken);
+                                var args = function.BuildArguments(toolCall.Arguments, cancellationToken);
                                 var result = function.Invocable(args);
                                 string toolResult;
 
@@ -202,7 +109,7 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
 
                                 messagesAppend.Add(new ChatMessage
                                 {
-                                    Role = "tool",
+                                    Role = ChatRole.Tool,
                                     Content = JsonSerializer.Serialize(new { status = "success", content = toolResult }),
                                     ToolCallId = toolCall.Id
                                 });
@@ -211,7 +118,7 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
                             {
                                 messagesAppend.Add(new ChatMessage
                                 {
-                                    Role = "tool",
+                                    Role = ChatRole.Tool,
                                     Content = JsonSerializer.Serialize(new { status = "error", reason = "tool_not_exists" }),
                                     ToolCallId = toolCall.Id
                                 });
@@ -235,9 +142,39 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
 
             if (m_Messages.Count >= options.MemorySize)
             {
-                int summaryRange = m_Messages.Count - 2;
-                var summaryContent = string.Join("\n", m_Messages.Take(summaryRange).Select(m => $"({m.Role}): {m.Content}"));
-                var summarySystem = $@"
+                await SummarizeHistoryAsync(cancellationToken);
+            }
+
+            yield break;
+        }
+        finally
+        {
+            m_Semaphore.Release();
+        }
+    }
+
+    public async Task TrySummarizeAsync(CancellationToken cancellationToken = default)
+    {
+        await m_Semaphore.WaitAsync(cancellationToken);
+        try
+        {
+            if (m_Messages.Count >= options.MemorySize)
+            {
+                logger.LogInformation("Trying summarize chat history.");
+                await SummarizeHistoryAsync(cancellationToken);
+            }
+        }
+        finally
+        {
+            m_Semaphore.Release();
+        }
+    }
+
+    private async Task SummarizeHistoryAsync(CancellationToken cancellationToken)
+    {
+        int summaryRange = m_Messages.Count - 2;
+        var summaryContent = string.Join("\n", m_Messages.Take(summaryRange).Select(m => $"({m.Role}): {m.Content}"));
+        var summarySystem = $@"
 너는 대화 요약 전문가야. 아래 내용을 참고해서 사용자가 원하는 요약을 진행해주어야 해.
 
 [시스템 정보]
@@ -251,200 +188,37 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
 - 예시: 'assistant: 내용'은 너(AI)의 이전 답변이야.
 - [이전 대화 요약]: 으로 시작하는 대화는 이전에 네가 먼저 요약한 내용이야.
 ";
-                var summaryPrompt = $@"
+        var summaryPrompt = $@"
 아래 대화 내용을 핵심 사건과 사용자 성향 위주로 간결하게 요약해.
 
 [대화 내용]
 {summaryContent}
 ";
 
-                var response = await http.PostAsJsonAsync(options.Uri + "/api/generate", new
-                {
-                    model = options.SummaryModel,
-                    system = summarySystem,
-                    stream = false,
-                    prompt = summaryPrompt,
-                    keep_alive = options.SummaryKeepAlive,
-                    options = new
-                    {
-                        temperature = 0.5
-                    }
-                }, cancellationToken);
-                var result = await response.Content.ReadFromJsonAsync<OllamaGenerateResponse>(cancellationToken);
-                m_Messages.RemoveRange(0, summaryRange);
-                if (result != null)
-                {
-                    m_Messages.Insert(0, new ChatMessage
-                    {
-                        Role = "system",
-                        Content = $"[이전 대화 요약]: {result.Response}",
-                        Thinking = ""
-                    });
-
-                    if (logger.IsEnabled(LogLevel.Debug))
-                    {
-                        logger.LogDebug("The {count} messages were summarized as follows: {summary}", summaryRange, result.Response);
-                    }
-                }
-                else
-                {
-                    logger.LogError("Failed to generate summary message.");
-                }
-            }
-
-            yield break;
-
-            async IAsyncEnumerable<ChatResponseChunk> HandleResponseChunksAsync(Stream stream, List<ToolCall> toolCalls, [EnumeratorCancellation] CancellationToken cancellationToken)
-            {
-                try
-                {
-                    using var reader = new StreamReader(stream);
-                    string role = string.Empty;
-                    string content = string.Empty;
-                    string thinking = string.Empty;
-
-                    while (true)
-                    {
-                        var line = await reader.ReadLineAsync(cancellationToken);
-                        if (line == null)
-                        {
-                            break;
-                        }
-
-                        if (string.IsNullOrEmpty(line))
-                        {
-                            continue;
-                        }
-
-                        var chunk = JsonSerializer.Deserialize<OllamaChatResponse>(line);
-                        if (chunk == null)
-                        {
-                            yield return new ChatResponseChunk
-                            {
-                                Content = "Failed to deserialize ollama response.",
-                                Thinking = ""
-                            };
-
-                            yield break;
-                        }
-
-                        role = chunk.Message.Role;
-                        content += chunk.Message.Content;
-                        thinking += chunk.Message.Thinking;
-
-                        if (!string.IsNullOrEmpty(chunk.Message.Content) || !string.IsNullOrEmpty(chunk.Message.Thinking))
-                        {
-                            yield return new ChatResponseChunk
-                            {
-                                Content = chunk.Message.Content,
-                                Thinking = chunk.Message.Thinking
-                            };
-                        }
-
-                        if (chunk.Message.ToolCalls.Length > 0)
-                        {
-                            toolCalls.AddRange(chunk.Message.ToolCalls);
-                        }
-                    }
-
-                    var responseMessage = new ChatMessage
-                    {
-                        Role = role,
-                        Content = content,
-                        Thinking = thinking
-                    };
-
-                    messagesAppend.Add(responseMessage);
-                }
-                finally
-                {
-                    await stream.DisposeAsync();
-                }
-            }
-        }
-        finally
-        {
-            m_Semaphore.Release();
-        }
-
-        static async IAsyncEnumerable<ChatResponseChunk> Default(string message)
-        {
-            yield return new ChatResponseChunk
-            {
-                Content = message,
-                Thinking = ""
-            };
-        }
-    }
-
-    public async Task TrySummarizeAsync(CancellationToken cancellationToken = default)
-    {
-        await m_Semaphore.WaitAsync(cancellationToken);
         try
         {
-            if (m_Messages.Count >= options.MemorySize)
+            var summaryOptions = new ChatCompletionOptions
             {
-                logger.LogInformation("Trying summarize chat history.");
+                Model = options.SummaryModel,
+                Temperature = 0.5f
+            };
 
-                int summaryRange = m_Messages.Count - 2;
-                var summaryContent = string.Join("\n", m_Messages.Take(summaryRange).Select(m => $"({m.Role}): {m.Content}"));
-                var summarySystem = $@"
-너는 대화 요약 전문가야. 아래 내용을 참고해서 사용자가 원하는 요약을 진행해주어야 해.
+            var result = await chatClient.GenerateAsync(summaryPrompt, summaryOptions, summarySystem, cancellationToken);
+            m_Messages.RemoveRange(0, summaryRange);
+            m_Messages.Insert(0, new ChatMessage
+            {
+                Role = ChatRole.System,
+                Content = $"[이전 대화 요약]: {result}"
+            });
 
-[시스템 정보]
-- 페르소나: {options.Persona}
-- 현재 시간: {DateTime.Now:yyyy-MM-dd HH:mm}
-- 지시사항: 
-
-[데이터 형식 규칙]
-- 대화는 'Role: (작성자님의 메시지): 내용' 형태야.
-- 예시: 'user: (liberty님의 메시지): 안녕'은 사용자 liberty가 보낸 메시지야.
-- 예시: 'assistant: 내용'은 너(AI)의 이전 답변이야.
-- [이전 대화 요약]: 으로 시작하는 대화는 이전에 네가 먼저 요약한 내용이야.
-";
-                var summaryPrompt = $@"
-아래 대화 내용을 핵심 사건과 사용자 성향 위주로 간결하게 요약해.
-
-[대화 내용]
-{summaryContent}
-";
-
-                var response = await http.PostAsJsonAsync(options.Uri + "/api/generate", new
-                {
-                    model = options.SummaryModel,
-                    system = summarySystem,
-                    stream = false,
-                    prompt = summaryPrompt,
-                    options = new
-                    {
-                        temperature = 0.5
-                    }
-                }, cancellationToken);
-                var result = await response.Content.ReadFromJsonAsync<OllamaGenerateResponse>(cancellationToken);
-                m_Messages.RemoveRange(0, summaryRange);
-                if (result != null)
-                {
-                    m_Messages.Insert(0, new ChatMessage
-                    {
-                        Role = "system",
-                        Content = $"[이전 대화 요약]: {result.Response}",
-                        Thinking = ""
-                    });
-
-                    if (logger.IsEnabled(LogLevel.Debug))
-                    {
-                        logger.LogDebug("The {count} messages were summarized as follows: {summary}", summaryRange, result.Response);
-                    }
-                }
-                else
-                {
-                    logger.LogError("Failed to generate summary message.");
-                }
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("The {count} messages were summarized as follows: {summary}", summaryRange, result);
             }
         }
-        finally
+        catch (Exception ex)
         {
-            m_Semaphore.Release();
+            logger.LogError(ex, "Failed to generate summary message.");
         }
     }
 }

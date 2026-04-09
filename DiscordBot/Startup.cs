@@ -1,3 +1,5 @@
+using AI;
+using AI.Providers.Ollama;
 using DiscordBot.Components;
 using DiscordBot.Options;
 using DiscordBot.Repositories;
@@ -47,6 +49,14 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
 
     sc.Configure<DiscordService.Configuration>(conf.GetRequiredSection("Discord"));
     sc.AddHostedService<DiscordService>();
+
+    sc.Configure<OllamaChatClientOptions>(conf.GetRequiredSection("Ollama"));
+    sc.AddSingleton<IChatClient>(sp =>
+    {
+        var factory = sp.GetRequiredService<IHttpClientFactory>();
+        var options = sp.GetRequiredService<IOptions<OllamaChatClientOptions>>();
+        return new OllamaChatClient(factory.CreateClient(), options);
+    });
 
     sc.Configure<OllamaService.Configuration>(conf.GetRequiredSection("Ollama"));
     sc.AddSingleton<OllamaService>();

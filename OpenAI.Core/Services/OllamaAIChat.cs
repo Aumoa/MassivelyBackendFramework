@@ -1,14 +1,11 @@
-﻿using System.Net.Http.Json;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using AI;
-using Google.Protobuf;
-using OpenAI.Ollama;
 
 namespace OpenAI.Services;
 
-internal class OllamaAIChat(string conversationTopics, OllamaOptions options, HttpClient http, ToolsProvider tools) : IAIChat
+internal class OllamaAIChat(string conversationTopics, OllamaOptions options, IChatClient chatClient, ToolsProvider tools) : IAIChat
 {
     private const string CHAT_SYSTEM_PROMPT =
         "당신은 사용자에게 도움을 주는 친절하고 전문적인 AI 어시스턴트입니다. 당신의 답변은 명확하고 간결하며, 필요할 때 논리적인 구조(목록, 강조 등)를 사용하세요. " +
@@ -33,84 +30,55 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var messages = BuildChatMessages(history);
-        messages.Add(new OllamaChatMessage { Role = "user", Content = message });
+        messages.Add(new ChatMessage { Role = ChatRole.User, Content = message });
+
+        var chatOptions = new ChatCompletionOptions
+        {
+            Model = options.ChatModel,
+            Temperature = 0.4f,
+            TopP = 0.9f,
+            ContextLength = 32768,
+            RepeatPenalty = 1.1f
+        };
+        var toolFunctions = tools.GetToolFunctions();
+        IReadOnlyList<ToolFunctionDescription>? toolList = toolFunctions.Count > 0 ? [.. toolFunctions] : null;
 
         const int kMaxIterations = 5;
         int iterations = 0;
         while (iterations++ < kMaxIterations)
         {
-            var request = new OllamaChatRequest
-            {
-                Model = options.ChatModel,
-                Messages = [.. messages],
-                Stream = true,
-                Tools = OllamaChatRequest.CreateFrom(tools.GetToolFunctions()),
-                Options = new OllamaChatOptions
-                {
-                    Temperature = 0.4,
-                    TopP = 0.9,
-                    NumCtx = 32768,
-                    RepeatPenalty = 1.1
-                }
-            };
-
-            var inputContent = JsonContent.Create(request);
-            var requestMessage = new HttpRequestMessage(HttpMethod.Post, options.Uri + "/api/chat")
-            {
-                Content = inputContent
-            };
-
-            using var response = await http.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var reader = new StreamReader(stream);
-
-            List<OllamaToolCall> toolCalls = [];
+            List<ChatToolCall> toolCalls = [];
             List<IAsyncEnumerable<(string id, ChunkedResponse? result)>> toolCallsResults = [];
+            string content = string.Empty;
 
-            string? line;
-            while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
+            await foreach (var chunk in chatClient.ChatAsync(messages, chatOptions, toolList, cancellationToken))
             {
-                if (string.IsNullOrWhiteSpace(line))
-                    continue;
-
-                var chunk = JsonSerializer.Deserialize<OllamaChatResponse>(line);
-                if (chunk != null)
+                if (!string.IsNullOrEmpty(chunk.Content))
                 {
-                    if (chunk.Message != null)
+                    content += chunk.Content;
+                    yield return new ChunkedResponse
                     {
-                        if (chunk.Message.Content is { Length: > 0 } content)
-                        {
-                            yield return new ChunkedResponse
-                            {
-                                Type = ChunkedResponse.Types.Message,
-                                Content = content
-                            };
-                        }
+                        Type = ChunkedResponse.Types.Message,
+                        Content = chunk.Content
+                    };
+                }
 
-                        if (chunk.Message.ToolCalls != null)
-                        {
-                            foreach (var toolCall in chunk.Message.ToolCalls)
-                            {
-                                toolCalls.Add(toolCall);
-                                toolCallsResults.AddRange(CallAsync(toolCall));
-                            }
-                        }
-                    }
-
-                    if (chunk.Done == true)
+                if (chunk.ToolCalls != null)
+                {
+                    foreach (var toolCall in chunk.ToolCalls)
                     {
-                        break;
+                        toolCalls.Add(toolCall);
+                        toolCallsResults.AddRange(CallAsync(toolCall));
                     }
                 }
             }
 
             if (toolCallsResults.Count > 0)
             {
-                messages.Add(new OllamaChatMessage
+                messages.Add(new ChatMessage
                 {
-                    Role = "assistant",
+                    Role = ChatRole.Assistant,
+                    Content = content,
                     ToolCalls = [.. toolCalls]
                 });
 
@@ -124,10 +92,10 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
 
                             if (chunkedResponse.Type == ChunkedResponse.Types.ToolResult)
                             {
-                                messages.Add(new OllamaChatMessage
+                                messages.Add(new ChatMessage
                                 {
-                                    Role = "tool",
-                                    Content = chunkedResponse.Content,
+                                    Role = ChatRole.Tool,
+                                    Content = chunkedResponse.Content ?? "",
                                     ToolCallId = callId
                                 });
 
@@ -136,9 +104,9 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
                         }
                         else
                         {
-                            messages.Add(new OllamaChatMessage
+                            messages.Add(new ChatMessage
                             {
-                                Role = "tool",
+                                Role = ChatRole.Tool,
                                 Content = JsonSerializer.Serialize(new { status = "error" }),
                                 ToolCallId = callId
                             });
@@ -156,16 +124,16 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
 
         yield break;
 
-        async IAsyncEnumerable<(string id, ChunkedResponse?)> CallAsync(OllamaToolCall call)
+        async IAsyncEnumerable<(string id, ChunkedResponse?)> CallAsync(ChatToolCall call)
         {
-            var function = tools.FindFunction(call.Function.Name);
+            var function = tools.FindFunction(call.FunctionName);
             if (function == null)
             {
                 yield return (call.Id, null);
                 yield break;
             }
 
-            var arguments = function.BuildArguments(call.Function.Arguments, cancellationToken);
+            var arguments = function.BuildArguments(call.Arguments, cancellationToken);
 
             await foreach (var chunkedResponse in (IAsyncEnumerable<ChunkedResponse>)function.Invocable(arguments))
             {
@@ -195,35 +163,24 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
             sb.AppendLine();
         }
 
-        var response = await http.PostAsJsonAsync(options.Uri + "/api/generate", new
+        var summaryOptions = new ChatCompletionOptions
         {
-            model = options.ChatModel,
-            prompt = sb.ToString(),
-            stream = false,
-            system = SUMMARIZE_SYSTEM_PROMPT,
-            options = new
-            {
-                temperature = 0.15,
-                top_p = 0.85,
-                num_predict = 350
-            }
-        }, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var generateResponse = await response.Content.ReadFromJsonAsync<OllamaGenerateResponse>(cancellationToken)
-            ?? throw new InvalidOperationException("Failed to deserialize the summarization response from Ollama API.");
-
-        return generateResponse.Response;
-    }
-
-    private static List<OllamaChatMessage> BuildChatMessages(IReadOnlyList<ChatHistoryMessage> history)
-    {
-        var messages = new List<OllamaChatMessage>
-        {
-            new OllamaChatMessage { Role = "system", Content = CHAT_SYSTEM_PROMPT }
+            Model = options.ChatModel,
+            Temperature = 0.15f,
+            TopP = 0.85f,
+            MaxTokens = 350
         };
 
-        // Take the last MAX_HISTORY entries
+        return await chatClient.GenerateAsync(sb.ToString(), summaryOptions, SUMMARIZE_SYSTEM_PROMPT, cancellationToken);
+    }
+
+    private static List<ChatMessage> BuildChatMessages(IReadOnlyList<ChatHistoryMessage> history)
+    {
+        var messages = new List<ChatMessage>
+        {
+            new() { Role = ChatRole.System, Content = CHAT_SYSTEM_PROMPT }
+        };
+
         var slice = history.Count > MAX_HISTORY
             ? history.Skip(history.Count - MAX_HISTORY).ToList()
             : (IEnumerable<ChatHistoryMessage>)history;
@@ -232,15 +189,14 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
         {
             if (msg.Role == MessageRole.Summary)
             {
-                // Inject summary as a user/assistant exchange so the model has context
-                messages.Add(new OllamaChatMessage { Role = "user", Content = "[이전 대화 요약]\n" + msg.Content });
-                messages.Add(new OllamaChatMessage { Role = "assistant", Content = "이전 대화 내용을 확인했습니다." });
+                messages.Add(new ChatMessage { Role = ChatRole.User, Content = "[이전 대화 요약]\n" + msg.Content });
+                messages.Add(new ChatMessage { Role = ChatRole.Assistant, Content = "이전 대화 내용을 확인했습니다." });
             }
             else
             {
-                messages.Add(new OllamaChatMessage
+                messages.Add(new ChatMessage
                 {
-                    Role = msg.Role == MessageRole.User ? "user" : "assistant",
+                    Role = msg.Role == MessageRole.User ? ChatRole.User : ChatRole.Assistant,
                     Content = msg.Content
                 });
             }
