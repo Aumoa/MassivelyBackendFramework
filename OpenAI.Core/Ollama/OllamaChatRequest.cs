@@ -1,5 +1,5 @@
 ﻿using System.Text.Json.Serialization;
-using OpenAI.Tools;
+using AI;
 
 namespace OpenAI.Ollama;
 

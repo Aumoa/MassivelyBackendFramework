@@ -1,7 +1,7 @@
-﻿namespace OpenAI.Tools;
+﻿namespace AI;
 
 [AttributeUsage(AttributeTargets.Parameter, Inherited = false, AllowMultiple = false)]
-internal class ToolParameterInfoAttribute : Attribute
+public class ToolParameterInfoAttribute : Attribute
 {
     public string? Name { get; set; }
 

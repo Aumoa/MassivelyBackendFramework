@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AICommon\AICommon.csproj" />
     <ProjectReference Include="..\ASPNETUtility\ASPNETUtility.csproj" />
     <ProjectReference Include="..\DiscordBot.SQL\DiscordBot.SQL.csproj" />
     <ProjectReference Include="..\SQLMigration\SQLMigration.csproj" />

@@ -1,7 +1,7 @@
-﻿namespace OpenAI.Tools;
+﻿namespace AI;
 
 [AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = false)]
-internal class ToolFunctionAttribute : Attribute
+public class ToolFunctionAttribute : Attribute
 {
     public required string Name { get; init; }
 

@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AICommon\AICommon.csproj" />
     <ProjectReference Include="..\OpenAI.Abstractions\OpenAI.Abstractions.csproj" />
   </ItemGroup>
 

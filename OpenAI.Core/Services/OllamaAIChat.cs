@@ -2,9 +2,9 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using AI;
 using Google.Protobuf;
 using OpenAI.Ollama;
-using OpenAI.Tools;
 
 namespace OpenAI.Services;
 
@@ -165,33 +165,9 @@ internal class OllamaAIChat(string conversationTopics, OllamaOptions options, Ht
                 yield break;
             }
 
-            int count = function.Parameters.Length;
-            object?[] arguments = new object[count + (function.HasCancellationTokenParameter ? 1 : 0)];
-            for (int i = 0; i < count; ++i)
-            {
-                if (call.Function.Arguments.TryGetProperty(function.Parameters[i].Name, out var argument))
-                {
-                    switch (function.Parameters[i].Type)
-                    {
-                        case ToolFunctionDescription.SimpleType.String:
-                            arguments[i] = argument.GetString();
-                            break;
-                        case ToolFunctionDescription.SimpleType.Number:
-                            arguments[i] = argument.GetDouble();
-                            break;
-                        case ToolFunctionDescription.SimpleType.Boolean:
-                            arguments[i] = argument.GetBoolean();
-                            break;
-                    }
-                }
-            }
+            var arguments = function.BuildArguments(call.Function.Arguments, cancellationToken);
 
-            if (function.HasCancellationTokenParameter)
-            {
-                arguments[^1] = cancellationToken;
-            }
-
-            await foreach (var chunkedResponse in function.Invocable(arguments))
+            await foreach (var chunkedResponse in (IAsyncEnumerable<ChunkedResponse>)function.Invocable(arguments))
             {
                 if (chunkedResponse.Type == ChunkedResponse.Types.ToolContent)
                 {

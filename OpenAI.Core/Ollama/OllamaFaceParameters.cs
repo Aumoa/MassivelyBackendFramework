@@ -1,5 +1,5 @@
 ﻿using System.Text.Json.Serialization;
-using OpenAI.Tools;
+using AI;
 
 namespace OpenAI.Ollama;
 
@@ -24,6 +24,7 @@ internal record OllamaFaceParameters
                 {
                     ToolFunctionDescription.SimpleType.String => "string",
                     ToolFunctionDescription.SimpleType.Number => "number",
+                    ToolFunctionDescription.SimpleType.Integer => "number",
                     ToolFunctionDescription.SimpleType.Boolean => "boolean",
                     _ => throw new InvalidOperationException($"Unsupported parameter type: {pi.Type}")
                 },

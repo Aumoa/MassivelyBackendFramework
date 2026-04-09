@@ -1,7 +1,7 @@
 ﻿using System.Net.Http.Json;
+using AI;
 using Microsoft.Extensions.Options;
 using OpenAI.Ollama;
-using OpenAI.Tools;
 
 namespace OpenAI.Services;
 

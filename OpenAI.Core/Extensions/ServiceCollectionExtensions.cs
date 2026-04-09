@@ -1,4 +1,5 @@
-﻿using Dapper;
+﻿using AI;
+using Dapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,7 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<IAIMessenger, OllamaAIMessenger>();
         s.AddTransient<IChatRepository, MySqlChatRepository>();
 
+        s.AddSingleton(new ToolsProviderOptions().AddAssemblyOf<StableDiffusion>());
         s.AddSingleton<ToolsProvider>();
         s.AddHttpClient<StableDiffusion>((p, client) =>
         {

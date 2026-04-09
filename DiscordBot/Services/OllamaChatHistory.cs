@@ -2,6 +2,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using AI;
 using Discord;
 
 namespace DiscordBot.Services;
@@ -59,47 +60,39 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
     private readonly List<ChatMessage> m_Messages = [];
     private readonly SemaphoreSlim m_Semaphore = new(1);
 
-    private static readonly object kTools = new object[]
+    private static object[] CreateOllamaTools(IReadOnlyCollection<ToolFunctionDescription> functions)
     {
-        new
+        return [.. functions.Select(f => new
         {
             type = "function",
             function = new
             {
-                name = "get_chat_history",
-                description = "현재 채팅방의 채팅 목록 중 마지막 N개를 가져옵니다. 대화 요약, 분위기 파악, 이저니 맥락 확인이 필요할 때 사용합니다. AI와 직접 대화한 내용과 별개로, 현재 채팅방의 모든 대화를 조회합니다.",
+                name = f.Name,
+                description = f.Description,
                 parameters = new
                 {
                     type = "object",
-                    properties = new
-                    {
-                        limit = new
+                    properties = f.Parameters.ToDictionary(
+                        p => p.Name,
+                        p => (object)new
                         {
-                            type = "integer",
-                            description = "가져올 최근 메시지 수 (최대 100개)",
-                            @default = 10
-                        }
-                    }
+                            type = p.Type switch
+                            {
+                                ToolFunctionDescription.SimpleType.String => "string",
+                                ToolFunctionDescription.SimpleType.Number => "number",
+                                ToolFunctionDescription.SimpleType.Integer => "integer",
+                                ToolFunctionDescription.SimpleType.Boolean => "boolean",
+                                _ => "string"
+                            },
+                            description = p.Description
+                        }),
+                    required = f.Parameters.Where(p => p.IsRequired).Select(p => p.Name).ToArray()
                 }
             }
-        },
-        new
-        {
-            type = "function",
-            function = new
-            {
-                name = "get_current_date",
-                description = "현재 날짜와 시간을 UTC 기준으로 가져옵니다.",
-                parameters = new
-                {
-                    type = "object",
-                    properties = new { }
-                }
-            }
-        }
-    };
+        })];
+    }
 
-    public async IAsyncEnumerable<ChatResponseChunk> AddAsync(IUser author, string prompt, IToolsProvider toolsProvider, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ChatResponseChunk> AddAsync(IUser author, string prompt, ToolsProvider toolsProvider, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (author.IsBot)
         {
@@ -134,11 +127,12 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
 
             while (true)
             {
+                var ollamaTools = CreateOllamaTools(toolsProvider.GetToolFunctions());
                 var json = JsonSerializer.Serialize(new
                 {
                     model = options.Model,
                     messages = recentHistory.Concat(messagesAppend),
-                    tools = kTools,
+                    tools = ollamaTools,
                     stream = true,
                     keep_alive = options.KeepAlive,
                     options = new
@@ -171,8 +165,6 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
 
                 if (toolCalls.Count > 0)
                 {
-                    const string kError_ToolNotExists = "tool_not_exists";
-
                     try
                     {
                         messagesAppend.Add(new ChatMessage
@@ -184,38 +176,33 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
 
                         foreach (var toolCall in toolCalls)
                         {
-                            switch (toolCall.Function.Name)
+                            var function = toolsProvider.FindFunction(toolCall.Function.Name);
+                            if (function != null)
                             {
-                                case "get_chat_history":
-                                    if (toolCall.Function.Arguments.TryGetProperty("limit", out var limit))
-                                    {
-                                        var toolResult = await toolsProvider.GetMessagesAsync(limit.GetInt32(), cancellationToken);
-                                        messagesAppend.Add(new ChatMessage
-                                        {
-                                            Role = "tool",
-                                            Content = JsonSerializer.Serialize(new { status = "success", content = toolResult }),
-                                            ToolCallId = toolCall.Id
-                                        });
-                                    }
-                                    else
-                                    {
-                                        messagesAppend.Add(new ChatMessage
-                                        {
-                                            Role = "tool",
-                                            Content = JsonSerializer.Serialize(new { status = "error", reason = kError_ToolNotExists }),
-                                            ToolCallId = toolCall.Id
-                                        });
-                                    }
-                                    break;
-                                case "get_current_date":
-                                    var currentDateResult = await toolsProvider.GetCurrentDateAsync(cancellationToken);
-                                    messagesAppend.Add(new ChatMessage
-                                    {
-                                        Role = "tool",
-                                        Content = JsonSerializer.Serialize(new { status = "success", content = currentDateResult }),
-                                        ToolCallId = toolCall.Id
-                                    });
-                                    break;
+                                var args = function.BuildArguments(toolCall.Function.Arguments, cancellationToken);
+                                var result = function.Invocable(args);
+                                string toolResult;
+
+                                if (result is Task<string> taskResult)
+                                    toolResult = await taskResult;
+                                else
+                                    toolResult = result?.ToString() ?? string.Empty;
+
+                                messagesAppend.Add(new ChatMessage
+                                {
+                                    Role = "tool",
+                                    Content = JsonSerializer.Serialize(new { status = "success", content = toolResult }),
+                                    ToolCallId = toolCall.Id
+                                });
+                            }
+                            else
+                            {
+                                messagesAppend.Add(new ChatMessage
+                                {
+                                    Role = "tool",
+                                    Content = JsonSerializer.Serialize(new { status = "error", reason = "tool_not_exists" }),
+                                    ToolCallId = toolCall.Id
+                                });
                             }
                         }
                     }

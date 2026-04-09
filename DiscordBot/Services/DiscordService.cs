@@ -40,36 +40,6 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
 
     private static readonly Emoji s_Emoji = "✍️";
 
-    private class ToolsProvider(SocketSelfUser selfUser, SocketMessage message) : IToolsProvider
-    {
-        public async Task<string> GetMessagesAsync(int limit, CancellationToken cancellationToken = default)
-        {
-            List<string> totalMessages = [];
-
-            await foreach (var dmc in message.Channel.GetMessagesAsync(limit, CacheMode.AllowDownload))
-            {
-                foreach (var dm in dmc)
-                {
-                    if (dm.Author.Id == selfUser.Id)
-                    {
-                        totalMessages.Add($"[{dm.CreatedAt}](나의 응답): {dm.Content}");
-                    }
-                    else
-                    {
-                        totalMessages.Add($"[{dm.CreatedAt}]({dm.Author.Username}님의 메시지): {dm.Content}");
-                    }
-                }
-            }
-
-            return string.Join("\n", totalMessages);
-        }
-
-        public Task<string> GetCurrentDateAsync(CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(DateTimeOffset.UtcNow.ToString());
-        }
-    }
-
     private async Task OnMessageReceived(SocketMessage message)
     {
         var content = message.Content;
@@ -100,7 +70,8 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         DateTime? lastEditTime = default;
         bool hasModify = false;
         List<Task> emojiTasks = [];
-        var toolsProvider = new ToolsProvider(m_Socket.CurrentUser, message);
+        var discordTools = new DiscordTools(m_Socket.CurrentUser, message);
+        var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools);
 
         IDisposable? typingState = message.Channel.EnterTypingState();
         string thinkingTicker = "";
