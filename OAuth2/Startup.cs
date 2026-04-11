@@ -9,6 +9,7 @@ using OAuth2.Options;
 using OAuth2.Services;
 using OAuth2.SQL.Migration;
 using SQLMigration;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,15 +34,16 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
            .AddSupportedUICultures(supportedCultures);
 });
 
-var dataProtection = builder.Configuration.GetSection("DataProtection");
-if (dataProtection.Exists())
+var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");
+var redisConnectionString = dataProtection.GetValue<string>("RedisConnectionString");
+if (string.IsNullOrWhiteSpace(redisConnectionString))
 {
-    var keyPath = dataProtection.GetValue<string>("KeyPath")
-        ?? throw new InvalidOperationException("DataProtection:KeyPath is not configured.");
-    builder.Services.AddDataProtection()
-        .PersistKeysToFileSystem(new DirectoryInfo(keyPath))
-        .SetApplicationName("OAuth2");
+    throw new InvalidOperationException("DataProtection:RedisConnectionString is not configured.");
 }
+
+builder.Services.AddDataProtection()
+    .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
+    .SetApplicationName("OAuth2");
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<JwtAuthenticationStateProvider>();
