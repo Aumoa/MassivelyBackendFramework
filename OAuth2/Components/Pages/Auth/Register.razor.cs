@@ -3,8 +3,10 @@ using System.Net.Mail;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 using OAuth2.Localizations;
+using OAuth2.Options;
 using OAuth2.Services;
 
 namespace OAuth2.Components.Pages.Auth;
@@ -15,6 +17,7 @@ public partial class Register(
     NavigationManager nav,
     IJSRuntime js,
     EmailVerify emailVerify,
+    IOptions<RegisterOptions> registerOptions,
     ILogger<Register> logger)
 {
     private readonly struct RequestScope : IDisposable
@@ -122,6 +125,17 @@ public partial class Register(
         {
             m_ErrorMessageEmail = Strings.LOGIN_VALIDATION_ERROR_EMAIL_INVALID_FORMAT;
             return;
+        }
+
+        var allowedDomains = registerOptions.Value.AllowedEmailDomains;
+        if (allowedDomains.Length > 0)
+        {
+            var emailDomain = new MailAddress(m_Email).Host;
+            if (!allowedDomains.Any(d => d.Equals(emailDomain, StringComparison.OrdinalIgnoreCase)))
+            {
+                m_ErrorMessageEmail = Strings.LOGIN_VALIDATION_ERROR_EMAIL_DOMAIN_NOT_ALLOWED;
+                return;
+            }
         }
 
         Interlocked.Increment(ref m_Requesting);

@@ -174,6 +174,9 @@
   <data name="LOGIN_VALIDATION_ERROR_EMAIL_ALREADY_EXISTS" xml:space="preserve">
     <value>The ID or email is already in use.</value>
   </data>
+  <data name="LOGIN_VALIDATION_ERROR_EMAIL_DOMAIN_NOT_ALLOWED" xml:space="preserve">
+    <value>This email domain is not allowed for registration.</value>
+  </data>
   <data name="MANAGEACCOUNTS_PAGE_TITLE" xml:space="preserve">
     <value>My Account</value>
   </data>

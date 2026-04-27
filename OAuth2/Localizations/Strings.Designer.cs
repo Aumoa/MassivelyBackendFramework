@@ -79,6 +79,15 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Add URI과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTFORM_BUTTON_ADD_URI {
+            get {
+                return ResourceManager.GetString("CLIENTFORM_BUTTON_ADD_URI", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Apply과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string CLIENTFORM_BUTTON_APPLY {
@@ -88,11 +97,29 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Cancel과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTFORM_BUTTON_CANCEL {
+            get {
+                return ResourceManager.GetString("CLIENTFORM_BUTTON_CANCEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Remove과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string CLIENTFORM_BUTTON_REMOVE {
             get {
                 return ResourceManager.GetString("CLIENTFORM_BUTTON_REMOVE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   User not found. Please enter a valid user ID, email, or sub.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLIENTFORM_ERROR_USER_NOT_FOUND {
+            get {
+                return ResourceManager.GetString("CLIENTFORM_ERROR_USER_NOT_FOUND", resourceCulture);
             }
         }
         
@@ -277,24 +304,6 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
-        ///   Remove account과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string LOGIN_REMOVE_CACHED_ACCOUNT {
-            get {
-                return ResourceManager.GetString("LOGIN_REMOVE_CACHED_ACCOUNT", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Are you sure you want to remove the '{0}' account?과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string LOGIN_REMOVE_CACHED_ACCOUNT_CONFIRM {
-            get {
-                return ResourceManager.GetString("LOGIN_REMOVE_CACHED_ACCOUNT_CONFIRM", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Login to {0}과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_FORM_TITLE {
@@ -340,11 +349,38 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Remove account과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_REMOVE_CACHED_ACCOUNT {
+            get {
+                return ResourceManager.GetString("LOGIN_REMOVE_CACHED_ACCOUNT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Are you sure you want to remove the &apos;{0}&apos; account?과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_REMOVE_CACHED_ACCOUNT_CONFIRM {
+            get {
+                return ResourceManager.GetString("LOGIN_REMOVE_CACHED_ACCOUNT_CONFIRM", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   The ID or email is already in use.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_VALIDATION_ERROR_EMAIL_ALREADY_EXISTS {
             get {
                 return ResourceManager.GetString("LOGIN_VALIDATION_ERROR_EMAIL_ALREADY_EXISTS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   This email domain is not allowed for registration.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_VALIDATION_ERROR_EMAIL_DOMAIN_NOT_ALLOWED {
+            get {
+                return ResourceManager.GetString("LOGIN_VALIDATION_ERROR_EMAIL_DOMAIN_NOT_ALLOWED", resourceCulture);
             }
         }
         
@@ -417,6 +453,411 @@ namespace OAuth2.Localizations {
         internal static string LOGIN_VALIDATION_ERROR_PW_REQUIRED {
             get {
                 return ResourceManager.GetString("LOGIN_VALIDATION_ERROR_PW_REQUIRED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Created과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_APIKEYS_CREATED_AT {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_CREATED_AT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   No API keys yet. Create a new key to enable programmatic access.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_APIKEYS_EMPTY {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_EMPTY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Key name (e.g. Production)과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_APIKEYS_NAME_PLACEHOLDER {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_NAME_PLACEHOLDER", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   New API Key과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_APIKEYS_NEW_BUTTON {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_NEW_BUTTON", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Remove API key과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_APIKEYS_REMOVE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_REMOVE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Are you sure you want to remove this API key? Any applications using it will lose access.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_APIKEYS_REMOVE_CONFIRM {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_REMOVE_CONFIRM", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   API Keys과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_APIKEYS_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_SECTION", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Manage API keys for programmatic access. Keys are stored securely and cannot be viewed after creation.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_APIKEYS_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_SECTION_DESC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Applications과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_BACK {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_BACK", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Delete application과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_DELETE_BUTTON {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_DELETE_BUTTON", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Are you sure you want to delete this application? The application will be removed from your list.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_DELETE_CONFIRM {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_DELETE_CONFIRM", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   I&apos;ve saved my API key과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_CLOSE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_CLOSE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Copied!과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_COPIED {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_COPIED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Copy과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_COPY {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_COPY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   API Key과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_KEY_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_KEY_LABEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Save your API key과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   This is the only time this key will be shown. Copy it now and store it securely — you won&apos;t be able to retrieve it again.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWAPIKEY_WARNING {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_WARNING", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   I&apos;ve saved my secret과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWSECRET_CLOSE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_CLOSE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Copied!과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWSECRET_COPIED {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_COPIED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Copy과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWSECRET_COPY {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_COPY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Client Secret과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWSECRET_SECRET_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_SECRET_LABEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Save your client secret과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWSECRET_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   This is the only time this secret will be shown. Copy it now and store it securely — you won&apos;t be able to retrieve it again.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_NEWSECRET_WARNING {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_WARNING", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Authorized redirect URIs과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_REDIRECT_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_REDIRECT_SECTION", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   URIs that OAuth2 will redirect to after authorization과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_REDIRECT_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_REDIRECT_SECTION_DESC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Created과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_SECRETS_CREATED_AT {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_CREATED_AT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   No secrets yet. Create a new secret to authenticate your application.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_SECRETS_EMPTY {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_EMPTY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   New Secret과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_SECRETS_NEW_BUTTON {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_NEW_BUTTON", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Remove secret과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_SECRETS_REMOVE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_REMOVE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Are you sure you want to remove this secret? Any applications using it will lose access.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_SECRETS_REMOVE_CONFIRM {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_REMOVE_CONFIRM", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Client Secrets과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_SECRETS_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_SECTION", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Manage client secrets for authentication. Secrets are stored securely and cannot be viewed after creation.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_SECRETS_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_SECTION_DESC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   App settings과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_SETTINGS_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_SETTINGS_SECTION", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   User groups과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_USERGROUPS_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_USERGROUPS_SECTION", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Assign users to groups for this application과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_USERGROUPS_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_USERGROUPS_SECTION_DESC", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Create your first client application to get started과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATIONS_EMPTY_SUBTITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATIONS_EMPTY_SUBTITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   No applications yet과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATIONS_EMPTY_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATIONS_EMPTY_TITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Manage your OAuth2 client applications과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATIONS_SUBTITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATIONS_SUBTITLE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   All clients과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_APIKEYS_ALL_CLIENTS {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_ALL_CLIENTS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   All scopes과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_APIKEYS_ALL_SCOPES {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_ALL_SCOPES", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Client과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Allowed client ID (leave empty for all clients)과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Scope과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_APIKEYS_SCOPE_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SCOPE_LABEL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Allowed scope (leave empty for all scopes)과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Manage personal API keys for programmatic access. Keys are stored securely and cannot be viewed after creation.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_APIKEYS_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SECTION_DESC", resourceCulture);
             }
         }
         
@@ -547,6 +988,78 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Birthdate과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_BIRTHDATE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_BIRTHDATE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Email과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_EMAIL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_EMAIL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Family Name과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_FAMILY_NAME {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_FAMILY_NAME", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Gender과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_GENDER {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_GENDER", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Given Name과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_GIVEN_NAME {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_GIVEN_NAME", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Locale과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_LOCALE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_LOCALE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Display Name과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_NAME {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_NAME", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Nickname과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_NICKNAME {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_NICKNAME", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Password과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string MANAGEACCOUNTS_HEAD_PASSWORD {
@@ -565,11 +1078,56 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Preferred Username과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_PREFERRED_USERNAME {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_PREFERRED_USERNAME", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   User Identifier과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string MANAGEACCOUNTS_HEAD_SUB {
             get {
                 return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_SUB", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Last Updated과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_UPDATEDAT {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_UPDATEDAT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Website과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_WEBSITE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_WEBSITE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Time Zone과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_HEAD_ZONEINFO {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_ZONEINFO", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   My Account과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PAGE_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PAGE_TITLE", resourceCulture);
             }
         }
         
@@ -601,15 +1159,6 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
-        ///   Picture URI must be a valid http or https URL.과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Your picture has been successfully changed. You will be logged out for refresh.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE {
@@ -628,11 +1177,74 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Picture URI must be a valid http or https URL.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Picture Uri과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string MANAGEACCOUNTS_PICTURE_URI {
             get {
                 return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_URI", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Account과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_SECTION_ACCOUNT {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_ACCOUNT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   API Keys과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_SECTION_APIKEYS {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_APIKEYS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Profile과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_SECTION_PROFILE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_PROFILE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Security과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_SECTION_SECURITY {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_SECURITY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Not Verified과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_VALUE_EMAIL_NOT_VERIFIED {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_VALUE_EMAIL_NOT_VERIFIED", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Verified과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_VALUE_EMAIL_VERIFIED {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_VALUE_EMAIL_VERIFIED", resourceCulture);
             }
         }
         
@@ -741,408 +1353,6 @@ namespace OAuth2.Localizations {
         internal static string REGISTER_FORM_TITLE {
             get {
                 return ResourceManager.GetString("REGISTER_FORM_TITLE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATIONS_SUBTITLE {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATIONS_SUBTITLE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATIONS_EMPTY_TITLE {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATIONS_EMPTY_TITLE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATIONS_EMPTY_SUBTITLE {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATIONS_EMPTY_SUBTITLE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_BACK {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_BACK", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_SETTINGS_SECTION {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_SETTINGS_SECTION", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_REDIRECT_SECTION {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_REDIRECT_SECTION", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_REDIRECT_SECTION_DESC {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_REDIRECT_SECTION_DESC", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_USERGROUPS_SECTION {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_USERGROUPS_SECTION", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_USERGROUPS_SECTION_DESC {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_USERGROUPS_SECTION_DESC", resourceCulture);
-            }
-        }
-        
-        internal static string CLIENTFORM_BUTTON_ADD_URI {
-            get {
-                return ResourceManager.GetString("CLIENTFORM_BUTTON_ADD_URI", resourceCulture);
-            }
-        }
-        
-        internal static string CLIENTFORM_BUTTON_CANCEL {
-            get {
-                return ResourceManager.GetString("CLIENTFORM_BUTTON_CANCEL", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_DELETE_CONFIRM {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_DELETE_CONFIRM", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_DELETE_BUTTON {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_DELETE_BUTTON", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_PAGE_TITLE {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_PAGE_TITLE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_SECTION_PROFILE {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_PROFILE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_SECTION_ACCOUNT {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_ACCOUNT", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_SECTION_SECURITY {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_SECURITY", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_NAME {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_NAME", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_EMAIL {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_EMAIL", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_GIVEN_NAME {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_GIVEN_NAME", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_FAMILY_NAME {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_FAMILY_NAME", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_NICKNAME {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_NICKNAME", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_PREFERRED_USERNAME {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_PREFERRED_USERNAME", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_WEBSITE {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_WEBSITE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_GENDER {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_GENDER", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_BIRTHDATE {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_BIRTHDATE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_LOCALE {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_LOCALE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_ZONEINFO {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_ZONEINFO", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_HEAD_UPDATEDAT {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_HEAD_UPDATEDAT", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_VALUE_EMAIL_VERIFIED {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_VALUE_EMAIL_VERIFIED", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGEACCOUNTS_VALUE_EMAIL_NOT_VERIFIED {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_VALUE_EMAIL_NOT_VERIFIED", resourceCulture);
-            }
-        }
-        
-        internal static string CLIENTFORM_ERROR_USER_NOT_FOUND {
-            get {
-                return ResourceManager.GetString("CLIENTFORM_ERROR_USER_NOT_FOUND", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_SECRETS_SECTION {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_SECTION", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_SECRETS_EMPTY {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_EMPTY", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_SECRETS_SECTION_DESC {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_SECTION_DESC", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_SECRETS_NEW_BUTTON {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_NEW_BUTTON", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_SECRETS_CREATED_AT {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_CREATED_AT", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_SECRETS_REMOVE {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_REMOVE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_SECRETS_REMOVE_CONFIRM {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_SECRETS_REMOVE_CONFIRM", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWSECRET_TITLE {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_TITLE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWSECRET_WARNING {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_WARNING", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWSECRET_SECRET_LABEL {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_SECRET_LABEL", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWSECRET_COPY {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_COPY", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWSECRET_COPIED {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_COPIED", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWSECRET_CLOSE {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWSECRET_CLOSE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_APIKEYS_SECTION {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_SECTION", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_APIKEYS_SECTION_DESC {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_SECTION_DESC", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_APIKEYS_NEW_BUTTON {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_NEW_BUTTON", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_APIKEYS_EMPTY {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_EMPTY", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_APIKEYS_CREATED_AT {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_CREATED_AT", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_APIKEYS_REMOVE {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_REMOVE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_APIKEYS_REMOVE_CONFIRM {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_REMOVE_CONFIRM", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWAPIKEY_TITLE {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_TITLE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWAPIKEY_WARNING {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_WARNING", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWAPIKEY_KEY_LABEL {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_KEY_LABEL", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWAPIKEY_COPY {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_COPY", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWAPIKEY_COPIED {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_COPIED", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_NEWAPIKEY_CLOSE {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_NEWAPIKEY_CLOSE", resourceCulture);
-            }
-        }
-        
-        internal static string MANAGE_APPLICATION_APIKEYS_NAME_PLACEHOLDER {
-            get {
-                return ResourceManager.GetString("MANAGE_APPLICATION_APIKEYS_NAME_PLACEHOLDER", resourceCulture);
-            }
-        }
-
-        internal static string MANAGEACCOUNTS_SECTION_APIKEYS {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_APIKEYS", resourceCulture);
-            }
-        }
-
-        internal static string MANAGEACCOUNTS_APIKEYS_SECTION_DESC {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SECTION_DESC", resourceCulture);
-            }
-        }
-
-        internal static string MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER", resourceCulture);
-            }
-        }
-
-        internal static string MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER", resourceCulture);
-            }
-        }
-
-        internal static string MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL", resourceCulture);
-            }
-        }
-
-        internal static string MANAGEACCOUNTS_APIKEYS_SCOPE_LABEL {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SCOPE_LABEL", resourceCulture);
-            }
-        }
-
-        internal static string MANAGEACCOUNTS_APIKEYS_ALL_CLIENTS {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_ALL_CLIENTS", resourceCulture);
-            }
-        }
-
-        internal static string MANAGEACCOUNTS_APIKEYS_ALL_SCOPES {
-            get {
-                return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_ALL_SCOPES", resourceCulture);
             }
         }
     }

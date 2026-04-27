@@ -58,6 +58,7 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddHttpClient();
 builder.Services.AddOAuth2(builder.Configuration.GetRequiredSection("OAuth2"));
 
+builder.Services.Configure<RegisterOptions>(builder.Configuration.GetSection("Register"));
 builder.Services.Configure<EmailVerifyOptions>(builder.Configuration.GetRequiredSection("EmailVerify"));
 builder.Services.AddTransient<EmailVerify>();
 
