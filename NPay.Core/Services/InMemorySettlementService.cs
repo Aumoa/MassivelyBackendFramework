@@ -56,4 +56,7 @@ public class InMemorySettlementService : ISettlementService
         _settlements.RemoveAll(s => s.Id == id);
         return Task.CompletedTask;
     }
+
+    /// <summary>Returns all settlements regardless of owner, for internal service use only.</summary>
+    internal IReadOnlyList<Settlement> GetAllSettlements() => _settlements;
 }

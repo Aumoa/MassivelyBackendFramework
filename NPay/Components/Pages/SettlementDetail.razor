@@ -158,7 +158,9 @@ else
             <div class="inline-form">
                 <div class="inline-form-field">
                     <label class="inline-form-label">@Strings.SETTLEMENT_DETAIL_PARTICIPANT_NAME</label>
-                    <input class="form-input" @bind="newParticipantName" @bind:event="oninput" placeholder="e.g. Alice" maxlength="50" />
+                    <input class="form-input" @bind="newParticipantName" @bind:event="oninput"
+                           @onkeydown="OnParticipantNameKeyDown"
+                           placeholder="e.g. Alice" maxlength="50" />
                 </div>
                 <button class="btn-primary" @onclick="AddParticipantAsync"
                         disabled="@string.IsNullOrWhiteSpace(newParticipantName)"
@@ -200,6 +202,17 @@ else
     <!-- Result Tab -->
     @if (activeTab == Tab.Result)
     {
+        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);">
+            <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm);color:var(--color-text-muted);user-select:none;">
+                <input type="checkbox" @bind="minimizeTransfers" @bind:after="RefreshTransfersAsync"
+                       style="width:16px;height:16px;accent-color:var(--color-accent);cursor:pointer;" />
+                최소 이체 모드
+            </label>
+            <span style="font-size:var(--text-xs);color:var(--color-text-muted);">
+                @(minimizeTransfers ? "이체 횟수를 최소화합니다." : "항목별로 개별 지급합니다.")
+            </span>
+        </div>
+
         @if (isCalculating)
         {
             <div class="transfer-list">
@@ -256,6 +269,7 @@ else
     private string newParticipantName = string.Empty;
 
     // Result
+    private bool minimizeTransfers = false;
     private List<TransferInstruction> transfers = [];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -281,7 +295,7 @@ else
     {
         isCalculating = true;
         StateHasChanged();
-        transfers = [.. await ExpenseService.CalculateTransfersAsync(Id)];
+        transfers = [.. await ExpenseService.CalculateTransfersAsync(Id, minimizeTransfers)];
         isCalculating = false;
         StateHasChanged();
     }
@@ -316,6 +330,11 @@ else
         await ParticipantService.AddParticipantAsync(Id, newParticipantName.Trim());
         newParticipantName = string.Empty;
         await LoadAsync();
+    }
+
+    private async Task OnParticipantNameKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await AddParticipantAsync();
     }
 
     private async Task RemoveParticipantAsync(Guid participantId)

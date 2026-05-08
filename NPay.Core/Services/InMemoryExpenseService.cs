@@ -34,25 +34,52 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
         return expense;
     }
 
-    public async Task RemoveExpenseAsync(Guid expenseId, CancellationToken ct = default)
+    public Task RemoveExpenseAsync(Guid expenseId, CancellationToken ct = default)
     {
-        foreach (var s in (await settlements.GetSettlementsAsync(string.Empty, ct)).ToList())
+        foreach (var s in settlements.GetAllSettlements())
         {
             var e = s.Expenses.FirstOrDefault(e => e.Id == expenseId);
             if (e is not null)
             {
                 s.Expenses.Remove(e);
-                return;
+                return Task.CompletedTask;
             }
         }
+        return Task.CompletedTask;
     }
 
-    public async Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(Guid settlementId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(Guid settlementId, bool minimizeTransfers = false, CancellationToken ct = default)
     {
         var settlement = await settlements.GetSettlementAsync(settlementId, ct)
             ?? throw new InvalidOperationException($"Settlement {settlementId} not found.");
 
-        // Build a balance map: positive = owed to this participant, negative = owes others.
+        var participantName = settlement.Participants.ToDictionary(p => p.Id, p => p.Name);
+
+        if (!minimizeTransfers)
+        {
+            // Per-expense mode: each debtor pays the payer directly for each expense.
+            var result = new List<TransferInstruction>();
+            foreach (var expense in settlement.Expenses)
+            {
+                var splitIds = expense.SplitAmongParticipantIds.Count > 0
+                    ? expense.SplitAmongParticipantIds
+                    : settlement.Participants.Select(p => p.Id).ToList();
+
+                var share = Math.Round(expense.Amount / splitIds.Count, 0);
+                foreach (var pid in splitIds)
+                {
+                    if (pid == expense.PaidByParticipantId) continue;
+                    if (!participantName.ContainsKey(pid)) continue;
+                    result.Add(new TransferInstruction(
+                        participantName.GetValueOrDefault(pid, "?"),
+                        participantName.GetValueOrDefault(expense.PaidByParticipantId, "?"),
+                        share));
+                }
+            }
+            return result;
+        }
+
+        // Greedy minimization mode: build balance map then minimize transfer count.
         var balance = settlement.Participants.ToDictionary(p => p.Id, _ => 0m);
 
         foreach (var expense in settlement.Expenses)
@@ -72,7 +99,6 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
             }
         }
 
-        // Greedy minimization: pair the largest creditor with the largest debtor.
         var creditors = new SortedList<decimal, Queue<Guid>>();
         var debtors = new SortedList<decimal, Queue<Guid>>();
 
@@ -82,8 +108,7 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
             else if (bal < -0.01m) Enqueue(debtors, -bal, pid);
         }
 
-        var result = new List<TransferInstruction>();
-        var participantName = settlement.Participants.ToDictionary(p => p.Id, p => p.Name);
+        var minimized = new List<TransferInstruction>();
 
         while (creditors.Count > 0 && debtors.Count > 0)
         {
@@ -91,7 +116,7 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
             var (debt, debtorId) = Dequeue(debtors);
 
             var transfer = Math.Min(cred, debt);
-            result.Add(new TransferInstruction(
+            minimized.Add(new TransferInstruction(
                 participantName.GetValueOrDefault(debtorId, "?"),
                 participantName.GetValueOrDefault(creditorId, "?"),
                 Math.Round(transfer, 0)));
@@ -100,7 +125,7 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
             if (debt - transfer > 0.01m) Enqueue(debtors, debt - transfer, debtorId);
         }
 
-        return result;
+        return minimized;
 
         static void Enqueue(SortedList<decimal, Queue<Guid>> list, decimal key, Guid id)
         {

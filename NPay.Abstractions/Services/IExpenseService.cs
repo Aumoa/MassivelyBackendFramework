@@ -12,7 +12,9 @@ public interface IExpenseService
     Task RemoveExpenseAsync(Guid expenseId, CancellationToken ct = default);
 
     /// <summary>
-    /// Calculates the minimum set of transfers needed to settle all debts.
+    /// Calculates transfers needed to settle all debts.
+    /// When <paramref name="minimizeTransfers"/> is true, uses greedy debt-minimization (fewer transactions).
+    /// When false, each debtor pays each creditor individually per expense (exact per-expense view).
     /// </summary>
-    Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(Guid settlementId, CancellationToken ct = default);
+    Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(Guid settlementId, bool minimizeTransfers = false, CancellationToken ct = default);
 }
