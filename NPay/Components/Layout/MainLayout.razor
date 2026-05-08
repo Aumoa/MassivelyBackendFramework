@@ -1,29 +1,39 @@
 @inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Routing
 
 <AuthorizeView>
     <Authorized>
-        <div class="page">
-            <div class="sidebar">
-                <NavMenu Title="@Strings.APP_TITLE" Items="Items" />
-            </div>
+        <div class="npay-shell">
+            <!-- Top navigation bar -->
+            <header class="npay-topbar">
+                <a class="npay-topbar-brand" href="/">NPay</a>
 
-            <main>
-                <div class="top-row px-4">
-                    <div class="ms-auto d-flex align-items-center">
-                        <ProfileCard />
-                    </div>
+                <nav class="npay-topbar-nav">
+                    <NavLink class="npay-nav-link" href="/" Match="NavLinkMatch.All">
+                        <span class="material-symbols-outlined">home</span>
+                        @Strings.NAVMENU_LABEL_HOME
+                    </NavLink>
+                    <NavLink class="npay-nav-link" href="/settlements">
+                        <span class="material-symbols-outlined">receipt_long</span>
+                        @Strings.NAVMENU_LABEL_SETTLEMENTS
+                    </NavLink>
+                </nav>
+
+                <div class="npay-topbar-end">
+                    <ProfileCard />
                 </div>
+            </header>
 
-                <article class="content px-4">
-                    @Body
-                </article>
+            <!-- Page content -->
+            <main class="npay-main">
+                @Body
             </main>
         </div>
 
         <div id="blazor-error-ui">
             @Strings.ERROR_UNHANDLED
             <a href="" class="reload">@Strings.ERROR_RELOAD</a>
-            <a class="dismiss">🗙</a>
+            <span class="dismiss">✕</span>
         </div>
     </Authorized>
     <NotAuthorized>
@@ -31,10 +41,3 @@
     </NotAuthorized>
 </AuthorizeView>
 
-@code {
-    private static readonly NavMenu.NavMenuItem[] Items =
-    [
-        new(Strings.NAVMENU_LABEL_HOME, "home", "/", true),
-        new(Strings.NAVMENU_LABEL_SETTLEMENTS, "receipt_long", "/settlements", false),
-    ];
-}

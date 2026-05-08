@@ -11,33 +11,37 @@
 
 @if (isLoading)
 {
-    <p class="text-muted">@Strings.LOADING</p>
+    <div class="page-header">
+        <span class="skeleton" style="width:240px;height:1.75rem;"></span>
+    </div>
 }
 else if (settlement is null)
 {
-    <div class="alert alert-warning">@Strings.SETTLEMENT_DETAIL_NOT_FOUND</div>
+    <div class="alert-info">@Strings.SETTLEMENT_DETAIL_NOT_FOUND</div>
 }
 else
 {
-    <div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
-        <div>
-            <h1>@settlement.Title</h1>
-            @if (!string.IsNullOrWhiteSpace(settlement.Description))
+    <div class="page-header">
+        <div class="page-header-row">
+            <div>
+                <h1 class="page-title">@settlement.Title</h1>
+                @if (!string.IsNullOrWhiteSpace(settlement.Description))
+                {
+                    <p class="page-subtitle">@settlement.Description</p>
+                }
+            </div>
+            @if (settlement.Status == SettlementStatus.Open)
             {
-                <p>@settlement.Description</p>
+                <button class="btn-ghost" @onclick="CloseSettlementAsync">
+                    <span class="material-symbols-outlined" style="font-size:16px;">lock</span>
+                    @Strings.SETTLEMENT_DETAIL_BUTTON_CLOSE
+                </button>
+            }
+            else
+            {
+                <span class="badge badge-closed">@Strings.SETTLEMENTS_STATUS_CLOSED</span>
             }
         </div>
-        @if (settlement.Status == SettlementStatus.Open)
-        {
-            <button class="btn-primary-npay" @onclick="CloseSettlementAsync">
-                <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle;">lock</span>
-                @Strings.SETTLEMENT_DETAIL_BUTTON_CLOSE
-            </button>
-        }
-        else
-        {
-            <span class="badge-closed">@Strings.SETTLEMENTS_STATUS_CLOSED</span>
-        }
     </div>
 
     <!-- Tabs -->
@@ -58,71 +62,59 @@ else
     {
         @if (settlement.Status == SettlementStatus.Open && settlement.Participants.Count > 0)
         {
-            <div class="npay-card mb-4">
-                <div class="row g-2 align-items-end">
-                    <div class="col-12 col-sm-4">
-                        <label class="form-label fw-semibold">@Strings.SETTLEMENT_DETAIL_EXPENSE_LABEL</label>
-                        <input class="form-control" @bind="newExpenseLabel" placeholder="e.g. Beer" maxlength="100" />
-                    </div>
-                    <div class="col-6 col-sm-2">
-                        <label class="form-label fw-semibold">@Strings.SETTLEMENT_DETAIL_EXPENSE_AMOUNT</label>
-                        <input class="form-control" type="number" min="1" @bind="newExpenseAmount" />
-                    </div>
-                    <div class="col-6 col-sm-3">
-                        <label class="form-label fw-semibold">@Strings.SETTLEMENT_DETAIL_EXPENSE_PAID_BY</label>
-                        <select class="form-select" @bind="newExpensePaidBy">
-                            <option value="">—</option>
-                            @foreach (var p in settlement.Participants)
-                            {
-                                <option value="@p.Id">@p.Name</option>
-                            }
-                        </select>
-                    </div>
-                    <div class="col-12 col-sm-3 d-flex align-items-end">
-                        <button class="btn-primary-npay w-100" @onclick="AddExpenseAsync"
-                                disabled="@(string.IsNullOrWhiteSpace(newExpenseLabel) || newExpenseAmount <= 0 || newExpensePaidBy == Guid.Empty)">
-                            @Strings.SETTLEMENT_DETAIL_EXPENSE_ADD
-                        </button>
-                    </div>
+            <div class="inline-form">
+                <div class="inline-form-field" style="flex:2;">
+                    <label class="inline-form-label">@Strings.SETTLEMENT_DETAIL_EXPENSE_LABEL</label>
+                    <input class="form-input" @bind="newExpenseLabel" placeholder="e.g. Beer" maxlength="100" />
                 </div>
+                <div class="inline-form-field" style="flex:1;min-width:100px;">
+                    <label class="inline-form-label">@Strings.SETTLEMENT_DETAIL_EXPENSE_AMOUNT</label>
+                    <input class="form-input" type="number" min="1" @bind="newExpenseAmount" />
+                </div>
+                <div class="inline-form-field" style="flex:2;">
+                    <label class="inline-form-label">@Strings.SETTLEMENT_DETAIL_EXPENSE_PAID_BY</label>
+                    <select class="form-select" @bind="newExpensePaidBy">
+                        <option value="">—</option>
+                        @foreach (var p in settlement.Participants)
+                        {
+                            <option value="@p.Id">@p.Name</option>
+                        }
+                    </select>
+                </div>
+                <button class="btn-primary" @onclick="AddExpenseAsync"
+                        disabled="@(string.IsNullOrWhiteSpace(newExpenseLabel) || newExpenseAmount <= 0 || newExpensePaidBy == Guid.Empty)"
+                        style="flex-shrink:0;align-self:flex-end;">
+                    @Strings.SETTLEMENT_DETAIL_EXPENSE_ADD
+                </button>
             </div>
         }
 
         @if (settlement.Expenses.Count == 0)
         {
-            <p class="text-muted">@Strings.SETTLEMENT_DETAIL_EXPENSE_EMPTY</p>
+            <div class="empty-state">
+                <span class="material-symbols-outlined">receipt</span>
+                <p>@Strings.SETTLEMENT_DETAIL_EXPENSE_EMPTY</p>
+            </div>
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>@Strings.SETTLEMENT_DETAIL_EXPENSE_LABEL</th>
-                            <th>@Strings.SETTLEMENT_DETAIL_EXPENSE_AMOUNT</th>
-                            <th>@Strings.SETTLEMENT_DETAIL_EXPENSE_PAID_BY</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var e in settlement.Expenses)
+            <div class="item-list">
+                @foreach (var e in settlement.Expenses)
+                {
+                    <div class="item-row">
+                        <span class="item-row-label">@e.Label</span>
+                        <span class="item-row-sub">@ParticipantName(e.PaidByParticipantId)</span>
+                        <span class="item-row-amount">@e.Amount.ToString("N0") ₩</span>
+                        @if (settlement.Status == SettlementStatus.Open)
                         {
-                            <tr>
-                                <td>@e.Label</td>
-                                <td>@e.Amount.ToString("N0") ₩</td>
-                                <td>@ParticipantName(e.PaidByParticipantId)</td>
-                                <td>
-                                    @if (settlement.Status == SettlementStatus.Open)
-                                    {
-                                        <button class="link-button text-danger" @onclick="() => RemoveExpenseAsync(e.Id)">
-                                            @Strings.BUTTON_DELETE
-                                        </button>
-                                    }
-                                </td>
-                            </tr>
+                            <span class="item-row-action">
+                                <button class="btn-danger" @onclick="() => RemoveExpenseAsync(e.Id)">
+                                    @Strings.BUTTON_DELETE
+                                </button>
+                            </span>
                         }
-                    </tbody>
-                </table>
+                    </div>
+                }
             </div>
         }
     }
@@ -132,43 +124,45 @@ else
     {
         @if (settlement.Status == SettlementStatus.Open)
         {
-            <div class="npay-card mb-4">
-                <div class="d-flex gap-2 align-items-end">
-                    <div class="flex-grow-1">
-                        <label class="form-label fw-semibold">@Strings.SETTLEMENT_DETAIL_PARTICIPANT_NAME</label>
-                        <input class="form-control" @bind="newParticipantName" placeholder="e.g. Alice" maxlength="50" />
-                    </div>
-                    <button class="btn-primary-npay" @onclick="AddParticipantAsync"
-                            disabled="@string.IsNullOrWhiteSpace(newParticipantName)">
-                        @Strings.SETTLEMENT_DETAIL_PARTICIPANT_ADD
-                    </button>
+            <div class="inline-form">
+                <div class="inline-form-field">
+                    <label class="inline-form-label">@Strings.SETTLEMENT_DETAIL_PARTICIPANT_NAME</label>
+                    <input class="form-input" @bind="newParticipantName" placeholder="e.g. Alice" maxlength="50" />
                 </div>
+                <button class="btn-primary" @onclick="AddParticipantAsync"
+                        disabled="@string.IsNullOrWhiteSpace(newParticipantName)"
+                        style="flex-shrink:0;align-self:flex-end;">
+                    @Strings.SETTLEMENT_DETAIL_PARTICIPANT_ADD
+                </button>
             </div>
         }
 
         @if (settlement.Participants.Count == 0)
         {
-            <p class="text-muted">@Strings.SETTLEMENT_DETAIL_PARTICIPANT_EMPTY</p>
+            <div class="empty-state">
+                <span class="material-symbols-outlined">group</span>
+                <p>@Strings.SETTLEMENT_DETAIL_PARTICIPANT_EMPTY</p>
+            </div>
         }
         else
         {
-            <ul class="list-group">
+            <div class="item-list">
                 @foreach (var p in settlement.Participants)
                 {
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span>
-                            <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle;color:#6d28d9;">person</span>
-                            @p.Name
-                        </span>
+                    <div class="item-row">
+                        <span class="material-symbols-outlined" style="font-size:18px;color:var(--color-text-muted);">person</span>
+                        <span class="item-row-label">@p.Name</span>
                         @if (settlement.Status == SettlementStatus.Open)
                         {
-                            <button class="link-button text-danger" @onclick="() => RemoveParticipantAsync(p.Id)">
-                                @Strings.BUTTON_DELETE
-                            </button>
+                            <span class="item-row-action">
+                                <button class="btn-danger" @onclick="() => RemoveParticipantAsync(p.Id)">
+                                    @Strings.BUTTON_DELETE
+                                </button>
+                            </span>
                         }
-                    </li>
+                    </div>
                 }
-            </ul>
+            </div>
         }
     }
 
@@ -177,27 +171,33 @@ else
     {
         @if (isCalculating)
         {
-            <p class="text-muted">@Strings.LOADING</p>
+            <div class="transfer-list">
+                @for (int i = 0; i < 2; i++)
+                {
+                    <div class="transfer-card">
+                        <span class="skeleton" style="width:200px;"></span>
+                    </div>
+                }
+            </div>
         }
         else if (transfers.Count == 0)
         {
-            <div class="npay-card text-center py-4 text-muted">
-                <span class="material-symbols-outlined" style="font-size:3rem;color:#10b981;">check_circle</span>
-                <p class="mt-2 mb-0 fw-semibold">@Strings.SETTLEMENT_DETAIL_RESULT_EMPTY</p>
+            <div class="empty-state">
+                <span class="material-symbols-outlined" style="color:var(--color-success);">check_circle</span>
+                <p>@Strings.SETTLEMENT_DETAIL_RESULT_EMPTY</p>
             </div>
         }
         else
         {
-            <div class="d-flex flex-column gap-2">
+            <div class="transfer-list">
                 @foreach (var t in transfers)
                 {
                     <div class="transfer-card">
-                        <span class="material-symbols-outlined" style="color:#6d28d9;">arrow_forward</span>
-                        <span><strong>@t.FromParticipantName</strong></span>
-                        <span class="text-muted">@Strings.SETTLEMENT_DETAIL_RESULT_PAYS</span>
-                        <span class="amount">@t.Amount.ToString("N0") ₩</span>
-                        <span class="text-muted">@Strings.SETTLEMENT_DETAIL_RESULT_TO</span>
-                        <span><strong>@t.ToParticipantName</strong></span>
+                        <span class="transfer-from">@t.FromParticipantName</span>
+                        <span class="material-symbols-outlined transfer-arrow">arrow_forward</span>
+                        <span class="transfer-amount">@t.Amount.ToString("N0") ₩</span>
+                        <span style="color:var(--color-text-muted);font-size:var(--text-sm);">@Strings.SETTLEMENT_DETAIL_RESULT_TO</span>
+                        <span class="transfer-to">@t.ToParticipantName</span>
                     </div>
                 }
             </div>
@@ -248,6 +248,52 @@ else
     private async Task RefreshTransfersAsync()
     {
         isCalculating = true;
+        StateHasChanged();
+        transfers = [.. await ExpenseService.CalculateTransfersAsync(Id)];
+        isCalculating = false;
+        StateHasChanged();
+    }
+
+    private async Task AddExpenseAsync()
+    {
+        if (settlement is null || string.IsNullOrWhiteSpace(newExpenseLabel) || newExpensePaidBy == Guid.Empty) return;
+        await ExpenseService.AddExpenseAsync(Id, newExpenseLabel.Trim(), newExpenseAmount, newExpensePaidBy);
+        newExpenseLabel = string.Empty;
+        newExpenseAmount = 0;
+        newExpensePaidBy = Guid.Empty;
+        await LoadAsync();
+    }
+
+    private async Task RemoveExpenseAsync(Guid expenseId)
+    {
+        await ExpenseService.RemoveExpenseAsync(expenseId);
+        await LoadAsync();
+    }
+
+    private async Task AddParticipantAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newParticipantName)) return;
+        await ParticipantService.AddParticipantAsync(Id, newParticipantName.Trim());
+        newParticipantName = string.Empty;
+        await LoadAsync();
+    }
+
+    private async Task RemoveParticipantAsync(Guid participantId)
+    {
+        await ParticipantService.RemoveParticipantAsync(participantId);
+        await LoadAsync();
+    }
+
+    private async Task CloseSettlementAsync()
+    {
+        await SettlementService.CloseSettlementAsync(Id);
+        await LoadAsync();
+    }
+
+    private string ParticipantName(Guid id) =>
+        settlement?.Participants.FirstOrDefault(p => p.Id == id)?.Name ?? "?";
+}
+
         StateHasChanged();
         transfers = [.. await ExpenseService.CalculateTransfersAsync(Id)];
         isCalculating = false;
