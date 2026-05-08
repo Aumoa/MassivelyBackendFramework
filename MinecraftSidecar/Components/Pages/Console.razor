@@ -35,7 +35,7 @@
                     <div class="console-output" style="background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 4px; min-height: 400px; max-height: 600px; font-family: 'Consolas', monospace; overflow-y: auto;">
                         @foreach (var log in consoleOutput)
                         {
-                            <p style="margin: 0; padding: 2px 0;">@log</p>
+                            <p style="margin: 0; padding: 2px 0; white-space: pre-wrap; word-break: break-word;">@log</p>
                         }
                     </div>
                     <div class="console-input mt-3">
@@ -102,12 +102,7 @@
                 
                 if (!string.IsNullOrWhiteSpace(response))
                 {
-                    // ���� �� ���� ó��
-                    var lines = response.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var line in lines)
-                    {
-                        consoleOutput.Add($"  {line.Trim()}");
-                    }
+                    consoleOutput.Add($"  {response}");
                 }
                 else
                 {
