@@ -58,7 +58,8 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
         if (!minimizeTransfers)
         {
             // Per-expense mode: each debtor pays the payer directly for each expense.
-            var result = new List<TransferInstruction>();
+            // Entries with the same (from, to) pair are merged into a single transfer.
+            var grouped = new Dictionary<(Guid from, Guid to), decimal>();
             foreach (var expense in settlement.Expenses)
             {
                 var splitIds = expense.SplitAmongParticipantIds.Count > 0
@@ -70,13 +71,17 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
                 {
                     if (pid == expense.PaidByParticipantId) continue;
                     if (!participantName.ContainsKey(pid)) continue;
-                    result.Add(new TransferInstruction(
-                        participantName.GetValueOrDefault(pid, "?"),
-                        participantName.GetValueOrDefault(expense.PaidByParticipantId, "?"),
-                        share));
+                    var key = (pid, expense.PaidByParticipantId);
+                    grouped[key] = grouped.GetValueOrDefault(key, 0m) + share;
                 }
             }
-            return result;
+
+            return grouped
+                .Select(kv => new TransferInstruction(
+                    participantName.GetValueOrDefault(kv.Key.from, "?"),
+                    participantName.GetValueOrDefault(kv.Key.to, "?"),
+                    kv.Value))
+                .ToList();
         }
 
         // Greedy minimization mode: build balance map then minimize transfer count.
