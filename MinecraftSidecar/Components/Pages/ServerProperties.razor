@@ -1,0 +1,163 @@
+@page "/server-properties"
+@rendermode InteractiveServer
+@inject IOptions<ServerPropertiesOptions> Options
+@using Microsoft.Extensions.Options
+@using MinecraftSidecar.Options
+
+<PageTitle>@Strings.APP_TITLE - @Strings.SERVER_PROPERTIES_TITLE</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1>
+                        <span class="material-symbols-outlined" style="vertical-align: middle;">settings</span>
+                        @Strings.SERVER_PROPERTIES_TITLE
+                    </h1>
+                    <p class="lead">@Strings.SERVER_PROPERTIES_SUBTITLE</p>
+                </div>
+                <div>
+                    <button class="btn btn-outline-primary" @onclick="OnRefreshClick">
+                        <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">refresh</span>
+                        @Strings.BUTTON_REFRESH
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    @if (isLoading)
+                    {
+                        <p class="text-muted">@Strings.SERVER_PROPERTIES_LOADING</p>
+                    }
+                    else if (fileNotFound)
+                    {
+                        <div class="alert alert-warning">
+                            <span class="material-symbols-outlined" style="vertical-align: middle;">warning</span>
+                            @Strings.SERVER_PROPERTIES_FILE_NOT_FOUND
+                            <br />
+                            <small class="text-muted">@filePath</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 40%;">@Strings.SERVER_PROPERTIES_COL_KEY</th>
+                                    <th>@Strings.SERVER_PROPERTIES_COL_VALUE</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var entry in entries)
+                                {
+                                    @if (entry.IsComment)
+                                    {
+                                        <tr class="table-secondary">
+                                            <td colspan="2" class="text-muted fst-italic" style="font-size: 0.85em;">
+                                                @entry.Raw
+                                            </td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        <tr>
+                                            <td><code>@entry.Key</code></td>
+                                            <td>@entry.Value</td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isLoading = true;
+    private bool fileNotFound = false;
+    private string filePath = string.Empty;
+    private List<PropertyEntry> entries = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProperties();
+    }
+
+    private async Task OnRefreshClick()
+    {
+        await LoadProperties();
+    }
+
+    private async Task LoadProperties()
+    {
+        isLoading = true;
+        fileNotFound = false;
+        entries.Clear();
+
+        filePath = Options.Value.FilePath;
+
+        try
+        {
+            if (!File.Exists(filePath))
+            {
+                fileNotFound = true;
+                return;
+            }
+
+            var lines = await File.ReadAllLinesAsync(filePath);
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+
+                if (string.IsNullOrEmpty(trimmed))
+                    continue;
+
+                if (trimmed.StartsWith('#'))
+                {
+                    entries.Add(new PropertyEntry { IsComment = true, Raw = trimmed });
+                    continue;
+                }
+
+                var eqIndex = trimmed.IndexOf('=');
+                if (eqIndex >= 0)
+                {
+                    entries.Add(new PropertyEntry
+                    {
+                        Key = trimmed[..eqIndex],
+                        Value = trimmed[(eqIndex + 1)..]
+                    });
+                }
+                else
+                {
+                    entries.Add(new PropertyEntry { Key = trimmed, Value = string.Empty });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            entries.Clear();
+            entries.Add(new PropertyEntry { IsComment = true, Raw = $"# Error: {ex.Message}" });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private sealed class PropertyEntry
+    {
+        public bool IsComment { get; init; }
+        public string Raw { get; init; } = string.Empty;
+        public string Key { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
+    }
+}

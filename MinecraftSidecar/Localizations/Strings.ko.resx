@@ -243,4 +243,25 @@
   <data name="PLAYERS_TITLE" xml:space="preserve">
     <value>온라인 플레이어</value>
   </data>
+  <data name="SERVER_PROPERTIES_TITLE" xml:space="preserve">
+    <value>서버 속성</value>
+  </data>
+  <data name="SERVER_PROPERTIES_SUBTITLE" xml:space="preserve">
+    <value>server.properties 읽기 전용 보기</value>
+  </data>
+  <data name="SERVER_PROPERTIES_COL_KEY" xml:space="preserve">
+    <value>키</value>
+  </data>
+  <data name="SERVER_PROPERTIES_COL_VALUE" xml:space="preserve">
+    <value>값</value>
+  </data>
+  <data name="SERVER_PROPERTIES_FILE_NOT_FOUND" xml:space="preserve">
+    <value>server.properties 파일을 찾을 수 없습니다.</value>
+  </data>
+  <data name="SERVER_PROPERTIES_LOADING" xml:space="preserve">
+    <value>server.properties 불러오는 중...</value>
+  </data>
+  <data name="NAVMENU_LABEL_SERVER_PROPERTIES" xml:space="preserve">
+    <value>서버 속성</value>
+  </data>
 </root>

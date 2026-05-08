@@ -425,5 +425,47 @@ namespace MinecraftSidecar.Localizations {
                 return ResourceManager.GetString("PLAYERS_TITLE", resourceCulture);
             }
         }
+
+        internal static string SERVER_PROPERTIES_TITLE {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_TITLE", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_SUBTITLE {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_SUBTITLE", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_COL_KEY {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_COL_KEY", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_COL_VALUE {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_COL_VALUE", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_FILE_NOT_FOUND {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_FILE_NOT_FOUND", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_LOADING {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_LOADING", resourceCulture);
+            }
+        }
+
+        internal static string NAVMENU_LABEL_SERVER_PROPERTIES {
+            get {
+                return ResourceManager.GetString("NAVMENU_LABEL_SERVER_PROPERTIES", resourceCulture);
+            }
+        }
     }
 }

@@ -50,6 +50,8 @@ builder.Services.Configure<ServerLogOptions>(builder.Configuration.GetSection("S
 builder.Services.AddSingleton<ServerLogService>();
 builder.Services.AddHostedService(p => p.GetRequiredService<ServerLogService>());
 
+builder.Services.Configure<ServerPropertiesOptions>(builder.Configuration.GetSection("ServerProperties"));
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
