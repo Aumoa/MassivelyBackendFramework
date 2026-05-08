@@ -40,7 +40,9 @@ builder.Services.AddHttpClient();
 builder.Services.AddOpenIDConnect(builder.Configuration);
 
 // Register NPay business logic services.
-builder.Services.AddNPay();
+var nPayConnectionString = builder.Configuration.GetConnectionString("NPay")
+    ?? throw new InvalidOperationException("ConnectionStrings:NPay is not configured.");
+builder.Services.AddNPay(nPayConnectionString);
 
 var app = builder.Build();
 

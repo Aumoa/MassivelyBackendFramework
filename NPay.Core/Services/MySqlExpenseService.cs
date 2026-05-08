@@ -1,25 +1,23 @@
+using Dapper;
+using MySql.Data.MySqlClient;
 using NPay.Models;
 using NPay.Services;
 
 namespace NPay.Core.Services;
 
 /// <summary>
-/// In-memory stub implementation of <see cref="IExpenseService"/>.
-/// Includes a greedy debt-minimization algorithm for transfer calculation.
+/// MySQL-backed implementation of <see cref="IExpenseService"/>.
+/// Calculation logic is identical to the in-memory version.
 /// </summary>
-public class InMemoryExpenseService(InMemorySettlementService settlements) : IExpenseService
+public class MySqlExpenseService(string connectionString, MySqlSettlementService settlementService) : IExpenseService
 {
+    private MySqlConnection Open() => new(connectionString);
+
     public async Task<Expense> AddExpenseAsync(
-        Guid settlementId,
-        string label,
-        decimal amount,
-        Guid paidByParticipantId,
-        IEnumerable<Guid>? splitAmong = null,
+        Guid settlementId, string label, decimal amount,
+        Guid paidByParticipantId, IEnumerable<Guid>? splitAmong = null,
         CancellationToken cancellationToken = default)
     {
-        var settlement = await settlements.GetSettlementAsync(settlementId, cancellationToken)
-            ?? throw new InvalidOperationException($"Settlement {settlementId} not found.");
-
         var expense = new Expense
         {
             Id = Guid.NewGuid(),
@@ -30,35 +28,56 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
             SplitAmongParticipantIds = splitAmong?.ToList() ?? [],
             CreatedAt = DateTimeOffset.UtcNow
         };
-        settlement.Expenses.Add(expense);
+
+        const string expenseSql = """
+            INSERT INTO `npay_expense` (`id`, `settlement_id`, `label`, `amount`, `paid_by_participant_id`, `created_at`)
+            VALUES (@Id, @SettlementId, @Label, @Amount, @PaidBy, @CreatedAt)
+            """;
+        const string splitSql = """
+            INSERT INTO `npay_expense_split` (`expense_id`, `participant_id`) VALUES (@ExpenseId, @ParticipantId)
+            """;
+
+        await using var conn = Open();
+        await conn.ExecuteAsync(expenseSql, new
+        {
+            Id = expense.Id.ToString(),
+            SettlementId = settlementId.ToString(),
+            expense.Label,
+            expense.Amount,
+            PaidBy = paidByParticipantId.ToString(),
+            CreatedAt = expense.CreatedAt.UtcDateTime
+        });
+
+        foreach (var pid in expense.SplitAmongParticipantIds)
+        {
+            await conn.ExecuteAsync(splitSql, new
+            {
+                ExpenseId = expense.Id.ToString(),
+                ParticipantId = pid.ToString()
+            });
+        }
+
         return expense;
     }
 
-    public Task RemoveExpenseAsync(Guid expenseId, CancellationToken cancellationToken = default)
+    public async Task RemoveExpenseAsync(Guid expenseId, CancellationToken cancellationToken = default)
     {
-        foreach (var s in settlements.GetAllSettlements())
-        {
-            var e = s.Expenses.FirstOrDefault(e => e.Id == expenseId);
-            if (e is not null)
-            {
-                s.Expenses.Remove(e);
-                return Task.CompletedTask;
-            }
-        }
-        return Task.CompletedTask;
+        const string sql = "DELETE FROM `npay_expense` WHERE `id` = @id";
+        await using var conn = Open();
+        await conn.ExecuteAsync(sql, new { id = expenseId.ToString() });
     }
 
-    public async Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(Guid settlementId, bool minimizeTransfers = false, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(
+        Guid settlementId, bool minimizeTransfers = false, CancellationToken cancellationToken = default)
     {
-        var settlement = await settlements.GetSettlementAsync(settlementId, cancellationToken)
+        var settlement = await settlementService.GetSettlementAsync(settlementId, cancellationToken)
             ?? throw new InvalidOperationException($"Settlement {settlementId} not found.");
 
         var participantName = settlement.Participants.ToDictionary(p => p.Id, p => p.Name);
 
         if (!minimizeTransfers)
         {
-            // Per-expense mode: each debtor pays the payer directly for each expense.
-            // Entries with the same (from, to) pair are merged into a single transfer.
+            // Per-expense mode: merge transfers with the same (from, to) pair.
             var grouped = new Dictionary<(Guid from, Guid to), decimal>();
             foreach (var expense in settlement.Expenses)
             {

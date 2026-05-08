@@ -10,16 +10,16 @@ namespace NPay.Core.Extensions;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers NPay business logic services with the DI container.
+    /// Registers NPay business logic services backed by MySQL.
+    /// Requires a "NPay" connection string in configuration.
     /// </summary>
-    public static IServiceCollection AddNPay(this IServiceCollection services)
+    public static IServiceCollection AddNPay(this IServiceCollection services, string connectionString)
     {
-        // Register in-memory implementations for now.
-        // Swap these with MySQL-backed implementations when the database schema is ready.
-        services.AddSingleton<InMemorySettlementService>();
-        services.AddSingleton<ISettlementService>(sp => sp.GetRequiredService<InMemorySettlementService>());
-        services.AddSingleton<IParticipantService, InMemoryParticipantService>();
-        services.AddSingleton<IExpenseService, InMemoryExpenseService>();
+        services.AddSingleton(new MySqlSettlementService(connectionString));
+        services.AddSingleton<ISettlementService>(sp => sp.GetRequiredService<MySqlSettlementService>());
+        services.AddSingleton<IParticipantService>(new MySqlParticipantService(connectionString));
+        services.AddSingleton<IExpenseService>(sp =>
+            new MySqlExpenseService(connectionString, sp.GetRequiredService<MySqlSettlementService>()));
         return services;
     }
 }

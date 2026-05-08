@@ -8,9 +8,9 @@ namespace NPay.Core.Services;
 /// </summary>
 public class InMemoryParticipantService(InMemorySettlementService settlements) : IParticipantService
 {
-    public async Task<Participant> AddParticipantAsync(Guid settlementId, string name, string? subject = null, CancellationToken ct = default)
+    public async Task<Participant> AddParticipantAsync(Guid settlementId, string name, string? subject = null, CancellationToken cancellationToken = default)
     {
-        var settlement = await settlements.GetSettlementAsync(settlementId, ct)
+        var settlement = await settlements.GetSettlementAsync(settlementId, cancellationToken)
             ?? throw new InvalidOperationException($"Settlement {settlementId} not found.");
 
         var participant = new Participant
@@ -24,9 +24,9 @@ public class InMemoryParticipantService(InMemorySettlementService settlements) :
         return participant;
     }
 
-    public async Task RemoveParticipantAsync(Guid participantId, CancellationToken ct = default)
+    public async Task RemoveParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
     {
-        foreach (var s in (await settlements.GetSettlementsAsync(string.Empty, ct)).ToList())
+        foreach (var s in (await settlements.GetSettlementsAsync(string.Empty, cancellationToken)).ToList())
         {
             var p = s.Participants.FirstOrDefault(p => p.Id == participantId);
             if (p is not null)
