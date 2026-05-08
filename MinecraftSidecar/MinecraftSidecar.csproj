@@ -10,6 +10,8 @@
   <ItemGroup>
     <PackageReference Include="CoreRCON" Version="5.4.2" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.5" />
+    <PackageReference Include="StackExchange.Redis" Version="2.9.25" />
   </ItemGroup>
 
   <ItemGroup>
