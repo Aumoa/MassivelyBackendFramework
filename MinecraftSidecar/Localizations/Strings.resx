@@ -213,6 +213,18 @@
   <data name="NAVMENU_LABEL_SERVER_CONSOLE" xml:space="preserve">
     <value>Terminal</value>
   </data>
+  <data name="NAVMENU_LABEL_SERVER_LOG" xml:space="preserve">
+    <value>Server Log</value>
+  </data>
+  <data name="SERVERLOG_TITLE" xml:space="preserve">
+    <value>Server Log</value>
+  </data>
+  <data name="SERVERLOG_STATUS_WATCHING" xml:space="preserve">
+    <value>Watching</value>
+  </data>
+  <data name="SERVERLOG_STATUS_FILE_NOT_FOUND" xml:space="preserve">
+    <value>Log file not found</value>
+  </data>
   <data name="PLAYERS_BUTTON_KICK" xml:space="preserve">
     <value>Kick</value>
   </data>

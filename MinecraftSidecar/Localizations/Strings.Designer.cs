@@ -347,7 +347,31 @@ namespace MinecraftSidecar.Localizations {
                 return ResourceManager.GetString("NAVMENU_LABEL_SERVER_CONSOLE", resourceCulture);
             }
         }
-        
+
+        internal static string NAVMENU_LABEL_SERVER_LOG {
+            get {
+                return ResourceManager.GetString("NAVMENU_LABEL_SERVER_LOG", resourceCulture);
+            }
+        }
+
+        internal static string SERVERLOG_TITLE {
+            get {
+                return ResourceManager.GetString("SERVERLOG_TITLE", resourceCulture);
+            }
+        }
+
+        internal static string SERVERLOG_STATUS_WATCHING {
+            get {
+                return ResourceManager.GetString("SERVERLOG_STATUS_WATCHING", resourceCulture);
+            }
+        }
+
+        internal static string SERVERLOG_STATUS_FILE_NOT_FOUND {
+            get {
+                return ResourceManager.GetString("SERVERLOG_STATUS_FILE_NOT_FOUND", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Kick과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>

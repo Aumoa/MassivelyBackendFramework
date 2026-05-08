@@ -46,6 +46,10 @@ builder.Services.Configure<RCONOptions>(builder.Configuration.GetRequiredSection
 builder.Services.AddSingleton<RCONClient>();
 builder.Services.AddHostedService(p => p.GetRequiredService<RCONClient>());
 
+builder.Services.Configure<ServerLogOptions>(builder.Configuration.GetSection("ServerLog"));
+builder.Services.AddSingleton<ServerLogService>();
+builder.Services.AddHostedService(p => p.GetRequiredService<ServerLogService>());
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

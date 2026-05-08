@@ -213,6 +213,18 @@
   <data name="NAVMENU_LABEL_SERVER_CONSOLE" xml:space="preserve">
     <value>터미널</value>
   </data>
+  <data name="NAVMENU_LABEL_SERVER_LOG" xml:space="preserve">
+    <value>서버 로그</value>
+  </data>
+  <data name="SERVERLOG_TITLE" xml:space="preserve">
+    <value>서버 로그</value>
+  </data>
+  <data name="SERVERLOG_STATUS_WATCHING" xml:space="preserve">
+    <value>모니터링 중</value>
+  </data>
+  <data name="SERVERLOG_STATUS_FILE_NOT_FOUND" xml:space="preserve">
+    <value>로그 파일을 찾을 수 없음</value>
+  </data>
   <data name="PLAYERS_BUTTON_KICK" xml:space="preserve">
     <value>추방</value>
   </data>

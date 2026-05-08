@@ -1,0 +1,88 @@
+@page "/server-log"
+@rendermode InteractiveServer
+@using MinecraftSidecar.Services
+@inject ServerLogService LogService
+@implements IDisposable
+
+<PageTitle>@Strings.APP_TITLE - @Strings.SERVERLOG_TITLE</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>
+                    <span class="material-symbols-outlined" style="vertical-align: middle;">article</span>
+                    @Strings.SERVERLOG_TITLE
+                </h1>
+                <div>
+                    @if (m_FileFound)
+                    {
+                        <span class="badge bg-success">@Strings.SERVERLOG_STATUS_WATCHING</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning text-dark">@Strings.SERVERLOG_STATUS_FILE_NOT_FOUND</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body p-0">
+                    <div @ref="m_ScrollContainer"
+                         style="background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 4px; min-height: 400px; max-height: 70vh; font-family: 'Consolas', monospace; font-size: 0.85rem; overflow-y: auto;">
+                        @foreach (var line in m_Lines)
+                        {
+                            <div style="margin: 0; padding: 1px 0; white-space: pre-wrap; word-break: break-word;">@line</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<string> m_Lines = [];
+    private bool m_FileFound;
+    private ElementReference m_ScrollContainer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var initial = await LogService.GetInitialLinesAsync();
+        m_Lines = [..initial];
+        m_FileFound = m_Lines.Count > 0;
+        LogService.LineReceived += OnLineReceived;
+    }
+
+    public void Dispose()
+    {
+        LogService.LineReceived -= OnLineReceived;
+        GC.SuppressFinalize(this);
+    }
+
+    private void OnLineReceived(string line)
+    {
+        InvokeAsync(async () =>
+        {
+            m_Lines.Add(line);
+            m_FileFound = true;
+            StateHasChanged();
+            // Scroll to bottom after render
+            await Task.Yield();
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("scrollToBottom", m_ScrollContainer);
+            }
+            catch
+            {
+                // JS interop may fail during prerender or disposal; ignore
+            }
+        });
+    }
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+}
