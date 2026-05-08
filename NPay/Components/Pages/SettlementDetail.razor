@@ -127,10 +127,11 @@ else
                     <tr class="item-row">
                         <td class="item-row-label">@e.Label</td>
                         <td class="item-row-sub" style="white-space:nowrap;">
-                            @ParticipantName(e.PaidByParticipantId)
+                            <span style="font-weight:500;color:var(--color-text-primary);">@ParticipantName(e.PaidByParticipantId)</span>
                             @if (e.SplitAmongParticipantIds.Count > 0)
                             {
-                                <span> · @string.Join(", ", e.SplitAmongParticipantIds.Select(id => ParticipantName(id)))</span>
+                                <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;margin:0 2px;color:var(--color-text-muted);">arrow_forward</span>
+                                <span>@string.Join(", ", e.SplitAmongParticipantIds.Select(id => ParticipantName(id)))</span>
                             }
                         </td>
                         <td class="item-row-amount" style="white-space:nowrap;">@e.Amount.ToString("N0") ₩</td>
@@ -157,7 +158,7 @@ else
             <div class="inline-form">
                 <div class="inline-form-field">
                     <label class="inline-form-label">@Strings.SETTLEMENT_DETAIL_PARTICIPANT_NAME</label>
-                    <input class="form-input" @bind="newParticipantName" placeholder="e.g. Alice" maxlength="50" />
+                    <input class="form-input" @bind="newParticipantName" @bind:event="oninput" placeholder="e.g. Alice" maxlength="50" />
                 </div>
                 <button class="btn-primary" @onclick="AddParticipantAsync"
                         disabled="@string.IsNullOrWhiteSpace(newParticipantName)"
