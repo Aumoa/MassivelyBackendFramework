@@ -270,14 +270,16 @@
 
     private void ParseTpsCommand(string response)
     {
-        // "TPS from last 1m, 5m, 15m: 20.0, 20.0, 20.0" ���� �Ľ�
-        var parts = response.Split(':');
+        // "TPS from last 1m, 5m, 15m: 20.0, 20.0, 20.0" format
+        // Strip Minecraft color codes (e.g., §a, §r) before parsing
+        var clean = System.Text.RegularExpressions.Regex.Replace(response, @"§[0-9a-fk-or]", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var parts = clean.Split(':');
         if (parts.Length >= 2)
         {
             var tpsValues = parts[1].Split(',');
-            if (tpsValues.Length > 0 && double.TryParse(tpsValues[0].Trim(), out var tps))
+            if (tpsValues.Length > 0 && double.TryParse(tpsValues[0].Trim().TrimEnd('*'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var tps))
             {
-                serverTps = tps;
+                serverTps = Math.Min(20.0, Math.Max(0, tps));
                 tpsHistory.Add(new TpsEntry(DateTime.UtcNow, serverTps));
                 if (tpsHistory.Count > 50)
                 {
@@ -289,11 +291,12 @@
 
     private long ParseGameTime(string response)
     {
-        // "The time is 12345" ���Ŀ��� ���� ����
-        var parts = response.Split(' ');
-        for (int i = 0; i < parts.Length; i++)
+        // "The time is 12345" - strip color codes and parse number
+        var clean = System.Text.RegularExpressions.Regex.Replace(response, @"§[0-9a-fk-or]", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var parts = clean.Split(' ');
+        for (int i = parts.Length - 1; i >= 0; i--)
         {
-            if (long.TryParse(parts[i], out var time))
+            if (long.TryParse(parts[i].Trim(), out var time))
             {
                 return time;
             }
