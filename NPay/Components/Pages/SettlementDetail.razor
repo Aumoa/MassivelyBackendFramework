@@ -62,8 +62,8 @@ else
     {
         @if (settlement.Status == SettlementStatus.Open && settlement.Participants.Count > 0)
         {
-            <div class="inline-form">
-                <div class="inline-form-field" style="flex:2;">
+            <div class="inline-form" style="flex-wrap:wrap;">
+                <div class="inline-form-field" style="flex:2;min-width:140px;">
                     <label class="inline-form-label">@Strings.SETTLEMENT_DETAIL_EXPENSE_LABEL</label>
                     <input class="form-input" @bind="newExpenseLabel" placeholder="e.g. Beer" maxlength="100" />
                 </div>
@@ -71,7 +71,7 @@ else
                     <label class="inline-form-label">@Strings.SETTLEMENT_DETAIL_EXPENSE_AMOUNT</label>
                     <input class="form-input" type="number" min="1" @bind="newExpenseAmount" />
                 </div>
-                <div class="inline-form-field" style="flex:2;">
+                <div class="inline-form-field" style="flex:2;min-width:140px;">
                     <label class="inline-form-label">@Strings.SETTLEMENT_DETAIL_EXPENSE_PAID_BY</label>
                     <select class="form-select" @bind="newExpensePaidBy">
                         <option value="">—</option>
@@ -80,6 +80,22 @@ else
                             <option value="@p.Id">@p.Name</option>
                         }
                     </select>
+                </div>
+                <div class="inline-form-field" style="flex:100%;margin-top:0;">
+                    <label class="inline-form-label">참여 인원 <span style="font-weight:400;color:var(--color-text-muted);">(미선택 시 전원 참여)</span></label>
+                    <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-1);">
+                        @foreach (var p in settlement.Participants)
+                        {
+                            var pid = p.Id;
+                            var checked_ = newExpenseSplitAmong.Contains(pid);
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--text-sm);padding:4px 10px;border-radius:var(--radius-full);border:1px solid @(checked_ ? "var(--color-accent)" : "var(--color-border)");background:@(checked_ ? "var(--color-accent)" : "transparent");color:@(checked_ ? "#fff" : "var(--color-text)");">
+                                <input type="checkbox" style="display:none;"
+                                       checked="@checked_"
+                                       @onchange="() => ToggleSplitParticipant(pid)" />
+                                @p.Name
+                            </label>
+                        }
+                    </div>
                 </div>
                 <button class="btn-primary" @onclick="AddExpenseAsync"
                         disabled="@(string.IsNullOrWhiteSpace(newExpenseLabel) || newExpenseAmount <= 0 || newExpensePaidBy == Guid.Empty)"
@@ -98,24 +114,38 @@ else
         }
         else
         {
-            <div class="item-list">
+            <table class="item-table">
+                <colgroup>
+                    <col style="width:100%;" />
+                    <col style="width:1px;" />
+                    <col style="width:1px;" />
+                    <col style="width:1px;" />
+                </colgroup>
+                <tbody>
                 @foreach (var e in settlement.Expenses)
                 {
-                    <div class="item-row">
-                        <span class="item-row-label">@e.Label</span>
-                        <span class="item-row-sub">@ParticipantName(e.PaidByParticipantId)</span>
-                        <span class="item-row-amount">@e.Amount.ToString("N0") ₩</span>
-                        @if (settlement.Status == SettlementStatus.Open)
-                        {
-                            <span class="item-row-action">
+                    <tr class="item-row">
+                        <td class="item-row-label">@e.Label</td>
+                        <td class="item-row-sub" style="white-space:nowrap;">
+                            @ParticipantName(e.PaidByParticipantId)
+                            @if (e.SplitAmongParticipantIds.Count > 0)
+                            {
+                                <span> · @string.Join(", ", e.SplitAmongParticipantIds.Select(id => ParticipantName(id)))</span>
+                            }
+                        </td>
+                        <td class="item-row-amount" style="white-space:nowrap;">@e.Amount.ToString("N0") ₩</td>
+                        <td class="item-row-action">
+                            @if (settlement.Status == SettlementStatus.Open)
+                            {
                                 <button class="btn-danger" @onclick="() => RemoveExpenseAsync(e.Id)">
                                     @Strings.BUTTON_DELETE
                                 </button>
-                            </span>
-                        }
-                    </div>
+                            }
+                        </td>
+                    </tr>
                 }
-            </div>
+                </tbody>
+            </table>
         }
     }
 
@@ -149,7 +179,7 @@ else
             <div class="item-list">
                 @foreach (var p in settlement.Participants)
                 {
-                    <div class="item-row">
+                    <div class="item-row item-row-participant">
                         <span class="material-symbols-outlined" style="font-size:18px;color:var(--color-text-muted);">person</span>
                         <span class="item-row-label">@p.Name</span>
                         @if (settlement.Status == SettlementStatus.Open)
@@ -219,6 +249,7 @@ else
     private string newExpenseLabel = string.Empty;
     private decimal newExpenseAmount;
     private Guid newExpensePaidBy;
+    private HashSet<Guid> newExpenseSplitAmong = [];
 
     // New participant form
     private string newParticipantName = string.Empty;
@@ -257,11 +288,19 @@ else
     private async Task AddExpenseAsync()
     {
         if (settlement is null || string.IsNullOrWhiteSpace(newExpenseLabel) || newExpensePaidBy == Guid.Empty) return;
-        await ExpenseService.AddExpenseAsync(Id, newExpenseLabel.Trim(), newExpenseAmount, newExpensePaidBy);
+        await ExpenseService.AddExpenseAsync(Id, newExpenseLabel.Trim(), newExpenseAmount, newExpensePaidBy,
+            newExpenseSplitAmong.Count > 0 ? newExpenseSplitAmong : null);
         newExpenseLabel = string.Empty;
         newExpenseAmount = 0;
         newExpensePaidBy = Guid.Empty;
+        newExpenseSplitAmong = [];
         await LoadAsync();
+    }
+
+    private void ToggleSplitParticipant(Guid id)
+    {
+        if (!newExpenseSplitAmong.Remove(id))
+            newExpenseSplitAmong.Add(id);
     }
 
     private async Task RemoveExpenseAsync(Guid expenseId)

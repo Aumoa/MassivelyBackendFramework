@@ -619,22 +619,35 @@ button {
     overflow: hidden;
 }
 
+.item-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+/* expense rows */
 .item-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-3) var(--space-5);
-    border-bottom: 1px solid var(--color-border);
     background: var(--color-bg);
     font-size: var(--text-sm);
 }
 
-    .item-row:last-child {
-        border-bottom: none;
+    .item-row:not(:last-child) td {
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .item-row td {
+        padding: var(--space-3) var(--space-4);
+        vertical-align: middle;
+    }
+
+    /* participant rows only need [icon | name | action] */
+    .item-row.item-row-participant {
+        grid-template-columns: 20px 1fr 60px;
     }
 
 .item-row-label {
-    flex: 1;
     font-weight: 500;
     color: var(--color-text-primary);
 }
@@ -648,11 +661,15 @@ button {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: var(--color-text-primary);
+    text-align: right;
 }
 
 .item-row-action {
     opacity: 0;
     transition: opacity var(--transition);
+    text-align: right;
+    width: 1px;
+    white-space: nowrap;
 }
 
 .item-row:hover .item-row-action {
