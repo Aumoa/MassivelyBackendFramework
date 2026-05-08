@@ -4,7 +4,7 @@ using OpenIDConnect;
 namespace MinecraftSidecar.Controllers;
 
 [Route("auth")]
-public class AuthController(IAuthenticationStateProvider auth) : ControllerBase
+public class AuthController(IAuthenticationStateProvider auth, ILogger<AuthController> logger) : ControllerBase
 {
     [HttpGet("redirect")]
     public async ValueTask<IActionResult> RedirectAsync([FromQuery] string code, CancellationToken cancellationToken)
@@ -14,7 +14,12 @@ public class AuthController(IAuthenticationStateProvider auth) : ControllerBase
             return BadRequest("Authorization code is required.");
         }
 
-        await auth.AcceptAsync(code, HttpContext.Request.Scheme + "://" + HttpContext.Request.Host + HttpContext.Request.Path, cancellationToken);
+        string uri = HttpContext.Request.Scheme + "://" + HttpContext.Request.Host + HttpContext.Request.Path;
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation("Redirecting with authorization code: {Code}, URI: {Uri}", code, uri);
+        }
+        await auth.AcceptAsync(code, uri, cancellationToken);
         return Redirect("/");
     }
 }
