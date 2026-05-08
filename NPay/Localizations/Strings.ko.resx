@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+	<xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+	<xsd:element name="root" msdata:IsDataSet="true">
+	  <xsd:complexType>
+		<xsd:choice maxOccurs="unbounded">
+		  <xsd:element name="metadata">
+			<xsd:complexType>
+			  <xsd:sequence>
+				<xsd:element name="value" type="xsd:string" minOccurs="0" />
+			  </xsd:sequence>
+			  <xsd:attribute name="name" use="required" type="xsd:string" />
+			  <xsd:attribute name="type" type="xsd:string" />
+			  <xsd:attribute name="mimetype" type="xsd:string" />
+			  <xsd:attribute ref="xml:space" />
+			</xsd:complexType>
+		  </xsd:element>
+		  <xsd:element name="assembly">
+			<xsd:complexType>
+			  <xsd:attribute name="alias" type="xsd:string" />
+			  <xsd:attribute name="name" type="xsd:string" />
+			</xsd:complexType>
+		  </xsd:element>
+		  <xsd:element name="data">
+			<xsd:complexType>
+			  <xsd:sequence>
+				<xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+				<xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+			  </xsd:sequence>
+			  <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+			  <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+			  <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+			  <xsd:attribute ref="xml:space" />
+			</xsd:complexType>
+		  </xsd:element>
+		  <xsd:element name="resheader">
+			<xsd:complexType>
+			  <xsd:sequence>
+				<xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+			  </xsd:sequence>
+			  <xsd:attribute name="name" type="xsd:string" use="required" />
+			</xsd:complexType>
+		  </xsd:element>
+		</xsd:choice>
+	  </xsd:complexType>
+	</xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+	<value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+	<value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+	<value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+	<value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- App -->
+  <data name="APP_TITLE" xml:space="preserve">
+	<value>NPay</value>
+  </data>
+
+  <!-- Common -->
+  <data name="BUTTON_CONFIRM" xml:space="preserve">
+	<value>확인</value>
+  </data>
+  <data name="BUTTON_CANCEL" xml:space="preserve">
+	<value>취소</value>
+  </data>
+  <data name="BUTTON_DELETE" xml:space="preserve">
+	<value>삭제</value>
+  </data>
+  <data name="BUTTON_ADD" xml:space="preserve">
+	<value>추가</value>
+  </data>
+  <data name="BUTTON_CLOSE" xml:space="preserve">
+	<value>닫기</value>
+  </data>
+  <data name="LOADING" xml:space="preserve">
+	<value>불러오는 중...</value>
+  </data>
+  <data name="ERROR_RELOAD" xml:space="preserve">
+	<value>새로고침</value>
+  </data>
+  <data name="ERROR_UNHANDLED" xml:space="preserve">
+	<value>처리되지 않은 오류가 발생했습니다.</value>
+  </data>
+
+  <!-- NavMenu -->
+  <data name="NAVMENU_LABEL_HOME" xml:space="preserve">
+	<value>홈</value>
+  </data>
+  <data name="NAVMENU_LABEL_SETTLEMENTS" xml:space="preserve">
+	<value>정산 목록</value>
+  </data>
+
+  <!-- Home page -->
+  <data name="HOME_TITLE" xml:space="preserve">
+	<value>NPay에 오신 것을 환영합니다</value>
+  </data>
+  <data name="HOME_SUBTITLE" xml:space="preserve">
+	<value>친구들과의 금액 정산을 간편하게 관리하세요.</value>
+  </data>
+  <data name="HOME_CARD_SETTLEMENTS_TITLE" xml:space="preserve">
+	<value>내 정산 목록</value>
+  </data>
+  <data name="HOME_CARD_SETTLEMENTS_DESC" xml:space="preserve">
+	<value>진행 중인 정산 그룹을 확인하고 관리하세요.</value>
+  </data>
+  <data name="HOME_CARD_SETTLEMENTS_BUTTON" xml:space="preserve">
+	<value>정산 목록으로 이동</value>
+  </data>
+  <data name="HOME_CARD_CREATE_TITLE" xml:space="preserve">
+	<value>정산 만들기</value>
+  </data>
+  <data name="HOME_CARD_CREATE_DESC" xml:space="preserve">
+	<value>식사, 여행 등 공동 지출을 위한 새 정산 그룹을 시작하세요.</value>
+  </data>
+  <data name="HOME_CARD_CREATE_BUTTON" xml:space="preserve">
+	<value>새 정산 만들기</value>
+  </data>
+
+  <!-- Settlements list page -->
+  <data name="SETTLEMENTS_TITLE" xml:space="preserve">
+	<value>정산 목록</value>
+  </data>
+  <data name="SETTLEMENTS_SUBTITLE" xml:space="preserve">
+	<value>나의 정산 그룹</value>
+  </data>
+  <data name="SETTLEMENTS_BUTTON_NEW" xml:space="preserve">
+	<value>새 정산</value>
+  </data>
+  <data name="SETTLEMENTS_EMPTY" xml:space="preserve">
+	<value>정산 내역이 없습니다. 새 정산을 만들어 보세요!</value>
+  </data>
+  <data name="SETTLEMENTS_COL_TITLE" xml:space="preserve">
+	<value>제목</value>
+  </data>
+  <data name="SETTLEMENTS_COL_STATUS" xml:space="preserve">
+	<value>상태</value>
+  </data>
+  <data name="SETTLEMENTS_COL_CREATED" xml:space="preserve">
+	<value>생성일</value>
+  </data>
+  <data name="SETTLEMENTS_COL_PARTICIPANTS" xml:space="preserve">
+	<value>참여자 수</value>
+  </data>
+  <data name="SETTLEMENTS_COL_ACTIONS" xml:space="preserve">
+	<value>작업</value>
+  </data>
+  <data name="SETTLEMENTS_STATUS_OPEN" xml:space="preserve">
+	<value>진행 중</value>
+  </data>
+  <data name="SETTLEMENTS_STATUS_CLOSED" xml:space="preserve">
+	<value>완료</value>
+  </data>
+  <data name="SETTLEMENTS_BUTTON_OPEN" xml:space="preserve">
+	<value>열기</value>
+  </data>
+  <data name="SETTLEMENTS_BUTTON_DELETE" xml:space="preserve">
+	<value>삭제</value>
+  </data>
+
+  <!-- Create settlement page -->
+  <data name="CREATE_SETTLEMENT_TITLE" xml:space="preserve">
+	<value>새 정산 만들기</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_SUBTITLE" xml:space="preserve">
+	<value>새로운 정산 그룹을 시작합니다</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_LABEL_TITLE" xml:space="preserve">
+	<value>제목</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_PLACEHOLDER_TITLE" xml:space="preserve">
+	<value>예) 금요일 저녁 모임</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_LABEL_DESC" xml:space="preserve">
+	<value>설명 (선택)</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_PLACEHOLDER_DESC" xml:space="preserve">
+	<value>이 정산에 대한 간단한 메모</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_BUTTON_CREATE" xml:space="preserve">
+	<value>만들기</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_BUTTON_CANCEL" xml:space="preserve">
+	<value>취소</value>
+  </data>
+
+  <!-- Settlement detail page -->
+  <data name="SETTLEMENT_DETAIL_TAB_EXPENSES" xml:space="preserve">
+	<value>지출 내역</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_TAB_PARTICIPANTS" xml:space="preserve">
+	<value>참여자</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_TAB_RESULT" xml:space="preserve">
+	<value>정산 결과</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_BUTTON_CLOSE" xml:space="preserve">
+	<value>정산 마감</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_LABEL" xml:space="preserve">
+	<value>항목</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_AMOUNT" xml:space="preserve">
+	<value>금액 (₩)</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_PAID_BY" xml:space="preserve">
+	<value>결제자</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_SPLIT" xml:space="preserve">
+	<value>분담 대상 (비어 있으면 전체)</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_ADD" xml:space="preserve">
+	<value>지출 추가</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_EMPTY" xml:space="preserve">
+	<value>지출 내역이 없습니다.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_PARTICIPANT_NAME" xml:space="preserve">
+	<value>이름</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_PARTICIPANT_ADD" xml:space="preserve">
+	<value>참여자 추가</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_PARTICIPANT_EMPTY" xml:space="preserve">
+	<value>참여자가 없습니다.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_EMPTY" xml:space="preserve">
+	<value>모든 정산이 완료되었습니다! 송금이 필요하지 않습니다.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_PAYS" xml:space="preserve">
+	<value>이(가)</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_TO" xml:space="preserve">
+	<value>에게</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_NOT_FOUND" xml:space="preserve">
+	<value>정산을 찾을 수 없습니다.</value>
+  </data>
+</root>

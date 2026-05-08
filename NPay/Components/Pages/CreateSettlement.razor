@@ -1,0 +1,53 @@
+@page "/settlements/new"
+@rendermode InteractiveServer
+@using NPay.Services
+@inject ISettlementService SettlementService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>@Strings.CREATE_SETTLEMENT_TITLE — @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1>@Strings.CREATE_SETTLEMENT_TITLE</h1>
+    <p>@Strings.CREATE_SETTLEMENT_SUBTITLE</p>
+</div>
+
+<div class="row">
+    <div class="col-12 col-md-6">
+        <div class="npay-card">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">@Strings.CREATE_SETTLEMENT_LABEL_TITLE</label>
+                <input class="form-control" @bind="title" placeholder="@Strings.CREATE_SETTLEMENT_PLACEHOLDER_TITLE" maxlength="100" />
+            </div>
+            <div class="mb-4">
+                <label class="form-label fw-semibold">@Strings.CREATE_SETTLEMENT_LABEL_DESC</label>
+                <textarea class="form-control" @bind="description" rows="3" placeholder="@Strings.CREATE_SETTLEMENT_PLACEHOLDER_DESC" maxlength="300"></textarea>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn-primary-npay" @onclick="CreateAsync" disabled="@(isBusy || string.IsNullOrWhiteSpace(title))">
+                    @Strings.CREATE_SETTLEMENT_BUTTON_CREATE
+                </button>
+                <button @onclick='() => Nav.NavigateTo("/settlements")' disabled="@isBusy">
+                    @Strings.CREATE_SETTLEMENT_BUTTON_CANCEL
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string title = string.Empty;
+    private string? description;
+    private bool isBusy;
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(title)) return;
+        isBusy = true;
+
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        var subject = auth.User.FindFirst("sub")?.Value ?? string.Empty;
+        var settlement = await SettlementService.CreateSettlementAsync(subject, title.Trim(), description?.Trim());
+        Nav.NavigateTo($"/settlements/{settlement.Id}");
+    }
+}

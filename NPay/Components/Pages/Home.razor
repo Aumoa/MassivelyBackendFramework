@@ -1,0 +1,69 @@
+@page "/"
+@rendermode InteractiveServer
+@using NPay.Models
+@using NPay.Services
+@inject ISettlementService SettlementService
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>@Strings.HOME_TITLE — @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1>@Strings.HOME_TITLE</h1>
+    <p>@Strings.HOME_SUBTITLE</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-12 col-md-6">
+        <div class="npay-card h-100 d-flex flex-column">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <span class="material-symbols-outlined" style="color:#6d28d9;font-size:2rem;">receipt_long</span>
+                <h5 class="mb-0 fw-bold">@Strings.HOME_CARD_SETTLEMENTS_TITLE</h5>
+            </div>
+            <p class="text-muted flex-grow-1">@Strings.HOME_CARD_SETTLEMENTS_DESC</p>
+            @if (isLoading)
+            {
+                <p class="text-muted small">@Strings.LOADING</p>
+            }
+            else
+            {
+                <p class="fw-semibold" style="color:#6d28d9;">
+                    @openCount @(openCount == 1 ? "active settlement" : "active settlements")
+                </p>
+            }
+            <button class="btn-primary-npay mt-2 align-self-start" @onclick='() => Nav.NavigateTo("/settlements")'>
+                @Strings.HOME_CARD_SETTLEMENTS_BUTTON
+            </button>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6">
+        <div class="npay-card h-100 d-flex flex-column">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <span class="material-symbols-outlined" style="color:#6d28d9;font-size:2rem;">add_circle</span>
+                <h5 class="mb-0 fw-bold">@Strings.HOME_CARD_CREATE_TITLE</h5>
+            </div>
+            <p class="text-muted flex-grow-1">@Strings.HOME_CARD_CREATE_DESC</p>
+            <button class="btn-primary-npay mt-2 align-self-start" @onclick='() => Nav.NavigateTo("/settlements/new")'>
+                @Strings.HOME_CARD_CREATE_BUTTON
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool isLoading = true;
+    private int openCount = 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        var subject = auth.User.FindFirst("sub")?.Value ?? string.Empty;
+        var settlements = await SettlementService.GetSettlementsAsync(subject);
+        openCount = settlements.Count(s => s.Status == SettlementStatus.Open);
+        isLoading = false;
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+	<xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+	<xsd:element name="root" msdata:IsDataSet="true">
+	  <xsd:complexType>
+		<xsd:choice maxOccurs="unbounded">
+		  <xsd:element name="metadata">
+			<xsd:complexType>
+			  <xsd:sequence>
+				<xsd:element name="value" type="xsd:string" minOccurs="0" />
+			  </xsd:sequence>
+			  <xsd:attribute name="name" use="required" type="xsd:string" />
+			  <xsd:attribute name="type" type="xsd:string" />
+			  <xsd:attribute name="mimetype" type="xsd:string" />
+			  <xsd:attribute ref="xml:space" />
+			</xsd:complexType>
+		  </xsd:element>
+		  <xsd:element name="assembly">
+			<xsd:complexType>
+			  <xsd:attribute name="alias" type="xsd:string" />
+			  <xsd:attribute name="name" type="xsd:string" />
+			</xsd:complexType>
+		  </xsd:element>
+		  <xsd:element name="data">
+			<xsd:complexType>
+			  <xsd:sequence>
+				<xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+				<xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+			  </xsd:sequence>
+			  <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+			  <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+			  <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+			  <xsd:attribute ref="xml:space" />
+			</xsd:complexType>
+		  </xsd:element>
+		  <xsd:element name="resheader">
+			<xsd:complexType>
+			  <xsd:sequence>
+				<xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+			  </xsd:sequence>
+			  <xsd:attribute name="name" type="xsd:string" use="required" />
+			</xsd:complexType>
+		  </xsd:element>
+		</xsd:choice>
+	  </xsd:complexType>
+	</xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+	<value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+	<value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+	<value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+	<value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- App -->
+  <data name="APP_TITLE" xml:space="preserve">
+	<value>NPay</value>
+  </data>
+
+  <!-- Common -->
+  <data name="BUTTON_CONFIRM" xml:space="preserve">
+	<value>Confirm</value>
+  </data>
+  <data name="BUTTON_CANCEL" xml:space="preserve">
+	<value>Cancel</value>
+  </data>
+  <data name="BUTTON_DELETE" xml:space="preserve">
+	<value>Delete</value>
+  </data>
+  <data name="BUTTON_ADD" xml:space="preserve">
+	<value>Add</value>
+  </data>
+  <data name="BUTTON_CLOSE" xml:space="preserve">
+	<value>Close</value>
+  </data>
+  <data name="LOADING" xml:space="preserve">
+	<value>Loading...</value>
+  </data>
+  <data name="ERROR_RELOAD" xml:space="preserve">
+	<value>Reload</value>
+  </data>
+  <data name="ERROR_UNHANDLED" xml:space="preserve">
+	<value>An unhandled error has occurred.</value>
+  </data>
+
+  <!-- NavMenu -->
+  <data name="NAVMENU_LABEL_HOME" xml:space="preserve">
+	<value>Home</value>
+  </data>
+  <data name="NAVMENU_LABEL_SETTLEMENTS" xml:space="preserve">
+	<value>Settlements</value>
+  </data>
+
+  <!-- Home page -->
+  <data name="HOME_TITLE" xml:space="preserve">
+	<value>Welcome to NPay</value>
+  </data>
+  <data name="HOME_SUBTITLE" xml:space="preserve">
+	<value>Split bills and settle up with friends, simply.</value>
+  </data>
+  <data name="HOME_CARD_SETTLEMENTS_TITLE" xml:space="preserve">
+	<value>My Settlements</value>
+  </data>
+  <data name="HOME_CARD_SETTLEMENTS_DESC" xml:space="preserve">
+	<value>View and manage your active bill-splitting groups.</value>
+  </data>
+  <data name="HOME_CARD_SETTLEMENTS_BUTTON" xml:space="preserve">
+	<value>Go to Settlements</value>
+  </data>
+  <data name="HOME_CARD_CREATE_TITLE" xml:space="preserve">
+	<value>Create Settlement</value>
+  </data>
+  <data name="HOME_CARD_CREATE_DESC" xml:space="preserve">
+	<value>Start a new group for a dinner, trip, or any shared expense.</value>
+  </data>
+  <data name="HOME_CARD_CREATE_BUTTON" xml:space="preserve">
+	<value>New Settlement</value>
+  </data>
+
+  <!-- Settlements list page -->
+  <data name="SETTLEMENTS_TITLE" xml:space="preserve">
+	<value>Settlements</value>
+  </data>
+  <data name="SETTLEMENTS_SUBTITLE" xml:space="preserve">
+	<value>Your bill-splitting groups</value>
+  </data>
+  <data name="SETTLEMENTS_BUTTON_NEW" xml:space="preserve">
+	<value>New Settlement</value>
+  </data>
+  <data name="SETTLEMENTS_EMPTY" xml:space="preserve">
+	<value>No settlements yet. Create one to get started!</value>
+  </data>
+  <data name="SETTLEMENTS_COL_TITLE" xml:space="preserve">
+	<value>Title</value>
+  </data>
+  <data name="SETTLEMENTS_COL_STATUS" xml:space="preserve">
+	<value>Status</value>
+  </data>
+  <data name="SETTLEMENTS_COL_CREATED" xml:space="preserve">
+	<value>Created</value>
+  </data>
+  <data name="SETTLEMENTS_COL_PARTICIPANTS" xml:space="preserve">
+	<value>Participants</value>
+  </data>
+  <data name="SETTLEMENTS_COL_ACTIONS" xml:space="preserve">
+	<value>Actions</value>
+  </data>
+  <data name="SETTLEMENTS_STATUS_OPEN" xml:space="preserve">
+	<value>Open</value>
+  </data>
+  <data name="SETTLEMENTS_STATUS_CLOSED" xml:space="preserve">
+	<value>Closed</value>
+  </data>
+  <data name="SETTLEMENTS_BUTTON_OPEN" xml:space="preserve">
+	<value>Open</value>
+  </data>
+  <data name="SETTLEMENTS_BUTTON_DELETE" xml:space="preserve">
+	<value>Delete</value>
+  </data>
+
+  <!-- Create settlement page -->
+  <data name="CREATE_SETTLEMENT_TITLE" xml:space="preserve">
+	<value>New Settlement</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_SUBTITLE" xml:space="preserve">
+	<value>Start a new bill-splitting group</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_LABEL_TITLE" xml:space="preserve">
+	<value>Title</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_PLACEHOLDER_TITLE" xml:space="preserve">
+	<value>e.g. Friday dinner</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_LABEL_DESC" xml:space="preserve">
+	<value>Description (optional)</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_PLACEHOLDER_DESC" xml:space="preserve">
+	<value>A short memo about this settlement</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_BUTTON_CREATE" xml:space="preserve">
+	<value>Create</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_BUTTON_CANCEL" xml:space="preserve">
+	<value>Cancel</value>
+  </data>
+
+  <!-- Settlement detail page -->
+  <data name="SETTLEMENT_DETAIL_TAB_EXPENSES" xml:space="preserve">
+	<value>Expenses</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_TAB_PARTICIPANTS" xml:space="preserve">
+	<value>Participants</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_TAB_RESULT" xml:space="preserve">
+	<value>Result</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_BUTTON_CLOSE" xml:space="preserve">
+	<value>Close Settlement</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_LABEL" xml:space="preserve">
+	<value>Label</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_AMOUNT" xml:space="preserve">
+	<value>Amount (₩)</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_PAID_BY" xml:space="preserve">
+	<value>Paid by</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_SPLIT" xml:space="preserve">
+	<value>Split among (empty = all)</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_ADD" xml:space="preserve">
+	<value>Add Expense</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_EMPTY" xml:space="preserve">
+	<value>No expenses yet.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_PARTICIPANT_NAME" xml:space="preserve">
+	<value>Name</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_PARTICIPANT_ADD" xml:space="preserve">
+	<value>Add Participant</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_PARTICIPANT_EMPTY" xml:space="preserve">
+	<value>No participants yet.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_EMPTY" xml:space="preserve">
+	<value>All settled up! No transfers needed.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_PAYS" xml:space="preserve">
+	<value>pays</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_TO" xml:space="preserve">
+	<value>to</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_NOT_FOUND" xml:space="preserve">
+	<value>Settlement not found.</value>
+  </data>
+</root>
