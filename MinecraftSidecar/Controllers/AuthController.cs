@@ -14,7 +14,7 @@ public class AuthController(IAuthenticationStateProvider auth, ILogger<AuthContr
             return BadRequest("Authorization code is required.");
         }
 
-        string uri = HttpContext.Request.Scheme + "://" + HttpContext.Request.Host + HttpContext.Request.Path;
+        string uri = "https://" + HttpContext.Request.Host + HttpContext.Request.Path;
         if (logger.IsEnabled(LogLevel.Information))
         {
             logger.LogInformation("Redirecting with authorization code: {Code}, URI: {Uri}", code, uri);
