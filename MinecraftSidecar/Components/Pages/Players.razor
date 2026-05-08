@@ -93,7 +93,7 @@
     {
         await LoadPlayers();
 
-        // 5�ʸ��� �÷��̾� ��� ����
+        // Refresh player list every 5 seconds
         _timer = new System.Threading.Timer(async _ =>
         {
             await InvokeAsync(async () =>
@@ -117,13 +117,13 @@
 
         try
         {
-            // RCON ���� Ȯ��
+            // Ensure RCON is connected
             if (!RconClient.IsConnected)
             {
                 return;
             }
 
-            // list �������� �÷��̾� ��� ��������
+            // Retrieve the player list via the list command
             var response = await RconClient.SendCommandAsync("list");
             ParsePlayerList(response);
         }
@@ -143,7 +143,7 @@
     {
         players.Clear();
         
-        // "There are 2 of a max of 20 players online: Player1, Player2" ���� �Ľ�
+        // Parse "There are 2 of a max of 20 players online: Player1, Player2" format
         if (response.Contains("players online:"))
         {
             var colonIndex = response.IndexOf(':');
@@ -170,7 +170,7 @@
         try
         {
             await RconClient.SendCommandAsync($"kick {playerName}");
-            await LoadPlayers(); // ��� ���ΰ�ħ
+            await LoadPlayers(); // Refresh list after kick
         }
         catch (Exception ex)
         {

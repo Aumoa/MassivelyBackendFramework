@@ -1,8 +1,10 @@
 @page "/console"
 @rendermode InteractiveServer
 @inject RCONClient RconClient
+@inject ConsoleLogService LogService
+@inject IJSRuntime JS
 @inject IConfiguration Configuration
-@implements IDisposable
+@implements IAsyncDisposable
 
 <PageTitle>@Strings.APP_TITLE - @Strings.CONSOLE_TITLE</PageTitle>
 
@@ -32,23 +34,25 @@
         <div class="col-md-12">
             <div class="card">
                 <div class="card-body">
-                    <div class="console-output" style="background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 4px; min-height: 400px; max-height: 600px; font-family: 'Consolas', monospace; overflow-y: auto;">
-                        @foreach (var log in consoleOutput)
+                    <div id="console-output"
+                         class="console-output"
+                         style="background: #1e1e1e; color: #d4d4d4; padding: 1rem; border-radius: 4px; min-height: 400px; max-height: 600px; font-family: 'Consolas', monospace; overflow-y: auto;">
+                        @foreach (var entry in snapshot)
                         {
-                            <p style="margin: 0; padding: 2px 0; white-space: pre-wrap; word-break: break-word;">@log</p>
+                            <p style="margin: 0; padding: 2px 0; white-space: pre-wrap; word-break: break-word; color: @GetEntryColor(entry.Level);">@FormatEntry(entry)</p>
                         }
                     </div>
                     <div class="console-input mt-3">
                         <div class="input-group">
                             <span class="input-group-text">></span>
-                            <input type="text" 
-                                   class="form-control" 
-                                   placeholder="@Strings.CONSOLE_INPUT_PLACEHOLDER" 
-                                   @bind="commandInput" 
-                                   @bind:event="oninput" 
+                            <input type="text"
+                                   class="form-control"
+                                   placeholder="@Strings.CONSOLE_INPUT_PLACEHOLDER"
+                                   @bind="commandInput"
+                                   @bind:event="oninput"
                                    @onkeypress="OnKeyPress"
-                                   disabled="@(!RconClient.IsConnected)" />
-                            <button class="btn btn-primary" @onclick="SendCommand" disabled="@(!RconClient.IsConnected)">@Strings.CONSOLE_BUTTON_SEND</button>
+                                   disabled="@(!RconClient.IsConnected || isSending)" />
+                            <button class="btn btn-primary" @onclick="OnSendClick" disabled="@(!RconClient.IsConnected || isSending)">@Strings.CONSOLE_BUTTON_SEND</button>
                         </div>
                     </div>
                 </div>
@@ -58,72 +62,46 @@
 </div>
 
 @code {
-    private List<string> consoleOutput = new()
-    {
-        Strings.CONSOLE_LOG_INITIALIZED,
-        Strings.CONSOLE_LOG_CONNECT_HINT
-    };
-
+    private IReadOnlyList<ConsoleLogEntry> snapshot = Array.Empty<ConsoleLogEntry>();
     private string commandInput = string.Empty;
+    private bool isSending;
+    private IDisposable? _subscription;
 
     protected override Task OnInitializedAsync()
     {
-        RconClient.Connected += OnConnected;
-        RconClient.Disconnected += OnDisconnected;
+        snapshot = LogService.GetSnapshot();
+
+        _subscription = LogService.Subscribe(OnLogUpdated);
+
+        RconClient.Connected += OnConnectionChanged;
+        RconClient.Disconnected += OnConnectionChanged;
+
         return Task.CompletedTask;
     }
 
-    public void Dispose()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        RconClient.Connected -= OnConnected;
-        RconClient.Disconnected -= OnDisconnected;
-        GC.SuppressFinalize(this);
-    }
-
-    private void OnConnected()
-    {
-        InvokeAsync(StateHasChanged);
-    }
-
-    private void OnDisconnected()
-    {
-        InvokeAsync(StateHasChanged);
-    }
-
-    private async Task SendCommand()
-    {
-        if (!string.IsNullOrWhiteSpace(commandInput) && RconClient.IsConnected)
+        if (firstRender)
         {
-            consoleOutput.Add($"> {commandInput}");
-            
-            try
-            {
-                var response = await RconClient.SendCommandAsync(commandInput);
-                
-                if (!string.IsNullOrWhiteSpace(response))
-                {
-                    // Normalize line endings so \r\n renders correctly with white-space: pre-wrap
-                    consoleOutput.Add($"  {response.Replace("\r\n", "\n").Replace("\r", "\n")}");
-                }
-                else
-                {
-                    consoleOutput.Add(Strings.CONSOLE_LOG_COMMAND_SUCCESS);
-                }
-            }
-            catch (Exception ex)
-            {
-                consoleOutput.Add(string.Format(Strings.CONSOLE_LOG_COMMAND_FAILED, ex.Message));
-                
-                // ������ ������ ���
-                if (!RconClient.IsConnected)
-                {
-                    consoleOutput.Add(Strings.CONSOLE_LOG_CONNECTION_LOST);
-                }
-            }
-            
-            commandInput = string.Empty;
-            StateHasChanged();
+            await ScrollToBottomAsync();
         }
+    }
+
+    private async Task OnLogUpdated()
+    {
+        snapshot = LogService.GetSnapshot();
+        await InvokeAsync(StateHasChanged);
+        await InvokeAsync(ScrollToBottomAsync);
+    }
+
+    private void OnConnectionChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnSendClick()
+    {
+        await SendCommand();
     }
 
     private async Task OnKeyPress(KeyboardEventArgs e)
@@ -132,5 +110,76 @@
         {
             await SendCommand();
         }
+    }
+
+    private async Task SendCommand()
+    {
+        if (string.IsNullOrWhiteSpace(commandInput) || !RconClient.IsConnected || isSending)
+            return;
+
+        var cmd = commandInput.Trim();
+        commandInput = string.Empty;
+        isSending = true;
+        StateHasChanged();
+
+        LogService.Append(ConsoleLogLevel.Command, $"> {cmd}");
+
+        try
+        {
+            var response = await RconClient.SendCommandAsync(cmd);
+
+            if (!string.IsNullOrWhiteSpace(response))
+            {
+                LogService.Append(ConsoleLogLevel.Response, response.Replace("\r\n", "\n").Replace("\r", "\n"));
+            }
+            else
+            {
+                LogService.Append(ConsoleLogLevel.Info, Strings.CONSOLE_LOG_COMMAND_SUCCESS);
+            }
+        }
+        catch (Exception ex)
+        {
+            LogService.Append(ConsoleLogLevel.Error, string.Format(Strings.CONSOLE_LOG_COMMAND_FAILED, ex.Message));
+
+            if (!RconClient.IsConnected)
+            {
+                LogService.Append(ConsoleLogLevel.Error, Strings.CONSOLE_LOG_CONNECTION_LOST);
+            }
+        }
+        finally
+        {
+            isSending = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ScrollToBottomAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("consoleHelpers.scrollToBottom", "console-output");
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+
+    private static string GetEntryColor(ConsoleLogLevel level) => level switch
+    {
+        ConsoleLogLevel.Command  => "#569cd6",
+        ConsoleLogLevel.Response => "#d4d4d4",
+        ConsoleLogLevel.Error    => "#f44747",
+        _                        => "#858585",
+    };
+
+    private static string FormatEntry(ConsoleLogEntry entry)
+        => $"[{entry.Timestamp:HH:mm:ss}] {entry.Message}";
+
+    public async ValueTask DisposeAsync()
+    {
+        RconClient.Connected -= OnConnectionChanged;
+        RconClient.Disconnected -= OnConnectionChanged;
+        _subscription?.Dispose();
+        GC.SuppressFinalize(this);
+        await Task.CompletedTask;
     }
 }

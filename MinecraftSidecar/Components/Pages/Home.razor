@@ -132,7 +132,7 @@
     {
         await CheckServerStatus();
 
-        // 5�ʸ��� ���� ���� Ȯ��
+        // Check server status every 5 seconds
         _timer = new System.Threading.Timer(async _ =>
         {
             await InvokeAsync(async () =>
@@ -155,12 +155,12 @@
 
         try
         {
-            // RCON ���� ��������
+            // Read RCON connection settings
             var rconSettings = Configuration.GetSection("RCON");
             var host = rconSettings.GetValue<string>("Host") ?? "127.0.0.1";
             var port = rconSettings.GetValue<int>("Port");
 
-            // �̹� ����Ǿ� ���� �ʴٸ� ���� �õ�
+            // Skip if not yet connected
             if (!RconClient.IsConnected)
             {
                 statusMessage = $"Unable to connect to {host}:{port}";
@@ -170,14 +170,14 @@
                 return;
             }
 
-            // ���� ���� ��ȸ
+            // Fetch server info
             try
             {
-                // list �������� �÷��̾� �� Ȯ��
+                // Check player count via the list command
                 var listResponse = await RconClient.SendCommandAsync("list");
                 ParsePlayerList(listResponse);
-                
-                // TPS ���� �õ�
+
+                // Attempt to measure TPS
                 await MeasureTps();
                 
                 isServerRunning = true;
@@ -185,7 +185,7 @@
             }
             catch (Exception ex)
             {
-                // ���� ���� �� ���� ���� �� ��õ�
+                // Command failed; mark server as stopped
                 isServerRunning = false;
                 statusMessage = $"Command failed: {ex.Message}";
                 playersOnline = 0;
@@ -210,7 +210,7 @@
     {
         try
         {
-            // ��� 1: /tps ���ɾ� �õ� (Spigot/Paper)
+            // Strategy 1: try the /tps command (Spigot/Paper)
             try
             {
                 var tpsResponse = await RconClient.SendCommandAsync("tps");
@@ -223,7 +223,7 @@
             }
             catch { }
 
-            // ��� 2: ���� �ð� ��� ��� (�ٴҶ� ����)
+            // Strategy 2: calculate TPS from game time delta (vanilla fallback)
             var currentTime = DateTime.UtcNow;
             var gameTimeResponse = await RconClient.SendCommandAsync("time query gametime");
             
@@ -256,7 +256,7 @@
             }
             else
             {
-                // TPS�� ������ �� ���� ��� - ���� ������ �����Ƿ� 20.0���� ����
+                // Unable to retrieve TPS – assume full speed since the server responded
                 serverTps = 20.0;
                 tpsMessage = "Estimated (no TPS data available)";
             }
@@ -306,7 +306,7 @@
 
     private void ParsePlayerList(string response)
     {
-        // "There are 0 of a max of 20 players online:" ���� �Ľ�
+        // Parse "There are 0 of a max of 20 players online:" format
         if (response.Contains("players online"))
         {
             var parts = response.Split(' ');
