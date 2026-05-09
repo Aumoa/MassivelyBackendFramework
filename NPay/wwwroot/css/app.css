@@ -803,16 +803,88 @@ button {
     }
 
 /* ── Responsive ── */
+
+/* Touch devices: always show action buttons (no hover) */
+@media (hover: none) {
+    .settlement-row-actions {
+        opacity: 1;
+    }
+
+    .item-row-action {
+        opacity: 1;
+    }
+}
+
 @media (max-width: 640px) {
+    /* Topbar: tighten padding, hide nav link text (icon only) */
     .npay-topbar {
         padding: 0 var(--space-4);
-        gap: var(--space-4);
+        gap: var(--space-3);
+        height: 52px;
     }
 
+    .npay-topbar-nav {
+        gap: 0;
+    }
+
+    .npay-nav-link {
+        padding: var(--space-2);
+        gap: 0;
+    }
+
+    /* Hide nav link text on mobile — icon only */
+    .npay-nav-link span:not(.material-symbols-outlined) {
+        display: none;
+    }
+
+    /* Main content: reduce horizontal padding */
     .npay-main {
-        padding: var(--space-6) var(--space-4);
+        padding: var(--space-5) var(--space-4);
     }
 
+    /* Page header */
+    .page-header {
+        margin-bottom: var(--space-5);
+        padding-bottom: var(--space-4);
+    }
+
+    .page-title {
+        font-size: var(--text-xl);
+    }
+
+    .page-header-row {
+        gap: var(--space-3);
+    }
+
+    /* Inline form: stack vertically */
+    .inline-form {
+        flex-direction: column;
+        align-items: stretch;
+        padding: var(--space-4);
+    }
+
+    .inline-form-field {
+        min-width: unset;
+        width: 100%;
+    }
+
+    /* Increase touch target size for inputs and buttons */
+    .form-input,
+    .form-select,
+    .form-textarea {
+        font-size: var(--text-base);
+        padding: var(--space-3) var(--space-3);
+        min-height: 44px;
+    }
+
+    button,
+    .btn-primary,
+    .btn-ghost {
+        min-height: 44px;
+        padding: var(--space-2) var(--space-4);
+    }
+
+    /* Always show action buttons on mobile */
     .settlement-row-actions {
         opacity: 1;
     }
@@ -821,12 +893,77 @@ button {
         opacity: 1;
     }
 
-    .inline-form {
-        flex-direction: column;
-        align-items: stretch;
+    /* Settlement list rows: stack meta below title */
+    .settlement-row {
+        flex-wrap: wrap;
+        padding: var(--space-3) var(--space-4);
+        gap: var(--space-2);
     }
 
-    .inline-form-field {
-        min-width: unset;
+    .settlement-row-title {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    .settlement-row-meta {
+        flex: 1;
+        gap: var(--space-3);
+    }
+
+    .settlement-row-actions {
+        flex-shrink: 0;
+    }
+
+    /* Item rows: allow text wrapping */
+    .item-row {
+        flex-wrap: wrap;
+        padding: var(--space-3) var(--space-4);
+        gap: var(--space-2);
+    }
+
+    .item-row-label {
+        flex: 1 1 100%;
+    }
+
+    .item-row-sub {
+        flex: 1;
+    }
+
+    .item-row-amount {
+        flex-shrink: 0;
+    }
+
+    .item-row-action {
+        flex: 0 0 auto;
+    }
+
+    /* Transfer cards: stack nicely */
+    .transfer-card {
+        flex-direction: row;
+        flex-wrap: wrap;
+        padding: var(--space-3) var(--space-4);
+        gap: var(--space-2);
+    }
+
+    /* Quick cards: single column */
+    .quick-cards {
+        grid-template-columns: 1fr;
+    }
+
+    /* Tabs: full-width equal tabs */
+    .npay-tabs {
+        gap: 0;
+    }
+
+    .npay-tab {
+        flex: 1;
+        text-align: center;
+        padding: var(--space-3) var(--space-2);
+        font-size: var(--text-xs);
+    }
+
+    /* Stat cards grid */
+    .stat-card {
+        padding: var(--space-4);
     }
 }

@@ -77,3 +77,17 @@ When asked to create or modify UI components, act as a Senior UX Engineer. Refer
 - Example:SELECT `id`, `amount`, `created_at`
 FROM `npay_settlement`
 WHERE `status` = 'open'
+
+## 7. Mobile Responsive Standards
+The NPay app must be fully usable on mobile (portrait phone) screens. Follow these rules when adding or modifying UI:
+
+- **Breakpoint:** `@media (max-width: 640px)` is the single mobile breakpoint. Do not introduce additional breakpoints unless absolutely necessary.
+- **Touch targets:** All interactive elements (buttons, inputs, selects) must have a minimum height of **44px** on mobile. Never shrink touch targets below this.
+- **Action buttons in rows:** Use `@media (hover: none)` to always show `.settlement-row-actions` and `.item-row-action` on touch devices. Do NOT rely on hover-reveal for mobile.
+- **Topbar nav on mobile:** Nav links show icon only (text hidden via `span:not(.material-symbols-outlined) { display: none }`). Do not add text-only nav items without a corresponding Material Symbol icon.
+- **Flex layouts:** Prefer `flex-wrap: wrap` and `flex-direction: column` fallbacks for forms and row components on mobile. Use `min-width: unset` and `width: 100%` for full-width fields.
+- **Grid layouts:** Use `grid-template-columns: 1fr` on mobile for card grids (e.g., `.quick-cards`).
+- **Tabs:** Use `flex: 1; text-align: center` on `.npay-tab` so tabs fill the full width equally on mobile.
+- **Padding:** `.npay-main` uses `var(--space-5) var(--space-4)` on mobile (reduced from desktop `var(--space-10) var(--space-8)`).
+- **No horizontal scroll:** Ensure no component causes horizontal overflow. Use `min-width: 0` on flex children that contain long text.
+- **Font sizes on inputs:** Use `var(--text-base)` (1rem) minimum for form inputs on mobile to prevent iOS auto-zoom.
