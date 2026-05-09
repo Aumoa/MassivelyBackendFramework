@@ -32,12 +32,19 @@ else
                     <p class="page-subtitle">@settlement.Description</p>
                 }
             </div>
-            @if (settlement.Status == SettlementStatus.Open && isAuthenticated)
+            @if (settlement.Status == SettlementStatus.Open)
             {
-                <button class="btn-ghost" @onclick="CloseSettlementAsync">
-                    <span class="material-symbols-outlined" style="font-size:16px;">lock</span>
-                    @Strings.SETTLEMENT_DETAIL_BUTTON_CLOSE
-                </button>
+                @if (isAuthenticated)
+                {
+                    <button class="btn-ghost" @onclick="CloseSettlementAsync">
+                        <span class="material-symbols-outlined" style="font-size:16px;">lock</span>
+                        @Strings.SETTLEMENT_DETAIL_BUTTON_CLOSE
+                    </button>
+                }
+                else
+                {
+                    <span class="badge badge-open">@Strings.SETTLEMENTS_STATUS_OPEN</span>
+                }
             }
             else
             {
