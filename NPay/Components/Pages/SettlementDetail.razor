@@ -114,39 +114,31 @@ else
         }
         else
         {
-            <table class="item-table">
-                <colgroup>
-                    <col style="width:100%;" />
-                    <col style="width:1px;" />
-                    <col style="width:1px;" />
-                    <col style="width:1px;" />
-                </colgroup>
-                <tbody>
+            <div class="item-list">
                 @foreach (var e in settlement.Expenses)
                 {
-                    <tr class="item-row">
-                        <td class="item-row-label">@e.Label</td>
-                        <td class="item-row-sub" style="white-space:nowrap;">
+                    <div class="item-row">
+                        <span class="item-row-label">@e.Label</span>
+                        <span class="item-row-sub" style="white-space:nowrap;">
                             <span style="font-weight:500;color:var(--color-text-primary);">@ParticipantName(e.PaidByParticipantId)</span>
                             @if (e.SplitAmongParticipantIds.Count > 0)
                             {
                                 <span class="material-symbols-outlined" style="font-size:13px;vertical-align:middle;margin:0 2px;color:var(--color-text-muted);">arrow_forward</span>
                                 <span>@string.Join(", ", e.SplitAmongParticipantIds.Select(id => ParticipantName(id)))</span>
                             }
-                        </td>
-                        <td class="item-row-amount" style="white-space:nowrap;">@e.Amount.ToString("N0") ₩</td>
-                        <td class="item-row-action">
+                        </span>
+                        <span class="item-row-amount" style="white-space:nowrap;">@e.Amount.ToString("N0") ₩</span>
+                        <span class="item-row-action">
                             @if (settlement.Status == SettlementStatus.Open)
                             {
                                 <button class="btn-danger" @onclick="() => RemoveExpenseAsync(e.Id)">
                                     @Strings.BUTTON_DELETE
                                 </button>
                             }
-                        </td>
-                    </tr>
+                        </span>
+                    </div>
                 }
-                </tbody>
-            </table>
+            </div>
         }
     }
 

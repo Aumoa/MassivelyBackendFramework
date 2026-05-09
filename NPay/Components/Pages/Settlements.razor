@@ -8,78 +8,69 @@
 
 <PageTitle>@Strings.SETTLEMENTS_TITLE — @Strings.APP_TITLE</PageTitle>
 
-<div class="page-header d-flex align-items-start justify-content-between flex-wrap gap-2">
-    <div>
-        <h1>@Strings.SETTLEMENTS_TITLE</h1>
-        <p>@Strings.SETTLEMENTS_SUBTITLE</p>
+<div class="page-header">
+    <div class="page-header-row">
+        <div>
+            <h1 class="page-title">@Strings.SETTLEMENTS_TITLE</h1>
+            <p class="page-subtitle">@Strings.SETTLEMENTS_SUBTITLE</p>
+        </div>
+        <button class="btn-primary" @onclick='() => Nav.NavigateTo("/settlements/new")'>
+            <span class="material-symbols-outlined" style="font-size:1rem;">add</span>
+            @Strings.SETTLEMENTS_BUTTON_NEW
+        </button>
     </div>
-    <button class="btn-primary-npay" @onclick='() => Nav.NavigateTo("/settlements/new")'>
-        <span class="material-symbols-outlined" style="font-size:1rem;vertical-align:middle;">add</span>
-        @Strings.SETTLEMENTS_BUTTON_NEW
-    </button>
 </div>
 
 @if (isLoading)
 {
-    <p class="text-muted">@Strings.LOADING</p>
+    <div class="settlement-list">
+        @for (int i = 0; i < 3; i++)
+        {
+            <div class="settlement-row">
+                <div class="settlement-row-title">
+                    <span class="skeleton" style="width:180px;height:0.9rem;display:block;"></span>
+                </div>
+            </div>
+        }
+    </div>
 }
 else if (settlements.Count == 0)
 {
-    <div class="npay-card text-center py-5 text-muted">
-        <span class="material-symbols-outlined" style="font-size:3rem;opacity:0.4;">receipt_long</span>
-        <p class="mt-2 mb-0">@Strings.SETTLEMENTS_EMPTY</p>
+    <div class="empty-state">
+        <span class="material-symbols-outlined">receipt_long</span>
+        <p>@Strings.SETTLEMENTS_EMPTY</p>
     </div>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>@Strings.SETTLEMENTS_COL_TITLE</th>
-                    <th>@Strings.SETTLEMENTS_COL_STATUS</th>
-                    <th>@Strings.SETTLEMENTS_COL_PARTICIPANTS</th>
-                    <th>@Strings.SETTLEMENTS_COL_CREATED</th>
-                    <th>@Strings.SETTLEMENTS_COL_ACTIONS</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var s in settlements)
-                {
-                    <tr>
-                        <td>
-                            <button class="link-button fw-semibold" @onclick="() => OpenDetail(s.Id)">
-                                @s.Title
-                            </button>
-                            @if (!string.IsNullOrWhiteSpace(s.Description))
-                            {
-                                <br /><small class="text-muted">@s.Description</small>
-                            }
-                        </td>
-                        <td>
-                            @if (s.Status == SettlementStatus.Open)
-                            {
-                                <span class="badge-open">@Strings.SETTLEMENTS_STATUS_OPEN</span>
-                            }
-                            else
-                            {
-                                <span class="badge-closed">@Strings.SETTLEMENTS_STATUS_CLOSED</span>
-                            }
-                        </td>
-                        <td>@s.Participants.Count</td>
-                        <td>@s.CreatedAt.LocalDateTime.ToString("yyyy-MM-dd")</td>
-                        <td>
-                            <button class="link-button me-2" @onclick="() => OpenDetail(s.Id)">
-                                @Strings.SETTLEMENTS_BUTTON_OPEN
-                            </button>
-                            <button class="link-button text-danger" @onclick="() => DeleteAsync(s.Id)">
-                                @Strings.SETTLEMENTS_BUTTON_DELETE
-                            </button>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+    <div class="settlement-list">
+        @foreach (var s in settlements)
+        {
+            <div class="settlement-row">
+                <div class="settlement-row-title">
+                    <button class="settlement-row-name" @onclick="() => OpenDetail(s.Id)">@s.Title</button>
+                    @if (!string.IsNullOrWhiteSpace(s.Description))
+                    {
+                        <div class="settlement-row-desc">@s.Description</div>
+                    }
+                </div>
+                <div class="settlement-row-meta">
+                    @if (s.Status == SettlementStatus.Open)
+                    {
+                        <span class="badge badge-open">@Strings.SETTLEMENTS_STATUS_OPEN</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-closed">@Strings.SETTLEMENTS_STATUS_CLOSED</span>
+                    }
+                    <span class="settlement-row-date">@s.CreatedAt.LocalDateTime.ToString("yyyy-MM-dd")</span>
+                </div>
+                <div class="settlement-row-actions">
+                    <button class="btn-ghost" @onclick="() => OpenDetail(s.Id)">@Strings.SETTLEMENTS_BUTTON_OPEN</button>
+                    <button class="btn-danger" @onclick="() => DeleteAsync(s.Id)">@Strings.SETTLEMENTS_BUTTON_DELETE</button>
+                </div>
+            </div>
+        }
     </div>
 }
 

@@ -8,30 +8,26 @@
 <PageTitle>@Strings.CREATE_SETTLEMENT_TITLE — @Strings.APP_TITLE</PageTitle>
 
 <div class="page-header">
-    <h1>@Strings.CREATE_SETTLEMENT_TITLE</h1>
-    <p>@Strings.CREATE_SETTLEMENT_SUBTITLE</p>
+    <h1 class="page-title">@Strings.CREATE_SETTLEMENT_TITLE</h1>
+    <p class="page-subtitle">@Strings.CREATE_SETTLEMENT_SUBTITLE</p>
 </div>
 
-<div class="row">
-    <div class="col-12 col-md-6">
-        <div class="npay-card">
-            <div class="mb-3">
-                <label class="form-label fw-semibold">@Strings.CREATE_SETTLEMENT_LABEL_TITLE</label>
-                <input class="form-control" @bind="title" placeholder="@Strings.CREATE_SETTLEMENT_PLACEHOLDER_TITLE" maxlength="100" />
-            </div>
-            <div class="mb-4">
-                <label class="form-label fw-semibold">@Strings.CREATE_SETTLEMENT_LABEL_DESC</label>
-                <textarea class="form-control" @bind="description" rows="3" placeholder="@Strings.CREATE_SETTLEMENT_PLACEHOLDER_DESC" maxlength="300"></textarea>
-            </div>
-            <div class="d-flex gap-2">
-                <button class="btn-primary-npay" @onclick="CreateAsync" disabled="@(isBusy || string.IsNullOrWhiteSpace(title))">
-                    @Strings.CREATE_SETTLEMENT_BUTTON_CREATE
-                </button>
-                <button @onclick='() => Nav.NavigateTo("/settlements")' disabled="@isBusy">
-                    @Strings.CREATE_SETTLEMENT_BUTTON_CANCEL
-                </button>
-            </div>
-        </div>
+<div style="max-width:480px;">
+    <div class="form-group">
+        <label class="form-label">@Strings.CREATE_SETTLEMENT_LABEL_TITLE</label>
+        <input class="form-input" @bind="title" placeholder="@Strings.CREATE_SETTLEMENT_PLACEHOLDER_TITLE" maxlength="100" />
+    </div>
+    <div class="form-group">
+        <label class="form-label">@Strings.CREATE_SETTLEMENT_LABEL_DESC</label>
+        <textarea class="form-textarea" @bind="description" rows="3" placeholder="@Strings.CREATE_SETTLEMENT_PLACEHOLDER_DESC" maxlength="300"></textarea>
+    </div>
+    <div style="display:flex;gap:var(--space-3);">
+        <button class="btn-primary" @onclick="CreateAsync" disabled="@(isBusy || string.IsNullOrWhiteSpace(title))">
+            @Strings.CREATE_SETTLEMENT_BUTTON_CREATE
+        </button>
+        <button class="btn-ghost" @onclick='() => Nav.NavigateTo("/settlements")' disabled="@isBusy">
+            @Strings.CREATE_SETTLEMENT_BUTTON_CANCEL
+        </button>
     </div>
 </div>
 

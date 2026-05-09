@@ -13,41 +13,37 @@
     <p>@Strings.HOME_SUBTITLE</p>
 </div>
 
-<div class="row g-4">
-    <div class="col-12 col-md-6">
-        <div class="npay-card h-100 d-flex flex-column">
-            <div class="d-flex align-items-center gap-2 mb-3">
-                <span class="material-symbols-outlined" style="color:#6d28d9;font-size:2rem;">receipt_long</span>
-                <h5 class="mb-0 fw-bold">@Strings.HOME_CARD_SETTLEMENTS_TITLE</h5>
-            </div>
-            <p class="text-muted flex-grow-1">@Strings.HOME_CARD_SETTLEMENTS_DESC</p>
-            @if (isLoading)
-            {
-                <p class="text-muted small">@Strings.LOADING</p>
-            }
-            else
-            {
-                <p class="fw-semibold" style="color:#6d28d9;">
-                    @openCount @(openCount == 1 ? "active settlement" : "active settlements")
-                </p>
-            }
-            <button class="btn-primary-npay mt-2 align-self-start" @onclick='() => Nav.NavigateTo("/settlements")'>
-                @Strings.HOME_CARD_SETTLEMENTS_BUTTON
-            </button>
+<div class="quick-cards">
+    <div class="quick-card npay-card-hover" @onclick='() => Nav.NavigateTo("/settlements")' style="cursor:pointer;">
+        <span class="material-symbols-outlined" style="color:var(--color-accent);font-size:2rem;">receipt_long</span>
+        <div>
+            <div style="font-weight:600;font-size:var(--text-base);color:var(--color-text-primary);margin-bottom:var(--space-1);">@Strings.HOME_CARD_SETTLEMENTS_TITLE</div>
+            <p style="margin:0;font-size:var(--text-sm);">@Strings.HOME_CARD_SETTLEMENTS_DESC</p>
         </div>
+        @if (isLoading)
+        {
+            <span class="skeleton" style="width:120px;height:1rem;"></span>
+        }
+        else
+        {
+            <div style="font-size:var(--text-sm);font-weight:600;color:var(--color-accent);">
+                @openCount @(openCount == 1 ? "active settlement" : "active settlements")
+            </div>
+        }
+        <button class="btn-primary" style="align-self:flex-start;" @onclick='() => Nav.NavigateTo("/settlements")'>
+            @Strings.HOME_CARD_SETTLEMENTS_BUTTON
+        </button>
     </div>
 
-    <div class="col-12 col-md-6">
-        <div class="npay-card h-100 d-flex flex-column">
-            <div class="d-flex align-items-center gap-2 mb-3">
-                <span class="material-symbols-outlined" style="color:#6d28d9;font-size:2rem;">add_circle</span>
-                <h5 class="mb-0 fw-bold">@Strings.HOME_CARD_CREATE_TITLE</h5>
-            </div>
-            <p class="text-muted flex-grow-1">@Strings.HOME_CARD_CREATE_DESC</p>
-            <button class="btn-primary-npay mt-2 align-self-start" @onclick='() => Nav.NavigateTo("/settlements/new")'>
-                @Strings.HOME_CARD_CREATE_BUTTON
-            </button>
+    <div class="quick-card npay-card-hover" @onclick='() => Nav.NavigateTo("/settlements/new")' style="cursor:pointer;">
+        <span class="material-symbols-outlined" style="color:var(--color-accent);font-size:2rem;">add_circle</span>
+        <div>
+            <div style="font-weight:600;font-size:var(--text-base);color:var(--color-text-primary);margin-bottom:var(--space-1);">@Strings.HOME_CARD_CREATE_TITLE</div>
+            <p style="margin:0;font-size:var(--text-sm);">@Strings.HOME_CARD_CREATE_DESC</p>
         </div>
+        <button class="btn-primary" style="align-self:flex-start;" @onclick='() => Nav.NavigateTo("/settlements/new")'>
+            @Strings.HOME_CARD_CREATE_BUTTON
+        </button>
     </div>
 </div>
 
