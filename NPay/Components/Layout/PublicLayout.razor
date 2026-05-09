@@ -1,0 +1,53 @@
+@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@using OpenIDConnect
+@inject IAuthenticationStateProvider Auth
+@inject NavigationManager Nav
+
+<div class="npay-shell">
+    <header class="npay-topbar">
+        <a class="npay-topbar-brand" href="/">NPay</a>
+
+        <div class="npay-topbar-end">
+            <AuthorizeView>
+                <Authorized>
+                    <nav class="npay-topbar-nav">
+                        <NavLink class="npay-nav-link" href="/" Match="NavLinkMatch.All">
+                            <span class="material-symbols-outlined">home</span>
+                            @Strings.NAVMENU_LABEL_HOME
+                        </NavLink>
+                        <NavLink class="npay-nav-link" href="/settlements">
+                            <span class="material-symbols-outlined">receipt_long</span>
+                            @Strings.NAVMENU_LABEL_SETTLEMENTS
+                        </NavLink>
+                    </nav>
+                    <ProfileCard />
+                </Authorized>
+                <NotAuthorized>
+                    <button class="btn-primary" @onclick="OnLoginClick">
+                        <span class="material-symbols-outlined" style="font-size:16px;vertical-align:-3px;">login</span>
+                        @Strings.BUTTON_LOGIN
+                    </button>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </header>
+
+    <main class="npay-main">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    @Strings.ERROR_UNHANDLED
+    <a href="" class="reload">@Strings.ERROR_RELOAD</a>
+    <span class="dismiss">✕</span>
+</div>
+
+@code {
+    private void OnLoginClick()
+    {
+        Auth.NavigateToLogin(Nav, "auth/redirect", "all");
+    }
+}

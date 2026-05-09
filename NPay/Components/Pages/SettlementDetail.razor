@@ -1,4 +1,5 @@
 @page "/settlements/{Id:guid}"
+@layout PublicLayout
 @rendermode InteractiveServer
 @using NPay.Models
 @using NPay.Services
@@ -6,6 +7,7 @@
 @inject IParticipantService ParticipantService
 @inject IExpenseService ExpenseService
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
 
 <PageTitle>@(settlement?.Title ?? Strings.LOADING) — @Strings.APP_TITLE</PageTitle>
 
@@ -30,7 +32,7 @@ else
                     <p class="page-subtitle">@settlement.Description</p>
                 }
             </div>
-            @if (settlement.Status == SettlementStatus.Open)
+            @if (settlement.Status == SettlementStatus.Open && isAuthenticated)
             {
                 <button class="btn-ghost" @onclick="CloseSettlementAsync">
                     <span class="material-symbols-outlined" style="font-size:16px;">lock</span>
@@ -60,7 +62,7 @@ else
     <!-- Expenses Tab -->
     @if (activeTab == Tab.Expenses)
     {
-        @if (settlement.Status == SettlementStatus.Open && settlement.Participants.Count > 0)
+        @if (settlement.Status == SettlementStatus.Open && settlement.Participants.Count > 0 && isAuthenticated)
         {
             <div class="inline-form" style="flex-wrap:wrap;">
                 <div class="inline-form-field" style="flex:2;min-width:140px;">
@@ -136,7 +138,7 @@ else
                         </span>
                         <span class="item-row-amount" style="white-space:nowrap;">@e.Amount.ToString("N0") ₩</span>
                         <span class="item-row-action">
-                            @if (settlement.Status == SettlementStatus.Open)
+                            @if (settlement.Status == SettlementStatus.Open && isAuthenticated)
                             {
                                 <button class="btn-ghost" @onclick="() => OpenEditExpenseAsync(e)">
                                     @Strings.BUTTON_EDIT
@@ -155,7 +157,7 @@ else
     <!-- Participants Tab -->
     @if (activeTab == Tab.Participants)
     {
-        @if (settlement.Status == SettlementStatus.Open)
+        @if (settlement.Status == SettlementStatus.Open && isAuthenticated)
         {
             <div class="inline-form">
                 <div class="inline-form-field">
@@ -185,7 +187,7 @@ else
                     <div class="item-row item-row-participant">
                         <span class="material-symbols-outlined" style="font-size:18px;color:var(--color-text-muted);">person</span>
                         <span class="item-row-label">@p.Name</span>
-                        @if (settlement.Status == SettlementStatus.Open)
+                        @if (settlement.Status == SettlementStatus.Open && isAuthenticated)
                         {
                             <span class="item-row-action">
                                 <button class="btn-danger" @onclick="() => RemoveParticipantAsync(p.Id)">
@@ -279,9 +281,14 @@ else
     private bool minimizeTransfers = false;
     private List<TransferInstruction> transfers = [];
 
+    // Auth state
+    private bool isAuthenticated = false;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        isAuthenticated = auth.User.Identity?.IsAuthenticated ?? false;
         await LoadAsync();
     }
 

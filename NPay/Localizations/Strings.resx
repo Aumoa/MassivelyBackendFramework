@@ -77,6 +77,9 @@
   <data name="BUTTON_EDIT" xml:space="preserve">
 	<value>Edit</value>
   </data>
+  <data name="BUTTON_LOGIN" xml:space="preserve">
+	<value>Sign in</value>
+  </data>
   <data name="BUTTON_ADD" xml:space="preserve">
 	<value>Add</value>
   </data>

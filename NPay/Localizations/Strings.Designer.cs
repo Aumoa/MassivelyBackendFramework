@@ -45,6 +45,7 @@ namespace NPay.Localizations
         internal static string BUTTON_CANCEL => ResourceManager.GetString("BUTTON_CANCEL", resourceCulture)!;
         internal static string BUTTON_DELETE => ResourceManager.GetString("BUTTON_DELETE", resourceCulture)!;
         internal static string BUTTON_EDIT => ResourceManager.GetString("BUTTON_EDIT", resourceCulture)!;
+        internal static string BUTTON_LOGIN => ResourceManager.GetString("BUTTON_LOGIN", resourceCulture)!;
         internal static string BUTTON_ADD => ResourceManager.GetString("BUTTON_ADD", resourceCulture)!;
         internal static string BUTTON_CLOSE => ResourceManager.GetString("BUTTON_CLOSE", resourceCulture)!;
         internal static string LOADING => ResourceManager.GetString("LOADING", resourceCulture)!;
