@@ -1,0 +1,26 @@
+@page "/auth/logout"
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager Nav
+
+@code {
+    protected override Task OnParametersSetAsync()
+    {
+        var httpContext = HttpContextAccessor.HttpContext
+            ?? throw new InvalidOperationException("HttpContext is not available.");
+
+        httpContext.Response.Cookies.Delete("id_token");
+        httpContext.Response.Cookies.Delete("refresh_token");
+
+        return Task.CompletedTask;
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Nav.NavigateTo("/", forceLoad: true);
+        }
+
+        return base.OnAfterRenderAsync(firstRender);
+    }
+}
