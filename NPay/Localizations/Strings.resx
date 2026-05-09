@@ -74,6 +74,9 @@
   <data name="BUTTON_DELETE" xml:space="preserve">
 	<value>Delete</value>
   </data>
+  <data name="BUTTON_EDIT" xml:space="preserve">
+	<value>Edit</value>
+  </data>
   <data name="BUTTON_ADD" xml:space="preserve">
 	<value>Add</value>
   </data>

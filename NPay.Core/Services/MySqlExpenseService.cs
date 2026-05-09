@@ -67,6 +67,26 @@ public class MySqlExpenseService(string connectionString, MySqlSettlementService
         await conn.ExecuteAsync(sql, new { id = expenseId.ToString() });
     }
 
+    public async Task UpdateExpenseAsync(Guid expenseId, decimal amount, Guid paidByParticipantId, IEnumerable<Guid>? splitAmong = null, CancellationToken cancellationToken = default)
+    {
+        const string updateSql = "UPDATE `npay_expense` SET `amount` = @amount, `paid_by_participant_id` = @paidBy WHERE `id` = @id";
+        const string deleteSplitSql = "DELETE FROM `npay_expense_split` WHERE `expense_id` = @expenseId";
+        const string insertSplitSql = "INSERT INTO `npay_expense_split` (`expense_id`, `participant_id`) VALUES (@expenseId, @participantId)";
+
+        await using var conn = Open();
+        await conn.ExecuteAsync(updateSql, new { amount, paidBy = paidByParticipantId.ToString(), id = expenseId.ToString() });
+
+        await conn.ExecuteAsync(deleteSplitSql, new { expenseId = expenseId.ToString() });
+
+        if (splitAmong is not null)
+        {
+            foreach (var pid in splitAmong)
+            {
+                await conn.ExecuteAsync(insertSplitSql, new { expenseId = expenseId.ToString(), participantId = pid.ToString() });
+            }
+        }
+    }
+
     public async Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(
         Guid settlementId, bool minimizeTransfers = false, CancellationToken cancellationToken = default)
     {

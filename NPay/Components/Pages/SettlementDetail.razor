@@ -138,6 +138,9 @@ else
                         <span class="item-row-action">
                             @if (settlement.Status == SettlementStatus.Open)
                             {
+                                <button class="btn-ghost" @onclick="() => OpenEditExpenseAsync(e)">
+                                    @Strings.BUTTON_EDIT
+                                </button>
                                 <button class="btn-danger" @onclick="() => RemoveExpenseAsync(e.Id)">
                                     @Strings.BUTTON_DELETE
                                 </button>
@@ -246,6 +249,8 @@ else
     }
 }
 
+<EditExpenseDialog @ref="editExpenseDialog" OnSaved="LoadAsync" />
+
 @code {
     [Parameter] public Guid Id { get; set; }
 
@@ -346,6 +351,13 @@ else
     {
         await SettlementService.CloseSettlementAsync(Id);
         await LoadAsync();
+    }
+
+    private EditExpenseDialog editExpenseDialog = default!;
+
+    private Task OpenEditExpenseAsync(Expense e)
+    {
+        return editExpenseDialog.OpenAsync(e, settlement!.Participants.ToList());
     }
 
     private string ParticipantName(Guid id) =>

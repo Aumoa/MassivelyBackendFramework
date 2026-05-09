@@ -1,0 +1,126 @@
+@using NPay.Models
+@using NPay.Services
+@inject IExpenseService ExpenseService
+
+<Dialog @ref="dialog" OnClose="OnDialogClosed">
+    @if (expense is not null && participants is not null)
+    {
+        <div style="min-width:420px;max-width:520px;">
+            <div style="margin-bottom:var(--space-5);">
+                <div style="font-size:var(--text-lg);font-weight:700;color:var(--color-text-primary);margin-bottom:var(--space-1);">지출 항목 수정</div>
+                <div style="font-size:var(--text-sm);color:var(--color-text-muted);">@expense.Label</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">금액</label>
+                <input class="form-input" type="number" min="1" @bind="editAmount" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">결제자</label>
+                <select class="form-select" @bind="editPaidBy">
+                    <option value="">—</option>
+                    @foreach (var p in participants)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">참여 인원</label>
+                <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-1);">
+                    @foreach (var p in participants)
+                    {
+                        var pid = p.Id;
+                        var checked_ = editSplitAmong.Contains(pid);
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--text-sm);padding:4px 10px;border-radius:var(--radius-full);border:1px solid @(checked_ ? "var(--color-accent)" : "var(--color-border)");background:@(checked_ ? "var(--color-accent)" : "transparent");color:@(checked_ ? "#fff" : "var(--color-text)");">
+                            <input type="checkbox" style="display:none;"
+                                   checked="@checked_"
+                                   @onchange="() => ToggleSplitParticipant(pid)" />
+                            @p.Name
+                        </label>
+                    }
+                </div>
+                @if (editSplitAmong.Count == 0)
+                {
+                    <div style="display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-2);font-size:var(--text-xs);color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);">
+                        <span class="material-symbols-outlined" style="font-size:14px;">warning</span>
+                        이후 추가되는 인원도 이 항목의 정산에 포함됩니다.
+                    </div>
+                }
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-6);">
+                <button class="btn-ghost" @onclick="OnCancelClick" disabled="@isBusy">취소</button>
+                <button class="btn-primary" @onclick="OnSaveClick"
+                        disabled="@(isBusy || editAmount <= 0 || editPaidBy == Guid.Empty)">
+                    저장
+                </button>
+            </div>
+        </div>
+    }
+</Dialog>
+
+@code {
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private Dialog dialog = default!;
+    private Expense? expense;
+    private List<Participant>? participants;
+
+    private decimal editAmount;
+    private Guid editPaidBy;
+    private HashSet<Guid> editSplitAmong = [];
+    private bool isBusy;
+
+    public Task OpenAsync(Expense target, List<Participant> settlementParticipants)
+    {
+        expense = target;
+        participants = settlementParticipants;
+        editAmount = target.Amount;
+        editPaidBy = target.PaidByParticipantId;
+
+        // If SplitAmongParticipantIds is empty it means "all participants" (dynamic),
+        // so default to the current full list so the user sees them all selected.
+        editSplitAmong = target.SplitAmongParticipantIds.Count > 0
+            ? target.SplitAmongParticipantIds.ToHashSet()
+            : settlementParticipants.Select(p => p.Id).ToHashSet();
+
+        return dialog.ShowAsync();
+    }
+
+    private void ToggleSplitParticipant(Guid id)
+    {
+        if (!editSplitAmong.Remove(id))
+            editSplitAmong.Add(id);
+    }
+
+    private async Task OnSaveClick()
+    {
+        if (expense is null || editPaidBy == Guid.Empty) return;
+        isBusy = true;
+        StateHasChanged();
+
+        await ExpenseService.UpdateExpenseAsync(
+            expense.Id,
+            editAmount,
+            editPaidBy,
+            editSplitAmong.Count > 0 ? editSplitAmong : null);
+
+        isBusy = false;
+        await dialog.CloseAsync();
+        await OnSaved.InvokeAsync();
+    }
+
+    private async Task OnCancelClick()
+    {
+        await dialog.CloseAsync();
+    }
+
+    private void OnDialogClosed()
+    {
+        expense = null;
+        participants = null;
+    }
+}

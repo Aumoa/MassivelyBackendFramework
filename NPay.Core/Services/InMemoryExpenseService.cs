@@ -47,6 +47,21 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
         }
     }
 
+    public async Task UpdateExpenseAsync(Guid expenseId, decimal amount, Guid paidByParticipantId, IEnumerable<Guid>? splitAmong = null, CancellationToken cancellationToken = default)
+    {
+        foreach (var s in (await settlements.GetSettlementsAsync(string.Empty, cancellationToken)).ToList())
+        {
+            var e = s.Expenses.FirstOrDefault(e => e.Id == expenseId);
+            if (e is not null)
+            {
+                e.Amount = amount;
+                e.PaidByParticipantId = paidByParticipantId;
+                e.SplitAmongParticipantIds = splitAmong?.ToList() ?? [];
+                return;
+            }
+        }
+    }
+
     public async Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(Guid settlementId, bool minimizeTransfers = false, CancellationToken cancellationToken = default)
     {
         var settlement = await settlements.GetSettlementAsync(settlementId, cancellationToken)
