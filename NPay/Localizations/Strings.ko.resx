@@ -220,7 +220,7 @@
 	<value>결제자</value>
   </data>
   <data name="SETTLEMENT_DETAIL_EXPENSE_SPLIT" xml:space="preserve">
-	<value>분담 대상 (비어 있으면 전체)</value>
+	<value>정산 인원</value>
   </data>
   <data name="SETTLEMENT_DETAIL_EXPENSE_ADD" xml:space="preserve">
 	<value>지출 추가</value>
@@ -248,5 +248,8 @@
   </data>
   <data name="SETTLEMENT_DETAIL_NOT_FOUND" xml:space="preserve">
 	<value>정산을 찾을 수 없습니다.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_SPLIT_ALL_WARNING" xml:space="preserve">
+	<value>이후 추가되는 인원도 이 항목의 정산에 포함됩니다.</value>
   </data>
 </root>

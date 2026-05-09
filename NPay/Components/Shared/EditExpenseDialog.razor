@@ -28,7 +28,7 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">참여 인원</label>
+                <label class="form-label">@Strings.SETTLEMENT_DETAIL_EXPENSE_SPLIT</label>
                 <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-1);">
                     @foreach (var p in participants)
                     {
@@ -46,7 +46,7 @@
                 {
                     <div style="display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-2);font-size:var(--text-xs);color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);">
                         <span class="material-symbols-outlined" style="font-size:14px;">warning</span>
-                        이후 추가되는 인원도 이 항목의 정산에 포함됩니다.
+                        @Strings.SETTLEMENT_DETAIL_EXPENSE_SPLIT_ALL_WARNING
                     </div>
                 }
             </div>

@@ -104,5 +104,6 @@ namespace NPay.Localizations
         internal static string SETTLEMENT_DETAIL_RESULT_PAYS => ResourceManager.GetString("SETTLEMENT_DETAIL_RESULT_PAYS", resourceCulture)!;
         internal static string SETTLEMENT_DETAIL_RESULT_TO => ResourceManager.GetString("SETTLEMENT_DETAIL_RESULT_TO", resourceCulture)!;
         internal static string SETTLEMENT_DETAIL_NOT_FOUND => ResourceManager.GetString("SETTLEMENT_DETAIL_NOT_FOUND", resourceCulture)!;
+        internal static string SETTLEMENT_DETAIL_EXPENSE_SPLIT_ALL_WARNING => ResourceManager.GetString("SETTLEMENT_DETAIL_EXPENSE_SPLIT_ALL_WARNING", resourceCulture)!;
     }
 }

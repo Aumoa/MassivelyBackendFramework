@@ -220,7 +220,7 @@
 	<value>Paid by</value>
   </data>
   <data name="SETTLEMENT_DETAIL_EXPENSE_SPLIT" xml:space="preserve">
-	<value>Split among (empty = all)</value>
+	<value>Split among</value>
   </data>
   <data name="SETTLEMENT_DETAIL_EXPENSE_ADD" xml:space="preserve">
 	<value>Add Expense</value>
@@ -248,5 +248,8 @@
   </data>
   <data name="SETTLEMENT_DETAIL_NOT_FOUND" xml:space="preserve">
 	<value>Settlement not found.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_EXPENSE_SPLIT_ALL_WARNING" xml:space="preserve">
+	<value>Future participants will also be included in this expense.</value>
   </data>
 </root>
