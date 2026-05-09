@@ -34,7 +34,7 @@ else
             </div>
             @if (settlement.Status == SettlementStatus.Open)
             {
-                @if (isAuthenticated)
+                @if (isOwner)
                 {
                     <button class="btn-ghost" @onclick="CloseSettlementAsync">
                         <span class="material-symbols-outlined" style="font-size:16px;">lock</span>
@@ -69,7 +69,7 @@ else
     <!-- Expenses Tab -->
     @if (activeTab == Tab.Expenses)
     {
-        @if (settlement.Status == SettlementStatus.Open && settlement.Participants.Count > 0 && isAuthenticated)
+        @if (settlement.Status == SettlementStatus.Open && settlement.Participants.Count > 0 && isOwner)
         {
             <div class="inline-form" style="flex-wrap:wrap;">
                 <div class="inline-form-field" style="flex:2;min-width:140px;">
@@ -145,7 +145,7 @@ else
                         </span>
                         <span class="item-row-amount" style="white-space:nowrap;">@e.Amount.ToString("N0") ₩</span>
                         <span class="item-row-action">
-                            @if (settlement.Status == SettlementStatus.Open && isAuthenticated)
+                            @if (settlement.Status == SettlementStatus.Open && isOwner)
                             {
                                 <button class="btn-ghost" @onclick="() => OpenEditExpenseAsync(e)">
                                     @Strings.BUTTON_EDIT
@@ -164,7 +164,7 @@ else
     <!-- Participants Tab -->
     @if (activeTab == Tab.Participants)
     {
-        @if (settlement.Status == SettlementStatus.Open && isAuthenticated)
+        @if (settlement.Status == SettlementStatus.Open && isOwner)
         {
             <div class="inline-form">
                 <div class="inline-form-field">
@@ -194,7 +194,7 @@ else
                     <div class="item-row item-row-participant">
                         <span class="material-symbols-outlined" style="font-size:18px;color:var(--color-text-muted);">person</span>
                         <span class="item-row-label">@p.Name</span>
-                        @if (settlement.Status == SettlementStatus.Open && isAuthenticated)
+                        @if (settlement.Status == SettlementStatus.Open && isOwner)
                         {
                             <span class="item-row-action">
                                 <button class="btn-danger" @onclick="() => RemoveParticipantAsync(p.Id)">
@@ -290,6 +290,7 @@ else
 
     // Auth state
     private bool isAuthenticated = false;
+    private bool isOwner = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -299,6 +300,19 @@ else
         await LoadAsync();
     }
 
+    // Called after LoadAsync so settlement is available
+    private void UpdateOwnerState(System.Security.Claims.ClaimsPrincipal user)
+    {
+        if (!isAuthenticated || settlement is null)
+        {
+            isOwner = false;
+            return;
+        }
+        var sub = user.FindFirst("sub")?.Value
+            ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        isOwner = sub is not null && sub == settlement.OwnerSubject;
+    }
+
     private async Task LoadAsync()
     {
         isLoading = true;
@@ -306,6 +320,10 @@ else
 
         settlement = await SettlementService.GetSettlementAsync(Id);
         isLoading = false;
+
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        UpdateOwnerState(auth.User);
+
         StateHasChanged();
 
         if (settlement is not null)
