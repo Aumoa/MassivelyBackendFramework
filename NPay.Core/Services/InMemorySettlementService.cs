@@ -11,7 +11,7 @@ public class InMemorySettlementService : ISettlementService
 {
     private readonly List<Settlement> _settlements = [];
 
-    public Task<IReadOnlyList<Settlement>> GetSettlementsAsync(string ownerSubject, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<Settlement>> GetSettlementsAsync(string ownerSubject, CancellationToken ct = default)
     {
         var result = _settlements
             .Where(s => s.OwnerSubject == ownerSubject)
@@ -20,13 +20,13 @@ public class InMemorySettlementService : ISettlementService
         return Task.FromResult<IReadOnlyList<Settlement>>(result);
     }
 
-    public Task<Settlement?> GetSettlementAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<Settlement?> GetSettlementAsync(Guid id, CancellationToken ct = default)
     {
         var settlement = _settlements.FirstOrDefault(s => s.Id == id);
         return Task.FromResult(settlement);
     }
 
-    public Task<Settlement> CreateSettlementAsync(string ownerSubject, string title, string? description, CancellationToken cancellationToken = default)
+    public Task<Settlement> CreateSettlementAsync(string ownerSubject, string title, string? description, CancellationToken ct = default)
     {
         var settlement = new Settlement
         {
@@ -40,7 +40,7 @@ public class InMemorySettlementService : ISettlementService
         return Task.FromResult(settlement);
     }
 
-    public Task CloseSettlementAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task CloseSettlementAsync(Guid id, CancellationToken ct = default)
     {
         var settlement = _settlements.FirstOrDefault(s => s.Id == id);
         if (settlement is not null)
@@ -51,12 +51,9 @@ public class InMemorySettlementService : ISettlementService
         return Task.CompletedTask;
     }
 
-    public Task DeleteSettlementAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task DeleteSettlementAsync(Guid id, CancellationToken ct = default)
     {
         _settlements.RemoveAll(s => s.Id == id);
         return Task.CompletedTask;
     }
-
-    /// <summary>Returns all settlements regardless of owner, for internal service use only.</summary>
-    internal IReadOnlyList<Settlement> GetAllSettlements() => _settlements;
 }

@@ -58,9 +58,9 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
             .Select(p => p.ToModel())
             .ToList();
 
-        var splitMap = (await conn.QueryAsync<(string expense_id, string participant_id)>(splitSql, new { settlementId = id.ToString() }))
+        var splitMap = (await conn.QueryAsync<SplitRow>(splitSql, new { settlementId = id.ToString() }))
             .GroupBy(x => x.expense_id)
-            .ToDictionary(g => g.Key, g => g.Select(x => Guid.Parse(x.participant_id)).ToList());
+            .ToDictionary(g => g.Key, g => g.Select(x => x.participant_id).ToList());
 
         var expenses = (await conn.QueryAsync<ExpenseRow>(expenseSql, new { settlementId = id.ToString() }))
             .Select(e => e.ToModel(splitMap))
@@ -113,13 +113,19 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
 
     // ── Row DTOs ──────────────────────────────────────────────────────────────
 
-    private record SettlementRow(
-        string id, string owner_subject, string title, string? description,
-        int status, DateTime created_at, DateTime? closed_at)
+    private class SettlementRow
     {
+        public Guid id { get; set; }
+        public string owner_subject { get; set; } = "";
+        public string title { get; set; } = "";
+        public string? description { get; set; }
+        public int status { get; set; }
+        public DateTime created_at { get; set; }
+        public DateTime? closed_at { get; set; }
+
         public Settlement ToModel(IList<Participant> participants, IList<Expense> expenses) => new()
         {
-            Id = Guid.Parse(id),
+            Id = id,
             OwnerSubject = owner_subject,
             Title = title,
             Description = description,
@@ -131,30 +137,46 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
         };
     }
 
-    private record ParticipantRow(string id, string settlement_id, string name, string? subject)
+    private class ParticipantRow
     {
+        public Guid id { get; set; }
+        public Guid settlement_id { get; set; }
+        public string name { get; set; } = "";
+        public string? subject { get; set; }
+
         public Participant ToModel() => new()
         {
-            Id = Guid.Parse(id),
-            SettlementId = Guid.Parse(settlement_id),
+            Id = id,
+            SettlementId = settlement_id,
             Name = name,
             Subject = subject
         };
     }
 
-    private record ExpenseRow(
-        string id, string settlement_id, string label,
-        decimal amount, string paid_by_participant_id, DateTime created_at)
+    private class ExpenseRow
     {
-        public Expense ToModel(Dictionary<string, List<Guid>> splitMap) => new()
+        public Guid id { get; set; }
+        public Guid settlement_id { get; set; }
+        public string label { get; set; } = "";
+        public decimal amount { get; set; }
+        public Guid paid_by_participant_id { get; set; }
+        public DateTime created_at { get; set; }
+
+        public Expense ToModel(Dictionary<Guid, List<Guid>> splitMap) => new()
         {
-            Id = Guid.Parse(id),
-            SettlementId = Guid.Parse(settlement_id),
+            Id = id,
+            SettlementId = settlement_id,
             Label = label,
             Amount = amount,
-            PaidByParticipantId = Guid.Parse(paid_by_participant_id),
+            PaidByParticipantId = paid_by_participant_id,
             CreatedAt = new DateTimeOffset(created_at, TimeSpan.Zero),
             SplitAmongParticipantIds = splitMap.TryGetValue(id, out var list) ? list : []
         };
+    }
+
+    private class SplitRow
+    {
+        public Guid expense_id { get; set; }
+        public Guid participant_id { get; set; }
     }
 }

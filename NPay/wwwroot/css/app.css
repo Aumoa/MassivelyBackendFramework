@@ -619,35 +619,22 @@ button {
     overflow: hidden;
 }
 
-.item-table {
-    width: 100%;
-    border-collapse: collapse;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-}
-
-/* expense rows */
 .item-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-5);
+    border-bottom: 1px solid var(--color-border);
     background: var(--color-bg);
     font-size: var(--text-sm);
 }
 
-    .item-row:not(:last-child) td {
-        border-bottom: 1px solid var(--color-border);
-    }
-
-    .item-row td {
-        padding: var(--space-3) var(--space-4);
-        vertical-align: middle;
-    }
-
-    /* participant rows only need [icon | name | action] */
-    .item-row.item-row-participant {
-        grid-template-columns: 20px 1fr 60px;
+    .item-row:last-child {
+        border-bottom: none;
     }
 
 .item-row-label {
+    flex: 1;
     font-weight: 500;
     color: var(--color-text-primary);
 }
@@ -661,15 +648,11 @@ button {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     color: var(--color-text-primary);
-    text-align: right;
 }
 
 .item-row-action {
     opacity: 0;
     transition: opacity var(--transition);
-    text-align: right;
-    width: 1px;
-    white-space: nowrap;
 }
 
 .item-row:hover .item-row-action {
@@ -846,70 +829,4 @@ button {
     .inline-form-field {
         min-width: unset;
     }
-}
-
-/* ── Confirmation Dialog ── */
-.npay-dialog-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(2px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    animation: fadeIn 0.15s ease;
-}
-
-.npay-dialog {
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-    padding: var(--space-6);
-    max-width: 420px;
-    width: calc(100% - var(--space-8));
-    animation: slideUp 0.18s ease;
-}
-
-.npay-dialog-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: var(--radius-full);
-    background: #fef9c3;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: var(--space-4);
-    color: #ca8a04;
-}
-
-.npay-dialog-title {
-    font-size: var(--text-base);
-    font-weight: 600;
-    color: var(--color-text-primary);
-    margin: 0 0 var(--space-2) 0;
-}
-
-.npay-dialog-body {
-    font-size: var(--text-sm);
-    color: var(--color-text-secondary);
-    line-height: 1.6;
-    margin: 0 0 var(--space-6) 0;
-}
-
-.npay-dialog-actions {
-    display: flex;
-    gap: var(--space-2);
-    justify-content: flex-end;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
 }

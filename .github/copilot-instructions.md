@@ -70,7 +70,6 @@ When asked to create or modify UI components, act as a Senior UX Engineer. Refer
 - **Component Naming:** Use PascalCase for all component files and C# method names to maintain .NET naming conventions.
 - **Event Handler Prefix:** Prefix private event handler methods with On (e.g., OnLogoutClick, OnSaveSubmit) for better code traceability.
 - **Directive Precedence:** Place Blazor-specific directives (e.g., @ref, @bind, @onclick) at the beginning of the element tag, before standard HTML attributes, to improve scannability.
-- **CancellationToken parameters:** Always name CancellationToken parameters cancellationToken (do not use abbreviations like ct). Place the cancellationToken parameter as the last parameter in method signatures. This is a mandatory rule across the NPay project and the entire workspace.
 
 ## 6. Database & SQL Standards
 - Use backticks around all MySQL identifiers (table names, column names, aliases) without exception.

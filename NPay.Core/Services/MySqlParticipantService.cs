@@ -13,7 +13,8 @@ public class MySqlParticipantService(string connectionString) : IParticipantServ
     private MySqlConnection Open() => new(connectionString);
 
     public async Task<Participant> AddParticipantAsync(
-        Guid settlementId, string name, string? subject = null, CancellationToken cancellationToken = default)
+        Guid settlementId, string name, string? subject = null,
+        CancellationToken cancellationToken = default)
     {
         var participant = new Participant
         {
@@ -36,6 +37,7 @@ public class MySqlParticipantService(string connectionString) : IParticipantServ
             participant.Name,
             participant.Subject
         });
+
         return participant;
     }
 

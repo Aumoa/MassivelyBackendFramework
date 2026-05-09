@@ -7,7 +7,7 @@ namespace NPay.Services;
 /// </summary>
 public interface IParticipantService
 {
-    Task<Participant> AddParticipantAsync(Guid settlementId, string name, string? subject = null, CancellationToken cancellationToken = default);
+    Task<Participant> AddParticipantAsync(Guid settlementId, string name, string? subject = null, CancellationToken ct = default);
 
-    Task RemoveParticipantAsync(Guid participantId, CancellationToken cancellationToken = default);
+    Task RemoveParticipantAsync(Guid participantId, CancellationToken ct = default);
 }

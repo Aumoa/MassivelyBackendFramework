@@ -6,29 +6,8 @@
 @inject IParticipantService ParticipantService
 @inject IExpenseService ExpenseService
 @inject NavigationManager Nav
-@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>@(settlement?.Title ?? Strings.LOADING) — @Strings.APP_TITLE</PageTitle>
-
-@if (showAllParticipantsDialog)
-{
-    <div class="npay-dialog-backdrop" @onclick="OnDialogBackdropClick">
-        <div class="npay-dialog" @onclick:stopPropagation>
-            <div class="npay-dialog-icon">
-                <span class="material-symbols-outlined" style="font-size:22px;">group_add</span>
-            </div>
-            <h2 class="npay-dialog-title">모든 인원이 포함돼요</h2>
-            <p class="npay-dialog-body">
-                참여 인원을 따로 고르지 않으면 <strong>지금 있는 인원은 물론, 나중에 추가되는 인원까지 모두</strong> 이 항목을 나누게 돼요.<br /><br />
-                그래도 괜찮다면 그냥 추가하고, 특정 인원만 포함하고 싶다면 취소하고 직접 골라주세요.
-            </p>
-            <div class="npay-dialog-actions">
-                <button class="btn-ghost" @onclick="OnDialogCancel">취소할게요</button>
-                <button class="btn-primary" @onclick="OnDialogConfirm">그래도 추가</button>
-            </div>
-        </div>
-    </div>
-}
 
 @if (isLoading)
 {
@@ -51,33 +30,19 @@ else
                     <p class="page-subtitle">@settlement.Description</p>
                 }
             </div>
-            <AuthorizeView>
-                <Authorized>
-                    @if (settlement.Status == SettlementStatus.Open)
-                    {
-                        <button class="btn-ghost" @onclick="CloseSettlementAsync">
-                            <span class="material-symbols-outlined" style="font-size:16px;">lock</span>
-                            @Strings.SETTLEMENT_DETAIL_BUTTON_CLOSE
-                        </button>
-                    }
-                </Authorized>
-            </AuthorizeView>
-            @if (settlement.Status == SettlementStatus.Closed)
+            @if (settlement.Status == SettlementStatus.Open)
+            {
+                <button class="btn-ghost" @onclick="CloseSettlementAsync">
+                    <span class="material-symbols-outlined" style="font-size:16px;">lock</span>
+                    @Strings.SETTLEMENT_DETAIL_BUTTON_CLOSE
+                </button>
+            }
+            else
             {
                 <span class="badge badge-closed">@Strings.SETTLEMENTS_STATUS_CLOSED</span>
             }
         </div>
     </div>
-
-    <!-- Auth notice for guests -->
-    <AuthorizeView>
-        <NotAuthorized>
-            <div style="margin-bottom:var(--space-4);padding:var(--space-3) var(--space-4);background:var(--color-surface-2);border-radius:var(--radius-md);font-size:var(--text-sm);color:var(--color-text-muted);display:flex;align-items:center;gap:var(--space-2);">
-                <span class="material-symbols-outlined" style="font-size:18px;">info</span>
-                로그인하지 않으면 내용을 볼 수만 있고 편집할 수 없습니다.
-            </div>
-        </NotAuthorized>
-    </AuthorizeView>
 
     <!-- Tabs -->
     <div class="npay-tabs">
@@ -95,8 +60,6 @@ else
     <!-- Expenses Tab -->
     @if (activeTab == Tab.Expenses)
     {
-        <AuthorizeView>
-            <Authorized>
         @if (settlement.Status == SettlementStatus.Open && settlement.Participants.Count > 0)
         {
             <div class="inline-form" style="flex-wrap:wrap;">
@@ -134,13 +97,6 @@ else
                         }
                     </div>
                 </div>
-                @if (newExpenseSplitAmong.Count == 0)
-                {
-                    <div style="flex:100%;display:flex;align-items:flex-start;gap:var(--space-2);padding:var(--space-2) var(--space-3);background:var(--color-surface-2);border-radius:var(--radius-md);font-size:var(--text-xs);color:var(--color-text-muted);line-height:1.5;">
-                        <span class="material-symbols-outlined" style="font-size:15px;margin-top:1px;flex-shrink:0;">tips_and_updates</span>
-                        <span>참여 인원을 따로 지정하지 않으면 <strong style="color:var(--color-text);">현재 및 이후 추가되는 모든 인원</strong>이 이 항목에 포함돼요. 특정 인원만 나누고 싶다면 위에서 선택해 주세요.</span>
-                    </div>
-                }
                 <button class="btn-primary" @onclick="AddExpenseAsync"
                         disabled="@(string.IsNullOrWhiteSpace(newExpenseLabel) || newExpenseAmount <= 0 || newExpensePaidBy == Guid.Empty)"
                         style="flex-shrink:0;align-self:flex-end;">
@@ -148,8 +104,6 @@ else
                 </button>
             </div>
         }
-            </Authorized>
-        </AuthorizeView>
 
         @if (settlement.Expenses.Count == 0)
         {
@@ -182,16 +136,12 @@ else
                         </td>
                         <td class="item-row-amount" style="white-space:nowrap;">@e.Amount.ToString("N0") ₩</td>
                         <td class="item-row-action">
-                            <AuthorizeView>
-                                <Authorized>
                             @if (settlement.Status == SettlementStatus.Open)
                             {
                                 <button class="btn-danger" @onclick="() => RemoveExpenseAsync(e.Id)">
                                     @Strings.BUTTON_DELETE
                                 </button>
                             }
-                                </Authorized>
-                            </AuthorizeView>
                         </td>
                     </tr>
                 }
@@ -203,16 +153,12 @@ else
     <!-- Participants Tab -->
     @if (activeTab == Tab.Participants)
     {
-        <AuthorizeView>
-            <Authorized>
         @if (settlement.Status == SettlementStatus.Open)
         {
             <div class="inline-form">
                 <div class="inline-form-field">
                     <label class="inline-form-label">@Strings.SETTLEMENT_DETAIL_PARTICIPANT_NAME</label>
-                    <input class="form-input" @bind="newParticipantName" @bind:event="oninput"
-                           @onkeydown="OnParticipantNameKeyDown"
-                           placeholder="e.g. Alice" maxlength="50" />
+                    <input class="form-input" @bind="newParticipantName" @bind:event="oninput" placeholder="e.g. Alice" maxlength="50" />
                 </div>
                 <button class="btn-primary" @onclick="AddParticipantAsync"
                         disabled="@string.IsNullOrWhiteSpace(newParticipantName)"
@@ -221,8 +167,6 @@ else
                 </button>
             </div>
         }
-            </Authorized>
-        </AuthorizeView>
 
         @if (settlement.Participants.Count == 0)
         {
@@ -239,8 +183,6 @@ else
                     <div class="item-row item-row-participant">
                         <span class="material-symbols-outlined" style="font-size:18px;color:var(--color-text-muted);">person</span>
                         <span class="item-row-label">@p.Name</span>
-                        <AuthorizeView>
-                            <Authorized>
                         @if (settlement.Status == SettlementStatus.Open)
                         {
                             <span class="item-row-action">
@@ -249,8 +191,6 @@ else
                                 </button>
                             </span>
                         }
-                            </Authorized>
-                        </AuthorizeView>
                     </div>
                 }
             </div>
@@ -260,17 +200,6 @@ else
     <!-- Result Tab -->
     @if (activeTab == Tab.Result)
     {
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);">
-            <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm);color:var(--color-text-muted);user-select:none;">
-                <input type="checkbox" @bind="minimizeTransfers" @bind:after="RefreshTransfersAsync"
-                       style="width:16px;height:16px;accent-color:var(--color-accent);cursor:pointer;" />
-                최소 이체 모드
-            </label>
-            <span style="font-size:var(--text-xs);color:var(--color-text-muted);">
-                @(minimizeTransfers ? "이체 횟수를 최소화합니다." : "항목별로 개별 지급합니다.")
-            </span>
-        </div>
-
         @if (isCalculating)
         {
             <div class="transfer-list">
@@ -327,25 +256,12 @@ else
     private string newParticipantName = string.Empty;
 
     // Result
-    private bool minimizeTransfers = false;
     private List<TransferInstruction> transfers = [];
-
-    // All-participants dialog
-    private bool showAllParticipantsDialog = false;
-    private bool allParticipantsWarningAcknowledged = false;
-    private TaskCompletionSource<bool>? dialogTcs;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
         await LoadAsync();
-    }
-
-    // Server-side authorization guard: prevents unauthenticated calls even if UI is bypassed.
-    private async Task<bool> EnsureAuthorizedAsync()
-    {
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        return authState.User.Identity?.IsAuthenticated == true;
     }
 
     private async Task LoadAsync()
@@ -365,27 +281,14 @@ else
     {
         isCalculating = true;
         StateHasChanged();
-        transfers = [.. await ExpenseService.CalculateTransfersAsync(Id, minimizeTransfers)];
+        transfers = [.. await ExpenseService.CalculateTransfersAsync(Id)];
         isCalculating = false;
         StateHasChanged();
     }
 
     private async Task AddExpenseAsync()
     {
-        if (!await EnsureAuthorizedAsync()) return;
         if (settlement is null || string.IsNullOrWhiteSpace(newExpenseLabel) || newExpensePaidBy == Guid.Empty) return;
-
-        // On first attempt with no participants selected, show the confirmation dialog.
-        if (newExpenseSplitAmong.Count == 0 && !allParticipantsWarningAcknowledged)
-        {
-            dialogTcs = new TaskCompletionSource<bool>();
-            showAllParticipantsDialog = true;
-            StateHasChanged();
-            var confirmed = await dialogTcs.Task;
-            if (!confirmed) return;
-        }
-
-        allParticipantsWarningAcknowledged = false;
         await ExpenseService.AddExpenseAsync(Id, newExpenseLabel.Trim(), newExpenseAmount, newExpensePaidBy,
             newExpenseSplitAmong.Count > 0 ? newExpenseSplitAmong : null);
         newExpenseLabel = string.Empty;
@@ -395,21 +298,6 @@ else
         await LoadAsync();
     }
 
-    private void OnDialogConfirm()
-    {
-        allParticipantsWarningAcknowledged = true;
-        showAllParticipantsDialog = false;
-        dialogTcs?.SetResult(true);
-    }
-
-    private void OnDialogCancel()
-    {
-        showAllParticipantsDialog = false;
-        dialogTcs?.SetResult(false);
-    }
-
-    private void OnDialogBackdropClick() => OnDialogCancel();
-
     private void ToggleSplitParticipant(Guid id)
     {
         if (!newExpenseSplitAmong.Remove(id))
@@ -418,35 +306,26 @@ else
 
     private async Task RemoveExpenseAsync(Guid expenseId)
     {
-        if (!await EnsureAuthorizedAsync()) return;
         await ExpenseService.RemoveExpenseAsync(expenseId);
         await LoadAsync();
     }
 
     private async Task AddParticipantAsync()
     {
-        if (!await EnsureAuthorizedAsync()) return;
         if (string.IsNullOrWhiteSpace(newParticipantName)) return;
         await ParticipantService.AddParticipantAsync(Id, newParticipantName.Trim());
         newParticipantName = string.Empty;
         await LoadAsync();
     }
 
-    private async Task OnParticipantNameKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter") await AddParticipantAsync();
-    }
-
     private async Task RemoveParticipantAsync(Guid participantId)
     {
-        if (!await EnsureAuthorizedAsync()) return;
         await ParticipantService.RemoveParticipantAsync(participantId);
         await LoadAsync();
     }
 
     private async Task CloseSettlementAsync()
     {
-        if (!await EnsureAuthorizedAsync()) return;
         await SettlementService.CloseSettlementAsync(Id);
         await LoadAsync();
     }
