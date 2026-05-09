@@ -82,8 +82,8 @@ else
                     </select>
                 </div>
                 <div class="inline-form-field" style="flex:100%;margin-top:0;">
-                    <label class="inline-form-label">참여 인원 <span style="font-weight:400;color:var(--color-text-muted);">(미선택 시 전원 참여)</span></label>
-                    <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-1);">
+                    <label class="inline-form-label">참여 인원</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-1);">                        
                         @foreach (var p in settlement.Participants)
                         {
                             var pid = p.Id;
@@ -96,6 +96,13 @@ else
                             </label>
                         }
                     </div>
+                    @if (newExpenseSplitAmong.Count == 0)
+                    {
+                        <div style="display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-2);font-size:var(--text-xs);color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);">
+                            <span class="material-symbols-outlined" style="font-size:14px;">warning</span>
+                            이후 추가되는 인원도 이 항목의 정산에 포함됩니다.
+                        </div>
+                    }
                 </div>
                 <button class="btn-primary" @onclick="AddExpenseAsync"
                         disabled="@(string.IsNullOrWhiteSpace(newExpenseLabel) || newExpenseAmount <= 0 || newExpensePaidBy == Guid.Empty)"
@@ -255,6 +262,11 @@ else
     private Guid newExpensePaidBy;
     private HashSet<Guid> newExpenseSplitAmong = [];
 
+    private void InitSplitAmong()
+    {
+        newExpenseSplitAmong = settlement?.Participants.Select(p => p.Id).ToHashSet() ?? [];
+    }
+
     // New participant form
     private string newParticipantName = string.Empty;
 
@@ -278,7 +290,10 @@ else
         StateHasChanged();
 
         if (settlement is not null)
+        {
+            InitSplitAmong();
             await RefreshTransfersAsync();
+        }
     }
 
     private async Task RefreshTransfersAsync()
@@ -298,7 +313,6 @@ else
         newExpenseLabel = string.Empty;
         newExpenseAmount = 0;
         newExpensePaidBy = Guid.Empty;
-        newExpenseSplitAmong = [];
         await LoadAsync();
     }
 
