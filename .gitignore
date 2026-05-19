@@ -6,3 +6,6 @@
 
 # ASP.NET
 appsettings.*.json
+
+# Claude Code
+.claude/*.local.json

@@ -5,7 +5,7 @@ using AI;
 
 namespace OpenAI.Services;
 
-internal class OllamaAIChat(string conversationTopics, OllamaOptions options, IChatClient chatClient, ToolsProvider tools) : IAIChat
+internal class OllamaAIChat(string conversationTopics, ClaudeOptions options, IChatClient chatClient, ToolsProvider tools) : IAIChat
 {
     private const string CHAT_SYSTEM_PROMPT =
         "당신은 사용자에게 도움을 주는 친절하고 전문적인 AI 어시스턴트입니다. 당신의 답변은 명확하고 간결하며, 필요할 때 논리적인 구조(목록, 강조 등)를 사용하세요. " +

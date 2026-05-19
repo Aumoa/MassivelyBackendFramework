@@ -1,7 +1,8 @@
 # OpenAI 서비스 API 사용 가이드
 
-이 서비스는 Ollama에 대한 인증된 프록시로, `/api/chat` 및 `/api/generate` 엔드포인트를 외부에 노출합니다.  
-실제 요청과 응답은 Ollama에 그대로 전달되므로, [Ollama API 공식 문서](https://github.com/ollama/ollama/blob/main/docs/api.md)와 동일한 요청/응답 형식을 사용할 수 있습니다.
+이 서비스는 Anthropic Claude 백엔드를 Ollama 호환 인터페이스로 노출합니다. `/api/chat` 및 `/api/generate` 엔드포인트의 요청/응답 형식은 [Ollama API 공식 문서](https://github.com/ollama/ollama/blob/main/docs/api.md)와 동일하므로 기존 Ollama 클라이언트를 그대로 사용할 수 있습니다.
+
+단, `model` 필드에는 Claude 모델 ID(예: `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`)를 지정해야 합니다.
 
 ---
 
@@ -41,7 +42,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "model": "gemma2:27b",
+  "model": "claude-opus-4-7",
   "messages": [
     { "role": "user", "content": "안녕하세요! 오늘 날씨 어때요?" }
   ],
@@ -57,7 +58,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "model": "gemma2:27b",
+  "model": "claude-opus-4-7",
   "messages": [
     { "role": "system", "content": "당신은 친절한 AI 어시스턴트입니다." },
     { "role": "user",   "content": "파이썬으로 피보나치 수열을 출력하는 코드를 작성해줘." }
@@ -71,17 +72,17 @@ Content-Type: application/json
 응답이 NDJSON(개행으로 구분된 JSON) 형식으로 청크 단위로 전달됩니다.
 
 ```jsonl
-{"model":"gemma2:27b","created_at":"...","message":{"role":"assistant","content":"안"},"done":false}
-{"model":"gemma2:27b","created_at":"...","message":{"role":"assistant","content":"녕"},"done":false}
+{"model":"claude-opus-4-7","created_at":"...","message":{"role":"assistant","content":"안"},"done":false}
+{"model":"claude-opus-4-7","created_at":"...","message":{"role":"assistant","content":"녕"},"done":false}
 ...
-{"model":"gemma2:27b","created_at":"...","message":{"role":"assistant","content":""},"done":true,"total_duration":...}
+{"model":"claude-opus-4-7","created_at":"...","message":{"role":"assistant","content":""},"done":true,"total_duration":...}
 ```
 
 #### 단건 응답 형식 (`stream: false`)
 
 ```json
 {
-  "model": "gemma2:27b",
+  "model": "claude-opus-4-7",
   "created_at": "2024-01-01T00:00:00Z",
   "message": {
     "role": "assistant",
@@ -129,10 +130,10 @@ Content-Type: application/json
 #### 스트리밍 응답 형식 (`stream: true`)
 
 ```jsonl
-{"model":"llama3.1:8b","created_at":"...","response":"하","done":false}
-{"model":"llama3.1:8b","created_at":"...","response":"늘","done":false}
+{"model":"claude-sonnet-4-6","created_at":"...","response":"하","done":false}
+{"model":"claude-sonnet-4-6","created_at":"...","response":"늘","done":false}
 ...
-{"model":"llama3.1:8b","created_at":"...","response":"","done":true,"total_duration":...}
+{"model":"claude-sonnet-4-6","created_at":"...","response":"","done":true,"total_duration":...}
 ```
 
 #### 단건 응답 형식 (`stream: false`)
@@ -158,7 +159,7 @@ curl -X POST https://<서비스_주소>/api/chat \
   -H "Authorization: Bearer MY_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gemma2:27b",
+    "model": "claude-opus-4-7",
     "messages": [{"role": "user", "content": "안녕하세요!"}],
     "stream": true
   }'
@@ -171,7 +172,7 @@ curl -X POST https://<서비스_주소>/api/generate \
   -H "Authorization: Bearer MY_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "llama3.1:8b",
+    "model": "claude-sonnet-4-6",
     "prompt": "AI란 무엇인가요?",
     "stream": false
   }'
@@ -185,10 +186,10 @@ curl -X POST https://<서비스_주소>/api/generate \
 
 ```json
 {
-  "Ollama": {
-    "Uri": "http://localhost:11434",
-    "GenerateTopicsModel": "llama3.1:8b",
-    "ChatModel": "gemma2:27b"
+  "Claude": {
+    "ApiKey": "<Anthropic API Key>",
+    "GenerateTopicsModel": "claude-sonnet-4-6",
+    "ChatModel": "claude-opus-4-7"
   }
 }
 ```

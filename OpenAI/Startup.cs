@@ -24,7 +24,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
 
-builder.Services.AddOllamaAI(builder.Configuration);
+builder.Services.AddClaudeAI(builder.Configuration);
 builder.Services.AddScoped<ChatStateService>();
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>

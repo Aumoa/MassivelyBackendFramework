@@ -1,5 +1,5 @@
 ﻿using AI;
-using AI.Providers.Ollama;
+using AI.Providers.Claude;
 using Dapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,19 +13,19 @@ namespace OpenAI.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddOllamaAI(this IServiceCollection s, IConfiguration config)
+    public static IServiceCollection AddClaudeAI(this IServiceCollection s, IConfiguration config)
     {
-        s.Configure<OllamaOptions>(config.GetRequiredSection("Ollama"));
+        s.Configure<ClaudeOptions>(config.GetRequiredSection("Claude"));
         s.Configure<MySqlOptions>(config.GetRequiredSection("MySql"));
         s.Configure<StableDiffusionOptions>(config.GetRequiredSection("StableDiffusion"));
 
-        s.Configure<OllamaChatClientOptions>(config.GetRequiredSection("Ollama"));
+        s.Configure<ClaudeChatClientOptions>(config.GetRequiredSection("Claude"));
         s.AddHttpClient();
         s.AddSingleton<IChatClient>(sp =>
         {
             var factory = sp.GetRequiredService<IHttpClientFactory>();
-            var chatOptions = sp.GetRequiredService<IOptions<OllamaChatClientOptions>>();
-            return new OllamaChatClient(factory.CreateClient(), chatOptions);
+            var chatOptions = sp.GetRequiredService<IOptions<ClaudeChatClientOptions>>();
+            return new ClaudeChatClient(factory.CreateClient(), chatOptions);
         });
 
         s.AddSingleton<IAIMessenger, OllamaAIMessenger>();
