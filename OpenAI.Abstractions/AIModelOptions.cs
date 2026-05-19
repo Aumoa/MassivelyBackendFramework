@@ -1,6 +1,6 @@
 namespace OpenAI;
 
-public record ClaudeOptions
+public record AIModelOptions
 {
     public required string GenerateTopicsModel { get; init; }
 

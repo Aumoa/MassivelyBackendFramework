@@ -187,7 +187,9 @@ curl -X POST https://<서비스_주소>/api/generate \
 ```json
 {
   "Claude": {
-    "ApiKey": "<Anthropic API Key>",
+    "ApiKey": "<Anthropic API Key>"
+  },
+  "AIModel": {
     "GenerateTopicsModel": "claude-sonnet-4-6",
     "ChatModel": "claude-opus-4-7"
   }

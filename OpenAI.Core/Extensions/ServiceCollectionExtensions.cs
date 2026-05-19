@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddClaudeAI(this IServiceCollection s, IConfiguration config)
     {
-        s.Configure<ClaudeOptions>(config.GetRequiredSection("Claude"));
+        s.Configure<AIModelOptions>(config.GetRequiredSection("AIModel"));
         s.Configure<MySqlOptions>(config.GetRequiredSection("MySql"));
         s.Configure<StableDiffusionOptions>(config.GetRequiredSection("StableDiffusion"));
 

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 
 namespace OpenAI.Services;
 
-internal class OllamaAIMessenger(IOptions<ClaudeOptions> options, IChatClient chatClient, ToolsProvider tools) : IAIMessenger
+internal class OllamaAIMessenger(IOptions<AIModelOptions> options, IChatClient chatClient, ToolsProvider tools) : IAIMessenger
 {
     public async ValueTask<string> GenerateConversationTopicsAsync(string message, CancellationToken cancellationToken = default)
     {
