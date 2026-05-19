@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- App -->
+  <data name="APP_TITLE" xml:space="preserve">
+    <value>DiscordBot</value>
+  </data>
+
+  <!-- Common -->
+  <data name="ERROR_RELOAD" xml:space="preserve">
+    <value>Reload</value>
+  </data>
+  <data name="ERROR_UNHANDLED" xml:space="preserve">
+    <value>An unhandled error has occurred.</value>
+  </data>
+
+  <!-- NavMenu -->
+  <data name="NAVMENU_LABEL_HOME" xml:space="preserve">
+    <value>Home</value>
+  </data>
+
+  <!-- Home -->
+  <data name="HOME_TITLE" xml:space="preserve">
+    <value>Home</value>
+  </data>
+  <data name="HOME_SUBTITLE" xml:space="preserve">
+    <value>DiscordBot management console</value>
+  </data>
+  <data name="HOME_WELCOME" xml:space="preserve">
+    <value>Welcome, {0}.</value>
+  </data>
+
+  <!-- NotFound -->
+  <data name="NOTFOUND_TITLE" xml:space="preserve">
+    <value>Not Found</value>
+  </data>
+  <data name="NOTFOUND_DESCRIPTION" xml:space="preserve">
+    <value>Sorry, the content you are looking for does not exist.</value>
+  </data>
+
+  <!-- AccessDenied -->
+  <data name="ACCESS_DENIED_TITLE" xml:space="preserve">
+    <value>Access Denied</value>
+  </data>
+  <data name="ACCESS_DENIED_DESCRIPTION" xml:space="preserve">
+    <value>You do not have permission to access this page. Administrator privileges are required.</value>
+  </data>
+  <data name="ACCESS_DENIED_BUTTON_LOGOUT" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+</root>

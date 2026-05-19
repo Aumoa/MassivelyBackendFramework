@@ -1,0 +1,22 @@
+@inject NavigationManager Nav
+
+<div class="bot-shell">
+    <main class="bot-main">
+        <div class="access-denied">
+            <span class="material-symbols-outlined access-denied-icon">block</span>
+            <h1 class="page-title">@Strings.ACCESS_DENIED_TITLE</h1>
+            <p class="page-subtitle">@Strings.ACCESS_DENIED_DESCRIPTION</p>
+            <button class="btn-primary" @onclick="OnClick_Logout">
+                <span class="material-symbols-outlined">logout</span>
+                @Strings.ACCESS_DENIED_BUTTON_LOGOUT
+            </button>
+        </div>
+    </main>
+</div>
+
+@code {
+    private void OnClick_Logout()
+    {
+        Nav.NavigateTo("/auth/logout", forceLoad: true);
+    }
+}

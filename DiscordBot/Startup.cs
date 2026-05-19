@@ -5,14 +5,46 @@ using DiscordBot.Options;
 using DiscordBot.Repositories;
 using DiscordBot.Services;
 using DiscordBot.SQL.Migration;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Options;
+using OpenIDConnect.Extensions;
 using SQLMigration;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddControllers();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    string[] supportedCultures = ["en", "ko"];
+    options.SetDefaultCulture("en")
+           .AddSupportedCultures(supportedCultures)
+           .AddSupportedUICultures(supportedCultures);
+});
+
+var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");
+var redisConnectionString = dataProtection.GetValue<string>("RedisConnectionString");
+if (string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    throw new InvalidOperationException("DataProtection:RedisConnectionString is not configured.");
+}
+
+builder.Services.AddDataProtection()
+    .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
+    .SetApplicationName("DiscordBot");
+
+builder.Services.AddAuthentication("Bearer")
+    .AddJwtBearer("Bearer", options => options.Audience = "discordbot");
+builder.Services.AddAuthorizationCore();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddOpenIDConnect(builder.Configuration);
 
 RegisterServices(builder.Services, builder.Configuration);
 
@@ -25,11 +57,23 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
+app.UseRequestLocalization();
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseAntiforgery();
 
+app.MapControllers();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

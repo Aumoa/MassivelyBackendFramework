@@ -10,14 +10,34 @@
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Discord.Net" Version="3.19.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.5" />
     <PackageReference Include="MySql.Data" Version="9.4.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.9.25" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\AICommon\AICommon.csproj" />
     <ProjectReference Include="..\ASPNETUtility\ASPNETUtility.csproj" />
+    <ProjectReference Include="..\BlazorSharedComponent\BlazorSharedComponent.csproj" />
     <ProjectReference Include="..\DiscordBot.SQL\DiscordBot.SQL.csproj" />
+    <ProjectReference Include="..\OpenIDConnect.Core\OpenIDConnect.Core.csproj" />
     <ProjectReference Include="..\SQLMigration\SQLMigration.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Localizations\Strings.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Strings.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Localizations\Strings.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Strings.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

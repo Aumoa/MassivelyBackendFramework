@@ -1,7 +1,28 @@
-﻿@page "/"
+@page "/"
+@rendermode InteractiveServer
+@inject AuthenticationStateProvider AuthState
 
-<PageTitle>Home</PageTitle>
+<PageTitle>@Strings.HOME_TITLE — @Strings.APP_TITLE</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="page-header">
+    <h1 class="page-title">@Strings.HOME_TITLE</h1>
+    <p class="page-subtitle">@Strings.HOME_SUBTITLE</p>
+</div>
 
-Welcome to your new app.
+@if (!string.IsNullOrEmpty(userName))
+{
+    <p>@string.Format(Strings.HOME_WELCOME, userName)</p>
+}
+
+@code {
+    private string userName = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        userName = auth.User.FindFirst("name")?.Value ?? string.Empty;
+        StateHasChanged();
+    }
+}

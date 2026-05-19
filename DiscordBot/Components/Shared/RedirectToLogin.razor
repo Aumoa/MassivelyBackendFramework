@@ -1,0 +1,14 @@
+@using OpenIDConnect
+@inject NavigationManager Nav
+@inject IAuthenticationStateProvider Auth
+
+@code {
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Auth.NavigateToLogin(Nav, "auth/redirect", "all");
+        }
+        return base.OnAfterRenderAsync(firstRender);
+    }
+}
