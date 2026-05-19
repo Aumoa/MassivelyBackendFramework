@@ -162,12 +162,18 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
                 }
             }
 
-            if (sentMessage != null)
+            if (sentMessage == null)
             {
-                if (hasModify)
+                if (!string.IsNullOrEmpty(totalMessage))
                 {
-                    await sentMessage.ModifyAsync(p => p.Content = totalMessage);
+                    sentMessage = await message.Channel.SendMessageAsync(totalMessage);
+                    typingState?.Dispose();
+                    typingState = null;
                 }
+            }
+            else if (hasModify)
+            {
+                await sentMessage.ModifyAsync(p => p.Content = totalMessage);
             }
         }
         finally
