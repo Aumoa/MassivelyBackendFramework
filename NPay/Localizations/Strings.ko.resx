@@ -61,7 +61,7 @@
 
   <!-- App -->
   <data name="APP_TITLE" xml:space="preserve">
-	<value>NPay</value>
+	<value>N-Pay</value>
   </data>
 
   <!-- Common -->
@@ -106,7 +106,7 @@
 
   <!-- Home page -->
   <data name="HOME_TITLE" xml:space="preserve">
-	<value>NPay에 오신 것을 환영합니다</value>
+	<value>N-Pay에 오신 것을 환영합니다</value>
   </data>
   <data name="HOME_SUBTITLE" xml:space="preserve">
 	<value>친구들과의 금액 정산을 간편하게 관리하세요.</value>
