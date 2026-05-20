@@ -75,14 +75,23 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
                     }
                 }
 
-                messagesAppend.Add(new ChatMessage
+                bool hasContent = !string.IsNullOrEmpty(content);
+                bool hasToolCalls = toolCalls.Count > 0;
+                if (hasContent || hasToolCalls)
                 {
-                    Role = ChatRole.Assistant,
-                    Content = content,
-                    ToolCalls = toolCalls.Count > 0 ? [.. toolCalls] : null
-                });
+                    messagesAppend.Add(new ChatMessage
+                    {
+                        Role = ChatRole.Assistant,
+                        Content = content,
+                        ToolCalls = hasToolCalls ? [.. toolCalls] : null
+                    });
+                }
+                else
+                {
+                    logger.LogWarning("AI returned empty response (no content, no tool calls). Skipping assistant turn to keep history clean.");
+                }
 
-                if (toolCalls.Count > 0)
+                if (hasToolCalls)
                 {
                     try
                     {

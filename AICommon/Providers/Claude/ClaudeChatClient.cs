@@ -348,9 +348,10 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
                             });
                         }
                     }
+                    // Skip empty assistant turns — Claude API rejects messages with empty text blocks.
                     if (content.Count == 0)
                     {
-                        content.Add(new { type = "text", text = "" });
+                        break;
                     }
                     claudeMessages.Add(new { role = "assistant", content = content.ToArray() });
                     break;
