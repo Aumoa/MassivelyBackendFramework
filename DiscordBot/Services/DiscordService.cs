@@ -13,7 +13,10 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         public required string Token { get; set; }
     }
 
-    private readonly DiscordSocketClient m_Socket = new();
+    private readonly DiscordSocketClient m_Socket = new(new DiscordSocketConfig
+    {
+        GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
+    });
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -54,13 +57,14 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
             logger.LogInformation("Message: {message}", content.ToString());
         }
 
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        await SaveChatLogAsync(message.Id.ToString(), guildId, message.Channel.Id.ToString(), message.Author.Id.ToString(), content);
+
         bool isMentioned = message.MentionedUsers.Any(u => u.Id == m_Socket.CurrentUser.Id);
         if (!isMentioned)
         {
             return;
         }
-
-        await SaveChatLogAsync(message.Channel.Id.ToString(), message.Author.Id.ToString(), content);
 
         string totalReasoning = string.Empty;
         string totalMessage = string.Empty;
@@ -187,7 +191,7 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
 
             if (!string.IsNullOrEmpty(totalMessage))
             {
-                await SaveChatLogAsync(message.Channel.Id.ToString(), m_Socket.CurrentUser.Id.ToString(), totalMessage);
+                await SaveChatLogAsync(sentMessage?.Id.ToString(), guildId, message.Channel.Id.ToString(), m_Socket.CurrentUser.Id.ToString(), totalMessage);
             }
 
             if (sentMessage != null)
@@ -220,13 +224,13 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         return Task.CompletedTask;
     }
 
-    private async Task SaveChatLogAsync(string channelId, string userId, string content)
+    private async Task SaveChatLogAsync(string? messageId, string? guildId, string channelId, string userId, string content)
     {
         try
         {
             using var scope = scopeFactory.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
-            await repository.AddAsync(channelId, userId, content);
+            await repository.AddAsync(messageId, guildId, channelId, userId, content);
         }
         catch (Exception e)
         {
