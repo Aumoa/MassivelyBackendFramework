@@ -252,4 +252,21 @@
   <data name="SETTLEMENT_DETAIL_EXPENSE_SPLIT_ALL_WARNING" xml:space="preserve">
 	<value>이후 추가되는 인원도 이 항목의 정산에 포함됩니다.</value>
   </data>
+
+  <!-- Guest expense edit option -->
+  <data name="CREATE_SETTLEMENT_LABEL_GUEST_EDIT" xml:space="preserve">
+	<value>비로그인 사용자도 지출 내역 수정 허용</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_HINT_GUEST_EDIT" xml:space="preserve">
+	<value>링크를 공유받은 사람은 로그인 없이도 지출을 추가하거나 제거할 수 있습니다.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_GUEST_EDIT_TOGGLE" xml:space="preserve">
+	<value>비로그인 사용자 지출 수정 허용</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_GUEST_EDIT_HINT_ON" xml:space="preserve">
+	<value>링크를 공유받은 누구나 지출을 추가하거나 제거할 수 있습니다.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_GUEST_EDIT_HINT_OFF" xml:space="preserve">
+	<value>소유자만 지출을 추가하거나 제거할 수 있습니다.</value>
+  </data>
 </root>

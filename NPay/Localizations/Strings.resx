@@ -252,4 +252,21 @@
   <data name="SETTLEMENT_DETAIL_EXPENSE_SPLIT_ALL_WARNING" xml:space="preserve">
 	<value>Future participants will also be included in this expense.</value>
   </data>
+
+  <!-- Guest expense edit option -->
+  <data name="CREATE_SETTLEMENT_LABEL_GUEST_EDIT" xml:space="preserve">
+	<value>Let guests edit expenses</value>
+  </data>
+  <data name="CREATE_SETTLEMENT_HINT_GUEST_EDIT" xml:space="preserve">
+	<value>Anyone with the link can add or remove expenses without signing in.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_GUEST_EDIT_TOGGLE" xml:space="preserve">
+	<value>Guests can edit expenses</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_GUEST_EDIT_HINT_ON" xml:space="preserve">
+	<value>Anyone with the link can add or remove expenses.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_GUEST_EDIT_HINT_OFF" xml:space="preserve">
+	<value>Only the owner can add or remove expenses.</value>
+  </data>
 </root>

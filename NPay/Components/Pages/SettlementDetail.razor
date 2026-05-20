@@ -69,7 +69,22 @@ else
     <!-- Expenses Tab -->
     @if (activeTab == Tab.Expenses)
     {
-        @if (settlement.Status == SettlementStatus.Open && settlement.Participants.Count > 0 && isOwner)
+        @if (settlement.Status == SettlementStatus.Open && isOwner)
+        {
+            <div style="display:flex;align-items:flex-start;gap:var(--space-3);margin-bottom:var(--space-4);padding:var(--space-3);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);">
+                <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;user-select:none;flex-shrink:0;">
+                    <input type="checkbox" checked="@settlement.AllowGuestExpenseEdit"
+                           @onchange="OnToggleGuestEditAsync"
+                           style="width:16px;height:16px;accent-color:var(--color-accent);cursor:pointer;" />
+                    <span style="font-size:var(--text-sm);color:var(--color-text-primary);">@Strings.SETTLEMENT_DETAIL_GUEST_EDIT_TOGGLE</span>
+                </label>
+                <span style="font-size:var(--text-xs);color:var(--color-text-muted);align-self:center;">
+                    @(settlement.AllowGuestExpenseEdit ? Strings.SETTLEMENT_DETAIL_GUEST_EDIT_HINT_ON : Strings.SETTLEMENT_DETAIL_GUEST_EDIT_HINT_OFF)
+                </span>
+            </div>
+        }
+
+        @if (settlement.Status == SettlementStatus.Open && settlement.Participants.Count > 0 && canEditExpenses)
         {
             <div class="inline-form" style="flex-wrap:wrap;">
                 <div class="inline-form-field" style="flex:2;min-width:140px;">
@@ -145,7 +160,7 @@ else
                         </span>
                         <span class="item-row-amount" style="white-space:nowrap;">@e.Amount.ToString("N0") ₩</span>
                         <span class="item-row-action">
-                            @if (settlement.Status == SettlementStatus.Open && isOwner)
+                            @if (settlement.Status == SettlementStatus.Open && canEditExpenses)
                             {
                                 <button class="btn-ghost" @onclick="() => OpenEditExpenseAsync(e)">
                                     @Strings.BUTTON_EDIT
@@ -292,6 +307,14 @@ else
     private bool isAuthenticated = false;
     private bool isOwner = false;
 
+    // Whether the current viewer may add, edit, or remove expenses.
+    // Owners can always edit. Guests can edit only when the settlement is open
+    // and the owner has enabled AllowGuestExpenseEdit on the settlement.
+    private bool canEditExpenses =>
+        settlement is not null
+        && settlement.Status == SettlementStatus.Open
+        && (isOwner || settlement.AllowGuestExpenseEdit);
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
@@ -383,6 +406,14 @@ else
     {
         await SettlementService.CloseSettlementAsync(Id);
         await LoadAsync();
+    }
+
+    private async Task OnToggleGuestEditAsync(ChangeEventArgs e)
+    {
+        if (settlement is null || !isOwner) return;
+        var allow = e.Value is bool b && b;
+        settlement.AllowGuestExpenseEdit = allow;
+        await SettlementService.SetAllowGuestExpenseEditAsync(Id, allow);
     }
 
     private EditExpenseDialog editExpenseDialog = default!;

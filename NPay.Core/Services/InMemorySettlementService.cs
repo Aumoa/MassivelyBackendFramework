@@ -26,7 +26,7 @@ public class InMemorySettlementService : ISettlementService
         return Task.FromResult(settlement);
     }
 
-    public Task<Settlement> CreateSettlementAsync(string ownerSubject, string title, string? description, CancellationToken ct = default)
+    public Task<Settlement> CreateSettlementAsync(string ownerSubject, string title, string? description, bool allowGuestExpenseEdit = true, CancellationToken ct = default)
     {
         var settlement = new Settlement
         {
@@ -34,6 +34,7 @@ public class InMemorySettlementService : ISettlementService
             OwnerSubject = ownerSubject,
             Title = title,
             Description = description,
+            AllowGuestExpenseEdit = allowGuestExpenseEdit,
             CreatedAt = DateTimeOffset.UtcNow
         };
         _settlements.Add(settlement);
@@ -54,6 +55,14 @@ public class InMemorySettlementService : ISettlementService
     public Task DeleteSettlementAsync(Guid id, CancellationToken ct = default)
     {
         _settlements.RemoveAll(s => s.Id == id);
+        return Task.CompletedTask;
+    }
+
+    public Task SetAllowGuestExpenseEditAsync(Guid id, bool allow, CancellationToken ct = default)
+    {
+        var settlement = _settlements.FirstOrDefault(s => s.Id == id);
+        if (settlement is not null)
+            settlement.AllowGuestExpenseEdit = allow;
         return Task.CompletedTask;
     }
 }

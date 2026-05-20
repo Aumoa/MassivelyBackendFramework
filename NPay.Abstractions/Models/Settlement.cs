@@ -34,6 +34,13 @@ public class Settlement
     /// <summary>Sub-account ID of the user who created this settlement.</summary>
     public string OwnerSubject { get; set; } = string.Empty;
 
+    /// <summary>
+    /// When true, anyone who has the settlement link (including unauthenticated users)
+    /// may add or remove expenses. Owner-only actions (participants, closing, deletion) are
+    /// unaffected.
+    /// </summary>
+    public bool AllowGuestExpenseEdit { get; set; } = true;
+
     public IList<Participant> Participants { get; set; } = [];
 
     public IList<Expense> Expenses { get; set; } = [];

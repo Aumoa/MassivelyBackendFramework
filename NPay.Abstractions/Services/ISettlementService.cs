@@ -11,9 +11,11 @@ public interface ISettlementService
 
     Task<Settlement?> GetSettlementAsync(Guid id, CancellationToken ct = default);
 
-    Task<Settlement> CreateSettlementAsync(string ownerSubject, string title, string? description, CancellationToken ct = default);
+    Task<Settlement> CreateSettlementAsync(string ownerSubject, string title, string? description, bool allowGuestExpenseEdit = true, CancellationToken ct = default);
 
     Task CloseSettlementAsync(Guid id, CancellationToken ct = default);
 
     Task DeleteSettlementAsync(Guid id, CancellationToken ct = default);
+
+    Task SetAllowGuestExpenseEditAsync(Guid id, bool allow, CancellationToken ct = default);
 }

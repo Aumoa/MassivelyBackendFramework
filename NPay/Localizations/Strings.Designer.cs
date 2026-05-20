@@ -105,5 +105,11 @@ namespace NPay.Localizations
         internal static string SETTLEMENT_DETAIL_RESULT_TO => ResourceManager.GetString("SETTLEMENT_DETAIL_RESULT_TO", resourceCulture)!;
         internal static string SETTLEMENT_DETAIL_NOT_FOUND => ResourceManager.GetString("SETTLEMENT_DETAIL_NOT_FOUND", resourceCulture)!;
         internal static string SETTLEMENT_DETAIL_EXPENSE_SPLIT_ALL_WARNING => ResourceManager.GetString("SETTLEMENT_DETAIL_EXPENSE_SPLIT_ALL_WARNING", resourceCulture)!;
+
+        internal static string CREATE_SETTLEMENT_LABEL_GUEST_EDIT => ResourceManager.GetString("CREATE_SETTLEMENT_LABEL_GUEST_EDIT", resourceCulture)!;
+        internal static string CREATE_SETTLEMENT_HINT_GUEST_EDIT => ResourceManager.GetString("CREATE_SETTLEMENT_HINT_GUEST_EDIT", resourceCulture)!;
+        internal static string SETTLEMENT_DETAIL_GUEST_EDIT_TOGGLE => ResourceManager.GetString("SETTLEMENT_DETAIL_GUEST_EDIT_TOGGLE", resourceCulture)!;
+        internal static string SETTLEMENT_DETAIL_GUEST_EDIT_HINT_ON => ResourceManager.GetString("SETTLEMENT_DETAIL_GUEST_EDIT_HINT_ON", resourceCulture)!;
+        internal static string SETTLEMENT_DETAIL_GUEST_EDIT_HINT_OFF => ResourceManager.GetString("SETTLEMENT_DETAIL_GUEST_EDIT_HINT_OFF", resourceCulture)!;
     }
 }

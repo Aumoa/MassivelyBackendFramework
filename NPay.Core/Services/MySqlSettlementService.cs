@@ -15,7 +15,7 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
     public async Task<IReadOnlyList<Settlement>> GetSettlementsAsync(string ownerSubject, CancellationToken cancellationToken = default)
     {
         const string sql = """
-            SELECT `id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `closed_at`
+            SELECT `id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `closed_at`, `allow_guest_expense_edit`
             FROM `npay_settlement`
             WHERE `owner_subject` = @ownerSubject
             ORDER BY `created_at` DESC
@@ -29,7 +29,7 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
     public async Task<Settlement?> GetSettlementAsync(Guid id, CancellationToken cancellationToken = default)
     {
         const string settlementSql = """
-            SELECT `id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `closed_at`
+            SELECT `id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `closed_at`, `allow_guest_expense_edit`
             FROM `npay_settlement`
             WHERE `id` = @id
             """;
@@ -69,7 +69,7 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
         return row.ToModel(participants, expenses);
     }
 
-    public async Task<Settlement> CreateSettlementAsync(string ownerSubject, string title, string? description, CancellationToken cancellationToken = default)
+    public async Task<Settlement> CreateSettlementAsync(string ownerSubject, string title, string? description, bool allowGuestExpenseEdit = true, CancellationToken cancellationToken = default)
     {
         var settlement = new Settlement
         {
@@ -77,12 +77,13 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
             OwnerSubject = ownerSubject,
             Title = title,
             Description = description,
+            AllowGuestExpenseEdit = allowGuestExpenseEdit,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
         const string sql = """
-            INSERT INTO `npay_settlement` (`id`, `owner_subject`, `title`, `description`, `status`, `created_at`)
-            VALUES (@Id, @OwnerSubject, @Title, @Description, 0, @CreatedAt)
+            INSERT INTO `npay_settlement` (`id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `allow_guest_expense_edit`)
+            VALUES (@Id, @OwnerSubject, @Title, @Description, 0, @CreatedAt, @AllowGuestExpenseEdit)
             """;
 
         await using var conn = Open();
@@ -92,7 +93,8 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
             settlement.OwnerSubject,
             settlement.Title,
             settlement.Description,
-            CreatedAt = settlement.CreatedAt.UtcDateTime
+            CreatedAt = settlement.CreatedAt.UtcDateTime,
+            AllowGuestExpenseEdit = settlement.AllowGuestExpenseEdit ? 1 : 0
         });
         return settlement;
     }
@@ -111,6 +113,13 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
         await conn.ExecuteAsync(sql, new { id = id.ToString() });
     }
 
+    public async Task SetAllowGuestExpenseEditAsync(Guid id, bool allow, CancellationToken cancellationToken = default)
+    {
+        const string sql = "UPDATE `npay_settlement` SET `allow_guest_expense_edit` = @allow WHERE `id` = @id";
+        await using var conn = Open();
+        await conn.ExecuteAsync(sql, new { id = id.ToString(), allow = allow ? 1 : 0 });
+    }
+
     // ── Row DTOs ──────────────────────────────────────────────────────────────
 
     private class SettlementRow
@@ -122,6 +131,7 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
         public int status { get; set; }
         public DateTime created_at { get; set; }
         public DateTime? closed_at { get; set; }
+        public bool allow_guest_expense_edit { get; set; }
 
         public Settlement ToModel(IList<Participant> participants, IList<Expense> expenses) => new()
         {
@@ -132,6 +142,7 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
             Status = (SettlementStatus)status,
             CreatedAt = new DateTimeOffset(created_at, TimeSpan.Zero),
             ClosedAt = closed_at.HasValue ? new DateTimeOffset(closed_at.Value, TimeSpan.Zero) : null,
+            AllowGuestExpenseEdit = allow_guest_expense_edit,
             Participants = participants,
             Expenses = expenses
         };
