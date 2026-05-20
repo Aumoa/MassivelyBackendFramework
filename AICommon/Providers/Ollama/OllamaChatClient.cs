@@ -116,7 +116,7 @@ public class OllamaChatClient(HttpClient http, IOptions<OllamaChatClientOptions>
             _ => throw new ArgumentOutOfRangeException(nameof(message))
         },
         Content = message.Content,
-        Images = message.Images?.Count > 0 ? [.. message.Images] : null,
+        Images = message.Images?.Count > 0 ? [.. message.Images.Select(i => i.Base64)] : null,
         ToolCalls = message.ToolCalls?.Select(tc => new OllamaToolCallDto
         {
             Id = tc.Id,

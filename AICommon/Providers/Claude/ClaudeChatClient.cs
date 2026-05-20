@@ -312,7 +312,7 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
                     {
                         foreach (var image in msg.Images)
                         {
-                            content.Add(BuildImageBlock(image));
+                            content.Add(BuildImageBlock(image.Base64, image.MediaType));
                         }
                     }
                     if (!string.IsNullOrEmpty(msg.Content))
@@ -375,16 +375,15 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
         return (system, claudeMessages.ToArray());
     }
 
-    private static object BuildImageBlock(string base64Data)
+    private static object BuildImageBlock(string base64Data, string? mediaType)
     {
-        var mediaType = DetectMediaType(base64Data);
         return new
         {
             type = "image",
             source = new
             {
                 type = "base64",
-                media_type = mediaType,
+                media_type = string.IsNullOrEmpty(mediaType) ? DetectMediaType(base64Data) : mediaType,
                 data = base64Data
             }
         };
@@ -395,8 +394,8 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
         if (string.IsNullOrEmpty(base64)) return "image/png";
         try
         {
-            Span<byte> header = stackalloc byte[8];
-            int written = Convert.TryFromBase64Chars(base64.AsSpan(0, Math.Min(base64.Length, 12)), header, out var bytesWritten)
+            Span<byte> header = stackalloc byte[12];
+            int written = Convert.TryFromBase64Chars(base64.AsSpan(0, Math.Min(base64.Length, 16)), header, out var bytesWritten)
                 ? bytesWritten
                 : 0;
             if (written >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF) return "image/jpeg";

@@ -10,7 +10,7 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
     private readonly List<ChatMessage> m_Messages = [];
     private readonly SemaphoreSlim m_Semaphore = new(1);
 
-    public async IAsyncEnumerable<ChatResponseChunk> AddAsync(IUser author, string prompt, ToolsProvider toolsProvider, IReadOnlyList<string>? images = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ChatResponseChunk> AddAsync(IUser author, string prompt, ToolsProvider toolsProvider, IReadOnlyList<ChatImage>? images = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (author.IsBot)
         {

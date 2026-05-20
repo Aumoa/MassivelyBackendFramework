@@ -76,7 +76,7 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository);
         var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools);
 
-        List<string>? imageData = null;
+        List<AI.ChatImage>? imageData = null;
         var imageAttachments = message.Attachments
             .Where(a => a.ContentType?.StartsWith("image/") == true)
             .ToList();
@@ -90,7 +90,11 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
                 try
                 {
                     var bytes = await httpClient.GetByteArrayAsync(attachment.Url);
-                    imageData.Add(Convert.ToBase64String(bytes));
+                    imageData.Add(new AI.ChatImage
+                    {
+                        Base64 = Convert.ToBase64String(bytes),
+                        MediaType = attachment.ContentType
+                    });
                 }
                 catch (Exception e)
                 {

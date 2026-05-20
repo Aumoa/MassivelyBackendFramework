@@ -231,7 +231,7 @@ public class OllamaProxyController(IChatClient chatClient) : ControllerBase
             var role = element.TryGetProperty("role", out var r) ? r.GetString() : null;
             var content = element.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
 
-            List<string>? images = null;
+            List<ChatImage>? images = null;
             if (element.TryGetProperty("images", out var imgs) && imgs.ValueKind == JsonValueKind.Array)
             {
                 images = [];
@@ -240,7 +240,7 @@ public class OllamaProxyController(IChatClient chatClient) : ControllerBase
                     if (img.ValueKind == JsonValueKind.String)
                     {
                         var s = img.GetString();
-                        if (!string.IsNullOrEmpty(s)) images.Add(s);
+                        if (!string.IsNullOrEmpty(s)) images.Add(new ChatImage { Base64 = s });
                     }
                 }
             }
