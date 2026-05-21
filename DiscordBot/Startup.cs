@@ -4,6 +4,7 @@ using DiscordBot.Components;
 using DiscordBot.Options;
 using DiscordBot.Repositories;
 using DiscordBot.Services;
+using DiscordBot.Services.ImageGeneration;
 using DiscordBot.SQL.Migration;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -93,6 +94,15 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
 
     sc.Configure<DiscordService.Configuration>(conf.GetRequiredSection("Discord"));
     sc.AddHostedService<DiscordService>();
+
+    sc.Configure<ImageGenerationOptions>(conf.GetRequiredSection("ImageGeneration"));
+    sc.AddSingleton<ImagePromptProfileProvider>();
+    sc.AddHttpClient<IImageGenerationClient, ComfyUIClient>((sp, client) =>
+    {
+        var imageOptions = sp.GetRequiredService<IOptions<ImageGenerationOptions>>().Value;
+        client.BaseAddress = new Uri(imageOptions.BaseUrl.TrimEnd('/') + "/");
+        client.Timeout = TimeSpan.FromSeconds(Math.Max(30, imageOptions.TimeoutSeconds + 30));
+    });
 
     sc.Configure<ClaudeChatClientOptions>(conf.GetRequiredSection("Claude"));
     sc.AddSingleton<IChatClient>(sp =>

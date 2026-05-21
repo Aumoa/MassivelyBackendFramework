@@ -2,11 +2,12 @@
 using Discord.Rest;
 using Discord.WebSocket;
 using DiscordBot.Repositories;
+using DiscordBot.Services.ImageGeneration;
 using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
-public class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory) : IHostedService, IAsyncDisposable
+public class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, IImageGenerationClient imageGenerationClient) : IHostedService, IAsyncDisposable
 {
     public record Configuration
     {
@@ -78,7 +79,10 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         using var scope = scopeFactory.CreateScope();
         var chatLogRepository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
         var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository);
-        var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools);
+        var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
+        var promptProfileProvider = scope.ServiceProvider.GetRequiredService<ImagePromptProfileProvider>();
+        var imageTools = new DiscordImageTools(message, imageGenerationClient, promptProfileProvider, imageToolsLogger);
+        var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools, imageTools);
 
         List<AI.ChatImage>? imageData = null;
         var imageAttachments = message.Attachments

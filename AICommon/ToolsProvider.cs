@@ -100,7 +100,7 @@ public class ToolsProvider
                         var instance = instanceResolver(capturedType);
                         return capturedMethod.Invoke(instance, args)!;
                     },
-                    Description = toolFunctionAttribute.Description ?? string.Empty,
+                    Description = ResolveDescription(capturedType, toolFunctionAttribute, instanceResolver),
                     Parameters = [.. parameterInfos],
                     HasCancellationTokenParameter = hasCancellationToken
                 };
@@ -108,5 +108,21 @@ public class ToolsProvider
                 m_Tools.Add(toolFunctionDescription.Name, toolFunctionDescription);
             }
         }
+    }
+
+    private static string ResolveDescription(
+        Type type,
+        ToolFunctionAttribute toolFunctionAttribute,
+        Func<Type, object> instanceResolver)
+    {
+        var fallback = toolFunctionAttribute.Description ?? string.Empty;
+        if (!typeof(IToolFunctionDescriptionProvider).IsAssignableFrom(type))
+        {
+            return fallback;
+        }
+
+        var instance = instanceResolver(type);
+        var provider = (IToolFunctionDescriptionProvider)instance;
+        return provider.GetToolFunctionDescription(toolFunctionAttribute.Name) ?? fallback;
     }
 }
