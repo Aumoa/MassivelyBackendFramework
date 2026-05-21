@@ -1,3 +1,4 @@
+using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -18,21 +19,40 @@ public sealed class ComfyUIClient(
     public async Task<GeneratedImage> GenerateAsync(
         string positivePrompt,
         string negativePrompt,
+        IProgress<ImageGenerationProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         await m_Semaphore.WaitAsync(cancellationToken);
+        ClientWebSocket? progressSocket = null;
+        Task? progressTask = null;
+        using var progressCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
         try
         {
             var workflow = await LoadWorkflowAsync(cancellationToken);
             var positivePromptNodeId = FindNodeIdByMetaTitle(workflow, m_Options.PositivePromptTitle);
             var negativePromptNodeId = FindNodeIdByMetaTitle(workflow, m_Options.NegativePromptTitle);
             var saveImageNodeId = FindNodeIdByMetaTitle(workflow, m_Options.SaveImageTitle);
+            var nodeTitles = BuildNodeTitleMap(workflow);
 
             SetWorkflowInput(workflow, positivePromptNodeId, "text", positivePrompt);
             SetWorkflowInput(workflow, negativePromptNodeId, "text", negativePrompt);
             SetWorkflowInput(workflow, saveImageNodeId, "filename_prefix", BuildFilenamePrefix());
 
-            string promptId = await QueuePromptAsync(workflow, cancellationToken);
+            var clientId = BuildClientId();
+            progressSocket = await TryConnectProgressSocketAsync(clientId, progress, cancellationToken);
+
+            string promptId = await QueuePromptAsync(workflow, clientId, cancellationToken);
+            if (progressSocket != null && progress != null)
+            {
+                progressTask = ListenForProgressAsync(
+                    progressSocket,
+                    promptId,
+                    nodeTitles,
+                    progress,
+                    progressCts.Token);
+            }
+
             var image = await WaitForImageAsync(promptId, saveImageNodeId, cancellationToken);
 
             var viewPath = BuildViewPath(image);
@@ -41,6 +61,7 @@ public sealed class ComfyUIClient(
         }
         finally
         {
+            await StopProgressSocketAsync(progressSocket, progressCts, progressTask);
             m_Semaphore.Release();
         }
     }
@@ -63,11 +84,11 @@ public sealed class ComfyUIClient(
             ?? throw new InvalidOperationException($"ComfyUI workflow file is not a JSON object: {path}");
     }
 
-    private async Task<string> QueuePromptAsync(JsonObject workflow, CancellationToken cancellationToken)
+    private async Task<string> QueuePromptAsync(JsonObject workflow, string clientId, CancellationToken cancellationToken)
     {
         var body = new JsonObject
         {
-            ["client_id"] = m_Options.ClientId,
+            ["client_id"] = clientId,
             ["prompt"] = workflow
         };
 
@@ -96,6 +117,208 @@ public sealed class ComfyUIClient(
         }
 
         return promptId;
+    }
+
+    private async Task<ClientWebSocket?> TryConnectProgressSocketAsync(
+        string clientId,
+        IProgress<ImageGenerationProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (progress == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var socket = new ClientWebSocket();
+            await socket.ConnectAsync(BuildWebSocketUri(clientId), cancellationToken);
+            return socket;
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogWarning(e, "Failed to connect to ComfyUI progress websocket.");
+            progress.Report(new ImageGenerationProgress("진행 정보 연결 실패"));
+            return null;
+        }
+    }
+
+    private async Task ListenForProgressAsync(
+        ClientWebSocket socket,
+        string promptId,
+        IReadOnlyDictionary<string, string> nodeTitles,
+        IProgress<ImageGenerationProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        string? currentNodeTitle = null;
+
+        try
+        {
+            while (socket.State == WebSocketState.Open)
+            {
+                var message = await ReceiveTextMessageAsync(socket, cancellationToken);
+                if (message == null)
+                {
+                    break;
+                }
+                if (string.IsNullOrWhiteSpace(message))
+                {
+                    continue;
+                }
+
+                using var document = JsonDocument.Parse(message);
+                var root = document.RootElement;
+                if (!root.TryGetProperty("type", out var typeProperty))
+                {
+                    continue;
+                }
+
+                var type = typeProperty.GetString();
+                if (!root.TryGetProperty("data", out var data))
+                {
+                    continue;
+                }
+
+                if (!IsPromptMessage(data, promptId))
+                {
+                    continue;
+                }
+
+                switch (type)
+                {
+                    case "execution_start":
+                        progress.Report(new ImageGenerationProgress("실행 시작"));
+                        break;
+                    case "executing":
+                    {
+                        var nodeId = TryGetString(data, "node");
+                        currentNodeTitle = nodeId != null && nodeTitles.TryGetValue(nodeId, out var title)
+                            ? title
+                            : nodeId;
+
+                        progress.Report(new ImageGenerationProgress(
+                            string.IsNullOrEmpty(currentNodeTitle) ? "마무리 중" : "노드 실행 중",
+                            currentNodeTitle));
+                        break;
+                    }
+                    case "progress":
+                    {
+                        var value = TryGetInt32(data, "value");
+                        var max = TryGetInt32(data, "max");
+                        progress.Report(new ImageGenerationProgress("샘플링 중", currentNodeTitle, value, max));
+                        break;
+                    }
+                    case "executed":
+                    {
+                        var nodeId = TryGetString(data, "node");
+                        var nodeTitle = nodeId != null && nodeTitles.TryGetValue(nodeId, out var title)
+                            ? title
+                            : nodeId;
+                        progress.Report(new ImageGenerationProgress("노드 완료", nodeTitle ?? currentNodeTitle));
+                        break;
+                    }
+                    case "execution_error":
+                    {
+                        var errorMessage = TryGetString(data, "exception_message");
+                        progress.Report(new ImageGenerationProgress(
+                            string.IsNullOrWhiteSpace(errorMessage) ? "실행 오류" : errorMessage));
+                        break;
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Failed to receive ComfyUI progress websocket message.");
+        }
+    }
+
+    private static async Task<string?> ReceiveTextMessageAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[8192];
+        using var stream = new MemoryStream();
+        WebSocketReceiveResult result;
+
+        do
+        {
+            result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+            if (result.MessageType == WebSocketMessageType.Close)
+            {
+                return null;
+            }
+
+            if (result.MessageType == WebSocketMessageType.Text)
+            {
+                stream.Write(buffer, 0, result.Count);
+            }
+        }
+        while (!result.EndOfMessage);
+
+        return result.MessageType == WebSocketMessageType.Text
+            ? Encoding.UTF8.GetString(stream.ToArray())
+            : string.Empty;
+    }
+
+    private static bool IsPromptMessage(JsonElement data, string promptId)
+    {
+        var messagePromptId = TryGetString(data, "prompt_id");
+        return string.IsNullOrEmpty(messagePromptId)
+            || string.Equals(messagePromptId, promptId, StringComparison.Ordinal);
+    }
+
+    private static string? TryGetString(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind == JsonValueKind.String
+                ? property.GetString()
+                : null;
+    }
+
+    private static int? TryGetInt32(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var property)
+            && property.ValueKind == JsonValueKind.Number
+            && property.TryGetInt32(out var value)
+                ? value
+                : null;
+    }
+
+    private static async Task StopProgressSocketAsync(
+        ClientWebSocket? socket,
+        CancellationTokenSource progressCts,
+        Task? progressTask)
+    {
+        await progressCts.CancelAsync();
+
+        if (socket != null)
+        {
+            try
+            {
+                if (socket.State == WebSocketState.Open)
+                {
+                    await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        if (progressTask != null)
+        {
+            try
+            {
+                await progressTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        socket?.Dispose();
     }
 
     private async Task<ComfyUIImage> WaitForImageAsync(
@@ -240,12 +463,61 @@ public sealed class ComfyUIClient(
         throw new InvalidOperationException($"Workflow node with _meta.title '{title}' does not exist.");
     }
 
+    private static IReadOnlyDictionary<string, string> BuildNodeTitleMap(JsonObject workflow)
+    {
+        Dictionary<string, string> titles = [];
+        foreach (var (nodeId, nodeValue) in workflow)
+        {
+            if (nodeValue is not JsonObject node)
+            {
+                continue;
+            }
+
+            if (node["_meta"] is not JsonObject meta)
+            {
+                continue;
+            }
+
+            var title = meta["title"]?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(title))
+            {
+                titles[nodeId] = title;
+            }
+        }
+
+        return titles;
+    }
+
     private string BuildFilenamePrefix()
     {
         var safePrefix = string.IsNullOrWhiteSpace(m_Options.FilenamePrefix)
             ? "DiscordBot"
             : m_Options.FilenamePrefix.Trim();
         return $"{safePrefix}_{DateTimeOffset.UtcNow:yyyyMMdd_HHmmss}";
+    }
+
+    private string BuildClientId()
+    {
+        var prefix = string.IsNullOrWhiteSpace(m_Options.ClientId)
+            ? "discordbot"
+            : m_Options.ClientId.Trim();
+        return $"{prefix}-{Guid.NewGuid():N}";
+    }
+
+    private Uri BuildWebSocketUri(string clientId)
+    {
+        var baseAddress = http.BaseAddress
+            ?? throw new InvalidOperationException("ComfyUI HttpClient BaseAddress is not configured.");
+
+        var builder = new UriBuilder(baseAddress)
+        {
+            Scheme = baseAddress.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) ? "wss" : "ws",
+            Query = $"clientId={Uri.EscapeDataString(clientId)}"
+        };
+
+        var path = builder.Path.TrimEnd('/');
+        builder.Path = string.IsNullOrEmpty(path) ? "ws" : path + "/ws";
+        return builder.Uri;
     }
 
     private static string BuildViewPath(ComfyUIImage image)

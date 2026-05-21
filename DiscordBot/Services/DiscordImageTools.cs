@@ -30,12 +30,45 @@ internal class DiscordImageTools(
         string negativePrompt,
         CancellationToken cancellationToken = default)
     {
+        IUserMessage? statusMessage = null;
+        using var statusCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task? statusUpdateTask = null;
+        ImageGenerationProgress? latestProgress = null;
+        object latestProgressLock = new();
+
         try
         {
-            var image = await imageGenerationClient.GenerateAsync(positivePrompt, negativePrompt, cancellationToken);
+            statusMessage = await message.Channel.SendMessageAsync("이미지를 생성 중입니다...");
+            statusUpdateTask = UpdateStatusMessageAsync(
+                statusMessage,
+                () =>
+                {
+                    lock (latestProgressLock)
+                    {
+                        return latestProgress;
+                    }
+                },
+                statusCts.Token);
+
+            var progress = new Progress<ImageGenerationProgress>(value =>
+            {
+                lock (latestProgressLock)
+                {
+                    latestProgress = value;
+                }
+            });
+
+            var image = await imageGenerationClient.GenerateAsync(
+                positivePrompt,
+                negativePrompt,
+                progress,
+                cancellationToken);
+
+            await StopStatusUpdateAsync(statusCts, statusUpdateTask);
 
             await using var stream = new MemoryStream(image.Bytes, writable: false);
-            await message.Channel.SendFileAsync(stream, image.FileName, "생성된 이미지입니다.");
+            await message.Channel.SendFileAsync(stream, image.FileName);
+            await DeleteStatusMessageAsync(statusMessage);
 
             return JsonSerializer.Serialize(new
             {
@@ -47,6 +80,12 @@ internal class DiscordImageTools(
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            await StopStatusUpdateAsync(statusCts, statusUpdateTask);
+            if (statusMessage != null)
+            {
+                await statusMessage.ModifyAsync(p => p.Content = "이미지 생성 시간이 초과되었습니다.");
+            }
+
             return JsonSerializer.Serialize(new
             {
                 status = "error",
@@ -56,6 +95,12 @@ internal class DiscordImageTools(
         }
         catch (Exception e)
         {
+            await StopStatusUpdateAsync(statusCts, statusUpdateTask);
+            if (statusMessage != null)
+            {
+                await statusMessage.ModifyAsync(p => p.Content = "이미지 생성에 실패했습니다.");
+            }
+
             logger.LogError(e, "Failed to generate image.");
             return JsonSerializer.Serialize(new
             {
@@ -63,6 +108,97 @@ internal class DiscordImageTools(
                 reason = "image_generation_failed",
                 message = e.Message
             });
+        }
+    }
+
+    private async Task UpdateStatusMessageAsync(
+        IUserMessage statusMessage,
+        Func<ImageGenerationProgress?> getProgress,
+        CancellationToken cancellationToken)
+    {
+        var startedAt = DateTimeOffset.UtcNow;
+        string[] frames = ["이미지를 생성 중입니다.", "이미지를 생성 중입니다..", "이미지를 생성 중입니다..."];
+        int frameIndex = 0;
+
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+                var elapsed = DateTimeOffset.UtcNow - startedAt;
+                var frame = frames[frameIndex++ % frames.Length];
+                var progress = getProgress();
+                await statusMessage.ModifyAsync(p => p.Content = BuildStatusMessage(frame, elapsed, progress));
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Failed to update image generation status message.");
+        }
+    }
+
+    private static string BuildStatusMessage(
+        string frame,
+        TimeSpan elapsed,
+        ImageGenerationProgress? progress)
+    {
+        List<string> lines = [frame];
+        if (progress != null)
+        {
+            if (!string.IsNullOrWhiteSpace(progress.NodeTitle))
+            {
+                lines.Add($"현재 단계: {progress.NodeTitle}");
+            }
+
+            if (progress.Value.HasValue && progress.Max is > 0)
+            {
+                var percent = Math.Clamp(progress.Value.Value / (double)progress.Max.Value * 100, 0, 100);
+                lines.Add($"진행률: {progress.Value} / {progress.Max} ({percent:F0}%)");
+            }
+            else if (!string.IsNullOrWhiteSpace(progress.Status))
+            {
+                lines.Add($"상태: {progress.Status}");
+            }
+        }
+
+        lines.Add($"경과 시간: {elapsed:mm\\:ss}");
+        return string.Join("\n", lines);
+    }
+
+    private static async Task StopStatusUpdateAsync(CancellationTokenSource cts, Task? statusUpdateTask)
+    {
+        await cts.CancelAsync();
+        if (statusUpdateTask == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await statusUpdateTask;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task DeleteStatusMessageAsync(IUserMessage? statusMessage)
+    {
+        if (statusMessage == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await statusMessage.DeleteAsync();
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Failed to delete image generation status message.");
         }
     }
 
