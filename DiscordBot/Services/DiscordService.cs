@@ -95,8 +95,7 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
         var promptProfileProvider = scope.ServiceProvider.GetRequiredService<ImagePromptProfileProvider>();
         var imageTools = new DiscordImageTools(message, imageGenerationClient, promptProfileProvider, imageToolsLogger);
-        var calculationTools = new AI.Tools.CalculationTools();
-        var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools, imageTools, calculationTools);
+        var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools, imageTools);
 
         List<AI.ChatImage>? imageData = null;
         var imageAttachments = message.Attachments
