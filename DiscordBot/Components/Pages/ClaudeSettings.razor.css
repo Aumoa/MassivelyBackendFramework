@@ -1,0 +1,73 @@
+.settings-form {
+    display: grid;
+    grid-template-columns: minmax(14rem, 1fr) minmax(14rem, 1fr);
+    gap: var(--space-4);
+    align-items: end;
+    max-width: 720px;
+}
+
+.settings-form label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    margin: 0;
+}
+
+.settings-form input {
+    width: 100%;
+    min-width: 0;
+    height: 2.25rem;
+    border: 1px solid var(--color-border-dark);
+    border-radius: var(--radius-md);
+    padding: 0 var(--space-3);
+    color: var(--color-text-primary);
+    background: #fff;
+    font: inherit;
+}
+
+.settings-form input:focus {
+    outline: 2px solid var(--color-accent-border);
+    border-color: var(--color-accent);
+}
+
+.save-button {
+    width: fit-content;
+    height: 2.25rem;
+    justify-content: center;
+}
+
+.status-message {
+    max-width: 720px;
+    margin: var(--space-4) 0;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+}
+
+.status-message.success {
+    color: var(--color-success);
+    background: var(--color-success-bg);
+}
+
+.status-message.error {
+    color: var(--color-danger);
+    background: var(--color-danger-bg);
+}
+
+.empty-state {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+}
+
+.material-symbols-outlined {
+    font-size: 18px;
+}
+
+@media (max-width: 760px) {
+    .settings-form {
+        grid-template-columns: 1fr;
+    }
+}

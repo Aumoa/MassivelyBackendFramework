@@ -84,6 +84,8 @@ if (app.Environment.IsDevelopment())
     await StartMigrationAsync(app.Lifetime.ApplicationStopping);
 }
 
+await InitializeClaudeSettingsAsync(app.Lifetime.ApplicationStopping);
+
 app.Run();
 
 return;
@@ -120,6 +122,8 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddTransient<IChatLogRepository, MySqlChatLogRepository>();
     sc.AddTransient<IAllowedChannelRepository, MySqlAllowedChannelRepository>();
     sc.AddScoped<IAllowedChannelService, AllowedChannelService>();
+    sc.AddSingleton<IClaudeSettingsRepository, MySqlClaudeSettingsRepository>();
+    sc.AddSingleton<IClaudeSettingsService, ClaudeSettingsService>();
 }
 
 async ValueTask StartMigrationAsync(CancellationToken cancellationToken)
@@ -129,4 +133,11 @@ async ValueTask StartMigrationAsync(CancellationToken cancellationToken)
     var logger = new ASPNETUtility.LoggerTextWriter(app.Logger);
     await Executor.RunAsync(options.Value.ConnectionString, options.Value.Database,
         [.. scripts.GetScripts()], logger, cancellationToken);
+}
+
+async ValueTask InitializeClaudeSettingsAsync(CancellationToken cancellationToken)
+{
+    using var scope = app.Services.CreateScope();
+    var settings = scope.ServiceProvider.GetRequiredService<IClaudeSettingsService>();
+    await settings.GetAsync(cancellationToken);
 }

@@ -1,0 +1,126 @@
+@page "/claude-settings"
+@rendermode InteractiveServer
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IClaudeSettingsService ClaudeSettingsService
+
+<PageTitle>@Strings.CLAUDE_SETTINGS_TITLE — @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">@Strings.CLAUDE_SETTINGS_TITLE</h1>
+    <p class="page-subtitle">@Strings.CLAUDE_SETTINGS_SUBTITLE</p>
+</div>
+
+@if (isLoading)
+{
+    <p class="empty-state">@Strings.CLAUDE_SETTINGS_STATUS_LOADING</p>
+}
+else
+{
+    <form class="settings-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <label>
+            <span>@Strings.CLAUDE_SETTINGS_LABEL_MODEL</span>
+            <input @bind="model" disabled="@isBusy" required maxlength="128" />
+        </label>
+        <label>
+            <span>@Strings.CLAUDE_SETTINGS_LABEL_SUMMARY_MODEL</span>
+            <input @bind="summaryModel" disabled="@isBusy" required maxlength="128" />
+        </label>
+        <label>
+            <span>@Strings.CLAUDE_SETTINGS_LABEL_DEFAULT_MAX_TOKENS</span>
+            <input type="number" min="1" max="200000" @bind="defaultMaxTokens" disabled="@isBusy" required />
+        </label>
+        <button class="btn-primary save-button" type="submit" disabled="@isBusy">
+            <span class="material-symbols-outlined">save</span>
+            @Strings.CLAUDE_SETTINGS_BUTTON_SAVE
+        </button>
+    </form>
+}
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@code {
+    private string model = string.Empty;
+    private string summaryModel = string.Empty;
+    private int defaultMaxTokens;
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var settings = await ClaudeSettingsService.GetAsync();
+            model = settings.Model;
+            summaryModel = settings.SummaryModel;
+            defaultMaxTokens = settings.DefaultMaxTokens;
+        }
+        catch
+        {
+            SetStatus("error", Strings.CLAUDE_SETTINGS_ERROR_LOAD_FAILED);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            SetStatus("error", Strings.CLAUDE_SETTINGS_ERROR_MODEL_REQUIRED);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(summaryModel))
+        {
+            SetStatus("error", Strings.CLAUDE_SETTINGS_ERROR_SUMMARY_MODEL_REQUIRED);
+            return;
+        }
+
+        if (defaultMaxTokens <= 0)
+        {
+            SetStatus("error", Strings.CLAUDE_SETTINGS_ERROR_MAX_TOKENS_RANGE);
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await ClaudeSettingsService.SaveAsync(model, summaryModel, defaultMaxTokens);
+            SetStatus("success", Strings.CLAUDE_SETTINGS_STATUS_SAVED);
+        }
+        catch
+        {
+            SetStatus("error", Strings.CLAUDE_SETTINGS_ERROR_SAVE_FAILED);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+}

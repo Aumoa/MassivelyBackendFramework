@@ -133,6 +133,15 @@ namespace DiscordBot.Localizations {
         }
 
         /// <summary>
+        ///   Claude과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NAVMENU_LABEL_CLAUDE_SETTINGS {
+            get {
+                return ResourceManager.GetString("NAVMENU_LABEL_CLAUDE_SETTINGS", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Allowed Channels과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string ALLOWED_CHANNELS_TITLE {
@@ -318,6 +327,123 @@ namespace DiscordBot.Localizations {
         internal static string ALLOWED_CHANNELS_ERROR_CHANNEL_ID_REQUIRED {
             get {
                 return ResourceManager.GetString("ALLOWED_CHANNELS_ERROR_CHANNEL_ID_REQUIRED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Claude Settings과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_TITLE {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Runtime model configuration과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_SUBTITLE {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_SUBTITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Model과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_LABEL_MODEL {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_LABEL_MODEL", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Summary Model과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_LABEL_SUMMARY_MODEL {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_LABEL_SUMMARY_MODEL", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Default Max Tokens과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_LABEL_DEFAULT_MAX_TOKENS {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_LABEL_DEFAULT_MAX_TOKENS", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Save과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_BUTTON_SAVE {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_BUTTON_SAVE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Loading...과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_STATUS_LOADING {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_STATUS_LOADING", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Claude settings saved.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_STATUS_SAVED {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_STATUS_SAVED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Failed to load Claude settings.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_ERROR_LOAD_FAILED {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_ERROR_LOAD_FAILED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Failed to save Claude settings.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_ERROR_SAVE_FAILED {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_ERROR_SAVE_FAILED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Model is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_ERROR_MODEL_REQUIRED {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_ERROR_MODEL_REQUIRED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Summary model is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_ERROR_SUMMARY_MODEL_REQUIRED {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_ERROR_SUMMARY_MODEL_REQUIRED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Default max tokens must be greater than 0.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_ERROR_MAX_TOKENS_RANGE {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_ERROR_MAX_TOKENS_RANGE", resourceCulture);
             }
         }
         

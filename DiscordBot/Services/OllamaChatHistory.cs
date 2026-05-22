@@ -5,7 +5,11 @@ using Discord;
 
 namespace DiscordBot.Services;
 
-public class OllamaChatHistory(ILogger logger, OllamaService.Configuration options, IChatClient chatClient)
+public class OllamaChatHistory(
+    ILogger logger,
+    OllamaService.Configuration options,
+    IChatClient chatClient,
+    IClaudeSettingsService claudeSettings)
 {
     private readonly List<ChatMessage> m_Messages = [];
     private readonly SemaphoreSlim m_Semaphore = new(1);
@@ -44,11 +48,13 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
 
             while (true)
             {
+                var settings = await claudeSettings.GetAsync(cancellationToken);
                 var allMessages = recentHistory.Concat(messagesAppend).ToList();
                 var chatOptions = new ChatCompletionOptions
                 {
-                    Model = options.Model,
+                    Model = settings.Model,
                     Temperature = 0.7f,
+                    MaxTokens = settings.DefaultMaxTokens,
                     ContextLength = 8192
                 };
                 var toolFunctions = toolsProvider.GetToolFunctions();
@@ -206,10 +212,12 @@ public class OllamaChatHistory(ILogger logger, OllamaService.Configuration optio
 
         try
         {
+            var settings = await claudeSettings.GetAsync(cancellationToken);
             var summaryOptions = new ChatCompletionOptions
             {
-                Model = options.SummaryModel,
-                Temperature = 0.5f
+                Model = settings.SummaryModel,
+                Temperature = 0.5f,
+                MaxTokens = settings.DefaultMaxTokens
             };
 
             var result = await chatClient.GenerateAsync(summaryPrompt, summaryOptions, summarySystem, cancellationToken);

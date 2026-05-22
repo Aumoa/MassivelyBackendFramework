@@ -79,6 +79,9 @@
   <data name="NAVMENU_LABEL_CHANNELS" xml:space="preserve">
     <value>Channels</value>
   </data>
+  <data name="NAVMENU_LABEL_CLAUDE_SETTINGS" xml:space="preserve">
+    <value>Claude</value>
+  </data>
 
   <!-- Home -->
   <data name="HOME_TITLE" xml:space="preserve">
@@ -173,5 +176,46 @@
   </data>
   <data name="ALLOWED_CHANNELS_ERROR_CHANNEL_ID_REQUIRED" xml:space="preserve">
     <value>Channel ID is required.</value>
+  </data>
+
+  <!-- ClaudeSettings -->
+  <data name="CLAUDE_SETTINGS_TITLE" xml:space="preserve">
+    <value>Claude Settings</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_SUBTITLE" xml:space="preserve">
+    <value>Runtime model configuration</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_LABEL_MODEL" xml:space="preserve">
+    <value>Model</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_LABEL_SUMMARY_MODEL" xml:space="preserve">
+    <value>Summary Model</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_LABEL_DEFAULT_MAX_TOKENS" xml:space="preserve">
+    <value>Default Max Tokens</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_BUTTON_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_STATUS_LOADING" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_STATUS_SAVED" xml:space="preserve">
+    <value>Claude settings saved.</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>Failed to load Claude settings.</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>Failed to save Claude settings.</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_ERROR_MODEL_REQUIRED" xml:space="preserve">
+    <value>Model is required.</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_ERROR_SUMMARY_MODEL_REQUIRED" xml:space="preserve">
+    <value>Summary model is required.</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_ERROR_MAX_TOKENS_RANGE" xml:space="preserve">
+    <value>Default max tokens must be greater than 0.</value>
   </data>
 </root>

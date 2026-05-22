@@ -4,7 +4,11 @@ using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
-public class OllamaService(ILogger<OllamaService> logger, IOptions<OllamaService.Configuration> options, IChatClient chatClient)
+public class OllamaService(
+    ILogger<OllamaService> logger,
+    IOptions<OllamaService.Configuration> options,
+    IChatClient chatClient,
+    IClaudeSettingsService claudeSettings)
 {
     public record Configuration
     {
@@ -22,7 +26,7 @@ public class OllamaService(ILogger<OllamaService> logger, IOptions<OllamaService
         {
             if (m_Chats.TryGetValue(channel.Id, out var chatHistory) == false)
             {
-                chatHistory = new OllamaChatHistory(logger, options.Value, chatClient);
+                chatHistory = new OllamaChatHistory(logger, options.Value, chatClient, claudeSettings);
                 m_Chats.Add(channel.Id, chatHistory);
             }
 
