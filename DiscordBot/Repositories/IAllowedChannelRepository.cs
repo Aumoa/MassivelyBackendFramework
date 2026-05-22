@@ -16,6 +16,8 @@ public interface IAllowedChannelRepository
 {
     ValueTask<IReadOnlyList<AllowedChannelData>> GetAllAsync(CancellationToken cancellationToken = default);
 
+    ValueTask<AllowedChannelData?> GetAsync(long id, CancellationToken cancellationToken = default);
+
     ValueTask<IReadOnlyList<string>> GetEnabledChannelIdsAsync(CancellationToken cancellationToken = default);
 
     ValueTask AddAsync(

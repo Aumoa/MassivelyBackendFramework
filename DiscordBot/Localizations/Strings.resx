@@ -113,12 +113,18 @@
     <value>Sign out</value>
   </data>
 
-  <!-- AllowedChannels -->
+  <!-- Channels -->
   <data name="ALLOWED_CHANNELS_TITLE" xml:space="preserve">
-    <value>Allowed Channels</value>
+    <value>Channels</value>
   </data>
   <data name="ALLOWED_CHANNELS_SUBTITLE" xml:space="preserve">
-    <value>Discord channel access control</value>
+    <value>Discord channel settings</value>
+  </data>
+  <data name="ALLOWED_CHANNELS_DETAIL_TITLE" xml:space="preserve">
+    <value>Channel Details</value>
+  </data>
+  <data name="ALLOWED_CHANNELS_DETAIL_SUBTITLE" xml:space="preserve">
+    <value>Channel settings</value>
   </data>
   <data name="ALLOWED_CHANNELS_LABEL_CHANNEL_ID" xml:space="preserve">
     <value>Channel ID</value>
@@ -141,14 +147,38 @@
   <data name="ALLOWED_CHANNELS_LABEL_DISABLED" xml:space="preserve">
     <value>Disabled</value>
   </data>
+  <data name="ALLOWED_CHANNELS_LABEL_CREATED_BY" xml:space="preserve">
+    <value>Created By</value>
+  </data>
+  <data name="ALLOWED_CHANNELS_LABEL_CREATED_AT" xml:space="preserve">
+    <value>Created At</value>
+  </data>
+  <data name="ALLOWED_CHANNELS_LABEL_UPDATED_AT" xml:space="preserve">
+    <value>Updated At</value>
+  </data>
   <data name="ALLOWED_CHANNELS_BUTTON_ADD" xml:space="preserve">
     <value>Add</value>
+  </data>
+  <data name="ALLOWED_CHANNELS_BUTTON_DETAIL" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="ALLOWED_CHANNELS_BUTTON_BACK" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="ALLOWED_CHANNELS_BUTTON_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="ALLOWED_CHANNELS_BUTTON_DELETE" xml:space="preserve">
+    <value>Delete</value>
   </data>
   <data name="ALLOWED_CHANNELS_STATUS_LOADING" xml:space="preserve">
     <value>Loading...</value>
   </data>
   <data name="ALLOWED_CHANNELS_EMPTY" xml:space="preserve">
     <value>No channels configured.</value>
+  </data>
+  <data name="ALLOWED_CHANNELS_STATUS_NOT_FOUND" xml:space="preserve">
+    <value>Channel not found.</value>
   </data>
   <data name="ALLOWED_CHANNELS_STATUS_ADDED" xml:space="preserve">
     <value>Channel added.</value>

@@ -1,4 +1,4 @@
-@page "/allowed-channels"
+@page "/channels"
 @rendermode InteractiveServer
 @using DiscordBot.Repositories
 @using DiscordBot.Services
@@ -7,7 +7,7 @@
 @inject IAllowedChannelService ChannelAccess
 @inject AuthenticationStateProvider AuthState
 
-<PageTitle>@Strings.ALLOWED_CHANNELS_TITLE — @Strings.APP_TITLE</PageTitle>
+<PageTitle>@Strings.ALLOWED_CHANNELS_TITLE - @Strings.APP_TITLE</PageTitle>
 
 <div class="page-header">
     <h1 class="page-title">@Strings.ALLOWED_CHANNELS_TITLE</h1>
@@ -77,39 +77,22 @@ else
                 @foreach (var channel in channels)
                 {
                     <tr @key="channel.Id">
+                        <td class="mono">@channel.ChannelId</td>
+                        <td class="mono">@channel.GuildId</td>
+                        <td>@channel.ChannelName</td>
+                        <td>@channel.GuildName</td>
+                        <td class="memo-cell">@channel.Memo</td>
                         <td>
-                            <input class="mono" @bind="channel.ChannelId" disabled="@channel.IsBusy" maxlength="64" />
-                        </td>
-                        <td>
-                            <input class="mono" @bind="channel.GuildId" disabled="@channel.IsBusy" maxlength="64" />
-                        </td>
-                        <td>
-                            <input @bind="channel.ChannelName" disabled="@channel.IsBusy" maxlength="128" />
-                        </td>
-                        <td>
-                            <input @bind="channel.GuildName" disabled="@channel.IsBusy" maxlength="128" />
-                        </td>
-                        <td>
-                            <input @bind="channel.Memo" disabled="@channel.IsBusy" maxlength="512" />
-                        </td>
-                        <td>
-                            <label class="row-toggle">
-                                <input
-                                    type="checkbox"
-                                    checked="@channel.Enabled"
-                                    disabled="@channel.IsBusy"
-                                    @onchange="e => SetEnabledAsync(channel, e.Value is bool enabled && enabled)" />
-                                <span>@(channel.Enabled ? Strings.ALLOWED_CHANNELS_LABEL_ENABLED : Strings.ALLOWED_CHANNELS_LABEL_DISABLED)</span>
-                            </label>
+                            <span class="status-badge @(channel.Enabled ? "enabled" : "disabled")">
+                                @(channel.Enabled ? Strings.ALLOWED_CHANNELS_LABEL_ENABLED : Strings.ALLOWED_CHANNELS_LABEL_DISABLED)
+                            </span>
                         </td>
                         <td>
                             <div class="row-actions">
-                                <button class="btn-ghost" type="button" disabled="@channel.IsBusy" @onclick="() => SaveAsync(channel)">
-                                    <span class="material-symbols-outlined">save</span>
-                                </button>
-                                <button class="btn-danger" type="button" disabled="@channel.IsBusy" @onclick="() => DeleteAsync(channel)">
-                                    <span class="material-symbols-outlined">delete</span>
-                                </button>
+                                <a class="btn-ghost detail-link" href="@($"/channels/{channel.Id}")" title="@Strings.ALLOWED_CHANNELS_BUTTON_DETAIL">
+                                    <span class="material-symbols-outlined">settings</span>
+                                    <span>@Strings.ALLOWED_CHANNELS_BUTTON_DETAIL</span>
+                                </a>
                             </div>
                         </td>
                     </tr>
@@ -121,7 +104,7 @@ else
 
 @code {
     private readonly ChannelForm newChannel = new();
-    private List<ChannelRow> channels = [];
+    private List<AllowedChannelData> channels = [];
     private bool isLoading = true;
     private bool isBusy;
     private string? statusMessage;
@@ -139,7 +122,7 @@ else
         try
         {
             var data = await ChannelAccess.GetAllAsync();
-            channels = data.Select(ChannelRow.From).ToList();
+            channels = data.ToList();
         }
         catch
         {
@@ -190,65 +173,6 @@ else
         }
     }
 
-    private async Task SaveAsync(ChannelRow channel)
-    {
-        await RunRowActionAsync(channel, async () =>
-        {
-            await ChannelAccess.UpdateAsync(
-                channel.Id,
-                channel.ChannelId,
-                channel.GuildId,
-                channel.ChannelName,
-                channel.GuildName,
-                channel.Memo,
-                channel.Enabled);
-            SetStatus("success", Strings.ALLOWED_CHANNELS_STATUS_SAVED);
-            await LoadAsync();
-        });
-    }
-
-    private async Task SetEnabledAsync(ChannelRow channel, bool enabled)
-    {
-        await RunRowActionAsync(channel, async () =>
-        {
-            await ChannelAccess.SetEnabledAsync(channel.Id, enabled);
-            channel.Enabled = enabled;
-            SetStatus("success", enabled ? Strings.ALLOWED_CHANNELS_STATUS_ENABLED : Strings.ALLOWED_CHANNELS_STATUS_DISABLED);
-        });
-    }
-
-    private async Task DeleteAsync(ChannelRow channel)
-    {
-        await RunRowActionAsync(channel, async () =>
-        {
-            await ChannelAccess.DeleteAsync(channel.Id);
-            channels.Remove(channel);
-            SetStatus("success", Strings.ALLOWED_CHANNELS_STATUS_DELETED);
-        });
-    }
-
-    private async Task RunRowActionAsync(ChannelRow channel, Func<Task> action)
-    {
-        if (channel.IsBusy)
-        {
-            return;
-        }
-
-        channel.IsBusy = true;
-        try
-        {
-            await action();
-        }
-        catch
-        {
-            SetStatus("error", Strings.ALLOWED_CHANNELS_ERROR_ACTION_FAILED);
-        }
-        finally
-        {
-            channel.IsBusy = false;
-        }
-    }
-
     private async Task<string?> GetCurrentUserAsync()
     {
         var auth = await AuthState.GetAuthenticationStateAsync();
@@ -280,26 +204,6 @@ else
             GuildName = null;
             Memo = null;
             Enabled = true;
-        }
-    }
-
-    private sealed class ChannelRow : ChannelForm
-    {
-        public long Id { get; init; }
-        public bool IsBusy { get; set; }
-
-        public static ChannelRow From(AllowedChannelData data)
-        {
-            return new ChannelRow
-            {
-                Id = data.Id,
-                ChannelId = data.ChannelId,
-                GuildId = data.GuildId,
-                ChannelName = data.ChannelName,
-                GuildName = data.GuildName,
-                Memo = data.Memo,
-                Enabled = data.Enabled
-            };
         }
     }
 }

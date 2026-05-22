@@ -142,7 +142,7 @@ namespace DiscordBot.Localizations {
         }
 
         /// <summary>
-        ///   Allowed Channels과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Channels과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string ALLOWED_CHANNELS_TITLE {
             get {
@@ -151,11 +151,29 @@ namespace DiscordBot.Localizations {
         }
 
         /// <summary>
-        ///   Discord channel access control과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Discord channel settings과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string ALLOWED_CHANNELS_SUBTITLE {
             get {
                 return ResourceManager.GetString("ALLOWED_CHANNELS_SUBTITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel Details과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_DETAIL_TITLE {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_DETAIL_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel settings과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_DETAIL_SUBTITLE {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_DETAIL_SUBTITLE", resourceCulture);
             }
         }
 
@@ -223,11 +241,74 @@ namespace DiscordBot.Localizations {
         }
 
         /// <summary>
+        ///   Created By과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_LABEL_CREATED_BY {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_LABEL_CREATED_BY", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Created At과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_LABEL_CREATED_AT {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_LABEL_CREATED_AT", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Updated At과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_LABEL_UPDATED_AT {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_LABEL_UPDATED_AT", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Add과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string ALLOWED_CHANNELS_BUTTON_ADD {
             get {
                 return ResourceManager.GetString("ALLOWED_CHANNELS_BUTTON_ADD", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Details과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_BUTTON_DETAIL {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_BUTTON_DETAIL", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Back과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_BUTTON_BACK {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_BUTTON_BACK", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Save과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_BUTTON_SAVE {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_BUTTON_SAVE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Delete과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_BUTTON_DELETE {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_BUTTON_DELETE", resourceCulture);
             }
         }
 
@@ -246,6 +327,15 @@ namespace DiscordBot.Localizations {
         internal static string ALLOWED_CHANNELS_EMPTY {
             get {
                 return ResourceManager.GetString("ALLOWED_CHANNELS_EMPTY", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel not found.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_STATUS_NOT_FOUND {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_STATUS_NOT_FOUND", resourceCulture);
             }
         }
 
