@@ -394,4 +394,10 @@
   <data name="TOOLS_TOOL_GET_CURRENT_DATE_PARAM_TIMEZONE" xml:space="preserve">
     <value>IANA 타임존 ID입니다.</value>
   </data>
+  <data name="TOOLS_TOOL_CALCULATE_DESCRIPTION" xml:space="preserve">
+    <value>사칙연산과 일반적인 수학 수식을 정확하게 계산합니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_CALCULATE_PARAM_EXPRESSION" xml:space="preserve">
+    <value>계산할 수식입니다.</value>
+  </data>
 </root>

@@ -394,4 +394,10 @@
   <data name="TOOLS_TOOL_GET_CURRENT_DATE_PARAM_TIMEZONE" xml:space="preserve">
     <value>IANA timezone ID.</value>
   </data>
+  <data name="TOOLS_TOOL_CALCULATE_DESCRIPTION" xml:space="preserve">
+    <value>Evaluates arithmetic and common math expressions accurately.</value>
+  </data>
+  <data name="TOOLS_TOOL_CALCULATE_PARAM_EXPRESSION" xml:space="preserve">
+    <value>The math expression to evaluate.</value>
+  </data>
 </root>
