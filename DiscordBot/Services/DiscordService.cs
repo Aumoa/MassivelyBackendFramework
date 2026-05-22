@@ -74,7 +74,14 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
             return;
         }
 
-        await SaveChatLogAsync(message.Id.ToString(), guildId, channelId, message.Author.Id.ToString(), content);
+        var processedImages = await ProcessImageAttachmentsAsync(message, scope.ServiceProvider);
+        await SaveChatLogAsync(
+            message.Id.ToString(),
+            guildId,
+            channelId,
+            message.Author.Id.ToString(),
+            content,
+            processedImages.Select(image => image.StoredImage).ToList());
 
         if (!isMentioned)
         {
@@ -102,45 +109,9 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         var toolSettings = scope.ServiceProvider.GetRequiredService<IToolSettingsService>();
         await toolSettings.ApplyAsync(toolsProvider);
 
-        List<AI.ChatImage>? imageData = null;
-        var imageAttachments = message.Attachments
-            .Where(a => a.ContentType?.StartsWith("image/") == true)
-            .ToList();
-
-        if (imageAttachments.Count > 0)
-        {
-            imageData = [];
-            using var httpClient = httpClientFactory.CreateClient();
-            foreach (var attachment in imageAttachments)
-            {
-                try
-                {
-                    var bytes = await httpClient.GetByteArrayAsync(attachment.Url);
-                    var detectedMediaType = DetectImageMediaType(bytes);
-                    var mediaType = detectedMediaType ?? attachment.ContentType;
-                    if (detectedMediaType != null
-                        && !string.IsNullOrEmpty(attachment.ContentType)
-                        && !string.Equals(detectedMediaType, attachment.ContentType, StringComparison.OrdinalIgnoreCase))
-                    {
-                        logger.LogWarning(
-                            "Attachment media type mismatch. Declared: {DeclaredMediaType}, Detected: {DetectedMediaType}, Url: {Url}",
-                            attachment.ContentType,
-                            detectedMediaType,
-                            attachment.Url);
-                    }
-
-                    imageData.Add(new AI.ChatImage
-                    {
-                        Base64 = Convert.ToBase64String(bytes),
-                        MediaType = mediaType
-                    });
-                }
-                catch (Exception e)
-                {
-                    logger.LogError(e, "Failed to download attachment: {url}", attachment.Url);
-                }
-            }
-        }
+        var imageData = processedImages.Count > 0
+            ? processedImages.Select(image => image.ChatImage).ToList()
+            : null;
 
         IDisposable? typingState = message.Channel.EnterTypingState();
         string thinkingTicker = "";
@@ -279,47 +250,50 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         return "응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
     }
 
-    private static string? DetectImageMediaType(ReadOnlySpan<byte> bytes)
+    private async Task<List<ProcessedChatImage>> ProcessImageAttachmentsAsync(SocketMessage message, IServiceProvider serviceProvider)
     {
-        if (bytes.Length >= 8
-            && bytes[0] == 0x89
-            && bytes[1] == 0x50
-            && bytes[2] == 0x4E
-            && bytes[3] == 0x47)
+        var imageAttachments = message.Attachments
+            .Where(IsImageAttachment)
+            .ToList();
+        if (imageAttachments.Count == 0)
         {
-            return "image/png";
+            return [];
         }
 
-        if (bytes.Length >= 3
-            && bytes[0] == 0xFF
-            && bytes[1] == 0xD8
-            && bytes[2] == 0xFF)
+        List<ProcessedChatImage> images = [];
+        using var httpClient = httpClientFactory.CreateClient();
+        var imageProcessor = serviceProvider.GetRequiredService<IChatLogImageProcessor>();
+
+        foreach (var attachment in imageAttachments)
         {
-            return "image/jpeg";
+            try
+            {
+                var bytes = await httpClient.GetByteArrayAsync(attachment.Url);
+                var processedImage = await imageProcessor.ProcessAsync(attachment.Filename, bytes);
+                images.Add(processedImage);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Failed to process attachment image: {url}", attachment.Url);
+            }
         }
 
-        if (bytes.Length >= 6
-            && bytes[0] == 0x47
-            && bytes[1] == 0x49
-            && bytes[2] == 0x46)
+        return images;
+    }
+
+    private static bool IsImageAttachment(Attachment attachment)
+    {
+        if (attachment.ContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true)
         {
-            return "image/gif";
+            return true;
         }
 
-        if (bytes.Length >= 12
-            && bytes[0] == 0x52
-            && bytes[1] == 0x49
-            && bytes[2] == 0x46
-            && bytes[3] == 0x46
-            && bytes[8] == 0x57
-            && bytes[9] == 0x45
-            && bytes[10] == 0x42
-            && bytes[11] == 0x50)
-        {
-            return "image/webp";
-        }
-
-        return null;
+        var extension = Path.GetExtension(attachment.Filename);
+        return extension.Equals(".png", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".gif", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
     }
 
     private Task OnLog(LogMessage message)
@@ -331,13 +305,19 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         return Task.CompletedTask;
     }
 
-    private async Task SaveChatLogAsync(string? messageId, string? guildId, string channelId, string userId, string content)
+    private async Task SaveChatLogAsync(
+        string? messageId,
+        string? guildId,
+        string channelId,
+        string userId,
+        string content,
+        IReadOnlyList<ChatLogImageInput>? images = null)
     {
         try
         {
             using var scope = scopeFactory.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
-            await repository.AddAsync(messageId, guildId, channelId, userId, content);
+            await repository.AddAsync(messageId, guildId, channelId, userId, content, images);
         }
         catch (Exception e)
         {

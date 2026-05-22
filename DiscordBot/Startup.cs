@@ -100,6 +100,7 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
 
     sc.Configure<ImageGenerationOptions>(conf.GetRequiredSection("ImageGeneration"));
     sc.AddSingleton<ImagePromptProfileProvider>();
+    sc.AddSingleton<IChatLogImageProcessor, ChatLogImageProcessor>();
     sc.AddHttpClient<IImageGenerationClient, ComfyUIClient>((sp, client) =>
     {
         var imageOptions = sp.GetRequiredService<IOptions<ImageGenerationOptions>>().Value;
