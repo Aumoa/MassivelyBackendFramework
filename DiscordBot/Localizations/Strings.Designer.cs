@@ -277,15 +277,6 @@ namespace DiscordBot.Localizations {
         }
 
         /// <summary>
-        ///   Details과(와) 유사한 지역화된 문자열을 찾습니다.
-        /// </summary>
-        internal static string ALLOWED_CHANNELS_BUTTON_DETAIL {
-            get {
-                return ResourceManager.GetString("ALLOWED_CHANNELS_BUTTON_DETAIL", resourceCulture);
-            }
-        }
-
-        /// <summary>
         ///   Back과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string ALLOWED_CHANNELS_BUTTON_BACK {

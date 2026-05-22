@@ -70,14 +70,15 @@ else
                     <th>@Strings.ALLOWED_CHANNELS_LABEL_GUILD_NAME</th>
                     <th>@Strings.ALLOWED_CHANNELS_LABEL_MEMO</th>
                     <th>@Strings.ALLOWED_CHANNELS_LABEL_ENABLED</th>
-                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var channel in channels)
                 {
                     <tr @key="channel.Id">
-                        <td class="mono">@channel.ChannelId</td>
+                        <td>
+                            <a class="channel-id-link mono" href="@($"/channels/{channel.Id}")">@channel.ChannelId</a>
+                        </td>
                         <td class="mono">@channel.GuildId</td>
                         <td>@channel.ChannelName</td>
                         <td>@channel.GuildName</td>
@@ -86,14 +87,6 @@ else
                             <span class="status-badge @(channel.Enabled ? "enabled" : "disabled")">
                                 @(channel.Enabled ? Strings.ALLOWED_CHANNELS_LABEL_ENABLED : Strings.ALLOWED_CHANNELS_LABEL_DISABLED)
                             </span>
-                        </td>
-                        <td>
-                            <div class="row-actions">
-                                <a class="btn-ghost detail-link" href="@($"/channels/{channel.Id}")" title="@Strings.ALLOWED_CHANNELS_BUTTON_DETAIL">
-                                    <span class="material-symbols-outlined">settings</span>
-                                    <span>@Strings.ALLOWED_CHANNELS_BUTTON_DETAIL</span>
-                                </a>
-                            </div>
                         </td>
                     </tr>
                 }

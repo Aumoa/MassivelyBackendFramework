@@ -83,7 +83,7 @@
 
 .channel-table {
     width: 100%;
-    min-width: 860px;
+    min-width: 760px;
     border-collapse: collapse;
 }
 
@@ -114,6 +114,15 @@
     text-overflow: ellipsis;
 }
 
+.channel-id-link {
+    color: var(--color-accent);
+    font-weight: 700;
+}
+
+.channel-id-link:hover {
+    text-decoration: underline;
+}
+
 .status-badge {
     display: inline-flex;
     align-items: center;
@@ -132,30 +141,6 @@
 
 .status-badge.disabled {
     color: var(--color-text-muted);
-    background: var(--color-surface);
-}
-
-.row-actions {
-    display: flex;
-    justify-content: flex-end;
-}
-
-.detail-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-2);
-    min-width: 5.25rem;
-    height: 2.25rem;
-    border: 1px solid var(--color-border-dark);
-    border-radius: var(--radius-md);
-    padding: 0 var(--space-3);
-    font-size: var(--text-sm);
-    font-weight: 600;
-}
-
-.detail-link:hover {
-    text-decoration: none;
     background: var(--color-surface);
 }
 

@@ -159,9 +159,6 @@
   <data name="ALLOWED_CHANNELS_BUTTON_ADD" xml:space="preserve">
     <value>추가</value>
   </data>
-  <data name="ALLOWED_CHANNELS_BUTTON_DETAIL" xml:space="preserve">
-    <value>상세</value>
-  </data>
   <data name="ALLOWED_CHANNELS_BUTTON_BACK" xml:space="preserve">
     <value>뒤로</value>
   </data>

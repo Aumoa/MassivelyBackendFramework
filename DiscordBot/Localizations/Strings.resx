@@ -159,9 +159,6 @@
   <data name="ALLOWED_CHANNELS_BUTTON_ADD" xml:space="preserve">
     <value>Add</value>
   </data>
-  <data name="ALLOWED_CHANNELS_BUTTON_DETAIL" xml:space="preserve">
-    <value>Details</value>
-  </data>
   <data name="ALLOWED_CHANNELS_BUTTON_BACK" xml:space="preserve">
     <value>Back</value>
   </data>
