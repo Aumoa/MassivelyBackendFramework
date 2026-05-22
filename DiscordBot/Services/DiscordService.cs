@@ -116,10 +116,23 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
                 try
                 {
                     var bytes = await httpClient.GetByteArrayAsync(attachment.Url);
+                    var detectedMediaType = DetectImageMediaType(bytes);
+                    var mediaType = detectedMediaType ?? attachment.ContentType;
+                    if (detectedMediaType != null
+                        && !string.IsNullOrEmpty(attachment.ContentType)
+                        && !string.Equals(detectedMediaType, attachment.ContentType, StringComparison.OrdinalIgnoreCase))
+                    {
+                        logger.LogWarning(
+                            "Attachment media type mismatch. Declared: {DeclaredMediaType}, Detected: {DetectedMediaType}, Url: {Url}",
+                            attachment.ContentType,
+                            detectedMediaType,
+                            attachment.Url);
+                    }
+
                     imageData.Add(new AI.ChatImage
                     {
                         Base64 = Convert.ToBase64String(bytes),
-                        MediaType = attachment.ContentType
+                        MediaType = mediaType
                     });
                 }
                 catch (Exception e)
@@ -264,6 +277,49 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         }
 
         return "응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+    }
+
+    private static string? DetectImageMediaType(ReadOnlySpan<byte> bytes)
+    {
+        if (bytes.Length >= 8
+            && bytes[0] == 0x89
+            && bytes[1] == 0x50
+            && bytes[2] == 0x4E
+            && bytes[3] == 0x47)
+        {
+            return "image/png";
+        }
+
+        if (bytes.Length >= 3
+            && bytes[0] == 0xFF
+            && bytes[1] == 0xD8
+            && bytes[2] == 0xFF)
+        {
+            return "image/jpeg";
+        }
+
+        if (bytes.Length >= 6
+            && bytes[0] == 0x47
+            && bytes[1] == 0x49
+            && bytes[2] == 0x46)
+        {
+            return "image/gif";
+        }
+
+        if (bytes.Length >= 12
+            && bytes[0] == 0x52
+            && bytes[1] == 0x49
+            && bytes[2] == 0x46
+            && bytes[3] == 0x46
+            && bytes[8] == 0x57
+            && bytes[9] == 0x45
+            && bytes[10] == 0x42
+            && bytes[11] == 0x50)
+        {
+            return "image/webp";
+        }
+
+        return null;
     }
 
     private Task OnLog(LogMessage message)

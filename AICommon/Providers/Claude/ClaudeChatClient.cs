@@ -422,36 +422,68 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
 
     private static object BuildImageBlock(string base64Data, string? mediaType)
     {
+        var resolvedMediaType = ResolveImageMediaType(base64Data, mediaType);
         return new
         {
             type = "image",
             source = new
             {
                 type = "base64",
-                media_type = string.IsNullOrEmpty(mediaType) ? DetectMediaType(base64Data) : mediaType,
+                media_type = resolvedMediaType,
                 data = base64Data
             }
         };
     }
 
-    private static string DetectMediaType(string base64)
+    private static string ResolveImageMediaType(string base64, string? declaredMediaType)
     {
-        if (string.IsNullOrEmpty(base64)) return "image/png";
+        return TryDetectMediaType(base64)
+            ?? NormalizeSupportedImageMediaType(declaredMediaType)
+            ?? "image/png";
+    }
+
+    private static string? NormalizeSupportedImageMediaType(string? mediaType)
+    {
+        if (string.IsNullOrWhiteSpace(mediaType))
+        {
+            return null;
+        }
+
+        var normalized = mediaType.Split(';', 2)[0].Trim().ToLowerInvariant();
+        return normalized is "image/png" or "image/jpeg" or "image/gif" or "image/webp"
+            ? normalized
+            : null;
+    }
+
+    private static string? TryDetectMediaType(string base64)
+    {
+        if (string.IsNullOrEmpty(base64)) return null;
         try
         {
             Span<byte> header = stackalloc byte[12];
             int written = Convert.TryFromBase64Chars(base64.AsSpan(0, Math.Min(base64.Length, 16)), header, out var bytesWritten)
                 ? bytesWritten
                 : 0;
-            if (written >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF) return "image/jpeg";
             if (written >= 8 && header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47) return "image/png";
+            if (written >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF) return "image/jpeg";
             if (written >= 6 && header[0] == 0x47 && header[1] == 0x49 && header[2] == 0x46) return "image/gif";
-            if (written >= 4 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46) return "image/webp";
+            if (written >= 12
+                && header[0] == 0x52
+                && header[1] == 0x49
+                && header[2] == 0x46
+                && header[3] == 0x46
+                && header[8] == 0x57
+                && header[9] == 0x45
+                && header[10] == 0x42
+                && header[11] == 0x50)
+            {
+                return "image/webp";
+            }
         }
         catch (FormatException)
         {
         }
-        return "image/png";
+        return null;
     }
 
     private static object[] CreateClaudeTools(IReadOnlyList<ToolFunctionDescription> tools) =>
