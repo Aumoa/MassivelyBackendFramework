@@ -1,0 +1,100 @@
+@page "/tools"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IToolSettingsService ToolSettingsService
+
+<PageTitle>@T("TOOLS_TITLE") - @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">@T("TOOLS_TITLE")</h1>
+    <p class="page-subtitle">@T("TOOLS_SUBTITLE")</p>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@if (isLoading)
+{
+    <p class="empty-state">@T("TOOLS_STATUS_LOADING")</p>
+}
+else if (tools.Count == 0)
+{
+    <p class="empty-state">@T("TOOLS_EMPTY")</p>
+}
+else
+{
+    <div class="tool-table-wrap">
+        <table class="tool-table">
+            <thead>
+                <tr>
+                    <th>@T("TOOLS_LABEL_NAME")</th>
+                    <th>@T("TOOLS_LABEL_DESCRIPTION")</th>
+                    <th>@T("TOOLS_LABEL_PARAMETER_COUNT")</th>
+                    <th>@T("TOOLS_LABEL_STATUS")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tool in tools)
+                {
+                    <tr @key="tool.Name">
+                        <td>
+                            <a class="tool-name-link mono" href="@($"/tools/{Uri.EscapeDataString(tool.Name)}")">@tool.Name</a>
+                        </td>
+                        <td class="description-cell">@tool.Description</td>
+                        <td>@tool.Parameters.Count</td>
+                        <td>
+                            <span class="status-badge @(tool.Enabled ? "enabled" : "disabled")">
+                                @(tool.Enabled ? T("TOOLS_LABEL_ENABLED") : T("TOOLS_LABEL_DISABLED"))
+                            </span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<ToolSettingsView> tools = [];
+    private bool isLoading = true;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            tools = await ToolSettingsService.GetAllAsync();
+        }
+        catch
+        {
+            SetStatus("error", T("TOOLS_ERROR_LOAD_FAILED"));
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+}

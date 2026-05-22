@@ -79,6 +79,9 @@
   <data name="NAVMENU_LABEL_CHANNELS" xml:space="preserve">
     <value>채널</value>
   </data>
+  <data name="NAVMENU_LABEL_TOOLS" xml:space="preserve">
+    <value>도구</value>
+  </data>
   <data name="NAVMENU_LABEL_CLAUDE_SETTINGS" xml:space="preserve">
     <value>Claude</value>
   </data>
@@ -244,5 +247,148 @@
   </data>
   <data name="CLAUDE_SETTINGS_ERROR_MAX_TOKENS_RANGE" xml:space="preserve">
     <value>기본 최대 토큰은 0보다 커야 합니다.</value>
+  </data>
+
+  <!-- Tools -->
+  <data name="TOOLS_TITLE" xml:space="preserve">
+    <value>도구</value>
+  </data>
+  <data name="TOOLS_SUBTITLE" xml:space="preserve">
+    <value>AI 도구 설정</value>
+  </data>
+  <data name="TOOLS_DETAIL_TITLE" xml:space="preserve">
+    <value>도구 상세</value>
+  </data>
+  <data name="TOOLS_DETAIL_SUBTITLE" xml:space="preserve">
+    <value>도구 스키마 및 런타임 활성 상태</value>
+  </data>
+  <data name="TOOLS_LABEL_NAME" xml:space="preserve">
+    <value>이름</value>
+  </data>
+  <data name="TOOLS_LABEL_DESCRIPTION" xml:space="preserve">
+    <value>설명</value>
+  </data>
+  <data name="TOOLS_LABEL_PARAMETERS" xml:space="preserve">
+    <value>파라미터</value>
+  </data>
+  <data name="TOOLS_LABEL_PARAMETER_COUNT" xml:space="preserve">
+    <value>파라미터</value>
+  </data>
+  <data name="TOOLS_LABEL_STATUS" xml:space="preserve">
+    <value>상태</value>
+  </data>
+  <data name="TOOLS_LABEL_ENABLED" xml:space="preserve">
+    <value>활성</value>
+  </data>
+  <data name="TOOLS_LABEL_DISABLED" xml:space="preserve">
+    <value>비활성</value>
+  </data>
+  <data name="TOOLS_LABEL_TYPE" xml:space="preserve">
+    <value>타입</value>
+  </data>
+  <data name="TOOLS_LABEL_REQUIRED" xml:space="preserve">
+    <value>필수</value>
+  </data>
+  <data name="TOOLS_LABEL_DEFAULT" xml:space="preserve">
+    <value>기본값</value>
+  </data>
+  <data name="TOOLS_LABEL_ENUM" xml:space="preserve">
+    <value>열거형</value>
+  </data>
+  <data name="TOOLS_BUTTON_BACK" xml:space="preserve">
+    <value>뒤로</value>
+  </data>
+  <data name="TOOLS_BUTTON_SAVE" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="TOOLS_STATUS_LOADING" xml:space="preserve">
+    <value>불러오는 중...</value>
+  </data>
+  <data name="TOOLS_STATUS_SAVED" xml:space="preserve">
+    <value>도구 설정을 저장했습니다.</value>
+  </data>
+  <data name="TOOLS_STATUS_NOT_FOUND" xml:space="preserve">
+    <value>도구를 찾을 수 없습니다.</value>
+  </data>
+  <data name="TOOLS_EMPTY" xml:space="preserve">
+    <value>설정된 도구가 없습니다.</value>
+  </data>
+  <data name="TOOLS_PARAMETERS_EMPTY" xml:space="preserve">
+    <value>파라미터가 없습니다.</value>
+  </data>
+  <data name="TOOLS_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>도구 목록을 불러오지 못했습니다.</value>
+  </data>
+  <data name="TOOLS_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>도구 설정을 저장하지 못했습니다.</value>
+  </data>
+  <data name="TOOLS_REQUIRED_YES" xml:space="preserve">
+    <value>예</value>
+  </data>
+  <data name="TOOLS_REQUIRED_NO" xml:space="preserve">
+    <value>아니오</value>
+  </data>
+  <data name="TOOLS_TYPE_STRING" xml:space="preserve">
+    <value>문자열</value>
+  </data>
+  <data name="TOOLS_TYPE_NUMBER" xml:space="preserve">
+    <value>숫자</value>
+  </data>
+  <data name="TOOLS_TYPE_INTEGER" xml:space="preserve">
+    <value>정수</value>
+  </data>
+  <data name="TOOLS_TYPE_BOOLEAN" xml:space="preserve">
+    <value>불리언</value>
+  </data>
+  <data name="TOOLS_TOOL_GENERATE_IMAGE_DESCRIPTION" xml:space="preserve">
+    <value>사용자 요청에 맞는 이미지를 생성하고 Discord 채널에 업로드합니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GENERATE_IMAGE_PARAM_POSITIVE_PROMPT" xml:space="preserve">
+    <value>사용자 요청을 반영한 최종 긍정 프롬프트입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GENERATE_IMAGE_PARAM_NEGATIVE_PROMPT" xml:space="preserve">
+    <value>원하지 않는 요소와 품질 저하 요소를 담은 최종 부정 프롬프트입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_DESCRIPTION" xml:space="preserve">
+    <value>현재 Discord 채널의 최근 채팅 기록을 조회합니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_PARAM_LIMIT" xml:space="preserve">
+    <value>가져올 최근 메시지 수입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_PARAM_OFFSET" xml:space="preserve">
+    <value>건너뛸 메시지 수입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_PARAM_FROM_DATE" xml:space="preserve">
+    <value>선택한 타임존 기준 조회 시작 날짜와 시간입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_PARAM_TO_DATE" xml:space="preserve">
+    <value>선택한 타임존 기준 조회 종료 날짜와 시간입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_PARAM_TIMEZONE" xml:space="preserve">
+    <value>IANA 타임존 ID입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_DESCRIPTION" xml:space="preserve">
+    <value>현재 Discord 채널의 채팅 기록을 키워드로 검색합니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_KEYWORDS" xml:space="preserve">
+    <value>검색할 키워드를 콤마로 구분한 문자열입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_LIMIT" xml:space="preserve">
+    <value>검색 결과 최대 개수입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_FROM_DATE" xml:space="preserve">
+    <value>선택한 타임존 기준 조회 시작 날짜와 시간입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_TO_DATE" xml:space="preserve">
+    <value>선택한 타임존 기준 조회 종료 날짜와 시간입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_TIMEZONE" xml:space="preserve">
+    <value>IANA 타임존 ID입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CURRENT_DATE_DESCRIPTION" xml:space="preserve">
+    <value>현재 날짜와 시간을 반환합니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CURRENT_DATE_PARAM_TIMEZONE" xml:space="preserve">
+    <value>IANA 타임존 ID입니다.</value>
   </data>
 </root>

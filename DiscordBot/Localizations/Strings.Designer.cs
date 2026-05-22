@@ -133,6 +133,15 @@ namespace DiscordBot.Localizations {
         }
 
         /// <summary>
+        ///   Tools과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NAVMENU_LABEL_TOOLS {
+            get {
+                return ResourceManager.GetString("NAVMENU_LABEL_TOOLS", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Claude과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string NAVMENU_LABEL_CLAUDE_SETTINGS {

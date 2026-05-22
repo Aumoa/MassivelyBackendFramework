@@ -79,6 +79,9 @@
   <data name="NAVMENU_LABEL_CHANNELS" xml:space="preserve">
     <value>Channels</value>
   </data>
+  <data name="NAVMENU_LABEL_TOOLS" xml:space="preserve">
+    <value>Tools</value>
+  </data>
   <data name="NAVMENU_LABEL_CLAUDE_SETTINGS" xml:space="preserve">
     <value>Claude</value>
   </data>
@@ -244,5 +247,148 @@
   </data>
   <data name="CLAUDE_SETTINGS_ERROR_MAX_TOKENS_RANGE" xml:space="preserve">
     <value>Default max tokens must be greater than 0.</value>
+  </data>
+
+  <!-- Tools -->
+  <data name="TOOLS_TITLE" xml:space="preserve">
+    <value>Tools</value>
+  </data>
+  <data name="TOOLS_SUBTITLE" xml:space="preserve">
+    <value>AI tool settings</value>
+  </data>
+  <data name="TOOLS_DETAIL_TITLE" xml:space="preserve">
+    <value>Tool Details</value>
+  </data>
+  <data name="TOOLS_DETAIL_SUBTITLE" xml:space="preserve">
+    <value>Tool schema and runtime availability</value>
+  </data>
+  <data name="TOOLS_LABEL_NAME" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="TOOLS_LABEL_DESCRIPTION" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="TOOLS_LABEL_PARAMETERS" xml:space="preserve">
+    <value>Parameters</value>
+  </data>
+  <data name="TOOLS_LABEL_PARAMETER_COUNT" xml:space="preserve">
+    <value>Parameters</value>
+  </data>
+  <data name="TOOLS_LABEL_STATUS" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="TOOLS_LABEL_ENABLED" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="TOOLS_LABEL_DISABLED" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="TOOLS_LABEL_TYPE" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="TOOLS_LABEL_REQUIRED" xml:space="preserve">
+    <value>Required</value>
+  </data>
+  <data name="TOOLS_LABEL_DEFAULT" xml:space="preserve">
+    <value>Default</value>
+  </data>
+  <data name="TOOLS_LABEL_ENUM" xml:space="preserve">
+    <value>Enum</value>
+  </data>
+  <data name="TOOLS_BUTTON_BACK" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="TOOLS_BUTTON_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="TOOLS_STATUS_LOADING" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="TOOLS_STATUS_SAVED" xml:space="preserve">
+    <value>Tool settings saved.</value>
+  </data>
+  <data name="TOOLS_STATUS_NOT_FOUND" xml:space="preserve">
+    <value>Tool not found.</value>
+  </data>
+  <data name="TOOLS_EMPTY" xml:space="preserve">
+    <value>No tools configured.</value>
+  </data>
+  <data name="TOOLS_PARAMETERS_EMPTY" xml:space="preserve">
+    <value>No parameters.</value>
+  </data>
+  <data name="TOOLS_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>Failed to load tools.</value>
+  </data>
+  <data name="TOOLS_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>Failed to save tool settings.</value>
+  </data>
+  <data name="TOOLS_REQUIRED_YES" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="TOOLS_REQUIRED_NO" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="TOOLS_TYPE_STRING" xml:space="preserve">
+    <value>string</value>
+  </data>
+  <data name="TOOLS_TYPE_NUMBER" xml:space="preserve">
+    <value>number</value>
+  </data>
+  <data name="TOOLS_TYPE_INTEGER" xml:space="preserve">
+    <value>integer</value>
+  </data>
+  <data name="TOOLS_TYPE_BOOLEAN" xml:space="preserve">
+    <value>boolean</value>
+  </data>
+  <data name="TOOLS_TOOL_GENERATE_IMAGE_DESCRIPTION" xml:space="preserve">
+    <value>Generates an image from the user's request and uploads it to the Discord channel.</value>
+  </data>
+  <data name="TOOLS_TOOL_GENERATE_IMAGE_PARAM_POSITIVE_PROMPT" xml:space="preserve">
+    <value>The final positive prompt that reflects the user's request.</value>
+  </data>
+  <data name="TOOLS_TOOL_GENERATE_IMAGE_PARAM_NEGATIVE_PROMPT" xml:space="preserve">
+    <value>The final negative prompt for unwanted elements and quality issues.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_DESCRIPTION" xml:space="preserve">
+    <value>Reads recent chat history for the current Discord channel.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_PARAM_LIMIT" xml:space="preserve">
+    <value>Number of recent messages to fetch.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_PARAM_OFFSET" xml:space="preserve">
+    <value>Number of messages to skip.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_PARAM_FROM_DATE" xml:space="preserve">
+    <value>Start date and time in the selected timezone.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_PARAM_TO_DATE" xml:space="preserve">
+    <value>End date and time in the selected timezone.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CHAT_HISTORY_PARAM_TIMEZONE" xml:space="preserve">
+    <value>IANA timezone ID.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_DESCRIPTION" xml:space="preserve">
+    <value>Searches chat history in the current Discord channel by keywords.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_KEYWORDS" xml:space="preserve">
+    <value>Comma-separated keywords to search for.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_LIMIT" xml:space="preserve">
+    <value>Maximum number of search results.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_FROM_DATE" xml:space="preserve">
+    <value>Start date and time in the selected timezone.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_TO_DATE" xml:space="preserve">
+    <value>End date and time in the selected timezone.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_TIMEZONE" xml:space="preserve">
+    <value>IANA timezone ID.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CURRENT_DATE_DESCRIPTION" xml:space="preserve">
+    <value>Returns the current date and time.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CURRENT_DATE_PARAM_TIMEZONE" xml:space="preserve">
+    <value>IANA timezone ID.</value>
   </data>
 </root>

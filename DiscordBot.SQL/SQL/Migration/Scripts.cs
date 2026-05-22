@@ -11,5 +11,6 @@ public partial class Scripts : IScripts
         yield return new _2__AddChatLogSearch();
         yield return new _3__AddAllowedChannels();
         yield return new _4__AddClaudeSettings();
+        yield return new _5__AddToolSettings();
     }
 }

@@ -48,6 +48,14 @@ public class ToolsProvider
         return m_Tools.Values;
     }
 
+    public void RemoveFunctions(IEnumerable<string> functionNames)
+    {
+        foreach (var functionName in functionNames)
+        {
+            m_Tools.Remove(functionName);
+        }
+    }
+
     public ToolFunctionDescription? FindFunction(string functionName)
     {
         return m_Tools.GetValueOrDefault(functionName);

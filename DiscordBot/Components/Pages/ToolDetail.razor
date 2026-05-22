@@ -1,0 +1,178 @@
+@page "/tools/{Name}"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IToolSettingsService ToolSettingsService
+
+<PageTitle>@T("TOOLS_DETAIL_TITLE") - @Strings.APP_TITLE</PageTitle>
+
+<div class="detail-toolbar">
+    <a class="btn-ghost back-link" href="/tools" title="@T("TOOLS_BUTTON_BACK")">
+        <span class="material-symbols-outlined">arrow_back</span>
+        <span>@T("TOOLS_BUTTON_BACK")</span>
+    </a>
+</div>
+
+<div class="page-header">
+    <h1 class="page-title">@T("TOOLS_DETAIL_TITLE")</h1>
+    <p class="page-subtitle">@T("TOOLS_DETAIL_SUBTITLE")</p>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@if (isLoading)
+{
+    <p class="empty-state">@T("TOOLS_STATUS_LOADING")</p>
+}
+else if (tool is null && !loadFailed)
+{
+    <p class="empty-state">@T("TOOLS_STATUS_NOT_FOUND")</p>
+}
+else if (tool is not null)
+{
+    <form class="tool-detail-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="readonly-field">
+            <span>@T("TOOLS_LABEL_NAME")</span>
+            <div class="readonly-box mono">@tool.Name</div>
+        </div>
+
+        <label class="enabled-field">
+            <input type="checkbox" @bind="enabled" disabled="@isBusy" />
+            <span>@T("TOOLS_LABEL_ENABLED")</span>
+        </label>
+
+        <div class="readonly-field description-field">
+            <span>@T("TOOLS_LABEL_DESCRIPTION")</span>
+            <div class="readonly-box multiline">@tool.Description</div>
+        </div>
+
+        <section class="parameters-section">
+            <h2>@T("TOOLS_LABEL_PARAMETERS")</h2>
+            @if (tool.Parameters.Count == 0)
+            {
+                <p class="empty-state">@T("TOOLS_PARAMETERS_EMPTY")</p>
+            }
+            else
+            {
+                <div class="parameter-table-wrap">
+                    <table class="parameter-table">
+                        <thead>
+                            <tr>
+                                <th>@T("TOOLS_LABEL_NAME")</th>
+                                <th>@T("TOOLS_LABEL_TYPE")</th>
+                                <th>@T("TOOLS_LABEL_REQUIRED")</th>
+                                <th>@T("TOOLS_LABEL_DEFAULT")</th>
+                                <th>@T("TOOLS_LABEL_ENUM")</th>
+                                <th>@T("TOOLS_LABEL_DESCRIPTION")</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var parameter in tool.Parameters)
+                            {
+                                <tr @key="parameter.Name">
+                                    <td class="mono">@parameter.Name</td>
+                                    <td>@parameter.Type</td>
+                                    <td>@(parameter.IsRequired ? T("TOOLS_REQUIRED_YES") : T("TOOLS_REQUIRED_NO"))</td>
+                                    <td>@parameter.DefaultValue</td>
+                                    <td>@FormatEnumValues(parameter.EnumValues)</td>
+                                    <td class="parameter-description">@parameter.Description</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <div class="form-actions">
+            <button class="btn-primary" type="submit" disabled="@isBusy">
+                <span class="material-symbols-outlined">save</span>
+                @T("TOOLS_BUTTON_SAVE")
+            </button>
+        </div>
+    </form>
+}
+
+@code {
+    [Parameter]
+    public string Name { get; set; } = string.Empty;
+
+    private ToolSettingsView? tool;
+    private bool enabled;
+    private bool isLoading = true;
+    private bool isBusy;
+    private bool loadFailed;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        loadFailed = false;
+        try
+        {
+            tool = await ToolSettingsService.GetAsync(Name);
+            enabled = tool?.Enabled ?? false;
+        }
+        catch
+        {
+            loadFailed = true;
+            tool = null;
+            SetStatus("error", T("TOOLS_ERROR_LOAD_FAILED"));
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (isBusy || tool is null)
+        {
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await ToolSettingsService.SetEnabledAsync(tool.Name, enabled);
+            tool = tool with { Enabled = enabled };
+            SetStatus("success", T("TOOLS_STATUS_SAVED"));
+        }
+        catch
+        {
+            SetStatus("error", T("TOOLS_ERROR_SAVE_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private static string FormatEnumValues(IReadOnlyList<string>? values)
+    {
+        return values is { Count: > 0 } ? string.Join(", ", values) : string.Empty;
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+}
