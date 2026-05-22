@@ -122,6 +122,204 @@ namespace DiscordBot.Localizations {
                 return ResourceManager.GetString("NAVMENU_LABEL_HOME", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Channels과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NAVMENU_LABEL_CHANNELS {
+            get {
+                return ResourceManager.GetString("NAVMENU_LABEL_CHANNELS", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Allowed Channels과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_TITLE {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Discord channel access control과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_SUBTITLE {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_SUBTITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel ID과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_LABEL_CHANNEL_ID {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_LABEL_CHANNEL_ID", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Guild ID과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_LABEL_GUILD_ID {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_LABEL_GUILD_ID", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel Name과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_LABEL_CHANNEL_NAME {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_LABEL_CHANNEL_NAME", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Guild Name과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_LABEL_GUILD_NAME {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_LABEL_GUILD_NAME", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Memo과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_LABEL_MEMO {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_LABEL_MEMO", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Enabled과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_LABEL_ENABLED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_LABEL_ENABLED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Disabled과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_LABEL_DISABLED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_LABEL_DISABLED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Add과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_BUTTON_ADD {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_BUTTON_ADD", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Loading...과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_STATUS_LOADING {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_STATUS_LOADING", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   No channels configured.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_EMPTY {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_EMPTY", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel added.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_STATUS_ADDED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_STATUS_ADDED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel saved.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_STATUS_SAVED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_STATUS_SAVED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel enabled.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_STATUS_ENABLED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_STATUS_ENABLED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel disabled.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_STATUS_DISABLED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_STATUS_DISABLED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel deleted.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_STATUS_DELETED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_STATUS_DELETED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Failed to load channels.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_ERROR_LOAD_FAILED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_ERROR_LOAD_FAILED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Failed to save channel.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_ERROR_SAVE_FAILED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_ERROR_SAVE_FAILED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Failed to update channel.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_ERROR_ACTION_FAILED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_ERROR_ACTION_FAILED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Channel ID is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ALLOWED_CHANNELS_ERROR_CHANNEL_ID_REQUIRED {
+            get {
+                return ResourceManager.GetString("ALLOWED_CHANNELS_ERROR_CHANNEL_ID_REQUIRED", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Sorry, the content you are looking for does not exist.과(와) 유사한 지역화된 문자열을 찾습니다.

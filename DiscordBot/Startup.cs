@@ -91,6 +91,7 @@ return;
 void RegisterServices(IServiceCollection sc, IConfiguration conf)
 {
     sc.AddHttpClient();
+    sc.AddMemoryCache();
 
     sc.Configure<DiscordService.Configuration>(conf.GetRequiredSection("Discord"));
     sc.AddHostedService<DiscordService>();
@@ -117,6 +118,8 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
 
     sc.Configure<MySqlOptions>(conf.GetRequiredSection("MySql"));
     sc.AddTransient<IChatLogRepository, MySqlChatLogRepository>();
+    sc.AddTransient<IAllowedChannelRepository, MySqlAllowedChannelRepository>();
+    sc.AddScoped<IAllowedChannelService, AllowedChannelService>();
 }
 
 async ValueTask StartMigrationAsync(CancellationToken cancellationToken)

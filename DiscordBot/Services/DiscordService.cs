@@ -58,10 +58,24 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
             logger.LogInformation("Message: {message}", content.ToString());
         }
 
-        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
-        await SaveChatLogAsync(message.Id.ToString(), guildId, message.Channel.Id.ToString(), message.Author.Id.ToString(), content);
-
         bool isMentioned = message.MentionedUsers.Any(u => u.Id == m_Socket.CurrentUser.Id);
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+
+        using var scope = scopeFactory.CreateScope();
+        var channelAccess = scope.ServiceProvider.GetRequiredService<IAllowedChannelService>();
+        if (!await channelAccess.IsAllowedAsync(channelId))
+        {
+            if (isMentioned)
+            {
+                await message.Channel.SendMessageAsync($"허용되지 않은 채널입니다. 관리자에게 요청하세요. 채널 ID: {channelId}");
+            }
+
+            return;
+        }
+
+        await SaveChatLogAsync(message.Id.ToString(), guildId, channelId, message.Author.Id.ToString(), content);
+
         if (!isMentioned)
         {
             return;
@@ -76,7 +90,6 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         bool hasModify = false;
         List<Task> emojiTasks = [];
 
-        using var scope = scopeFactory.CreateScope();
         var chatLogRepository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
         var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository);
         var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
