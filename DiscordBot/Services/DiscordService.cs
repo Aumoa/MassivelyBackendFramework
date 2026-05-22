@@ -94,7 +94,9 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository);
         var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
         var promptProfileProvider = scope.ServiceProvider.GetRequiredService<ImagePromptProfileProvider>();
-        var imageTools = new DiscordImageTools(message, imageGenerationClient, promptProfileProvider, imageToolsLogger);
+        var chatClient = scope.ServiceProvider.GetRequiredService<AI.IChatClient>();
+        var claudeSettings = scope.ServiceProvider.GetRequiredService<IClaudeSettingsService>();
+        var imageTools = new DiscordImageTools(message, chatClient, claudeSettings, imageGenerationClient, promptProfileProvider, imageToolsLogger);
         var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools, imageTools);
         var toolSettings = scope.ServiceProvider.GetRequiredService<IToolSettingsService>();
         await toolSettings.ApplyAsync(toolsProvider);

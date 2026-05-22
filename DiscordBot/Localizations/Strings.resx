@@ -341,7 +341,10 @@
     <value>boolean</value>
   </data>
   <data name="TOOLS_TOOL_GENERATE_IMAGE_DESCRIPTION" xml:space="preserve">
-    <value>Generates an image from the user's request and uploads it to the Discord channel.</value>
+    <value>Handles image generation and image modification requests. Prompt writing runs inside the tool.</value>
+  </data>
+  <data name="TOOLS_TOOL_GENERATE_IMAGE_PARAM_USER_REQUEST" xml:space="preserve">
+    <value>The user's image request and any necessary conversation context.</value>
   </data>
   <data name="TOOLS_TOOL_GENERATE_IMAGE_PARAM_POSITIVE_PROMPT" xml:space="preserve">
     <value>The final positive prompt that reflects the user's request.</value>

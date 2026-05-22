@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AI;
 using Discord;
 using Discord.WebSocket;
@@ -8,26 +9,23 @@ namespace DiscordBot.Services;
 
 internal class DiscordImageTools(
     SocketMessage message,
+    IChatClient chatClient,
+    IClaudeSettingsService claudeSettings,
     IImageGenerationClient imageGenerationClient,
     ImagePromptProfileProvider promptProfileProvider,
     ILogger<DiscordImageTools> logger) : IToolFunctionDescriptionProvider
 {
     private const string GenerateImageDescription =
-        "사용자의 이미지 생성, 그림 생성, 일러스트 생성 요청을 처리합니다. " +
-        "사용자가 이미지를 만들어 달라고 하면 텍스트 설명만 하지 말고 반드시 이 도구를 호출하세요. " +
-        "이 도구는 positive_prompt와 negative_prompt만 받으며 sampler, scheduler, steps, cfg 같은 workflow 설정은 변경하지 않습니다. " +
-        "positive_prompt와 negative_prompt는 영어 태그와 짧은 영어 구문 중심으로 작성하세요. " +
-        "사용자 요청에 없는 캐릭터 특징, 머리색, 의상, 배경, 구도는 예시에서 가져오지 마세요. " +
-        "사용자가 명시한 주제, 스타일, 구도, 배경, 조명, 분위기를 positive_prompt의 중심에 두고, 원하지 않는 요소와 품질 저하 요소는 negative_prompt에 넣으세요.";
+        "사용자의 이미지 생성, 그림 생성, 일러스트 생성, 이미지 수정 요청을 처리합니다. " +
+        "user_request에는 사용자의 요청 원문과 필요한 대화 맥락을 자연어로 전달하세요. " +
+        "프롬프트 작성은 도구 내부에서 별도로 처리합니다.";
 
     [ToolFunction(
         Name = "generate_image",
         Description = GenerateImageDescription)]
     public async Task<string> GenerateImageAsync(
-        [ToolParameterInfo(Name = "positive_prompt", Description = "사용자 요청을 반영한 최종 긍정 프롬프트입니다. 영어 태그와 짧은 영어 구문 중심으로 작성하세요.")]
-        string positivePrompt,
-        [ToolParameterInfo(Name = "negative_prompt", Description = "품질 저하, 원하지 않는 요소, 사용자 금지 요소를 담은 최종 부정 프롬프트입니다. 영어 태그와 짧은 영어 구문 중심으로 작성하세요.")]
-        string negativePrompt,
+        [ToolParameterInfo(Name = "user_request", Description = "사용자의 이미지 요청 원문과 필요한 대화 맥락입니다. 후속 수정 요청이면 이전 이미지에서 유지할 내용과 바꿀 내용을 함께 적으세요.")]
+        string userRequest,
         CancellationToken cancellationToken = default)
     {
         IUserMessage? statusMessage = null;
@@ -38,7 +36,10 @@ internal class DiscordImageTools(
 
         try
         {
-            statusMessage = await message.Channel.SendMessageAsync("이미지를 생성 중입니다...");
+            statusMessage = await message.Channel.SendMessageAsync("이미지 프롬프트를 준비 중입니다...");
+            var promptDraft = await GeneratePromptDraftAsync(userRequest, cancellationToken);
+            await statusMessage.ModifyAsync(p => p.Content = "이미지를 생성 중입니다...");
+
             statusUpdateTask = UpdateStatusMessageAsync(
                 statusMessage,
                 () =>
@@ -59,8 +60,8 @@ internal class DiscordImageTools(
             });
 
             var image = await imageGenerationClient.GenerateAsync(
-                positivePrompt,
-                negativePrompt,
+                promptDraft.PositivePrompt,
+                promptDraft.NegativePrompt,
                 progress,
                 cancellationToken);
 
@@ -75,7 +76,9 @@ internal class DiscordImageTools(
                 status = "success",
                 message = "이미지를 생성해서 Discord 채널에 업로드했습니다.",
                 file_name = image.FileName,
-                content_type = image.ContentType
+                content_type = image.ContentType,
+                positive_prompt = promptDraft.PositivePrompt,
+                negative_prompt = promptDraft.NegativePrompt
             });
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -205,7 +208,113 @@ internal class DiscordImageTools(
     public string? GetToolFunctionDescription(string functionName)
     {
         return functionName == "generate_image"
-            ? promptProfileProvider.BuildToolDescription(GenerateImageDescription)
+            ? GenerateImageDescription
             : null;
     }
+
+    private async Task<ImagePromptDraft> GeneratePromptDraftAsync(string userRequest, CancellationToken cancellationToken)
+    {
+        var normalizedRequest = string.IsNullOrWhiteSpace(userRequest)
+            ? message.Content
+            : userRequest.Trim();
+
+        var fallback = BuildFallbackPromptDraft(normalizedRequest);
+        try
+        {
+            var settings = await claudeSettings.GetAsync(cancellationToken);
+            var options = new ChatCompletionOptions
+            {
+                Model = settings.SummaryModel,
+                Temperature = 0.4f,
+                MaxTokens = Math.Clamp(settings.DefaultMaxTokens, 256, 2048),
+                ContextLength = 8192
+            };
+
+            var response = await chatClient.GenerateAsync(
+                BuildPromptGenerationUserMessage(normalizedRequest),
+                options,
+                promptProfileProvider.BuildPromptGenerationSystem(),
+                cancellationToken);
+
+            if (TryParsePromptDraft(response, out var promptDraft))
+            {
+                return NormalizePromptDraft(promptDraft, fallback);
+            }
+
+            logger.LogWarning("Failed to parse image prompt draft. Response: {Response}", response);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogWarning(e, "Failed to generate image prompt draft. Falling back to direct request prompt.");
+        }
+
+        return fallback;
+    }
+
+    private static string BuildPromptGenerationUserMessage(string userRequest)
+    {
+        return "다음 사용자 요청을 이미지 생성 프롬프트로 변환하세요.\n\n[사용자 요청]\n" + userRequest;
+    }
+
+    private ImagePromptDraft BuildFallbackPromptDraft(string userRequest)
+    {
+        var (positivePrompt, negativePrompt) = promptProfileProvider.BuildFallbackPrompts(userRequest);
+        return new ImagePromptDraft(positivePrompt, negativePrompt);
+    }
+
+    private static ImagePromptDraft NormalizePromptDraft(ImagePromptDraft promptDraft, ImagePromptDraft fallback)
+    {
+        var positivePrompt = string.IsNullOrWhiteSpace(promptDraft.PositivePrompt)
+            ? fallback.PositivePrompt
+            : promptDraft.PositivePrompt.Trim();
+        var negativePrompt = string.IsNullOrWhiteSpace(promptDraft.NegativePrompt)
+            ? fallback.NegativePrompt
+            : promptDraft.NegativePrompt.Trim();
+
+        return new ImagePromptDraft(positivePrompt, negativePrompt);
+    }
+
+    private static bool TryParsePromptDraft(string response, out ImagePromptDraft promptDraft)
+    {
+        promptDraft = default!;
+        var json = ExtractJsonObject(response);
+        if (json == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<ImagePromptDraftDto>(json);
+            if (parsed == null)
+            {
+                return false;
+            }
+
+            promptDraft = new ImagePromptDraft(
+                parsed.PositivePrompt ?? string.Empty,
+                parsed.NegativePrompt ?? string.Empty);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static string? ExtractJsonObject(string response)
+    {
+        var trimmed = response.Trim();
+        var start = trimmed.IndexOf('{');
+        var end = trimmed.LastIndexOf('}');
+        return start >= 0 && end > start
+            ? trimmed[start..(end + 1)]
+            : null;
+    }
+
+    private sealed record ImagePromptDraft(string PositivePrompt, string NegativePrompt);
+
+    private sealed record ImagePromptDraftDto(
+        [property: JsonPropertyName("positive_prompt")] string? PositivePrompt,
+        [property: JsonPropertyName("negative_prompt")] string? NegativePrompt);
 }

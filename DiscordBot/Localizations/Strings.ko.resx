@@ -341,7 +341,10 @@
     <value>불리언</value>
   </data>
   <data name="TOOLS_TOOL_GENERATE_IMAGE_DESCRIPTION" xml:space="preserve">
-    <value>사용자 요청에 맞는 이미지를 생성하고 Discord 채널에 업로드합니다.</value>
+    <value>이미지 생성 및 이미지 수정 요청을 처리합니다. 프롬프트 작성은 도구 내부에서 진행됩니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GENERATE_IMAGE_PARAM_USER_REQUEST" xml:space="preserve">
+    <value>사용자의 이미지 요청과 필요한 대화 맥락입니다.</value>
   </data>
   <data name="TOOLS_TOOL_GENERATE_IMAGE_PARAM_POSITIVE_PROMPT" xml:space="preserve">
     <value>사용자 요청을 반영한 최종 긍정 프롬프트입니다.</value>

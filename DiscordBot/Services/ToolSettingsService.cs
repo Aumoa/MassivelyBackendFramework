@@ -4,7 +4,6 @@ using System.Text;
 using AI;
 using DiscordBot.Localizations;
 using DiscordBot.Repositories;
-using DiscordBot.Services.ImageGeneration;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace DiscordBot.Services;
@@ -36,7 +35,6 @@ internal interface IToolSettingsService
 
 internal sealed class ToolSettingsService(
     IToolSettingsRepository repository,
-    ImagePromptProfileProvider promptProfileProvider,
     IMemoryCache cache) : IToolSettingsService
 {
     private const string DisabledToolNamesCacheKey = "DiscordBot.ToolSettings.DisabledToolNames";
@@ -151,23 +149,13 @@ internal sealed class ToolSettingsService(
                throw new InvalidOperationException($"Parameter type {parameterType.FullName} is unsupported.");
     }
 
-    private ToolSettingsView ToView(ToolCatalogItem item, bool enabled)
+    private static ToolSettingsView ToView(ToolCatalogItem item, bool enabled)
     {
         return new ToolSettingsView(
             item.Name,
-            ResolveDescription(item),
+            Localize($"TOOLS_TOOL_{ToResourceKey(item.Name)}_DESCRIPTION", item.Description),
             item.Parameters.Select(parameter => ToParameterView(item.Name, parameter)).ToList(),
             enabled);
-    }
-
-    private string ResolveDescription(ToolCatalogItem item)
-    {
-        if (item.Name == "generate_image")
-        {
-            return promptProfileProvider.BuildToolDescription(item.Description);
-        }
-
-        return Localize($"TOOLS_TOOL_{ToResourceKey(item.Name)}_DESCRIPTION", item.Description);
     }
 
     private static ToolParameterSettingsView ToParameterView(string toolName, ToolCatalogParameter parameter)
