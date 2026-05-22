@@ -202,6 +202,22 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
                 await sentMessage.ModifyAsync(p => p.Content = totalMessage);
             }
         }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Failed to generate AI response.");
+            totalMessage = BuildAIErrorMessage(e);
+
+            if (sentMessage == null)
+            {
+                sentMessage = await message.Channel.SendMessageAsync(totalMessage);
+                typingState?.Dispose();
+                typingState = null;
+            }
+            else
+            {
+                await sentMessage.ModifyAsync(p => p.Content = totalMessage);
+            }
+        }
         finally
         {
             typingState?.Dispose();
@@ -231,6 +247,19 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         }
 
         await channel.TrySummarizeAsync();
+    }
+
+    private static string BuildAIErrorMessage(Exception exception)
+    {
+        var message = exception.Message;
+        if (message.Contains("overloaded", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("529", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("capacity", StringComparison.OrdinalIgnoreCase))
+        {
+            return "현재 AI API가 혼잡합니다. 잠시 후 다시 시도해 주세요.";
+        }
+
+        return "응답 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
     }
 
     private Task OnLog(LogMessage message)

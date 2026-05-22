@@ -80,6 +80,24 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
                             JsonBuffer = new StringBuilder()
                         };
                     }
+                    else if (blockTypeProp.GetString() == "text"
+                        && blockProp.TryGetProperty("text", out var textProp))
+                    {
+                        var text = textProp.GetString() ?? "";
+                        if (!string.IsNullOrEmpty(text))
+                        {
+                            yield return new ChatResponseChunk { Content = text };
+                        }
+                    }
+                    else if (blockTypeProp.GetString() == "thinking"
+                        && blockProp.TryGetProperty("thinking", out var thinkingProp))
+                    {
+                        var thinking = thinkingProp.GetString() ?? "";
+                        if (!string.IsNullOrEmpty(thinking))
+                        {
+                            yield return new ChatResponseChunk { Thinking = thinking };
+                        }
+                    }
                     break;
                 }
                 case "content_block_delta":
@@ -160,6 +178,10 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
                     toolAccumulators.Remove(index);
                     break;
                 }
+                case "error":
+                {
+                    throw new HttpRequestException($"Claude stream error: {ReadStreamError(evt)}");
+                }
                 case "message_stop":
                     yield break;
             }
@@ -237,6 +259,28 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
         {
         }
         throw new HttpRequestException($"Claude API {(int)response.StatusCode} {response.StatusCode}: {body}");
+    }
+
+    private static string ReadStreamError(JsonElement evt)
+    {
+        if (!evt.TryGetProperty("error", out var errorProp))
+        {
+            return evt.GetRawText();
+        }
+
+        var type = errorProp.TryGetProperty("type", out var typeProp)
+            ? typeProp.GetString()
+            : null;
+        var message = errorProp.TryGetProperty("message", out var messageProp)
+            ? messageProp.GetString()
+            : null;
+
+        if (!string.IsNullOrEmpty(type) && !string.IsNullOrEmpty(message))
+        {
+            return $"{type}: {message}";
+        }
+
+        return errorProp.GetRawText();
     }
 
     private string BuildRequestBody(
