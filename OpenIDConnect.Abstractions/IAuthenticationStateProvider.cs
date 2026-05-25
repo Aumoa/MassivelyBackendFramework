@@ -6,7 +6,7 @@ public interface IAuthenticationStateProvider
 {
     string GenerateLoginUri(string redirectUri, string scope);
 
-    ValueTask AcceptAsync(string code, string redirectUri, CancellationToken cancellationToken = default);
+    ValueTask AcceptAsync(string code, string redirectUri, string? state, CancellationToken cancellationToken = default);
 
     void Clear();
 

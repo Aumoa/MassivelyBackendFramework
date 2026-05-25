@@ -71,11 +71,25 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return false;
         }
 
+        if (!IsValidPkceParameter(codeVerifier))
+        {
+            return false;
+        }
+
         // RFC 7636 specifies ASCII encoding for the code_verifier before hashing
         var hash = SHA256.HashData(Encoding.ASCII.GetBytes(codeVerifier));
         var computedChallenge = Convert.ToBase64String(hash)
             .Replace('+', '-').Replace('/', '_').TrimEnd('=');
         return computedChallenge == codeChallenge;
+    }
+
+    private static bool IsValidPkceParameter(string value)
+    {
+        return value.Length is >= 43 and <= 128 && value.All(static c =>
+            c is >= 'A' and <= 'Z' ||
+            c is >= 'a' and <= 'z' ||
+            c is >= '0' and <= '9' ||
+            c is '-' or '.' or '_' or '~');
     }
 
     /// <summary>
@@ -124,6 +138,42 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         }
     }
 
+    private async ValueTask<IActionResult?> ValidateAuthorizationCodeClientAsync(string clientId, string? clientSecret, CancellationToken cancellationToken)
+    {
+        if (clientId == hostOptions.Value.ClientId)
+        {
+            if (string.IsNullOrWhiteSpace(clientSecret))
+            {
+                return BadRequest(new { error = "invalid_client", error_description = "client_secret is required" });
+            }
+
+            return await ValidateClientSecretAsync(clientId, clientSecret, cancellationToken);
+        }
+
+        var cclaims = await clientClaims.GetClaimsAsync(clientId, cancellationToken);
+        string[] secrets = [.. cclaims.Where(p => p.Name == "secret").Select(c => c.Value)];
+        if (secrets.Length == 0)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(clientSecret))
+        {
+            return BadRequest(new { error = "invalid_client", error_description = "client_secret is required" });
+        }
+
+        foreach (var secret in secrets)
+        {
+            if (PasswordHasher.Verify(clientSecret, secret))
+            {
+                return null;
+            }
+        }
+
+        logger.LogWarning("Client secret verification failed: {ClientId}", clientId);
+        return BadRequest(new { error = "invalid_client", error_description = "client authentication failed" });
+    }
+
     private async ValueTask<IActionResult> HandleAuthorizeCodeAsync(TokenRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Code))
@@ -163,48 +213,35 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "redirect_uri_mismatch" });
         }
 
-        // Validate PKCE if code_challenge was present in the authorization request
-        if (code.Value.CodeChallenge != null)
+        if (code.Value.CodeChallenge == null)
         {
-            if (string.IsNullOrWhiteSpace(request.CodeVerifier))
-            {
-                logger.LogWarning("PKCE code_verifier missing for client: {ClientId}", request.ClientId);
-                return BadRequest(new { error = "code_verifier_missing" });
-            }
-
-            var challengeMethod = code.Value.CodeChallengeMethod;
-            if (string.IsNullOrEmpty(challengeMethod))
-            {
-                logger.LogWarning("Stored code_challenge_method is missing for client: {ClientId}", request.ClientId);
-                return BadRequest(new { error = "invalid_code_verifier" });
-            }
-
-            if (!ValidatePkce(request.CodeVerifier, code.Value.CodeChallenge, challengeMethod))
-            {
-                logger.LogWarning("PKCE validation failed for client: {ClientId}", request.ClientId);
-                return BadRequest(new { error = "invalid_code_verifier" });
-            }
+            logger.LogWarning("Authorization code was issued without a PKCE challenge for client: {ClientId}", request.ClientId);
+            return BadRequest(new { error = "invalid_grant", error_description = "PKCE is required" });
         }
-        else if (!string.IsNullOrWhiteSpace(request.CodeVerifier))
+
+        if (string.IsNullOrWhiteSpace(request.CodeVerifier))
         {
-            // code_verifier provided but no challenge was stored — reject to prevent downgrade attacks
-            logger.LogWarning("code_verifier provided but no code_challenge was stored for client: {ClientId}", request.ClientId);
+            logger.LogWarning("PKCE code_verifier missing for client: {ClientId}", request.ClientId);
+            return BadRequest(new { error = "code_verifier_missing" });
+        }
+
+        var challengeMethod = code.Value.CodeChallengeMethod;
+        if (string.IsNullOrEmpty(challengeMethod))
+        {
+            logger.LogWarning("Stored code_challenge_method is missing for client: {ClientId}", request.ClientId);
             return BadRequest(new { error = "invalid_code_verifier" });
         }
 
-        // Validate client secret only when not using PKCE (PKCE serves as client authentication for public clients)
-        if (code.Value.CodeChallenge == null)
+        if (!ValidatePkce(request.CodeVerifier, code.Value.CodeChallenge, challengeMethod))
         {
-            if (string.IsNullOrWhiteSpace(request.ClientSecret))
-            {
-                return BadRequest(new { error = "client_secret_missing" });
-            }
+            logger.LogWarning("PKCE validation failed for client: {ClientId}", request.ClientId);
+            return BadRequest(new { error = "invalid_code_verifier" });
+        }
 
-            var validationError = await ValidateClientSecretAsync(request.ClientId, request.ClientSecret, cancellationToken);
-            if (validationError != null)
-            {
-                return validationError;
-            }
+        var validationError = await ValidateAuthorizationCodeClientAsync(request.ClientId, request.ClientSecret, cancellationToken);
+        if (validationError != null)
+        {
+            return validationError;
         }
 
         // Issue tokens

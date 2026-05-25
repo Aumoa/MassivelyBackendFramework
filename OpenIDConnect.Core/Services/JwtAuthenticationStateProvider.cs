@@ -2,9 +2,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OAuth2.DTO;
@@ -16,11 +20,15 @@ internal class JwtAuthenticationStateProvider(
     ILogger<JwtAuthenticationStateProvider> logger,
     IOptions<OIDCOptions> options,
     TokenRefreshService tokenRefreshService,
-    HttpClient http) : AuthenticationStateProvider, IAuthenticationStateProvider
+    HttpClient http,
+    IDataProtectionProvider dataProtectionProvider) : AuthenticationStateProvider, IAuthenticationStateProvider
 {
+    private const int PkceStateLifetimeMinutes = 10;
+
     private ClaimsPrincipal? m_CurrentUser;
     private string? m_LastSuccessfullyCode;
     private readonly SemaphoreSlim m_Semaphore = new(1);
+    private readonly IDataProtector m_PkceProtector = dataProtectionProvider.CreateProtector("OpenIDConnect.Core.PKCE.v1");
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
@@ -138,12 +146,10 @@ internal class JwtAuthenticationStateProvider(
 
     public string GenerateLoginUri(string redirectUri, string scope)
     {
-        var clientId = Uri.EscapeDataString(options.Value.ClientId);
-        redirectUri = Uri.EscapeDataString(redirectUri);
-        return options.Value.Uri + $"/authorize?client_id={clientId}&redirect_uri={redirectUri}&response_type=code&scope={scope}";
+        return CreateLoginUri(redirectUri, scope);
     }
 
-    public async ValueTask AcceptAsync(string code, string redirectUri, CancellationToken cancellationToken = default)
+    public async ValueTask AcceptAsync(string code, string redirectUri, string? state, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         var httpContext = accessor.HttpContext ?? throw new InvalidOperationException("HttpContext is not available");
@@ -156,13 +162,21 @@ internal class JwtAuthenticationStateProvider(
                 return;
             }
 
+            if (!TryUnprotectCodeVerifier(state, out var codeVerifier))
+            {
+                logger.LogInformation("Failed to validate PKCE state for authorization code exchange.");
+                m_LastSuccessfullyCode = null;
+                return;
+            }
+
             var formData = new Dictionary<string, string>()
             {
                 ["grant_type"] = "authorization_code",
                 ["code"] = code,
                 ["redirect_uri"] = redirectUri,
                 ["client_id"] = options.Value.ClientId,
-                ["client_secret"] = options.Value.ClientSecret
+                ["client_secret"] = options.Value.ClientSecret,
+                ["code_verifier"] = codeVerifier
             };
 
             using var content = new FormUrlEncodedContent(formData);
@@ -236,9 +250,100 @@ internal class JwtAuthenticationStateProvider(
 
     public void NavigateToLogin(NavigationManager navigation, string redirectRelativeUri, string scope)
     {
-        var clientId = Uri.EscapeDataString(options.Value.ClientId);
-        var redirectUri = Uri.EscapeDataString(navigation.BaseUri + redirectRelativeUri);
-        scope = Uri.EscapeDataString(scope);
-        navigation.NavigateTo($"{options.Value.Uri}/authorize?client_id={clientId}&redirect_uri={redirectUri}&response_type=code&scope={scope}");
+        navigation.NavigateTo(CreateLoginUri(navigation.BaseUri + redirectRelativeUri, scope));
+    }
+
+    private string CreateLoginUri(string redirectUri, string scope)
+    {
+        var codeVerifier = CreateCodeVerifier();
+        var state = ProtectCodeVerifier(codeVerifier);
+        var codeChallenge = CreateCodeChallenge(codeVerifier);
+
+        return QueryHelpers.AddQueryString(options.Value.Uri.TrimEnd('/') + "/authorize", new Dictionary<string, string?>
+        {
+            ["client_id"] = options.Value.ClientId,
+            ["redirect_uri"] = redirectUri,
+            ["response_type"] = "code",
+            ["scope"] = scope,
+            ["state"] = state,
+            ["code_challenge"] = codeChallenge,
+            ["code_challenge_method"] = "S256"
+        });
+    }
+
+    private string ProtectCodeVerifier(string codeVerifier)
+    {
+        return m_PkceProtector.Protect($"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.{codeVerifier}");
+    }
+
+    private bool TryUnprotectCodeVerifier(string? state, out string codeVerifier)
+    {
+        codeVerifier = string.Empty;
+        if (string.IsNullOrWhiteSpace(state))
+        {
+            return false;
+        }
+
+        try
+        {
+            var unprotected = m_PkceProtector.Unprotect(state);
+            var separatorIndex = unprotected.IndexOf('.');
+            if (separatorIndex <= 0 || separatorIndex == unprotected.Length - 1)
+            {
+                return false;
+            }
+
+            if (!long.TryParse(unprotected[..separatorIndex], out var issuedAtSeconds))
+            {
+                return false;
+            }
+
+            var issuedAt = DateTimeOffset.FromUnixTimeSeconds(issuedAtSeconds);
+            var now = DateTimeOffset.UtcNow;
+            if (issuedAt > now.AddMinutes(1) || now - issuedAt > TimeSpan.FromMinutes(PkceStateLifetimeMinutes))
+            {
+                return false;
+            }
+
+            var verifier = unprotected[(separatorIndex + 1)..];
+            if (!IsValidPkceParameter(verifier))
+            {
+                return false;
+            }
+
+            codeVerifier = verifier;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string CreateCodeVerifier()
+    {
+        return Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+    }
+
+    private static string CreateCodeChallenge(string verifier)
+    {
+        return Base64UrlEncode(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
+    }
+
+    private static string Base64UrlEncode(byte[] bytes)
+    {
+        return Convert.ToBase64String(bytes)
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
+    }
+
+    private static bool IsValidPkceParameter(string value)
+    {
+        return value.Length is >= 43 and <= 128 && value.All(static c =>
+            c is >= 'A' and <= 'Z' ||
+            c is >= 'a' and <= 'z' ||
+            c is >= '0' and <= '9' ||
+            c is '-' or '.' or '_' or '~');
     }
 }

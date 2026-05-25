@@ -1,16 +1,11 @@
-﻿@using Microsoft.Extensions.Options
-@using HostOptions = OAuth2.Options.HostOptions;
 @inject NavigationManager Nav
-@inject IOptions<HostOptions> HostOptions
 
 @code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnAfterRender(bool firstRender)
     {
         if (firstRender)
         {
-            var clientId = Uri.EscapeDataString(HostOptions.Value.ClientId);
-            var redirectUri = Uri.EscapeDataString($"{Nav.BaseUri}redirect");
-            Nav.NavigateTo($"/authorize?client_id={clientId}&redirect_uri={redirectUri}&response_type=code&scope=all", forceLoad: true);
+            Nav.NavigateTo("/auth/login", forceLoad: true);
         }
     }
 }

@@ -117,7 +117,10 @@ public partial class Login(
         if (string.IsNullOrWhiteSpace(ResponseType) || ResponseType != "code" ||
             string.IsNullOrWhiteSpace(RedirectUri) ||
             string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope) ||
-            string.IsNullOrWhiteSpace(ClientName))
+            string.IsNullOrWhiteSpace(ClientName) ||
+            string.IsNullOrWhiteSpace(CodeChallenge) ||
+            CodeChallengeMethod != "S256" ||
+            !IsValidPkceParameter(CodeChallenge))
         {
             Error(Strings.ERRORS_BAD_REQUEST);
             return;
@@ -350,5 +353,14 @@ public partial class Login(
         m_ErrorMessageId = string.Empty;
         m_ErrorMessagePassword = string.Empty;
         return Task.CompletedTask;
+    }
+
+    private static bool IsValidPkceParameter(string value)
+    {
+        return value.Length is >= 43 and <= 128 && value.All(static c =>
+            c is >= 'A' and <= 'Z' ||
+            c is >= 'a' and <= 'z' ||
+            c is >= '0' and <= '9' ||
+            c is '-' or '.' or '_' or '~');
     }
 }

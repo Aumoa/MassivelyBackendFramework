@@ -7,7 +7,7 @@ namespace DiscordBot.Controllers;
 public class AuthController(IAuthenticationStateProvider auth, ILogger<AuthController> logger) : ControllerBase
 {
     [HttpGet("redirect")]
-    public async ValueTask<IActionResult> RedirectAsync([FromQuery] string code, CancellationToken cancellationToken)
+    public async ValueTask<IActionResult> RedirectAsync([FromQuery] string code, [FromQuery] string? state, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(code))
         {
@@ -20,7 +20,7 @@ public class AuthController(IAuthenticationStateProvider auth, ILogger<AuthContr
             logger.LogInformation("Redirecting with authorization code: {Code}, URI: {Uri}", code, uri);
         }
 
-        await auth.AcceptAsync(code, uri, cancellationToken);
+        await auth.AcceptAsync(code, uri, state, cancellationToken);
         return Redirect("/");
     }
 

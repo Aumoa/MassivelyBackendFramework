@@ -1,6 +1,9 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using OAuth2.DTO;
@@ -13,68 +16,120 @@ namespace OAuth2.Controllers;
 [ApiController]
 public class AuthController(IOptions<HostOptions> options, HttpClient http, ILogger<AuthController> logger) : ControllerBase
 {
+    private const string PkceVerifierCookieName = "oauth2_pkce_verifier";
+    private const string PkceStateCookieName = "oauth2_pkce_state";
+
+    [HttpGet("/auth/login")]
+    public IActionResult StartLogin()
+    {
+        var verifier = CreateCodeVerifier();
+        var challenge = CreateCodeChallenge(verifier);
+        var state = CreateCodeVerifier();
+
+        var cookieOptions = CreatePkceCookieOptions();
+        HttpContext.Response.Cookies.Append(PkceVerifierCookieName, verifier, cookieOptions);
+        HttpContext.Response.Cookies.Append(PkceStateCookieName, state, cookieOptions);
+
+        var authorizeUri = QueryHelpers.AddQueryString("/authorize", new Dictionary<string, string?>
+        {
+            ["client_id"] = options.Value.ClientId,
+            ["redirect_uri"] = GetInternalRedirectUri(),
+            ["response_type"] = "code",
+            ["scope"] = "all",
+            ["state"] = state,
+            ["code_challenge"] = challenge,
+            ["code_challenge_method"] = "S256"
+        });
+
+        return Redirect(authorizeUri);
+    }
+
     [HttpGet("/redirect")]
     public async Task<IActionResult> RedirectAsync(
         [FromQuery] string code,
+        [FromQuery] string? state,
         [FromServices] IAccesses accesses,
         CancellationToken cancellationToken)
     {
         var baseUri = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.PathBase}/";
+        var deleteCookieOptions = CreatePkceDeleteCookieOptions();
 
-        var formData = new Dictionary<string, string>()
+        try
         {
-            ["grant_type"] = "authorization_code",
-            ["code"] = code,
-            ["redirect_uri"] = baseUri + "redirect",
-            ["client_id"] = options.Value.ClientId,
-            ["client_secret"] = options.Value.Secret
-        };
+            if (!HttpContext.Request.Cookies.TryGetValue(PkceVerifierCookieName, out var codeVerifier) ||
+                string.IsNullOrWhiteSpace(codeVerifier))
+            {
+                return BadRequest("PKCE code verifier is missing.");
+            }
 
-        using var content = new FormUrlEncodedContent(formData);
-        using var response = await http.PostAsync(baseUri + "api/v1/token", content, cancellationToken);
-        response.EnsureSuccessStatusCode();
+            if (!HttpContext.Request.Cookies.TryGetValue(PkceStateCookieName, out var expectedState) ||
+                string.IsNullOrWhiteSpace(expectedState) ||
+                !string.Equals(expectedState, state, StringComparison.Ordinal))
+            {
+                return BadRequest("OAuth state validation failed.");
+            }
 
-        var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: cancellationToken)
-            ?? throw new InvalidOperationException("Failed to parse token response.");
+            var formData = new Dictionary<string, string>()
+            {
+                ["grant_type"] = "authorization_code",
+                ["code"] = code,
+                ["redirect_uri"] = GetInternalRedirectUri(),
+                ["client_id"] = options.Value.ClientId,
+                ["client_secret"] = options.Value.Secret,
+                ["code_verifier"] = codeVerifier
+            };
 
-        var access = await accesses.VerifyAsync(tokenResponse.AccessToken, cancellationToken);
-        if (access.HasValue == false)
-        {
-            return Unauthorized();
-        }
+            using var content = new FormUrlEncodedContent(formData);
+            using var response = await http.PostAsync(baseUri + "api/v1/token", content, cancellationToken);
+            response.EnsureSuccessStatusCode();
 
-        HttpContext.Response.Cookies.Append("access_token", tokenResponse.AccessToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict
-        });
+            var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: cancellationToken)
+                ?? throw new InvalidOperationException("Failed to parse token response.");
 
-        HttpContext.Response.Cookies.Append("refresh_token", tokenResponse.RefreshToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict
-        });
+            var access = await accesses.VerifyAsync(tokenResponse.AccessToken, cancellationToken);
+            if (access.HasValue == false)
+            {
+                return Unauthorized();
+            }
 
-        HttpContext.Response.Cookies.Append("id", access.Value.Id, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict
-        });
-
-        if (tokenResponse.IdToken != null)
-        {
-            HttpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
+            HttpContext.Response.Cookies.Append("access_token", tokenResponse.AccessToken, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Strict
             });
-        }
 
-        return Redirect("/");
+            HttpContext.Response.Cookies.Append("refresh_token", tokenResponse.RefreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict
+            });
+
+            HttpContext.Response.Cookies.Append("id", access.Value.Id, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict
+            });
+
+            if (tokenResponse.IdToken != null)
+            {
+                HttpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict
+                });
+            }
+
+            return Redirect("/");
+        }
+        finally
+        {
+            HttpContext.Response.Cookies.Delete(PkceVerifierCookieName, deleteCookieOptions);
+            HttpContext.Response.Cookies.Delete(PkceStateCookieName, deleteCookieOptions);
+        }
     }
 
     [HttpGet("/authorize")]
@@ -101,13 +156,11 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
             return BadRequest("Unsupported response type.");
         }
 
-        // Validate PKCE parameters when code_challenge is provided
-        if (!string.IsNullOrEmpty(code_challenge))
+        if (string.IsNullOrWhiteSpace(code_challenge) ||
+            code_challenge_method != "S256" ||
+            !IsValidPkceParameter(code_challenge))
         {
-            if (code_challenge_method != "S256")
-            {
-                return BadRequest("Invalid code challenge method.");
-            }
+            return BadRequest("PKCE S256 code challenge is required.");
         }
 
         string clientName;
@@ -115,7 +168,7 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
         // hosting service
         if (client_id == options.Value.ClientId)
         {
-            if (redirect_uri == options.Value.Uri + "/redirect")
+            if (redirect_uri == GetInternalRedirectUri())
             {
                 clientName = "OAuth2";
             }
@@ -325,5 +378,60 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
 
             return false;
         }
+    }
+
+    private string GetInternalRedirectUri()
+    {
+        return options.Value.Uri.TrimEnd('/') + "/redirect";
+    }
+
+    private static string CreateCodeVerifier()
+    {
+        return Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+    }
+
+    private static string CreateCodeChallenge(string verifier)
+    {
+        return Base64UrlEncode(SHA256.HashData(Encoding.ASCII.GetBytes(verifier)));
+    }
+
+    private static string Base64UrlEncode(byte[] bytes)
+    {
+        return Convert.ToBase64String(bytes)
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
+    }
+
+    private static bool IsValidPkceParameter(string value)
+    {
+        return value.Length is >= 43 and <= 128 && value.All(static c =>
+            c is >= 'A' and <= 'Z' ||
+            c is >= 'a' and <= 'z' ||
+            c is >= '0' and <= '9' ||
+            c is '-' or '.' or '_' or '~');
+    }
+
+    private static CookieOptions CreatePkceCookieOptions()
+    {
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Path = "/redirect",
+            Expires = DateTimeOffset.UtcNow.AddMinutes(10)
+        };
+    }
+
+    private static CookieOptions CreatePkceDeleteCookieOptions()
+    {
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Path = "/redirect"
+        };
     }
 }
