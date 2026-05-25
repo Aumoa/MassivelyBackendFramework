@@ -62,7 +62,7 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
         }
     }
 
-    public async Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(Guid settlementId, bool minimizeTransfers = false, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(Guid settlementId, bool minimizeTransfers = true, CancellationToken cancellationToken = default)
     {
         var settlement = await settlements.GetSettlementAsync(settlementId, cancellationToken)
             ?? throw new InvalidOperationException($"Settlement {settlementId} not found.");

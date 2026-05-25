@@ -88,7 +88,7 @@ public class MySqlExpenseService(string connectionString, MySqlSettlementService
     }
 
     public async Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(
-        Guid settlementId, bool minimizeTransfers = false, CancellationToken cancellationToken = default)
+        Guid settlementId, bool minimizeTransfers = true, CancellationToken cancellationToken = default)
     {
         var settlement = await settlementService.GetSettlementAsync(settlementId, cancellationToken)
             ?? throw new InvalidOperationException($"Settlement {settlementId} not found.");
