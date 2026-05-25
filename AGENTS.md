@@ -6,6 +6,8 @@
 - Create one commit per independently reviewable feature unit.
 - Do not mix unrelated refactors, formatting, dependency updates, or bug fixes into the same commit unless they are required for that feature.
 - Before committing, run the relevant build or test command when it is known and practical.
+- Unless the user explicitly asks not to commit, create the commit after requested changes pass the relevant build or tests.
+- If the relevant build or tests fail, do not commit until the failure is fixed or the user explicitly asks to commit anyway.
 - If validation cannot be run, mention that in the final response.
 - Do not commit user-made unrelated changes.
 - If the working tree already contains unrelated changes, isolate only Codex-made changes in the commit.
