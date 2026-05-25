@@ -2,6 +2,7 @@ using AI;
 using AI.Providers.Claude;
 using DiscordBot.Components;
 using DiscordBot.Games.Chess;
+using DiscordBot.Games.Othello;
 using DiscordBot.Options;
 using DiscordBot.Repositories;
 using DiscordBot.Services;
@@ -125,6 +126,11 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddSingleton<IChessOpponent, LlmChessOpponent>();
     sc.AddSingleton<IChessBoardRenderer, ImageSharpChessBoardRenderer>();
     sc.AddSingleton<IChessGameService, ChessGameService>();
+    sc.AddSingleton<IOthelloGameStore, InMemoryOthelloGameStore>();
+    sc.AddSingleton<IOthelloEngine, OthelloEngine>();
+    sc.AddSingleton<IOthelloOpponent, LlmOthelloOpponent>();
+    sc.AddSingleton<IOthelloBoardRenderer, ImageSharpOthelloBoardRenderer>();
+    sc.AddSingleton<IOthelloGameService, OthelloGameService>();
 
     sc.Configure<MySqlOptions>(conf.GetRequiredSection("MySql"));
     sc.AddTransient<IChatLogRepository, MySqlChatLogRepository>();

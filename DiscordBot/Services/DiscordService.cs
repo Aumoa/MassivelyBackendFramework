@@ -2,13 +2,14 @@ using Discord;
 using Discord.Rest;
 using Discord.WebSocket;
 using DiscordBot.Games.Chess;
+using DiscordBot.Games.Othello;
 using DiscordBot.Repositories;
 using DiscordBot.Services.ImageGeneration;
 using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
-internal class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, IImageGenerationClient imageGenerationClient, IChessGameService chessGameService) : IHostedService, IAsyncDisposable
+internal class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, IImageGenerationClient imageGenerationClient, IChessGameService chessGameService, IOthelloGameService othelloGameService) : IHostedService, IAsyncDisposable
 {
     public record Configuration
     {
@@ -46,6 +47,8 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
     }
 
     private static readonly Emoji s_Emoji = "✍️";
+    private static readonly TimeSpan s_ResponseEditInterval = TimeSpan.FromSeconds(5);
+    private const int DiscordSafeMessageLength = 1900;
 
     private async Task OnMessageReceived(SocketMessage message)
     {
@@ -105,21 +108,24 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         }
 
         var activeChessGame = chessGameService.FindActiveByUser(message.Author.Id.ToString());
-        if (activeChessGame != null && activeChessGame.ChannelId != channelId)
+        var activeOthelloGame = othelloGameService.FindActiveByUser(message.Author.Id.ToString());
+        var activeGameName = activeChessGame != null ? "체스" : activeOthelloGame != null ? "오셀로" : null;
+        var activeGameChannelId = activeChessGame?.ChannelId ?? activeOthelloGame?.ChannelId;
+        if (activeGameChannelId != null && activeGameChannelId != channelId)
         {
-            var notice = await message.Channel.SendMessageAsync("이미 다른 채널에서 체스 게임을 진행 중입니다. 게임을 시작한 채널에서 계속하거나 먼저 종료해 주세요.");
+            var notice = await message.Channel.SendMessageAsync($"이미 다른 채널에서 {activeGameName} 게임을 진행 중입니다. 게임을 시작한 채널에서 계속하거나 먼저 종료해 주세요.");
             await SaveChatLogAsync(notice.Id.ToString(), guildId, channelId, m_Socket.CurrentUser.Id.ToString(), notice.Content);
             return;
         }
 
         var isChessMode = activeChessGame != null;
+        var isOthelloMode = activeOthelloGame != null;
 
         string totalReasoning = string.Empty;
         string totalMessage = string.Empty;
         var channel = ollama.GetChannel(message.Channel);
         RestUserMessage? sentMessage = null;
         DateTime? lastEditTime = default;
-        bool hasModify = false;
 
         var chatLogRepository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
         var chatImageRepository = scope.ServiceProvider.GetRequiredService<IChatImageRepository>();
@@ -127,16 +133,20 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
         var chatImageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatImageTools>>();
         var chessToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChessTools>>();
+        var othelloToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordOthelloTools>>();
         var promptProfileProvider = scope.ServiceProvider.GetRequiredService<ImagePromptProfileProvider>();
         var chatClient = scope.ServiceProvider.GetRequiredService<AI.IChatClient>();
         var claudeSettings = scope.ServiceProvider.GetRequiredService<IClaudeSettingsService>();
         var imageTools = new DiscordImageTools(message, chatClient, claudeSettings, imageGenerationClient, promptProfileProvider, imageToolsLogger);
         var chatImageTools = new DiscordChatImageTools(message, chatImageRepository, chatImageToolsLogger);
-        var chessTools = new DiscordChessTools(m_Socket.CurrentUser, message, chessGameService, chatLogRepository, chessToolsLogger);
+        var chessTools = new DiscordChessTools(m_Socket.CurrentUser, message, chessGameService, othelloGameService, chatLogRepository, chessToolsLogger);
+        var othelloTools = new DiscordOthelloTools(m_Socket.CurrentUser, message, othelloGameService, chessGameService, chatLogRepository, othelloToolsLogger);
         var calculationTools = new AI.Tools.CalculationTools();
         var toolsProvider = isChessMode
             ? AI.ToolsProvider.CreateFrom(chessTools)
-            : AI.ToolsProvider.CreateFrom(discordTools, imageTools, chatImageTools, chessTools, calculationTools);
+            : isOthelloMode
+                ? AI.ToolsProvider.CreateFrom(othelloTools)
+                : AI.ToolsProvider.CreateFrom(discordTools, imageTools, chatImageTools, chessTools, othelloTools, calculationTools);
         var toolSettings = scope.ServiceProvider.GetRequiredService<IToolSettingsService>();
         await toolSettings.ApplyAsync(toolsProvider);
 
@@ -151,13 +161,14 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         {
             var prompt = isChessMode
                 ? BuildChessModePrompt(chessGameService, message)
-                : message.Content;
+                : isOthelloMode
+                    ? BuildOthelloModePrompt(othelloGameService, message)
+                    : message.Content;
 
             await foreach (var responseMessage in channel.AddAsync(message.Author, prompt, toolsProvider, imageData))
             {
                 totalReasoning += responseMessage.Thinking;
                 totalMessage += responseMessage.Content;
-                hasModify = true;
 
                 if (!string.IsNullOrEmpty(responseMessage.ToolName))
                 {
@@ -175,7 +186,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                 }
 
                 var span = DateTime.UtcNow - lastEditTime.Value;
-                if (span.TotalSeconds <= 1)
+                if (span < s_ResponseEditInterval)
                 {
                     continue;
                 }
@@ -193,9 +204,10 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                 }
                 else
                 {
-                    currentMessage = totalMessage;
+                    currentMessage = BuildDiscordPreview(totalMessage);
                 }
 
+                currentMessage = BuildDiscordPreview(currentMessage);
                 lastEditTime = DateTime.UtcNow;
                 if (sentMessage == null)
                 {
@@ -207,7 +219,6 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                 else
                 {
                     await sentMessage.ModifyAsync(p => p.Content = currentMessage);
-                    hasModify = false;
                 }
             }
 
@@ -215,14 +226,14 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             {
                 if (!string.IsNullOrEmpty(totalMessage))
                 {
-                    sentMessage = await message.Channel.SendMessageAsync(totalMessage);
+                    sentMessage = await SendDiscordResponseAsync(message.Channel, totalMessage);
                     typingState?.Dispose();
                     typingState = null;
                 }
             }
-            else if (hasModify)
+            else if (!string.IsNullOrEmpty(totalMessage))
             {
-                await sentMessage.ModifyAsync(p => p.Content = totalMessage);
+                await FinalizeDiscordResponseAsync(message.Channel, sentMessage, totalMessage);
             }
         }
         catch (Exception e)
@@ -238,7 +249,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             }
             else
             {
-                await sentMessage.ModifyAsync(p => p.Content = totalMessage);
+                await sentMessage.ModifyAsync(p => p.Content = BuildDiscordPreview(totalMessage));
             }
         }
         finally
@@ -272,6 +283,82 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         await channel.TrySummarizeAsync();
     }
 
+    private static string BuildDiscordPreview(string content)
+    {
+        if (content.Length <= DiscordSafeMessageLength)
+        {
+            return content;
+        }
+
+        const string suffix = "\n\n...(응답이 길어 이어서 생성 중입니다.)";
+        return content[..(DiscordSafeMessageLength - suffix.Length)].TrimEnd() + suffix;
+    }
+
+    private static async Task<RestUserMessage?> SendDiscordResponseAsync(ISocketMessageChannel channel, string content)
+    {
+        var chunks = SplitDiscordMessage(content);
+        RestUserMessage? firstMessage = null;
+        foreach (var chunk in chunks)
+        {
+            var sent = await channel.SendMessageAsync(chunk);
+            firstMessage ??= sent;
+        }
+
+        return firstMessage;
+    }
+
+    private static async Task FinalizeDiscordResponseAsync(
+        ISocketMessageChannel channel,
+        RestUserMessage sentMessage,
+        string content)
+    {
+        var chunks = SplitDiscordMessage(content);
+        if (chunks.Count == 0)
+        {
+            return;
+        }
+
+        await sentMessage.ModifyAsync(p => p.Content = chunks[0]);
+        foreach (var chunk in chunks.Skip(1))
+        {
+            await channel.SendMessageAsync(chunk);
+        }
+    }
+
+    private static IReadOnlyList<string> SplitDiscordMessage(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return [];
+        }
+
+        List<string> chunks = [];
+        var remaining = content.Replace("\r\n", "\n");
+        while (remaining.Length > DiscordSafeMessageLength)
+        {
+            var splitAt = remaining.LastIndexOf('\n', DiscordSafeMessageLength);
+            if (splitAt < DiscordSafeMessageLength / 2)
+            {
+                splitAt = remaining.LastIndexOf(' ', DiscordSafeMessageLength);
+            }
+
+            if (splitAt < DiscordSafeMessageLength / 2)
+            {
+                splitAt = DiscordSafeMessageLength;
+            }
+
+            chunks.Add(remaining[..splitAt].TrimEnd());
+            remaining = remaining[splitAt..].TrimStart('\n', ' ');
+        }
+
+        if (!string.IsNullOrWhiteSpace(remaining))
+        {
+            chunks.Add(remaining);
+        }
+
+        return chunks;
+    }
+
     private static string BuildChessModePrompt(IChessGameService chessGameService, SocketMessage message)
     {
         var instruction = chessGameService.BuildActiveGameInstruction(
@@ -284,6 +371,26 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 사용자의 메시지가 이동/기권/보드 확인이면 반드시 체스 도구를 사용하세요.
 사용자가 명백히 일반 대화를 원하면 길게 답하지 말고 "현재 체스 게임 진행 중입니다. 계속 둘까요, 종료할까요?"처럼 게임 진행 여부를 확인하세요.
 체스 도구 결과의 상태가 game_over이면 체스 세션은 이미 종료된 것입니다. 종료 요약을 그대로 전달하고 새 게임 권유, 칭찬, 다음 수 안내, 추가 해설을 덧붙이지 마세요.
+
+{instruction}
+
+[사용자 메시지]
+{message.Content}
+""";
+    }
+
+    private static string BuildOthelloModePrompt(IOthelloGameService othelloGameService, SocketMessage message)
+    {
+        var instruction = othelloGameService.BuildActiveGameInstruction(
+            message.Author.Id.ToString(),
+            message.Channel.Id.ToString());
+
+        return $"""
+[오셀로 게임 모드]
+현재 사용자는 오셀로 게임을 진행 중입니다.
+사용자의 메시지가 착수/패스/기권/보드 확인이면 반드시 오셀로 도구를 사용하세요.
+사용자가 명백히 일반 대화를 원하면 길게 답하지 말고 "현재 오셀로 게임 진행 중입니다. 계속 둘까요, 종료할까요?"처럼 게임 진행 여부를 확인하세요.
+오셀로 도구 결과의 상태가 game_over이면 오셀로 세션은 이미 종료된 것입니다. 종료 요약을 그대로 전달하고 새 게임 권유, 칭찬, 다음 수 안내, 추가 해설을 덧붙이지 마세요.
 
 {instruction}
 

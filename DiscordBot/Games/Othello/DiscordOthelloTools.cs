@@ -2,83 +2,83 @@ using System.Text.RegularExpressions;
 using AI;
 using Discord;
 using Discord.WebSocket;
-using DiscordBot.Games.Othello;
+using DiscordBot.Games.Chess;
 using DiscordBot.Repositories;
 
-namespace DiscordBot.Games.Chess;
+namespace DiscordBot.Games.Othello;
 
-internal sealed partial class DiscordChessTools(
+internal sealed partial class DiscordOthelloTools(
     SocketSelfUser selfUser,
     SocketMessage message,
-    IChessGameService chessGameService,
     IOthelloGameService othelloGameService,
+    IChessGameService chessGameService,
     IChatLogRepository chatLogRepository,
-    ILogger<DiscordChessTools> logger) : IToolFunctionDescriptionProvider
+    ILogger<DiscordOthelloTools> logger) : IToolFunctionDescriptionProvider
 {
-    private const string PlayChessDescription = """
-체스 게임을 시작합니다. 체스 게임 시작 요청에만 사용하세요.
+    private const string PlayOthelloDescription = """
+오셀로 게임을 시작합니다. 오셀로 또는 리버시 게임 시작 요청에만 사용하세요.
 
-white_player와 black_player에는 'me', 'ai', Discord 멘션(<@id>), 또는 현재 채널에서 볼 수 있는 사용자 이름을 넣으세요.
+black_player와 white_player에는 'me', 'ai', Discord 멘션(<@id>), 또는 현재 채널에서 볼 수 있는 사용자 이름을 넣으세요.
 사람 이름을 확실히 찾을 수 없으면 도구 결과가 사용자에게 정확한 멘션을 요청합니다.
 AI 상대와 두는 경우 한쪽 플레이어를 'ai'로 지정하세요.
+오셀로는 흑이 선공입니다.
 
 예:
-- 사용자가 '나랑 체스하자'라고 하면 white_player='me', black_player='ai'
-- 사용자가 '내가 흑으로 AI랑 둘래'라고 하면 white_player='ai', black_player='me'
-- 사용자가 '@철수랑 체스하고 싶어'라고 하면 white_player='me', black_player='<@철수 id>'
+- 사용자가 '나랑 오셀로 하자'라고 하면 black_player='me', white_player='ai'
+- 사용자가 '내가 백으로 AI랑 둘래'라고 하면 black_player='ai', white_player='me'
+- 사용자가 '@철수랑 오셀로하고 싶어'라고 하면 black_player='me', white_player='<@철수 id>'
 """;
 
-    private const string MoveChessBaseDescription = """
-진행 중인 체스 게임에서 말을 이동합니다.
+    private const string MoveOthelloBaseDescription = """
+진행 중인 오셀로 게임에서 돌을 둡니다.
 
-move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
-사용자가 SAN(Nf3, O-O, exd5 등)으로 말하면 그대로 넣어도 됩니다.
-사용자가 '왼쪽 두 번째 폰 두 칸', '앙파상', '캐슬링'처럼 자연어로 말하면 현재 합법수와 보드 상태를 참고해 가장 구체적인 이동으로 바꿔 넣으세요.
-보드 이미지는 항상 백 기준입니다. 왼쪽 아래는 a1, 오른쪽 아래는 h1, 왼쪽 위는 a8입니다. 사용자의 '왼쪽/오른쪽/위/아래' 표현도 이 화면 기준으로 해석하세요.
+move에는 가능한 한 좌표 표기(d3, c4, f5)를 넣으세요.
+사용자가 '왼쪽 위 구석', '가장 많이 뒤집는 곳', '안전한 곳', '오른쪽 아래'처럼 자연어로 말하면 현재 합법수와 보드 상태를 참고해 가장 구체적인 좌표로 바꿔 넣으세요.
+보드 이미지는 항상 백 기준 좌표입니다. 왼쪽 아래는 a1, 오른쪽 아래는 h1, 왼쪽 위는 a8입니다. 사용자의 '왼쪽/오른쪽/위/아래' 표현도 이 화면 기준으로 해석하세요.
 
-합법수가 애매하면 억지로 실행하지 말고 사용자에게 어느 말을 움직일지 되물으세요.
-도구 결과에 상태가 game_over로 표시되면 체스 세션은 이미 종료된 것입니다. 종료 요약을 그대로 전달하고 새 게임 권유, 칭찬, 다음 수 안내를 덧붙이지 마세요.
+합법수가 애매하면 억지로 실행하지 말고 사용자에게 어느 칸에 둘지 되물으세요.
+도구 결과에 상태가 game_over로 표시되면 오셀로 세션은 이미 종료된 것입니다. 종료 요약을 그대로 전달하고 새 게임 권유, 칭찬, 다음 수 안내를 덧붙이지 마세요.
 """;
 
     [ToolFunction(
-        Name = "play_chess",
-        Description = PlayChessDescription)]
-    public async Task<string> PlayChessAsync(
+        Name = "play_othello",
+        Description = PlayOthelloDescription)]
+    public async Task<string> PlayOthelloAsync(
+        [ToolParameterInfo(Description = "흑 플레이어. 'me', 'ai', Discord 멘션, 또는 현재 채널에서 볼 수 있는 사용자 이름. 흑이 선공입니다.")]
+        string black_player = "me",
         [ToolParameterInfo(Description = "백 플레이어. 'me', 'ai', Discord 멘션, 또는 현재 채널에서 볼 수 있는 사용자 이름.")]
-        string white_player = "me",
-        [ToolParameterInfo(Description = "흑 플레이어. 'me', 'ai', Discord 멘션, 또는 현재 채널에서 볼 수 있는 사용자 이름.")]
-        string black_player = "ai",
+        string white_player = "ai",
         [ToolParameterInfo(Description = "AI 난이도. easy, normal, hard 또는 한국어 쉬움/보통/어려움. 기본값 normal.")]
         string difficulty = "normal",
         [ToolParameterInfo(Description = "AI 플레이 성향. 예: balanced, aggressive, defensive, beginner-like. 기본값 balanced.")]
         string ai_personality = "balanced",
         CancellationToken cancellationToken = default)
     {
-        var white = ResolveParticipant(white_player, defaultToAuthor: true);
-        if (!white.Success)
-        {
-            return white.ErrorMessage;
-        }
-
-        var black = ResolveParticipant(black_player, defaultToAuthor: false);
+        var black = ResolveParticipant(black_player, defaultToAuthor: true);
         if (!black.Success)
         {
             return black.ErrorMessage;
         }
 
-        var conflict = ValidateNoActiveOthelloGame(white.Participant!, black.Participant!);
+        var white = ResolveParticipant(white_player, defaultToAuthor: false);
+        if (!white.Success)
+        {
+            return white.ErrorMessage;
+        }
+
+        var conflict = ValidateNoActiveChessGame(black.Participant!, white.Participant!);
         if (conflict != null)
         {
             return conflict;
         }
 
         var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
-        var result = await chessGameService.StartAsync(
+        var result = await othelloGameService.StartAsync(
             guildId,
             message.Channel.Id.ToString(),
             message.Author.Id.ToString(),
-            white.Participant!,
             black.Participant!,
+            white.Participant!,
             difficulty,
             ai_personality,
             cancellationToken);
@@ -87,14 +87,14 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
     }
 
     [ToolFunction(
-        Name = "move_chess",
-        Description = MoveChessBaseDescription)]
-    public async Task<string> MoveChessAsync(
-        [ToolParameterInfo(Description = "이동할 수. 가능하면 UCI(e2e4), 또는 SAN(Nf3/O-O), 또는 자연어 이동 설명.")]
+        Name = "move_othello",
+        Description = MoveOthelloBaseDescription)]
+    public async Task<string> MoveOthelloAsync(
+        [ToolParameterInfo(Description = "돌을 둘 위치. 가능하면 좌표(d3/c4/f5), 또는 자연어 위치 설명.")]
         string move,
         CancellationToken cancellationToken = default)
     {
-        var result = await chessGameService.MoveAsync(
+        var result = await othelloGameService.MoveAsync(
             message.Author.Id.ToString(),
             message.Channel.Id.ToString(),
             move,
@@ -104,14 +104,27 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
     }
 
     [ToolFunction(
-        Name = "surrender_chess",
-        Description = "진행 중인 체스 게임을 기권하고 종료합니다. 사용자가 '졌다', '그만하자', '항복', '끝내자', '내가 진 것 같아'처럼 말하면 이 도구를 호출하세요.")]
-    public async Task<string> SurrenderChessAsync(
+        Name = "pass_othello",
+        Description = "진행 중인 오셀로 게임에서 패스합니다. 사용자가 '둘 곳 없다', '패스', '넘길게'처럼 말하면 호출하세요. 단, 합법수가 없을 때만 성공합니다.")]
+    public async Task<string> PassOthelloAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await othelloGameService.PassAsync(
+            message.Author.Id.ToString(),
+            message.Channel.Id.ToString(),
+            cancellationToken);
+
+        return await SendBoardAndReturnMessageAsync(result);
+    }
+
+    [ToolFunction(
+        Name = "surrender_othello",
+        Description = "진행 중인 오셀로 게임을 기권하고 종료합니다. 사용자가 '졌다', '그만하자', '항복', '끝내자', '내가 진 것 같아'처럼 말하면 이 도구를 호출하세요.")]
+    public async Task<string> SurrenderOthelloAsync(
         [ToolParameterInfo(Description = "사용자가 말한 기권/종료 이유. 없으면 빈 문자열.")]
         string reason = "",
         CancellationToken cancellationToken = default)
     {
-        var result = await chessGameService.SurrenderAsync(
+        var result = await othelloGameService.SurrenderAsync(
             message.Author.Id.ToString(),
             message.Channel.Id.ToString(),
             reason,
@@ -121,11 +134,11 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
     }
 
     [ToolFunction(
-        Name = "show_chess",
-        Description = "진행 중인 체스 게임의 현재 보드를 다시 이미지로 보여줍니다.")]
-    public async Task<string> ShowChessAsync(CancellationToken cancellationToken = default)
+        Name = "show_othello",
+        Description = "진행 중인 오셀로 게임의 현재 보드를 다시 이미지로 보여줍니다.")]
+    public async Task<string> ShowOthelloAsync(CancellationToken cancellationToken = default)
     {
-        var result = await chessGameService.ShowAsync(
+        var result = await othelloGameService.ShowAsync(
             message.Author.Id.ToString(),
             message.Channel.Id.ToString(),
             cancellationToken);
@@ -137,15 +150,17 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
     {
         return functionName switch
         {
-            "move_chess" => MoveChessBaseDescription + "\n\n" + chessGameService.BuildActiveGameInstruction(
+            "move_othello" => MoveOthelloBaseDescription + "\n\n" + othelloGameService.BuildActiveGameInstruction(
                 message.Author.Id.ToString(),
                 message.Channel.Id.ToString()),
-            "play_chess" => PlayChessDescription,
+            "pass_othello" => "진행 중인 오셀로 게임에서 현재 플레이어가 둘 수 있는 합법수가 없을 때만 패스합니다.\n\n"
+                + othelloGameService.BuildActiveGameInstruction(message.Author.Id.ToString(), message.Channel.Id.ToString()),
+            "play_othello" => PlayOthelloDescription,
             _ => null
         };
     }
 
-    private async Task<string> SendBoardAndReturnMessageAsync(ChessGameActionResult result)
+    private async Task<string> SendBoardAndReturnMessageAsync(OthelloGameActionResult result)
     {
         if (!string.IsNullOrWhiteSpace(result.SystemNotice))
         {
@@ -155,27 +170,27 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
         if (result.BoardImage is { Length: > 0 })
         {
             await using var stream = new MemoryStream(result.BoardImage, writable: false);
-            await message.Channel.SendFileAsync(stream, result.FileName ?? "chess.png");
+            await message.Channel.SendFileAsync(stream, result.FileName ?? "othello.png");
         }
 
         var authoritativeState = BuildAuthoritativeState();
         if (result.IsGameOver)
         {
-            await SendSystemNoticeAsync("체스 게임 요약", result.Message);
+            await SendSystemNoticeAsync("오셀로 게임 요약", result.Message);
 
             return $"""
-[체스 도구 결과]
+[오셀로 도구 결과]
 상태: game_over
 시스템 알림: 이미 별도 메시지로 전송되었습니다.
 종료 요약: 이미 별도 메시지로 전송되었습니다.
-응답 규칙: 현재 체스 세션은 이미 종료되었습니다. 사용자에게는 처리 완료 여부만 한 문장으로 짧게 말하세요. 종료 요약, 새 게임 권유, 칭찬, 다음 수 안내, 추가 해설을 덧붙이지 마세요.
+응답 규칙: 현재 오셀로 세션은 이미 종료되었습니다. 사용자에게는 처리 완료 여부만 한 문장으로 짧게 말하세요. 종료 요약, 새 게임 권유, 칭찬, 다음 수 안내, 추가 해설을 덧붙이지 마세요.
 
 {result.Message}
 """;
         }
 
         return $"""
-[체스 도구 결과]
+[오셀로 도구 결과]
 상태: {(result.Success ? "active" : "error")}
 시스템 알림: {(string.IsNullOrWhiteSpace(result.SystemNotice) ? "없음" : "이미 별도 메시지로 전송되었습니다.")}
 응답 규칙: 아래 내용을 간결하게 전달하세요. 보드 상태와 합법수는 이전 대화나 추론보다 [권위 상태]를 우선하세요. 추천/후보/선택은 [권위 상태]의 현재 합법수 목록 안에서만 말하세요.
@@ -189,12 +204,12 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
 
     private string BuildAuthoritativeState()
     {
-        var state = chessGameService.BuildActiveGameInstruction(
+        var state = othelloGameService.BuildActiveGameInstruction(
             message.Author.Id.ToString(),
             message.Channel.Id.ToString());
 
         return string.IsNullOrWhiteSpace(state)
-            ? "현재 활성 체스 상태를 찾지 못했습니다."
+            ? "현재 활성 오셀로 상태를 찾지 못했습니다."
             : state.Trim();
     }
 
@@ -215,14 +230,14 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
         }
         catch (Exception e)
         {
-            logger.LogWarning(e, "Failed to save chess system notice.");
+            logger.LogWarning(e, "Failed to save othello system notice.");
         }
     }
 
     private static string BuildSystemNoticeMessage(string? title, string notice)
     {
         var normalizedTitle = string.IsNullOrWhiteSpace(title)
-            ? "체스 알림"
+            ? "오셀로 알림"
             : title.Trim();
 
         var lines = notice
@@ -232,7 +247,7 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
         return $"> **{normalizedTitle}**\n" + string.Join("\n", lines);
     }
 
-    private string? ValidateNoActiveOthelloGame(params ChessParticipant[] participants)
+    private string? ValidateNoActiveChessGame(params OthelloParticipant[] participants)
     {
         foreach (var participant in participants)
         {
@@ -241,9 +256,9 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
                 continue;
             }
 
-            if (othelloGameService.FindActiveByUser(participant.UserId) != null)
+            if (chessGameService.FindActiveByUser(participant.UserId) != null)
             {
-                return $"{participant.DisplayName}님은 이미 진행 중인 오셀로 게임이 있습니다. 먼저 해당 게임을 종료해 주세요.";
+                return $"{participant.DisplayName}님은 이미 진행 중인 체스 게임이 있습니다. 먼저 해당 게임을 종료해 주세요.";
             }
         }
 
@@ -256,18 +271,18 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
         if (string.IsNullOrWhiteSpace(raw))
         {
             return defaultToAuthor
-                ? ParticipantResolution.Ok(ChessParticipant.Human(DisplayName(message.Author), message.Author.Id.ToString()))
-                : ParticipantResolution.Ok(ChessParticipant.Ai());
+                ? ParticipantResolution.Ok(OthelloParticipant.Human(DisplayName(message.Author), message.Author.Id.ToString()))
+                : ParticipantResolution.Ok(OthelloParticipant.Ai());
         }
 
         if (IsAiValue(raw))
         {
-            return ParticipantResolution.Ok(ChessParticipant.Ai(selfUser.Username));
+            return ParticipantResolution.Ok(OthelloParticipant.Ai(selfUser.Username));
         }
 
         if (IsAuthorValue(raw))
         {
-            return ParticipantResolution.Ok(ChessParticipant.Human(DisplayName(message.Author), message.Author.Id.ToString()));
+            return ParticipantResolution.Ok(OthelloParticipant.Human(DisplayName(message.Author), message.Author.Id.ToString()));
         }
 
         var mentionId = ExtractMentionId(raw);
@@ -275,7 +290,7 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
         {
             if (mentionId == selfUser.Id)
             {
-                return ParticipantResolution.Ok(ChessParticipant.Ai(selfUser.Username));
+                return ParticipantResolution.Ok(OthelloParticipant.Ai(selfUser.Username));
             }
 
             var mentionedUser = message.MentionedUsers.FirstOrDefault(user => user.Id == mentionId.Value)
@@ -283,7 +298,7 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
 
             return mentionedUser == null
                 ? ParticipantResolution.Fail("해당 사용자를 볼 수 없습니다. 정확히 멘션해서 다시 지정해 주세요.")
-                : ParticipantResolution.Ok(ChessParticipant.Human(DisplayName(mentionedUser), mentionedUser.Id.ToString()));
+                : ParticipantResolution.Ok(OthelloParticipant.Human(DisplayName(mentionedUser), mentionedUser.Id.ToString()));
         }
 
         var matchedUsers = FindVisibleUsers(raw).ToList();
@@ -292,10 +307,10 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
             var user = matchedUsers[0];
             if (user.Id == selfUser.Id)
             {
-                return ParticipantResolution.Ok(ChessParticipant.Ai(selfUser.Username));
+                return ParticipantResolution.Ok(OthelloParticipant.Ai(selfUser.Username));
             }
 
-            return ParticipantResolution.Ok(ChessParticipant.Human(DisplayName(user), user.Id.ToString()));
+            return ParticipantResolution.Ok(OthelloParticipant.Human(DisplayName(user), user.Id.ToString()));
         }
 
         if (matchedUsers.Count > 1)
@@ -395,10 +410,10 @@ move에는 가능한 한 UCI 좌표 표기(e2e4, g1f3, e7e8q)를 넣으세요.
 
     private sealed record ParticipantResolution(
         bool Success,
-        ChessParticipant? Participant,
+        OthelloParticipant? Participant,
         string ErrorMessage)
     {
-        public static ParticipantResolution Ok(ChessParticipant participant) => new(true, participant, string.Empty);
+        public static ParticipantResolution Ok(OthelloParticipant participant) => new(true, participant, string.Empty);
 
         public static ParticipantResolution Fail(string message) => new(false, null, message);
     }
