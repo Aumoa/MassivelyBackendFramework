@@ -1,13 +1,14 @@
 using Discord;
 using Discord.Rest;
 using Discord.WebSocket;
+using DiscordBot.Games.Chess;
 using DiscordBot.Repositories;
 using DiscordBot.Services.ImageGeneration;
 using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
-public class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, IImageGenerationClient imageGenerationClient) : IHostedService, IAsyncDisposable
+internal class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, IImageGenerationClient imageGenerationClient, IChessGameService chessGameService) : IHostedService, IAsyncDisposable
 {
     public record Configuration
     {
@@ -103,6 +104,16 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
             return;
         }
 
+        var activeChessGame = chessGameService.FindActiveByUser(message.Author.Id.ToString());
+        if (activeChessGame != null && activeChessGame.ChannelId != channelId)
+        {
+            var notice = await message.Channel.SendMessageAsync("이미 다른 채널에서 체스 게임을 진행 중입니다. 게임을 시작한 채널에서 계속하거나 먼저 종료해 주세요.");
+            await SaveChatLogAsync(notice.Id.ToString(), guildId, channelId, m_Socket.CurrentUser.Id.ToString(), notice.Content);
+            return;
+        }
+
+        var isChessMode = activeChessGame != null;
+
         string totalReasoning = string.Empty;
         string totalMessage = string.Empty;
         var channel = ollama.GetChannel(message.Channel);
@@ -115,13 +126,17 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository);
         var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
         var chatImageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatImageTools>>();
+        var chessToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChessTools>>();
         var promptProfileProvider = scope.ServiceProvider.GetRequiredService<ImagePromptProfileProvider>();
         var chatClient = scope.ServiceProvider.GetRequiredService<AI.IChatClient>();
         var claudeSettings = scope.ServiceProvider.GetRequiredService<IClaudeSettingsService>();
         var imageTools = new DiscordImageTools(message, chatClient, claudeSettings, imageGenerationClient, promptProfileProvider, imageToolsLogger);
         var chatImageTools = new DiscordChatImageTools(message, chatImageRepository, chatImageToolsLogger);
+        var chessTools = new DiscordChessTools(m_Socket.CurrentUser, message, chessGameService, chatLogRepository, chessToolsLogger);
         var calculationTools = new AI.Tools.CalculationTools();
-        var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools, imageTools, chatImageTools, calculationTools);
+        var toolsProvider = isChessMode
+            ? AI.ToolsProvider.CreateFrom(chessTools)
+            : AI.ToolsProvider.CreateFrom(discordTools, imageTools, chatImageTools, chessTools, calculationTools);
         var toolSettings = scope.ServiceProvider.GetRequiredService<IToolSettingsService>();
         await toolSettings.ApplyAsync(toolsProvider);
 
@@ -134,7 +149,11 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         List<string> toolNames = [];
         try
         {
-            await foreach (var responseMessage in channel.AddAsync(message.Author, message.Content, toolsProvider, imageData))
+            var prompt = isChessMode
+                ? BuildChessModePrompt(chessGameService, message)
+                : message.Content;
+
+            await foreach (var responseMessage in channel.AddAsync(message.Author, prompt, toolsProvider, imageData))
             {
                 totalReasoning += responseMessage.Thinking;
                 totalMessage += responseMessage.Content;
@@ -251,6 +270,26 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         }
 
         await channel.TrySummarizeAsync();
+    }
+
+    private static string BuildChessModePrompt(IChessGameService chessGameService, SocketMessage message)
+    {
+        var instruction = chessGameService.BuildActiveGameInstruction(
+            message.Author.Id.ToString(),
+            message.Channel.Id.ToString());
+
+        return $"""
+[체스 게임 모드]
+현재 사용자는 체스 게임을 진행 중입니다.
+사용자의 메시지가 이동/기권/보드 확인이면 반드시 체스 도구를 사용하세요.
+사용자가 명백히 일반 대화를 원하면 길게 답하지 말고 "현재 체스 게임 진행 중입니다. 계속 둘까요, 종료할까요?"처럼 게임 진행 여부를 확인하세요.
+체스 도구 결과의 상태가 game_over이면 체스 세션은 이미 종료된 것입니다. 종료 요약을 그대로 전달하고 새 게임 권유, 칭찬, 다음 수 안내, 추가 해설을 덧붙이지 마세요.
+
+{instruction}
+
+[사용자 메시지]
+{message.Content}
+""";
     }
 
     private static string BuildAIErrorMessage(Exception exception)

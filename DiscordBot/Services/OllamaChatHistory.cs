@@ -34,6 +34,7 @@ public class OllamaChatHistory(
                 });
             }
 
+            PruneRememberedMessages();
             recentHistory.AddRange(m_Messages);
 
             var userMessage = new ChatMessage
@@ -163,7 +164,7 @@ public class OllamaChatHistory(
                 }
             }
 
-            m_Messages.AddRange(messagesAppend.Select(TrimForMemory));
+            m_Messages.AddRange(messagesAppend.Select(TrimForMemory).Where(ShouldRemember));
 
             if (m_Messages.Count >= options.MemorySize)
             {
@@ -228,6 +229,26 @@ public class OllamaChatHistory(
         };
     }
 
+    private static bool ShouldRemember(ChatMessage message)
+    {
+        if (message.Role == ChatRole.Tool)
+        {
+            return false;
+        }
+
+        if (message.ToolCalls is { Count: > 0 })
+        {
+            return false;
+        }
+
+        return message.Role != ChatRole.Assistant || !string.IsNullOrWhiteSpace(message.Content);
+    }
+
+    private void PruneRememberedMessages()
+    {
+        m_Messages.RemoveAll(message => !ShouldRemember(message));
+    }
+
     public async Task TrySummarizeAsync(CancellationToken cancellationToken = default)
     {
         await m_Semaphore.WaitAsync(cancellationToken);
@@ -247,7 +268,14 @@ public class OllamaChatHistory(
 
     private async Task SummarizeHistoryAsync(CancellationToken cancellationToken)
     {
+        PruneRememberedMessages();
+
         int summaryRange = m_Messages.Count - 2;
+        if (summaryRange <= 0)
+        {
+            return;
+        }
+
         var summaryContent = string.Join("\n", m_Messages.Take(summaryRange).Select(m => $"({m.Role}): {m.Content}"));
         var summarySystem = $@"
 너는 대화 요약 전문가야. 아래 내용을 참고해서 사용자가 원하는 요약을 진행해주어야 해.

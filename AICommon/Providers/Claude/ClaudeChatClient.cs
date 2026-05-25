@@ -329,6 +329,7 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
         string? system = null;
         List<object> claudeMessages = [];
         List<object>? pendingUserContent = null;
+        HashSet<string> pendingToolUseIds = [];
 
         void FlushPendingUser()
         {
@@ -336,6 +337,7 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
             {
                 claudeMessages.Add(new { role = "user", content = pendingUserContent.ToArray() });
                 pendingUserContent = null;
+                pendingToolUseIds.Clear();
             }
         }
 
@@ -381,6 +383,11 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
                     }
                     if (msg.ToolCalls is { Count: > 0 })
                     {
+                        pendingToolUseIds = msg.ToolCalls
+                            .Where(call => !string.IsNullOrEmpty(call.Id))
+                            .Select(call => call.Id)
+                            .ToHashSet(StringComparer.Ordinal);
+
                         foreach (var call in msg.ToolCalls)
                         {
                             content.Add(new
@@ -398,19 +405,30 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
                         break;
                     }
                     claudeMessages.Add(new { role = "assistant", content = content.ToArray() });
+                    if (msg.ToolCalls is not { Count: > 0 })
+                    {
+                        pendingToolUseIds.Clear();
+                    }
                     break;
                 }
 
                 case ChatRole.Tool:
                 {
+                    var toolCallId = msg.ToolCallId ?? string.Empty;
+                    if (!pendingToolUseIds.Contains(toolCallId))
+                    {
+                        break;
+                    }
+
                     // Tool results must be delivered as a user message in Claude's API.
                     pendingUserContent ??= [];
                     pendingUserContent.Add(new
                     {
                         type = "tool_result",
-                        tool_use_id = msg.ToolCallId ?? "",
+                        tool_use_id = toolCallId,
                         content = msg.Content ?? ""
                     });
+                    pendingToolUseIds.Remove(toolCallId);
                     break;
                 }
             }

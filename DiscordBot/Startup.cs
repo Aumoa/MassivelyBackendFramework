@@ -1,6 +1,7 @@
 using AI;
 using AI.Providers.Claude;
 using DiscordBot.Components;
+using DiscordBot.Games.Chess;
 using DiscordBot.Options;
 using DiscordBot.Repositories;
 using DiscordBot.Services;
@@ -118,6 +119,12 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
 
     sc.Configure<OllamaService.Configuration>(conf.GetRequiredSection("Claude"));
     sc.AddSingleton<OllamaService>();
+    sc.AddSingleton<IChessGameStore, InMemoryChessGameStore>();
+    sc.AddSingleton<IChessEngine, GeraChessEngine>();
+    sc.AddSingleton<IChessEvaluationProvider, NullChessEvaluationProvider>();
+    sc.AddSingleton<IChessOpponent, LlmChessOpponent>();
+    sc.AddSingleton<IChessBoardRenderer, ImageSharpChessBoardRenderer>();
+    sc.AddSingleton<IChessGameService, ChessGameService>();
 
     sc.Configure<MySqlOptions>(conf.GetRequiredSection("MySql"));
     sc.AddTransient<IChatLogRepository, MySqlChatLogRepository>();
