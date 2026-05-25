@@ -96,7 +96,7 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
     {
         scope ??= "profile";
 
-        if (response_type is not ("code" or "token"))
+        if (response_type != "code")
         {
             return BadRequest("Unsupported response type.");
         }

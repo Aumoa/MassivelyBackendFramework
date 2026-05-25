@@ -15,8 +15,6 @@ namespace OAuth2.Components.Pages.Auth;
 
 public partial class Login(
     IAccounts accounts,
-    IAccountClaims accountClaims,
-    IAccesses accesses,
     IAuthorizationCodes authorizationCodes,
     IOptions<HostOptions> hostOptions,
     NavigationManager nav,
@@ -116,7 +114,8 @@ public partial class Login(
 
     protected override async Task OnInitializedAsync()
     {
-        if (string.IsNullOrWhiteSpace(ResponseType) || string.IsNullOrWhiteSpace(RedirectUri) ||
+        if (string.IsNullOrWhiteSpace(ResponseType) || ResponseType != "code" ||
+            string.IsNullOrWhiteSpace(RedirectUri) ||
             string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope) ||
             string.IsNullOrWhiteSpace(ClientName))
         {
@@ -265,23 +264,17 @@ public partial class Login(
 
     private void ContinueWithLoginRequiredAsync()
     {
-        var redirect_uri = RedirectUri;
-        if (ResponseType == "code")
+        var query = new Dictionary<string, string?>
         {
-            redirect_uri += '?';
-        }
-        else
-        {
-            redirect_uri += '#';
-        }
+            ["error"] = "login_required"
+        };
 
-        redirect_uri += $"error={Uri.EscapeDataString("login_required")}";
         if (string.IsNullOrEmpty(State) == false)
         {
-            redirect_uri += $"&state={Uri.EscapeDataString(State)}";
+            query.Add("state", State);
         }
 
-        nav.NavigateTo(redirect_uri, forceLoad: true);
+        nav.NavigateTo(QueryHelpers.AddQueryString(RedirectUri, query), forceLoad: true);
     }
 
     private void UseAnotherAccount()
@@ -305,34 +298,20 @@ public partial class Login(
     private async Task ContinueWithAsync(string id, bool refreshCache)
     {
         var query = new Dictionary<string, string?>();
-        string? frag = null;
         if (string.IsNullOrEmpty(State) == false)
         {
             query.Add("state", State);
         }
 
-        if (ResponseType == "code")
-        {
-            var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, ClientId, Scope, RedirectUri, Nonce, CodeChallenge, CodeChallengeMethod));
-            query.Add("code", code);
-        }
-        else if (ResponseType == "token")
-        {
-            var expiresIn = TimeSpan.FromHours(1);
-            var rawAccount = await accounts.GetRawAccountAsync(id);
-            var access = await accesses.WriteAccessAsync(id, rawAccount.Value.Sub, Scope, ClientId, expiresIn, jwt.RefreshTokenExpiresIn);
-            var claims = await accountClaims.GetClaimsAsync(id);
-            var idTokenClaims = jwt.ConfigureClaims(rawAccount.Value, Scope, claims, Nonce, true);
-            var idToken = jwt.Issue(ClientId, idTokenClaims);
-            frag = $"#access_token={Uri.EscapeDataString(access.AccessToken)}&id_token={Uri.EscapeDataString(idToken)}&token_type=Bearer&expires_in={(int)jwt.ExpiresIn.TotalSeconds}&scope={Uri.EscapeDataString(access.Scope)}";
-        }
+        var authorizationCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, ClientId, Scope, RedirectUri, Nonce, CodeChallenge, CodeChallengeMethod));
+        query.Add("code", authorizationCode);
 
-        var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query) + frag;
+        var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query);
         if (refreshCache)
         {
-            var code = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", "/authorize/int", null));
+            var cacheCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", "/authorize/int", null));
 
-            nav.NavigateTo($"/authorize/int?redirect_uri={Uri.EscapeDataString(redirect_uri)}&code={Uri.EscapeDataString(code)}", forceLoad: true);
+            nav.NavigateTo($"/authorize/int?redirect_uri={Uri.EscapeDataString(redirect_uri)}&code={Uri.EscapeDataString(cacheCode)}", forceLoad: true);
         }
         else
         {
@@ -373,4 +352,3 @@ public partial class Login(
         return Task.CompletedTask;
     }
 }
-
