@@ -13,5 +13,6 @@ public partial class Scripts : IScripts
         yield return new _4__AddClaudeSettings();
         yield return new _5__AddToolSettings();
         yield return new _6__AddChatLogImages();
+        yield return new _7__AddAllowedChannelRequests();
     }
 }

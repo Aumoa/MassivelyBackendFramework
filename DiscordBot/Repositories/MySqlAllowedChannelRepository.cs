@@ -45,6 +45,30 @@ WHERE `enabled` = TRUE";
         return results.ToList();
     }
 
+    public async ValueTask<AllowedChannelData?> GetByChannelIdAsync(string channelId, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = @"
+SELECT
+    `id` AS Id,
+    `channel_id` AS ChannelId,
+    `guild_id` AS GuildId,
+    `channel_name` AS ChannelName,
+    `guild_name` AS GuildName,
+    `memo` AS Memo,
+    `enabled` AS Enabled,
+    `created_by` AS CreatedBy,
+    `created_at` AS CreatedAt,
+    `updated_at` AS UpdatedAt
+FROM `allowed_channel`
+WHERE `channel_id` = @channelId
+LIMIT 1";
+
+        var command = new CommandDefinition(QUERY, new { channelId }, cancellationToken: cancellationToken);
+        return await connection.QueryFirstOrDefaultAsync<AllowedChannelData>(command);
+    }
+
     public async ValueTask<AllowedChannelData?> GetAsync(long id, CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();

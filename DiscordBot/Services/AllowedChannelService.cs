@@ -11,6 +11,8 @@ internal interface IAllowedChannelService
 
     ValueTask<AllowedChannelData?> GetAsync(long id, CancellationToken cancellationToken = default);
 
+    ValueTask<AllowedChannelData?> GetByChannelIdAsync(string channelId, CancellationToken cancellationToken = default);
+
     ValueTask AddAsync(
         string channelId,
         string? guildId,
@@ -56,6 +58,11 @@ internal sealed class AllowedChannelService(IAllowedChannelRepository repository
     public ValueTask<AllowedChannelData?> GetAsync(long id, CancellationToken cancellationToken = default)
     {
         return repository.GetAsync(id, cancellationToken);
+    }
+
+    public ValueTask<AllowedChannelData?> GetByChannelIdAsync(string channelId, CancellationToken cancellationToken = default)
+    {
+        return repository.GetByChannelIdAsync(NormalizeRequired(channelId), cancellationToken);
     }
 
     public async ValueTask AddAsync(

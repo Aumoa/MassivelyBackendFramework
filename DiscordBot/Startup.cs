@@ -124,6 +124,8 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddTransient<IChatImageRepository, MySqlChatImageRepository>();
     sc.AddTransient<IAllowedChannelRepository, MySqlAllowedChannelRepository>();
     sc.AddScoped<IAllowedChannelService, AllowedChannelService>();
+    sc.AddTransient<IAllowedChannelRequestRepository, MySqlAllowedChannelRequestRepository>();
+    sc.AddScoped<IAllowedChannelRequestService, AllowedChannelRequestService>();
     sc.AddTransient<IToolSettingsRepository, MySqlToolSettingsRepository>();
     sc.AddScoped<IToolSettingsService, ToolSettingsService>();
     sc.AddSingleton<IClaudeSettingsRepository, MySqlClaudeSettingsRepository>();

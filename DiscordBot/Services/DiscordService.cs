@@ -12,6 +12,8 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
     public record Configuration
     {
         public required string Token { get; set; }
+
+        public string? AdminBaseUrl { get; set; }
     }
 
     private readonly DiscordSocketClient m_Socket = new(new DiscordSocketConfig
@@ -68,7 +70,20 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
         {
             if (isMentioned)
             {
-                await message.Channel.SendMessageAsync($"허용되지 않은 채널입니다. 관리자에게 요청하세요. 채널 ID: {channelId}");
+                var requestService = scope.ServiceProvider.GetRequiredService<IAllowedChannelRequestService>();
+                var guildChannel = message.Channel as SocketGuildChannel;
+                var request = await requestService.GetOrCreateAsync(
+                    channelId,
+                    guildId,
+                    guildChannel?.Name,
+                    guildChannel?.Guild.Name,
+                    message.Author.Id.ToString(),
+                    message.Author.Username,
+                    message.Id.ToString());
+                var approvalUrl = BuildAdminUrl($"/channel-requests/{request.Token}");
+                await message.Channel.SendMessageAsync(
+                    "허용되지 않은 채널입니다. 관리자에게 아래 승인 링크를 전달해 주세요.\n" +
+                    approvalUrl);
             }
 
             return;
@@ -295,6 +310,18 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
             || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)
             || extension.Equals(".gif", StringComparison.OrdinalIgnoreCase)
             || extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string BuildAdminUrl(string path)
+    {
+        var normalizedPath = path.StartsWith('/') ? path : "/" + path;
+        var baseUrl = options.Value.AdminBaseUrl?.Trim().TrimEnd('/');
+        if (Uri.TryCreate(baseUrl, UriKind.Absolute, out _))
+        {
+            return baseUrl + normalizedPath;
+        }
+
+        return normalizedPath;
     }
 
     private Task OnLog(LogMessage message)
