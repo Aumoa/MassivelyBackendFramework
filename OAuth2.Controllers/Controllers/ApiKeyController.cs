@@ -13,7 +13,18 @@ public class ApiKeyController(IApiKeys apiKeys, IAccesses accesses) : Authorized
     {
         return await VerifiedAsync(async access =>
         {
-            var apiKey = await apiKeys.CreateApiKeyAsync(access.Id, request.AllowedClientId, request.AllowedScope, request.Name, cancellationToken);
+            var allowedScope = request.AllowedScope;
+            if (!string.IsNullOrWhiteSpace(allowedScope))
+            {
+                if (!ScopePolicy.TryNormalize(allowedScope, true, out var normalizedScope, out _))
+                {
+                    return BadRequest(new { error = "invalid_scope" });
+                }
+
+                allowedScope = normalizedScope;
+            }
+
+            var apiKey = await apiKeys.CreateApiKeyAsync(access.Id, request.AllowedClientId, allowedScope, request.Name, cancellationToken);
             return Ok(new CreateApiKeyResponse { ApiKey = apiKey });
         }, null, cancellationToken);
     }

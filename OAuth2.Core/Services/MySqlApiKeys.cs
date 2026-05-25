@@ -13,6 +13,16 @@ internal class MySqlApiKeys(IOptions<MySqlOptions> options) : MySqlDbContext(opt
 
     public async ValueTask<string> CreateApiKeyAsync(string accountId, string? allowedClientId, string? allowedScope, string name, CancellationToken cancellationToken = default)
     {
+        if (!string.IsNullOrWhiteSpace(allowedScope))
+        {
+            if (!ScopePolicy.TryNormalize(allowedScope, true, out var normalizedScope, out _))
+            {
+                throw new ArgumentException("Invalid allowed scope.", nameof(allowedScope));
+            }
+
+            allowedScope = normalizedScope;
+        }
+
         var randomBytes = RandomNumberGenerator.GetBytes(32);
         var keyBody = Convert.ToBase64String(randomBytes)
             .Replace('+', '-')

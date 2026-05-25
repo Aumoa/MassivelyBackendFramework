@@ -164,10 +164,16 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
         }
 
         string clientName;
+        string normalizedScope;
 
         // hosting service
         if (client_id == options.Value.ClientId)
         {
+            if (!ScopePolicy.TryNormalize(scope, true, out normalizedScope, out var scopeError))
+            {
+                return BadRequest(scopeError);
+            }
+
             if (redirect_uri == GetInternalRedirectUri())
             {
                 clientName = "OAuth2";
@@ -190,6 +196,17 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
             if (allowedUris.Any(p => p.Value == redirect_uri) == false)
             {
                 return Error(Strings.ERRORS_INVALID_REDIRECT_URI);
+            }
+
+            if (!ScopePolicy.TryNormalize(scope, false, out normalizedScope, out var scopeError))
+            {
+                return Error(scopeError ?? Strings.ERRORS_BAD_REQUEST);
+            }
+
+            var allowedScopes = claims.Where(p => p.Name == "scope").Select(p => p.Value);
+            if (!ScopePolicy.IsAllowedByClient(normalizedScope, allowedScopes))
+            {
+                return Error("The requested scope is not allowed for this client.");
             }
 
             clientName = targetClient.Value.Name;
@@ -280,7 +297,7 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
         
         IActionResult Login()
         {
-            return Redirect($"/login?client_id={EscapeDataString(client_id)}&redirect_uri={EscapeDataString(redirect_uri)}&response_type={EscapeDataString(response_type)}&scope={EscapeDataString(scope)}&state={EscapeDataString(state)}&nonce={EscapeDataString(nonce)}&code_challenge={EscapeDataString(code_challenge)}&code_challenge_method={EscapeDataString(code_challenge_method)}&client_name={EscapeDataString(clientName)}");
+            return Redirect($"/login?client_id={EscapeDataString(client_id)}&redirect_uri={EscapeDataString(redirect_uri)}&response_type={EscapeDataString(response_type)}&scope={EscapeDataString(normalizedScope)}&state={EscapeDataString(state)}&nonce={EscapeDataString(nonce)}&code_challenge={EscapeDataString(code_challenge)}&code_challenge_method={EscapeDataString(code_challenge_method)}&client_name={EscapeDataString(clientName)}");
         }
 
         IActionResult Error(string message)
@@ -327,6 +344,11 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
         try
         {
             var rawAccount = await accounts.GetRawAccountAsync(authorizationCode.Value.AccountId, cancellationToken);
+            if (!rawAccount.HasValue)
+            {
+                return Error(Strings.ERRORS_INVALID_ACCESS);
+            }
+
             var access = await accesses.WriteAccessAsync(authorizationCode.Value.AccountId, rawAccount.Value.Sub, authorizationCode.Value.Scope, authorizationCode.Value.ClientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken);
             var claims = await accountClaims.GetClaimsAsync(authorizationCode.Value.AccountId, cancellationToken);
             var jwtToken = jwt.Issue(options.Value.ClientId, [

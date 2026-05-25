@@ -1,4 +1,5 @@
 @using OAuth2.Localizations
+@using OAuth2
 @using OAuth2.Services
 @using OAuth2.DTO
 @inject IClientClaims Claims
@@ -75,6 +76,28 @@
                         <span class="material-symbols-outlined">add</span>
                         @Strings.CLIENTFORM_BUTTON_ADD_URI
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-header">
+                <div class="section-header-text">
+                    <h3 class="section-title">OAuth scopes</h3>
+                    <p class="section-desc">Scopes this application is allowed to request.</p>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="scope-options">
+                    @foreach (var scope in ScopePolicy.SupportedScopes)
+                    {
+                        <label class="scope-option">
+                            <input type="checkbox"
+                                   checked="@IsScopeEnabled(scope)"
+                                   @onchange="args => ToggleScopeAsync(scope, args)" />
+                            <code>@scope</code>
+                        </label>
+                    }
                 </div>
             </div>
         </div>
@@ -219,6 +242,7 @@
     public EventCallback OnSubmit { get; set; }
 
     private RedirectUri[] m_RedirectUris = [];
+    private ClientClaim[] m_Scopes = [];
     private UserGroupItem[] m_UserGroups = [];
     private ClientSecretInfo[] m_Secrets = [];
     private DlgNewClientSecret m_DlgNewSecret = null!;
@@ -235,6 +259,7 @@
         }
 
         await RefreshRedirectUrisAsync(Id);
+        await RefreshScopesAsync(Id);
         await RefreshUserGroupsAsync(Id);
         await RefreshSecretsAsync(Id);
     }
@@ -306,6 +331,42 @@
                 OriginUri = c.Value!,
                 Uri = c.Value!
             })];
+    }
+
+    private bool IsScopeEnabled(string scope)
+    {
+        return m_Scopes.Any(c => c.Value == scope);
+    }
+
+    private async Task ToggleScopeAsync(string scope, ChangeEventArgs args)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        var enabled = args.Value is bool checkedValue && checkedValue;
+        var existing = m_Scopes.Where(c => c.Value == scope).ToArray();
+
+        if (enabled && existing.Length == 0)
+        {
+            await Claims.AddClaimAsync(Id, "scope", scope);
+        }
+        else if (!enabled)
+        {
+            foreach (var claim in existing)
+            {
+                await Claims.RemoveClaimAsync(claim.Id);
+            }
+        }
+
+        await RefreshScopesAsync(Id);
+    }
+
+    private async ValueTask RefreshScopesAsync(string id)
+    {
+        var claims = await Claims.GetClaimsAsync(id);
+        m_Scopes = [.. claims.Where(c => c.Name == "scope" && ScopePolicy.SupportedScopes.Contains(c.Value, StringComparer.Ordinal))];
     }
 
     public async Task AddUserGroupAsync()

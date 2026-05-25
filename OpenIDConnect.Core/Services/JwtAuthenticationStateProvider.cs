@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OAuth2;
 using OAuth2.DTO;
 
 namespace OpenIDConnect.Services;
@@ -258,6 +259,11 @@ internal class JwtAuthenticationStateProvider(
         var codeVerifier = CreateCodeVerifier();
         var state = ProtectCodeVerifier(codeVerifier);
         var codeChallenge = CreateCodeChallenge(codeVerifier);
+        scope = ScopePolicy.ExpandAllForExternalClient(scope);
+        if (ScopePolicy.TryNormalize(scope, false, out var normalizedScope, out _))
+        {
+            scope = normalizedScope;
+        }
 
         return QueryHelpers.AddQueryString(options.Value.Uri.TrimEnd('/') + "/authorize", new Dictionary<string, string?>
         {

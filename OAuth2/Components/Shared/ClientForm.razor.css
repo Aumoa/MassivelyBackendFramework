@@ -138,6 +138,36 @@
     margin-top: 4px;
 }
 
+.scope-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+    max-width: 600px;
+}
+
+.scope-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #e8eaed;
+    border-radius: 6px;
+    color: #3c4043;
+}
+
+    .scope-option input {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        flex-shrink: 0;
+    }
+
+    .scope-option code {
+        font-size: 0.8125rem;
+        color: #202124;
+    }
+
 .btn-text-add {
     display: inline-flex;
     align-items: center;

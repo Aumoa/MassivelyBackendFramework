@@ -244,6 +244,12 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return validationError;
         }
 
+        if (!ScopePolicy.TryNormalize(code.Value.Scope, code.Value.ClientId == hostOptions.Value.ClientId, out var normalizedScope, out _))
+        {
+            logger.LogWarning("Authorization code contains invalid scope for client: {ClientId}", code.Value.ClientId);
+            return BadRequest(new { error = "invalid_scope" });
+        }
+
         // Issue tokens
         var rawAccount = await accounts.GetRawAccountAsync(code.Value.AccountId, cancellationToken);
         if (!rawAccount.HasValue)
@@ -252,7 +258,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "account_not_found" });
         }
 
-        var tokenResponse = await GenerateTokenResponseAsync(code.Value.AccountId, rawAccount.Value, code.Value.ClientId, code.Value.Scope, code.Value.Nonce, cancellationToken);
+        var tokenResponse = await GenerateTokenResponseAsync(code.Value.AccountId, rawAccount.Value, code.Value.ClientId, normalizedScope, code.Value.Nonce, cancellationToken);
 
         logger.LogInformation("Token issued successfully for client: {ClientId}, account: {AccountId}", request.ClientId, code.Value.AccountId);
         return Ok(tokenResponse);
@@ -378,8 +384,13 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
 
         // Use the scope defined on the API key; fall back to "all" if unrestricted
         var scope = apiKeyInfo.Value.AllowedScope ?? "all";
+        if (!ScopePolicy.TryNormalize(scope, true, out var normalizedScope, out _))
+        {
+            logger.LogWarning("API key contains invalid scope configuration. ApiKeyId: {ApiKeyId}", apiKeyInfo.Value.Id);
+            return BadRequest(new { error = "invalid_grant", error_description = "api_key scope is invalid" });
+        }
 
-        var tokenResponse = await GenerateTokenResponseAsync(accountId, rawAccount.Value, request.ClientId, scope, null, cancellationToken);
+        var tokenResponse = await GenerateTokenResponseAsync(accountId, rawAccount.Value, request.ClientId, normalizedScope, null, cancellationToken);
 
         logger.LogInformation("Token issued successfully for client: {ClientId}, account: {AccountId} using API key.", request.ClientId, accountId);
         return Ok(tokenResponse);

@@ -2,6 +2,7 @@
 @page "/"
 @using OAuth2.Services
 @using OAuth2.DTO
+@using OAuth2
 @layout AuthorizedLayout
 @inject JwtAuthenticationStateProvider Auth
 @inject IApiKeys ApiKeys
@@ -275,6 +276,15 @@
 
         var allowedClientId = string.IsNullOrWhiteSpace(m_NewApiKeyAllowedClientId) ? null : m_NewApiKeyAllowedClientId.Trim();
         var allowedScope = string.IsNullOrWhiteSpace(m_NewApiKeyAllowedScope) ? null : m_NewApiKeyAllowedScope.Trim();
+        if (allowedScope != null)
+        {
+            if (!ScopePolicy.TryNormalize(allowedScope, true, out var normalizedScope, out _))
+            {
+                return;
+            }
+
+            allowedScope = normalizedScope;
+        }
 
         var apiKey = await ApiKeys.CreateApiKeyAsync(accountId, allowedClientId, allowedScope, m_NewApiKeyName.Trim());
         m_NewApiKeyName = null;

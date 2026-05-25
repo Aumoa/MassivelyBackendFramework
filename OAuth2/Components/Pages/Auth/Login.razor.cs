@@ -15,6 +15,8 @@ namespace OAuth2.Components.Pages.Auth;
 
 public partial class Login(
     IAccounts accounts,
+    IClients clients,
+    IClientClaims clientClaims,
     IAuthorizationCodes authorizationCodes,
     IOptions<HostOptions> hostOptions,
     NavigationManager nav,
@@ -125,6 +127,51 @@ public partial class Login(
             Error(Strings.ERRORS_BAD_REQUEST);
             return;
         }
+
+        var allowAllScope = ClientId == hostOptions.Value.ClientId;
+        if (!ScopePolicy.TryNormalize(Scope, allowAllScope, out var normalizedScope, out _))
+        {
+            Error(Strings.ERRORS_BAD_REQUEST);
+            return;
+        }
+
+        if (allowAllScope)
+        {
+            if (RedirectUri != hostOptions.Value.Uri.TrimEnd('/') + "/redirect")
+            {
+                Error(Strings.ERRORS_INVALID_REDIRECT_URI);
+                return;
+            }
+
+            ClientName = "OAuth2";
+        }
+        else
+        {
+            var client = await clients.GetClientAsync(ClientId);
+            if (!client.HasValue)
+            {
+                Error(Strings.ERRORS_INVALID_CLIENT_ID);
+                return;
+            }
+
+            var claims = await clientClaims.GetClaimsAsync(ClientId);
+            if (!claims.Where(c => c.Name == "redirect_uri").Any(c => c.Value == RedirectUri))
+            {
+                Error(Strings.ERRORS_INVALID_REDIRECT_URI);
+                return;
+            }
+
+            var allowedScopes = claims.Where(c => c.Name == "scope").Select(c => c.Value);
+            if (!ScopePolicy.IsAllowedByClient(normalizedScope, allowedScopes))
+            {
+                Error(Strings.ERRORS_BAD_REQUEST);
+                return;
+            }
+
+            ClientName = client.Value.Name;
+        }
+
+        Scope = normalizedScope;
 
         if (Prompt == "login")
         {
