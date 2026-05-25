@@ -240,6 +240,15 @@
   <data name="SETTLEMENT_DETAIL_RESULT_EMPTY" xml:space="preserve">
 	<value>모든 정산이 완료되었습니다! 송금이 필요하지 않습니다.</value>
   </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_TITLE" xml:space="preserve">
+	<value>AI 요약</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_SUBTITLE" xml:space="preserve">
+	<value>이번 정산 내용을 짧게 정리합니다.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_PENDING" xml:space="preserve">
+	<value>지출 내역이나 참여자를 수정한 뒤 이 탭을 다시 열면 요약이 갱신됩니다.</value>
+  </data>
   <data name="SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_TITLE" xml:space="preserve">
 	<value>인원별 실제 결제액</value>
   </data>

@@ -240,6 +240,15 @@
   <data name="SETTLEMENT_DETAIL_RESULT_EMPTY" xml:space="preserve">
 	<value>All settled up! No transfers needed.</value>
   </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_TITLE" xml:space="preserve">
+	<value>AI summary</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_SUBTITLE" xml:space="preserve">
+	<value>A short overview of this settlement.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_PENDING" xml:space="preserve">
+	<value>Open this tab again after editing expenses or participants to refresh the summary.</value>
+  </data>
   <data name="SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_TITLE" xml:space="preserve">
 	<value>Actual paid by participant</value>
   </data>

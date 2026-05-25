@@ -762,6 +762,40 @@ button {
     font-weight: 700;
 }
 
+.ai-summary-card {
+    border: 1px solid var(--color-accent-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-accent-light);
+    margin-bottom: var(--space-6);
+    padding: var(--space-4) var(--space-5);
+}
+
+.ai-summary-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.ai-summary-header .material-symbols-outlined {
+    color: var(--color-accent);
+    font-size: 20px;
+    margin-top: 2px;
+}
+
+.ai-summary-header .section-title {
+    margin-bottom: var(--space-1);
+}
+
+.ai-summary-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: var(--text-sm);
+}
+
 /* ── Home quick-action cards ── */
 .quick-cards {
     display: grid;
@@ -1008,7 +1042,8 @@ button {
     }
 
     .result-summary-header,
-    .participant-summary-row {
+    .participant-summary-row,
+    .ai-summary-card {
         padding-left: var(--space-4);
         padding-right: var(--space-4);
     }

@@ -101,6 +101,9 @@ namespace NPay.Localizations
         internal static string SETTLEMENT_DETAIL_PARTICIPANT_ADD => ResourceManager.GetString("SETTLEMENT_DETAIL_PARTICIPANT_ADD", resourceCulture)!;
         internal static string SETTLEMENT_DETAIL_PARTICIPANT_EMPTY => ResourceManager.GetString("SETTLEMENT_DETAIL_PARTICIPANT_EMPTY", resourceCulture)!;
         internal static string SETTLEMENT_DETAIL_RESULT_EMPTY => ResourceManager.GetString("SETTLEMENT_DETAIL_RESULT_EMPTY", resourceCulture)!;
+        internal static string SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_TITLE => ResourceManager.GetString("SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_TITLE", resourceCulture)!;
+        internal static string SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_SUBTITLE => ResourceManager.GetString("SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_SUBTITLE", resourceCulture)!;
+        internal static string SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_PENDING => ResourceManager.GetString("SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_PENDING", resourceCulture)!;
         internal static string SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_TITLE => ResourceManager.GetString("SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_TITLE", resourceCulture)!;
         internal static string SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_SUBTITLE => ResourceManager.GetString("SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_SUBTITLE", resourceCulture)!;
         internal static string SETTLEMENT_DETAIL_RESULT_SUMMARY_TITLE => ResourceManager.GetString("SETTLEMENT_DETAIL_RESULT_SUMMARY_TITLE", resourceCulture)!;

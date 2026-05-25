@@ -6,6 +6,7 @@
 @inject ISettlementService SettlementService
 @inject IParticipantService ParticipantService
 @inject IExpenseService ExpenseService
+@inject ISettlementAiSummaryService SettlementAiSummaryService
 @inject NavigationManager Nav
 @inject AuthenticationStateProvider AuthState
 
@@ -55,13 +56,13 @@ else
 
     <!-- Tabs -->
     <div class="npay-tabs">
-        <button class="npay-tab @(activeTab == Tab.Expenses ? "active" : "")" @onclick="() => activeTab = Tab.Expenses">
+        <button class="npay-tab @(activeTab == Tab.Expenses ? "active" : "")" @onclick="() => SetActiveTabAsync(Tab.Expenses)">
             @Strings.SETTLEMENT_DETAIL_TAB_EXPENSES
         </button>
-        <button class="npay-tab @(activeTab == Tab.Participants ? "active" : "")" @onclick="() => activeTab = Tab.Participants">
+        <button class="npay-tab @(activeTab == Tab.Participants ? "active" : "")" @onclick="() => SetActiveTabAsync(Tab.Participants)">
             @Strings.SETTLEMENT_DETAIL_TAB_PARTICIPANTS
         </button>
-        <button class="npay-tab @(activeTab == Tab.Result ? "active" : "")" @onclick="() => activeTab = Tab.Result">
+        <button class="npay-tab @(activeTab == Tab.Result ? "active" : "")" @onclick="() => SetActiveTabAsync(Tab.Result)">
             @Strings.SETTLEMENT_DETAIL_TAB_RESULT
         </button>
     </div>
@@ -273,6 +274,31 @@ else
             }
         </section>
 
+        <section class="ai-summary-card">
+            <div class="ai-summary-header">
+                <span class="material-symbols-outlined">auto_awesome</span>
+                <div>
+                    <h2 class="section-title">@Strings.SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_TITLE</h2>
+                    <p class="result-summary-subtitle">@Strings.SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_SUBTITLE</p>
+                </div>
+            </div>
+            @if (isAiSummaryLoading)
+            {
+                <div class="ai-summary-body">
+                    <span class="skeleton" style="width:100%;max-width:520px;height:1rem;"></span>
+                    <span class="skeleton" style="width:70%;max-width:360px;height:1rem;"></span>
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(aiSummary))
+            {
+                <p class="ai-summary-body">@aiSummary</p>
+            }
+            else
+            {
+                <p class="ai-summary-body">@Strings.SETTLEMENT_DETAIL_RESULT_AI_SUMMARY_PENDING</p>
+            }
+        </section>
+
         @if (participantPaidSummaries.Count > 0)
         {
             <section class="result-summary">
@@ -317,7 +343,7 @@ else
     }
 }
 
-<EditExpenseDialog @ref="editExpenseDialog" OnSaved="LoadAsync" />
+<EditExpenseDialog @ref="editExpenseDialog" OnSaved="OnExpenseDialogSavedAsync" />
 
 @code {
     [Parameter] public Guid Id { get; set; }
@@ -348,6 +374,10 @@ else
     private List<TransferInstruction> transfers = [];
     private List<ParticipantAmountSummary> participantExpenseSummaries = [];
     private List<ParticipantAmountSummary> participantPaidSummaries = [];
+    private string? aiSummary;
+    private bool aiSummaryDirty = true;
+    private bool isAiSummaryLoading;
+    private int aiSummaryRevision;
 
     // Auth state
     private bool isAuthenticated = false;
@@ -367,6 +397,13 @@ else
         var auth = await AuthState.GetAuthenticationStateAsync();
         isAuthenticated = auth.User.Identity?.IsAuthenticated ?? false;
         await LoadAsync();
+    }
+
+    private async Task SetActiveTabAsync(Tab tab)
+    {
+        activeTab = tab;
+        if (tab == Tab.Result)
+            await RefreshAiSummaryIfNeededAsync();
     }
 
     // Called after LoadAsync so settlement is available
@@ -475,6 +512,7 @@ else
         newExpenseLabel = string.Empty;
         newExpenseAmount = 0;
         newExpensePaidBy = Guid.Empty;
+        MarkAiSummaryDirty();
         await LoadAsync();
     }
 
@@ -487,6 +525,7 @@ else
     private async Task RemoveExpenseAsync(Guid expenseId)
     {
         await ExpenseService.RemoveExpenseAsync(expenseId);
+        MarkAiSummaryDirty();
         await LoadAsync();
     }
 
@@ -495,12 +534,14 @@ else
         if (string.IsNullOrWhiteSpace(newParticipantName)) return;
         await ParticipantService.AddParticipantAsync(Id, newParticipantName.Trim());
         newParticipantName = string.Empty;
+        MarkAiSummaryDirty();
         await LoadAsync();
     }
 
     private async Task RemoveParticipantAsync(Guid participantId)
     {
         await ParticipantService.RemoveParticipantAsync(participantId);
+        MarkAiSummaryDirty();
         await LoadAsync();
     }
 
@@ -523,6 +564,39 @@ else
     private Task OpenEditExpenseAsync(Expense e)
     {
         return editExpenseDialog.OpenAsync(e, settlement!.Participants.ToList());
+    }
+
+    private async Task OnExpenseDialogSavedAsync()
+    {
+        MarkAiSummaryDirty();
+        await LoadAsync();
+    }
+
+    private async Task RefreshAiSummaryIfNeededAsync()
+    {
+        if (!aiSummaryDirty || isAiSummaryLoading || settlement is null)
+            return;
+
+        var revision = aiSummaryRevision;
+        aiSummaryDirty = false;
+        isAiSummaryLoading = true;
+        StateHasChanged();
+
+        var summary = await SettlementAiSummaryService.GenerateSummaryAsync(settlement);
+
+        if (revision == aiSummaryRevision)
+            aiSummary = summary;
+        else
+            aiSummaryDirty = true;
+
+        isAiSummaryLoading = false;
+        StateHasChanged();
+    }
+
+    private void MarkAiSummaryDirty()
+    {
+        aiSummaryDirty = true;
+        aiSummaryRevision++;
     }
 
     private string ParticipantName(Guid id) =>
