@@ -240,6 +240,18 @@
   <data name="SETTLEMENT_DETAIL_RESULT_EMPTY" xml:space="preserve">
 	<value>All settled up! No transfers needed.</value>
   </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_TITLE" xml:space="preserve">
+	<value>Actual paid by participant</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_SUBTITLE" xml:space="preserve">
+	<value>Total amount each participant paid directly.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_SUMMARY_TITLE" xml:space="preserve">
+	<value>Final share by participant</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_SUMMARY_SUBTITLE" xml:space="preserve">
+	<value>Amount each participant is responsible for after splitting expenses.</value>
+  </data>
   <data name="SETTLEMENT_DETAIL_RESULT_PAYS" xml:space="preserve">
 	<value>pays</value>
   </data>

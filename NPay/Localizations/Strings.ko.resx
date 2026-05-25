@@ -240,6 +240,18 @@
   <data name="SETTLEMENT_DETAIL_RESULT_EMPTY" xml:space="preserve">
 	<value>모든 정산이 완료되었습니다! 송금이 필요하지 않습니다.</value>
   </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_TITLE" xml:space="preserve">
+	<value>인원별 실제 결제액</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_SUBTITLE" xml:space="preserve">
+	<value>각 인원이 직접 결제한 금액의 합계입니다.</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_SUMMARY_TITLE" xml:space="preserve">
+	<value>인원별 최종 부담액</value>
+  </data>
+  <data name="SETTLEMENT_DETAIL_RESULT_SUMMARY_SUBTITLE" xml:space="preserve">
+	<value>지출을 정산 인원 기준으로 나눈 뒤 각 인원이 부담하는 금액입니다.</value>
+  </data>
   <data name="SETTLEMENT_DETAIL_RESULT_PAYS" xml:space="preserve">
 	<value>이(가)</value>
   </data>

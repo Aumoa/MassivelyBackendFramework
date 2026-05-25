@@ -226,49 +226,93 @@ else
     <!-- Result Tab -->
     @if (activeTab == Tab.Result)
     {
-        <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);">
-            <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm);color:var(--color-text-muted);user-select:none;">
-                <input type="checkbox" @bind="minimizeTransfers" @bind:after="RefreshTransfersAsync"
-                       style="width:16px;height:16px;accent-color:var(--color-accent);cursor:pointer;" />
-                최소 이체 모드
-            </label>
-            <span style="font-size:var(--text-xs);color:var(--color-text-muted);">
-                @(minimizeTransfers ? "이체 횟수를 최소화합니다." : "항목별로 개별 지급합니다.")
-            </span>
-        </div>
+        <section class="result-transfers">
+            <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4);">
+                <label style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer;font-size:var(--text-sm);color:var(--color-text-muted);user-select:none;">
+                    <input type="checkbox" @bind="minimizeTransfers" @bind:after="RefreshTransfersAsync"
+                           style="width:16px;height:16px;accent-color:var(--color-accent);cursor:pointer;" />
+                    최소 이체 모드
+                </label>
+                <span style="font-size:var(--text-xs);color:var(--color-text-muted);">
+                    @(minimizeTransfers ? "이체 횟수를 최소화합니다." : "항목별로 개별 지급합니다.")
+                </span>
+            </div>
 
-        @if (isCalculating)
+            @if (isCalculating)
+            {
+                <div class="transfer-list">
+                    @for (int i = 0; i < 2; i++)
+                    {
+                        <div class="transfer-card">
+                            <span class="skeleton" style="width:200px;"></span>
+                        </div>
+                    }
+                </div>
+            }
+            else if (transfers.Count == 0)
+            {
+                <div class="empty-state">
+                    <span class="material-symbols-outlined" style="color:var(--color-success);">check_circle</span>
+                    <p>@Strings.SETTLEMENT_DETAIL_RESULT_EMPTY</p>
+                </div>
+            }
+            else
+            {
+                <div class="transfer-list">
+                    @foreach (var t in transfers)
+                    {
+                        <div class="transfer-card">
+                            <span class="transfer-from">@t.FromParticipantName</span>
+                            <span class="material-symbols-outlined transfer-arrow">arrow_forward</span>
+                            <span class="transfer-amount">@t.Amount.ToString("N0") ₩</span>
+                            <span style="color:var(--color-text-muted);font-size:var(--text-sm);">@Strings.SETTLEMENT_DETAIL_RESULT_TO</span>
+                            <span class="transfer-to">@t.ToParticipantName</span>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        @if (participantPaidSummaries.Count > 0)
         {
-            <div class="transfer-list">
-                @for (int i = 0; i < 2; i++)
-                {
-                    <div class="transfer-card">
-                        <span class="skeleton" style="width:200px;"></span>
+            <section class="result-summary">
+                <div class="result-summary-header">
+                    <div>
+                        <h2 class="section-title">@Strings.SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_TITLE</h2>
+                        <p class="result-summary-subtitle">@Strings.SETTLEMENT_DETAIL_RESULT_PAID_SUMMARY_SUBTITLE</p>
                     </div>
-                }
-            </div>
+                </div>
+                <div class="participant-summary-list">
+                    @foreach (var summary in participantPaidSummaries)
+                    {
+                        <div class="participant-summary-row">
+                            <span class="participant-summary-name">@summary.ParticipantName</span>
+                            <span class="participant-summary-amount">@summary.Amount.ToString("N0") ₩</span>
+                        </div>
+                    }
+                </div>
+            </section>
         }
-        else if (transfers.Count == 0)
+
+        @if (participantExpenseSummaries.Count > 0)
         {
-            <div class="empty-state">
-                <span class="material-symbols-outlined" style="color:var(--color-success);">check_circle</span>
-                <p>@Strings.SETTLEMENT_DETAIL_RESULT_EMPTY</p>
-            </div>
-        }
-        else
-        {
-            <div class="transfer-list">
-                @foreach (var t in transfers)
-                {
-                    <div class="transfer-card">
-                        <span class="transfer-from">@t.FromParticipantName</span>
-                        <span class="material-symbols-outlined transfer-arrow">arrow_forward</span>
-                        <span class="transfer-amount">@t.Amount.ToString("N0") ₩</span>
-                        <span style="color:var(--color-text-muted);font-size:var(--text-sm);">@Strings.SETTLEMENT_DETAIL_RESULT_TO</span>
-                        <span class="transfer-to">@t.ToParticipantName</span>
+            <section class="result-summary">
+                <div class="result-summary-header">
+                    <div>
+                        <h2 class="section-title">@Strings.SETTLEMENT_DETAIL_RESULT_SUMMARY_TITLE</h2>
+                        <p class="result-summary-subtitle">@Strings.SETTLEMENT_DETAIL_RESULT_SUMMARY_SUBTITLE</p>
                     </div>
-                }
-            </div>
+                </div>
+                <div class="participant-summary-list">
+                    @foreach (var summary in participantExpenseSummaries)
+                    {
+                        <div class="participant-summary-row">
+                            <span class="participant-summary-name">@summary.ParticipantName</span>
+                            <span class="participant-summary-amount">@summary.Amount.ToString("N0") ₩</span>
+                        </div>
+                    }
+                </div>
+            </section>
         }
     }
 }
@@ -302,6 +346,8 @@ else
     // Result
     private bool minimizeTransfers = false;
     private List<TransferInstruction> transfers = [];
+    private List<ParticipantAmountSummary> participantExpenseSummaries = [];
+    private List<ParticipantAmountSummary> participantPaidSummaries = [];
 
     // Auth state
     private bool isAuthenticated = false;
@@ -352,8 +398,64 @@ else
         if (settlement is not null)
         {
             InitSplitAmong();
+            RefreshParticipantPaidSummaries();
+            RefreshParticipantExpenseSummaries();
             await RefreshTransfersAsync();
         }
+    }
+
+    private void RefreshParticipantPaidSummaries()
+    {
+        if (settlement is null)
+        {
+            participantPaidSummaries = [];
+            return;
+        }
+
+        var amounts = settlement.Participants.ToDictionary(p => p.Id, _ => 0m);
+
+        foreach (var expense in settlement.Expenses)
+        {
+            if (amounts.ContainsKey(expense.PaidByParticipantId))
+                amounts[expense.PaidByParticipantId] += expense.Amount;
+        }
+
+        participantPaidSummaries = settlement.Participants
+            .Select(p => new ParticipantAmountSummary(p.Name, Math.Round(amounts.GetValueOrDefault(p.Id), 0)))
+            .ToList();
+    }
+
+    private void RefreshParticipantExpenseSummaries()
+    {
+        if (settlement is null)
+        {
+            participantExpenseSummaries = [];
+            return;
+        }
+
+        var amounts = settlement.Participants.ToDictionary(p => p.Id, _ => 0m);
+        var allParticipantIds = settlement.Participants.Select(p => p.Id).ToList();
+
+        foreach (var expense in settlement.Expenses)
+        {
+            var splitIds = expense.SplitAmongParticipantIds.Count > 0
+                ? expense.SplitAmongParticipantIds
+                : allParticipantIds;
+            var validSplitIds = splitIds
+                .Where(amounts.ContainsKey)
+                .Distinct()
+                .ToList();
+
+            if (validSplitIds.Count == 0) continue;
+
+            var share = expense.Amount / validSplitIds.Count;
+            foreach (var participantId in validSplitIds)
+                amounts[participantId] += share;
+        }
+
+        participantExpenseSummaries = settlement.Participants
+            .Select(p => new ParticipantAmountSummary(p.Name, Math.Round(amounts.GetValueOrDefault(p.Id), 0)))
+            .ToList();
     }
 
     private async Task RefreshTransfersAsync()
@@ -425,4 +527,6 @@ else
 
     private string ParticipantName(Guid id) =>
         settlement?.Participants.FirstOrDefault(p => p.Id == id)?.Name ?? "?";
+
+    private sealed record ParticipantAmountSummary(string ParticipantName, decimal Amount);
 }
