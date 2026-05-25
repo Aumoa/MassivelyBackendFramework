@@ -20,6 +20,7 @@ internal class Jwt : IJwt
     private readonly string m_Modulus;
     private readonly string m_Exponent;
     private readonly string m_KId;
+    private readonly string m_DefaultPictureUrl;
 
     public Jwt(IOptions<JwtOptions> options)
     {
@@ -30,6 +31,7 @@ internal class Jwt : IJwt
         m_Issuer = options.Value.Issuer;
         m_ExpiresIn = options.Value.ExpiresIn;
         m_RefreshTokenExpiresIn = options.Value.RefreshTokenExpiresIn;
+        m_DefaultPictureUrl = new Uri(new Uri(m_Issuer.TrimEnd('/') + "/"), "default-profile.png").ToString();
 
         var rsaPublic = RSA.Create();
         rsaPublic.ImportFromPem(File.ReadAllText(options.Value.PublicKeyPath));
@@ -196,7 +198,7 @@ internal class Jwt : IJwt
                         switch (expectedClaim)
                         {
                             case JwtRegisteredClaimNames.Picture:
-                                idTokenClaims.Add(new Claim(expectedClaim, "https://assets.ayla.r-e.kr/img/profile.png"));
+                                idTokenClaims.Add(new Claim(expectedClaim, m_DefaultPictureUrl));
                                 break;
                         }
                     }
