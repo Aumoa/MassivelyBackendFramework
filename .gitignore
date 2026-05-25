@@ -9,3 +9,6 @@ appsettings.*.json
 
 # Claude Code
 .claude/*.local.json
+
+# Codex
+.codex-build/
