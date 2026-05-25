@@ -1,4 +1,4 @@
-﻿using Discord;
+using Discord;
 using Discord.Rest;
 using Discord.WebSocket;
 using DiscordBot.Repositories;
@@ -90,22 +90,23 @@ public class DiscordService(IOptions<DiscordService.Configuration> options, ILog
 
         string totalReasoning = string.Empty;
         string totalMessage = string.Empty;
-        string cleanPrompt = message.Content.Replace($"<@{m_Socket.CurrentUser.Id}>", "").Trim();
         var channel = ollama.GetChannel(message.Channel);
         RestUserMessage? sentMessage = null;
         DateTime? lastEditTime = default;
         bool hasModify = false;
-        List<Task> emojiTasks = [];
 
         var chatLogRepository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
+        var chatImageRepository = scope.ServiceProvider.GetRequiredService<IChatImageRepository>();
         var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository);
         var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
+        var chatImageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatImageTools>>();
         var promptProfileProvider = scope.ServiceProvider.GetRequiredService<ImagePromptProfileProvider>();
         var chatClient = scope.ServiceProvider.GetRequiredService<AI.IChatClient>();
         var claudeSettings = scope.ServiceProvider.GetRequiredService<IClaudeSettingsService>();
         var imageTools = new DiscordImageTools(message, chatClient, claudeSettings, imageGenerationClient, promptProfileProvider, imageToolsLogger);
+        var chatImageTools = new DiscordChatImageTools(message, chatImageRepository, chatImageToolsLogger);
         var calculationTools = new AI.Tools.CalculationTools();
-        var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools, imageTools, calculationTools);
+        var toolsProvider = AI.ToolsProvider.CreateFrom(discordTools, imageTools, chatImageTools, calculationTools);
         var toolSettings = scope.ServiceProvider.GetRequiredService<IToolSettingsService>();
         await toolSettings.ApplyAsync(toolsProvider);
 

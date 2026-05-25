@@ -115,19 +115,29 @@ public class OllamaChatHistory(
                             {
                                 var args = function.BuildArguments(toolCall.Arguments, cancellationToken);
                                 var result = function.Invocable(args);
-                                string toolResult;
-
-                                if (result is Task<string> taskResult)
-                                    toolResult = await taskResult;
-                                else
-                                    toolResult = result?.ToString() ?? string.Empty;
+                                var toolResult = await NormalizeToolResultAsync(result);
 
                                 messagesAppend.Add(new ChatMessage
                                 {
                                     Role = ChatRole.Tool,
-                                    Content = JsonSerializer.Serialize(new { status = "success", content = toolResult }),
+                                    Content = JsonSerializer.Serialize(new
+                                    {
+                                        status = "success",
+                                        content = toolResult.Content,
+                                        image_count = toolResult.Images?.Count ?? 0
+                                    }),
                                     ToolCallId = toolCall.Id
                                 });
+
+                                if (toolResult.Images is { Count: > 0 })
+                                {
+                                    messagesAppend.Add(new ChatMessage
+                                    {
+                                        Role = ChatRole.User,
+                                        Content = "[도구 결과] 과거 채팅에서 가져온 참조 이미지입니다. 이 이미지를 보고 사용자의 원래 질문에 답하세요.",
+                                        Images = toolResult.Images
+                                    });
+                                }
                             }
                             else
                             {
@@ -153,7 +163,7 @@ public class OllamaChatHistory(
                 }
             }
 
-            m_Messages.AddRange(messagesAppend);
+            m_Messages.AddRange(messagesAppend.Select(TrimForMemory));
 
             if (m_Messages.Count >= options.MemorySize)
             {
@@ -166,6 +176,56 @@ public class OllamaChatHistory(
         {
             m_Semaphore.Release();
         }
+    }
+
+    private static async Task<ToolExecutionResult> NormalizeToolResultAsync(object? result)
+    {
+        switch (result)
+        {
+            case null:
+                return ToolExecutionResult.FromText(string.Empty);
+            case ToolExecutionResult toolExecutionResult:
+                return toolExecutionResult;
+            case Task<ToolExecutionResult> toolExecutionResultTask:
+                return await toolExecutionResultTask;
+            case Task<string> stringTask:
+                return ToolExecutionResult.FromText(await stringTask);
+            case Task task:
+                await task;
+                var resultProperty = task.GetType().GetProperty("Result");
+                return NormalizeToolResult(resultProperty?.GetValue(task));
+            default:
+                return NormalizeToolResult(result);
+        }
+    }
+
+    private static ToolExecutionResult NormalizeToolResult(object? result)
+    {
+        return result switch
+        {
+            null => ToolExecutionResult.FromText(string.Empty),
+            ToolExecutionResult toolExecutionResult => toolExecutionResult,
+            string text => ToolExecutionResult.FromText(text),
+            _ => ToolExecutionResult.FromText(result.ToString())
+        };
+    }
+
+    private static ChatMessage TrimForMemory(ChatMessage message)
+    {
+        if (message.Images is not { Count: > 0 })
+        {
+            return message;
+        }
+
+        var content = string.IsNullOrWhiteSpace(message.Content)
+            ? "[이미지 첨부됨]"
+            : message.Content + "\n[이미지 첨부됨]";
+
+        return message with
+        {
+            Content = content,
+            Images = null
+        };
     }
 
     public async Task TrySummarizeAsync(CancellationToken cancellationToken = default)
