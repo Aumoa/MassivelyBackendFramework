@@ -579,4 +579,25 @@
   <data name="MANAGEACCOUNTS_APIKEYS_ALL_SCOPES" xml:space="preserve">
     <value>All scopes</value>
   </data>
+  <data name="MANAGEACCOUNTS_SECTION_GRANTS" xml:space="preserve">
+    <value>Connected Applications</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_SECTION_DESC" xml:space="preserve">
+    <value>Review applications that can access your account and revoke access you no longer use.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_EMPTY" xml:space="preserve">
+    <value>No connected applications</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_SCOPE_LABEL" xml:space="preserve">
+    <value>Scopes</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_GRANTED_AT" xml:space="preserve">
+    <value>Granted</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_REVOKE" xml:space="preserve">
+    <value>Revoke access</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_REVOKE_CONFIRM" xml:space="preserve">
+    <value>Revoke access for {0}? You will need to grant permissions again next time.</value>
+  </data>
 </root>

@@ -6,6 +6,8 @@
 @layout AuthorizedLayout
 @inject JwtAuthenticationStateProvider Auth
 @inject IApiKeys ApiKeys
+@inject IOAuthGrants OAuthGrants
+@inject IAccesses Accesses
 @inject IJSRuntime JS
 
 <div class="account-container">
@@ -179,6 +181,54 @@
     <div class="info-section apikeys-section">
         <div class="section-header apikeys-section-header">
             <div class="section-header-text">
+                <span class="section-title">@Strings.MANAGEACCOUNTS_SECTION_GRANTS</span>
+                <span class="section-desc">@Strings.MANAGEACCOUNTS_GRANTS_SECTION_DESC</span>
+            </div>
+        </div>
+        <div class="info-card apikeys-card">
+            @if (m_OAuthGrants.Length == 0)
+            {
+                <div class="apikeys-empty">
+                    <span class="material-symbols-outlined apikeys-empty-icon">link_off</span>
+                    <span>@Strings.MANAGEACCOUNTS_GRANTS_EMPTY</span>
+                </div>
+            }
+            else
+            {
+                <div class="grants-list">
+                    @foreach (var grant in m_OAuthGrants)
+                    {
+                        var clientId = grant.ClientId;
+                        <div class="grant-row">
+                            <span class="material-symbols-outlined grant-icon">apps</span>
+                            <div class="grant-meta">
+                                <span class="grant-name">@grant.ClientName</span>
+                                <span class="grant-detail">
+                                    @Strings.MANAGEACCOUNTS_APIKEYS_CLIENT_LABEL: @grant.ClientId
+                                    &nbsp;|&nbsp;
+                                    @Strings.MANAGEACCOUNTS_GRANTS_GRANTED_AT: @grant.GrantedAt.ToString("yyyy-MM-dd HH:mm")
+                                </span>
+                                <span class="grant-scopes">
+                                    @Strings.MANAGEACCOUNTS_GRANTS_SCOPE_LABEL:
+                                    @foreach (var scope in grant.Scopes)
+                                    {
+                                        <code>@scope</code>
+                                    }
+                                </span>
+                            </div>
+                            <button @onclick="() => OnRevokeGrantAsync(clientId)" type="button" class="apikey-delete-btn" title="@Strings.MANAGEACCOUNTS_GRANTS_REVOKE">
+                                <span class="material-symbols-outlined">link_off</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="info-section apikeys-section">
+        <div class="section-header apikeys-section-header">
+            <div class="section-header-text">
                 <span class="section-title">@Strings.MANAGEACCOUNTS_SECTION_APIKEYS</span>
                 <span class="section-desc">@Strings.MANAGEACCOUNTS_APIKEYS_SECTION_DESC</span>
             </div>
@@ -243,6 +293,7 @@
     private DlgNewApiKey m_DlgNewApiKey = null!;
 
     private ApiKeyInfo[] m_ApiKeys = [];
+    private OAuthGrantInfo[] m_OAuthGrants = [];
     private string? m_NewApiKeyName;
     private string? m_NewApiKeyAllowedClientId;
     private string? m_NewApiKeyAllowedScope;
@@ -250,6 +301,7 @@
     protected override async Task OnInitializedAsync()
     {
         await RefreshApiKeysAsync();
+        await RefreshOAuthGrantsAsync();
     }
 
     private async Task RefreshApiKeysAsync()
@@ -258,6 +310,15 @@
         if (!string.IsNullOrEmpty(accountId))
         {
             m_ApiKeys = await ApiKeys.GetApiKeysAsync(accountId);
+        }
+    }
+
+    private async Task RefreshOAuthGrantsAsync()
+    {
+        var accountId = Auth.Id;
+        if (!string.IsNullOrEmpty(accountId))
+        {
+            m_OAuthGrants = await OAuthGrants.GetGrantedClientsAsync(accountId);
         }
     }
 
@@ -310,6 +371,28 @@
 
         await ApiKeys.RemoveApiKeyAsync(apiKeyId);
         await RefreshApiKeysAsync();
+    }
+
+    private async Task OnRevokeGrantAsync(string clientId)
+    {
+        var grant = m_OAuthGrants.FirstOrDefault(value => value.ClientId == clientId);
+        var clientName = string.IsNullOrEmpty(grant.ClientName) ? clientId : grant.ClientName;
+        var confirmed = await JS.InvokeAsync<bool>("confirm", string.Format(Strings.MANAGEACCOUNTS_GRANTS_REVOKE_CONFIRM, clientName));
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var accountId = Auth.Id;
+        var sub = Auth.Sub;
+        if (string.IsNullOrEmpty(accountId) || string.IsNullOrEmpty(sub))
+        {
+            return;
+        }
+
+        await Accesses.InvalidateClientTokensAsync(sub, clientId);
+        await OAuthGrants.RevokeClientGrantsAsync(accountId, clientId);
+        await RefreshOAuthGrantsAsync();
     }
 
     private async Task OnChangePasswordAsync()

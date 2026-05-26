@@ -11,4 +11,5 @@ public interface IAccesses
     ValueTask<Access?> RefreshAccessAsync(string refreshToken, string clientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default);
     ValueTask RevokeAsync(string accessToken, CancellationToken cancellationToken = default);
     ValueTask InvalidateAllTokensAsync(string sub, CancellationToken cancellationToken = default);
+    ValueTask InvalidateClientTokensAsync(string sub, string clientId, CancellationToken cancellationToken = default);
 }

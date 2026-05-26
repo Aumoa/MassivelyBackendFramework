@@ -21,4 +21,7 @@ internal static class KeyNames
 
     public const string UserGens = $"{Prefix}:user_gen";
     public static string UserGen(string sub) => $"{UserGens}:{sub}";
+
+    public const string ClientUserGens = $"{Prefix}:client_user_gen";
+    public static string ClientUserGen(string sub, string clientId) => $"{ClientUserGens}:{sub}:{clientId}";
 }

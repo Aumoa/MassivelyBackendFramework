@@ -579,4 +579,25 @@
   <data name="MANAGEACCOUNTS_APIKEYS_ALL_SCOPES" xml:space="preserve">
     <value>모든 스코프</value>
   </data>
+  <data name="MANAGEACCOUNTS_SECTION_GRANTS" xml:space="preserve">
+    <value>연결된 애플리케이션</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_SECTION_DESC" xml:space="preserve">
+    <value>계정에 접근할 수 있는 애플리케이션을 확인하고 더 이상 사용하지 않는 접근 권한을 철회합니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_EMPTY" xml:space="preserve">
+    <value>연결된 애플리케이션이 없습니다</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_SCOPE_LABEL" xml:space="preserve">
+    <value>스코프</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_GRANTED_AT" xml:space="preserve">
+    <value>승인 시각</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_REVOKE" xml:space="preserve">
+    <value>접근 권한 철회</value>
+  </data>
+  <data name="MANAGEACCOUNTS_GRANTS_REVOKE_CONFIRM" xml:space="preserve">
+    <value>{0}의 접근 권한을 철회할까요? 다음 사용 시 권한을 다시 승인해야 합니다.</value>
+  </data>
 </root>

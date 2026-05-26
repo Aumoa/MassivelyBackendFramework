@@ -225,6 +225,12 @@
     gap: 8px;
 }
 
+.grants-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
 .apikey-row {
     display: flex;
     align-items: center;
@@ -235,7 +241,23 @@
     border-radius: 6px;
 }
 
+.grant-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #e8eaed;
+    border-radius: 6px;
+}
+
 .apikey-icon {
+    font-size: 20px;
+    color: #5f6368;
+    flex-shrink: 0;
+}
+
+.grant-icon {
     font-size: 20px;
     color: #5f6368;
     flex-shrink: 0;
@@ -249,7 +271,24 @@
     min-width: 0;
 }
 
+.grant-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
 .apikey-name {
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: #202124;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.grant-name {
     font-weight: 500;
     font-size: 0.875rem;
     color: #202124;
@@ -264,6 +303,32 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.grant-detail {
+    font-size: 0.75rem;
+    color: #80868b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.grant-scopes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    color: #5f6368;
+}
+
+.grant-scopes code {
+    font-family: ui-monospace, 'Cascadia Code', 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
+    font-size: 0.75rem;
+    background-color: var(--oauth-surface-muted);
+    color: #3c4043;
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 
 .apikey-delete-btn {
@@ -334,11 +399,13 @@
 }
 
 @media (max-width: 600px) {
-    .apikey-row {
+    .apikey-row,
+    .grant-row {
         align-items: flex-start;
     }
 
-    .apikey-detail {
+    .apikey-detail,
+    .grant-detail {
         white-space: normal;
     }
 }

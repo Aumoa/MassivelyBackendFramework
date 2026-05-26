@@ -38,12 +38,22 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             storedGen = '0'
         end
 
+        local storedClientGen = redis.call('HGET', KEYS[1], 'client_gen')
+        if storedClientGen == false or storedClientGen == '' then
+            storedClientGen = '0'
+        end
+
         local currentGen = redis.call('GET', KEYS[4])
         if currentGen == false or currentGen == '' then
             currentGen = '0'
         end
 
-        if storedGen ~= currentGen then
+        local currentClientGen = redis.call('GET', KEYS[7])
+        if currentClientGen == false or currentClientGen == '' then
+            currentClientGen = '0'
+        end
+
+        if storedGen ~= currentGen or storedClientGen ~= currentClientGen then
             return nil
         end
 
@@ -54,7 +64,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             'sub', sub,
             'scope', scope,
             'client_id', clientId,
-            'gen', storedGen)
+            'gen', storedGen,
+            'client_gen', storedClientGen)
         redis.call('PEXPIRE', KEYS[3], ARGV[4])
         redis.call('HSET', KEYS[6],
             'access_token', ARGV[2],
@@ -63,7 +74,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             'sub', sub,
             'scope', scope,
             'client_id', clientId,
-            'gen', storedGen)
+            'gen', storedGen,
+            'client_gen', storedClientGen)
         redis.call('PEXPIRE', KEYS[6], ARGV[8])
         redis.call('DEL', KEYS[5], KEYS[1])
 
@@ -87,7 +99,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         "sub",
         "scope",
         "client_id",
-        "gen"
+        "gen",
+        "client_gen"
     ];
 
     public async ValueTask<Access> WriteAccessAsync(string id, string sub, string scope, string clientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default)
@@ -97,6 +110,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         // Read the current generation for this sub so the token can be invalidated later
         var genValue = await db.StringGetAsync(KeyNames.UserGen(sub)).WaitAsync(cancellationToken);
         var gen = genValue.IsNullOrEmpty ? 0L : (long)genValue;
+        var clientGenValue = await db.StringGetAsync(KeyNames.ClientUserGen(sub, clientId)).WaitAsync(cancellationToken);
+        var clientGen = clientGenValue.IsNullOrEmpty ? 0L : (long)clientGenValue;
 
         var tx = db.CreateTransaction();
 
@@ -113,7 +128,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             new("sub", sub),
             new("scope", scope),
             new("client_id", clientId),
-            new("gen", gen)
+            new("gen", gen),
+            new("client_gen", clientGen)
             ]).WaitAsync(cancellationToken);
         
         // Set TTL for refresh token
@@ -161,14 +177,21 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         var batch = db.CreateBatch();
         var storedGenTask = batch.HashGetAsync(refreshKey, "gen");
         var currentGenTask = batch.StringGetAsync(KeyNames.UserGen(sub));
+        var storedClientGenTask = batch.HashGetAsync(refreshKey, "client_gen");
+        var clientId = fields[4]!.ToString();
+        var currentClientGenTask = batch.StringGetAsync(KeyNames.ClientUserGen(sub, clientId));
         batch.Execute();
 
         var storedGenValue = await storedGenTask.WaitAsync(cancellationToken);
         var currentGenValue = await currentGenTask.WaitAsync(cancellationToken);
+        var storedClientGenValue = await storedClientGenTask.WaitAsync(cancellationToken);
+        var currentClientGenValue = await currentClientGenTask.WaitAsync(cancellationToken);
 
         var storedGen = storedGenValue.IsNullOrEmpty ? 0L : (long)storedGenValue;
         var currentGen = currentGenValue.IsNullOrEmpty ? 0L : (long)currentGenValue;
-        if (storedGen != currentGen)
+        var storedClientGen = storedClientGenValue.IsNullOrEmpty ? 0L : (long)storedClientGenValue;
+        var currentClientGen = currentClientGenValue.IsNullOrEmpty ? 0L : (long)currentClientGenValue;
+        if (storedGen != currentGen || storedClientGen != currentClientGen)
         {
             return null;
         }
@@ -180,7 +203,7 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             AccessToken = accessToken,
             RefreshToken = refreshToken!,
             Scope = fields[3]!,
-            ClientId = fields[4]!
+            ClientId = clientId
         };
     }
 
@@ -226,11 +249,23 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
 
         // Check the token generation against the user's current generation
         var sub = fields[2]!.ToString();
-        var storedGenValue = await db.HashGetAsync(refreshKey, "gen").WaitAsync(cancellationToken);
-        var currentGenValue = await db.StringGetAsync(KeyNames.UserGen(sub)).WaitAsync(cancellationToken);
+        var clientId = fields[4]!.ToString();
+        var batch = db.CreateBatch();
+        var storedGenTask = batch.HashGetAsync(refreshKey, "gen");
+        var currentGenTask = batch.StringGetAsync(KeyNames.UserGen(sub));
+        var storedClientGenTask = batch.HashGetAsync(refreshKey, "client_gen");
+        var currentClientGenTask = batch.StringGetAsync(KeyNames.ClientUserGen(sub, clientId));
+        batch.Execute();
+
+        var storedGenValue = await storedGenTask.WaitAsync(cancellationToken);
+        var currentGenValue = await currentGenTask.WaitAsync(cancellationToken);
+        var storedClientGenValue = await storedClientGenTask.WaitAsync(cancellationToken);
+        var currentClientGenValue = await currentClientGenTask.WaitAsync(cancellationToken);
         var storedGen = storedGenValue.IsNullOrEmpty ? 0L : (long)storedGenValue;
         var currentGen = currentGenValue.IsNullOrEmpty ? 0L : (long)currentGenValue;
-        if (storedGen != currentGen)
+        var storedClientGen = storedClientGenValue.IsNullOrEmpty ? 0L : (long)storedClientGenValue;
+        var currentClientGen = currentClientGenValue.IsNullOrEmpty ? 0L : (long)currentClientGenValue;
+        if (storedGen != currentGen || storedClientGen != currentClientGen)
         {
             logger.LogWarning("Refresh token generation mismatch. Token has been invalidated.");
             return null;
@@ -270,10 +305,11 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         var refreshKey = KeyNames.Refresh(refreshToken);
         var replayKey = KeyNames.RefreshReplay(refreshToken);
 
-        var refreshFields = await db.HashGetAsync(refreshKey, ["access_token", "sub"]).WaitAsync(cancellationToken);
+        var refreshFields = await db.HashGetAsync(refreshKey, ["access_token", "sub", "client_id"]).WaitAsync(cancellationToken);
         var oldAccessToken = refreshFields[0];
         var sub = refreshFields[1];
-        if (oldAccessToken.IsNullOrEmpty || sub.IsNullOrEmpty)
+        var refreshClientId = refreshFields[2];
+        if (oldAccessToken.IsNullOrEmpty || sub.IsNullOrEmpty || refreshClientId.IsNullOrEmpty)
         {
             return await ReadRefreshReplayAsync(db, refreshToken, expectedClientId, cancellationToken);
         }
@@ -288,7 +324,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
                 KeyNames.Refresh(newRefreshToken),
                 KeyNames.UserGen(sub!),
                 KeyNames.Access(oldAccessToken!),
-                replayKey
+                replayKey,
+                KeyNames.ClientUserGen(sub!.ToString(), refreshClientId.ToString())
             ],
             [
                 newRefreshToken,
@@ -364,6 +401,14 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             return null;
         }
 
+        var currentClientGenValue = await db.StringGetAsync(KeyNames.ClientUserGen(sub, clientId)).WaitAsync(cancellationToken);
+        var storedClientGen = (long)fields[7];
+        var currentClientGen = currentClientGenValue.IsNullOrEmpty ? 0L : (long)currentClientGenValue;
+        if (storedClientGen != currentClientGen)
+        {
+            return null;
+        }
+
         var activeRefreshToken = await db.StringGetAsync(KeyNames.Access(accessToken)).WaitAsync(cancellationToken);
         if (activeRefreshToken != replayedRefreshToken)
         {
@@ -423,6 +468,18 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
 
         // Keep the key alive long enough to outlast any existing long-lived refresh tokens.
         await db.KeyExpireAsync(userGenKey, TimeSpan.FromDays(90)).WaitAsync(cancellationToken);
+    }
+
+    public async ValueTask InvalidateClientTokensAsync(string sub, string clientId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sub);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+
+        var db = multiplexer.GetDatabase();
+        var clientUserGenKey = KeyNames.ClientUserGen(sub, clientId);
+
+        await db.StringIncrementAsync(clientUserGenKey).WaitAsync(cancellationToken);
+        await db.KeyExpireAsync(clientUserGenKey, TimeSpan.FromDays(90)).WaitAsync(cancellationToken);
     }
 
     private static long ToPositiveMilliseconds(TimeSpan value)

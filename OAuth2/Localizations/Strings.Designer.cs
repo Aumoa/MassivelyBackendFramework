@@ -950,6 +950,60 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("MANAGEACCOUNTS_APIKEYS_SECTION_DESC", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   No connected applications과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_GRANTS_EMPTY {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_GRANTS_EMPTY", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Granted과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_GRANTS_GRANTED_AT {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_GRANTS_GRANTED_AT", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Revoke access과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_GRANTS_REVOKE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_GRANTS_REVOKE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Revoke access for {0}? You will need to grant permissions again next time.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_GRANTS_REVOKE_CONFIRM {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_GRANTS_REVOKE_CONFIRM", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Scopes과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_GRANTS_SCOPE_LABEL {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_GRANTS_SCOPE_LABEL", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Review applications that can access your account and revoke access you no longer use.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_GRANTS_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_GRANTS_SECTION_DESC", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Cancel과(와) 유사한 지역화된 문자열을 찾습니다.
@@ -1299,6 +1353,15 @@ namespace OAuth2.Localizations {
         internal static string MANAGEACCOUNTS_SECTION_APIKEYS {
             get {
                 return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_APIKEYS", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Connected Applications과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_SECTION_GRANTS {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_SECTION_GRANTS", resourceCulture);
             }
         }
         
