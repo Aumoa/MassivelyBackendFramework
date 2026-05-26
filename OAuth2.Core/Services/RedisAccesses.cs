@@ -12,7 +12,16 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
 
     private const string RotateRefreshTokenScript = """
         local accessToken = redis.call('HGET', KEYS[1], 'access_token')
-        if accessToken == false or accessToken == '' or accessToken ~= ARGV[6] then
+        if accessToken == false or accessToken == '' then
+            return nil
+        end
+
+        local stableRefresh = redis.call('HGET', KEYS[1], 'stable_refresh')
+        if stableRefresh == false or stableRefresh == '' then
+            stableRefresh = '0'
+        end
+
+        if stableRefresh ~= '1' and accessToken ~= ARGV[6] then
             return nil
         end
 
@@ -57,6 +66,14 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             return nil
         end
 
+        if stableRefresh == '1' then
+            redis.call('SET', KEYS[2], ARGV[9], 'PX', ARGV[3])
+            redis.call('HSET', KEYS[1], 'access_token', ARGV[2])
+            redis.call('PEXPIRE', KEYS[1], ARGV[4])
+
+            return { accountId, sub, scope, clientId, ARGV[9] }
+        end
+
         redis.call('SET', KEYS[2], ARGV[1], 'PX', ARGV[3])
         redis.call('HSET', KEYS[3],
             'access_token', ARGV[2],
@@ -65,7 +82,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             'scope', scope,
             'client_id', clientId,
             'gen', storedGen,
-            'client_gen', storedClientGen)
+            'client_gen', storedClientGen,
+            'stable_refresh', stableRefresh)
         redis.call('PEXPIRE', KEYS[3], ARGV[4])
         redis.call('HSET', KEYS[6],
             'access_token', ARGV[2],
@@ -79,7 +97,7 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         redis.call('PEXPIRE', KEYS[6], ARGV[8])
         redis.call('DEL', KEYS[5], KEYS[1])
 
-        return { accountId, sub, scope, clientId }
+        return { accountId, sub, scope, clientId, ARGV[1] }
         """;
 
     private static readonly RedisValue[] Fields =
@@ -88,7 +106,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         "account_id",
         "sub",
         "scope",
-        "client_id"
+        "client_id",
+        "stable_refresh"
     ];
 
     private static readonly RedisValue[] ReplayFields =
@@ -112,6 +131,7 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         var gen = genValue.IsNullOrEmpty ? 0L : (long)genValue;
         var clientGenValue = await db.StringGetAsync(KeyNames.ClientUserGen(sub, clientId)).WaitAsync(cancellationToken);
         var clientGen = clientGenValue.IsNullOrEmpty ? 0L : (long)clientGenValue;
+        var stableRefresh = ScopePolicy.HasOfflineAccess(scope);
 
         var tx = db.CreateTransaction();
 
@@ -129,7 +149,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             new("scope", scope),
             new("client_id", clientId),
             new("gen", gen),
-            new("client_gen", clientGen)
+            new("client_gen", clientGen),
+            new("stable_refresh", stableRefresh ? "1" : "0")
             ]).WaitAsync(cancellationToken);
         
         // Set TTL for refresh token
@@ -166,7 +187,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             return null;
         }
 
-        if (fields[0] != accessToken)
+        var stableRefresh = fields[5] == "1";
+        if (!stableRefresh && fields[0] != accessToken)
         {
             return null;
         }
@@ -335,7 +357,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
                 sub!,
                 oldAccessToken!,
                 expectedClientId ?? string.Empty,
-                ToPositiveMilliseconds(RefreshReplayWindow)
+                ToPositiveMilliseconds(RefreshReplayWindow),
+                refreshToken
             ]).WaitAsync(cancellationToken);
 
         if (result.IsNull)
@@ -344,7 +367,7 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         }
 
         var accessFields = (RedisResult[]?)result;
-        if (accessFields is not { Length: 4 })
+        if (accessFields is not { Length: 5 })
         {
             return null;
         }
@@ -353,10 +376,12 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         var refreshedSub = GetString(accessFields[1]);
         var scope = GetString(accessFields[2]);
         var clientId = GetString(accessFields[3]);
+        var refreshedRefreshToken = GetString(accessFields[4]);
         if (string.IsNullOrWhiteSpace(accountId) ||
             string.IsNullOrWhiteSpace(refreshedSub) ||
             string.IsNullOrWhiteSpace(scope) ||
-            string.IsNullOrWhiteSpace(clientId))
+            string.IsNullOrWhiteSpace(clientId) ||
+            string.IsNullOrWhiteSpace(refreshedRefreshToken))
         {
             return null;
         }
@@ -366,7 +391,7 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             Id = accountId,
             Sub = refreshedSub,
             AccessToken = newAccessToken,
-            RefreshToken = newRefreshToken,
+            RefreshToken = refreshedRefreshToken,
             Scope = scope,
             ClientId = clientId
         };

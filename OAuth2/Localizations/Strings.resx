@@ -303,6 +303,9 @@
   <data name="LOGIN_CONSENT_SCOPE_OPENID" xml:space="preserve">
     <value>Sign you in and identify your account.</value>
   </data>
+  <data name="LOGIN_CONSENT_SCOPE_OFFLINE_ACCESS" xml:space="preserve">
+    <value>Keep access when you are not actively using the application.</value>
+  </data>
   <data name="LOGIN_CONSENT_SCOPE_PHONE" xml:space="preserve">
     <value>Read your phone number.</value>
   </data>

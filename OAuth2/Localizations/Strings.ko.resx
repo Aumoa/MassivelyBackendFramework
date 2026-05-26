@@ -303,6 +303,9 @@
   <data name="LOGIN_CONSENT_SCOPE_OPENID" xml:space="preserve">
     <value>로그인하고 계정을 식별합니다.</value>
   </data>
+  <data name="LOGIN_CONSENT_SCOPE_OFFLINE_ACCESS" xml:space="preserve">
+    <value>애플리케이션을 사용 중이지 않을 때도 접근을 유지합니다.</value>
+  </data>
   <data name="LOGIN_CONSENT_SCOPE_PHONE" xml:space="preserve">
     <value>전화번호를 읽습니다.</value>
   </data>

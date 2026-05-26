@@ -365,6 +365,15 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("LOGIN_CONSENT_SCOPE_OPENID", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Keep access when you are not actively using the application.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_SCOPE_OFFLINE_ACCESS {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_SCOPE_OFFLINE_ACCESS", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Read your phone number.과(와) 유사한 지역화된 문자열을 찾습니다.

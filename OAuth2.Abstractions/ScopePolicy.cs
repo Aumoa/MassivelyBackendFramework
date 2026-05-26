@@ -3,8 +3,9 @@ namespace OAuth2;
 public static class ScopePolicy
 {
     public const string AllScope = "all";
+    public const string OfflineAccessScope = "offline_access";
 
-    public static readonly string[] SupportedScopes =
+    public static readonly string[] ClaimScopes =
     [
         "openid",
         "profile",
@@ -13,6 +14,19 @@ public static class ScopePolicy
         "phone",
         "groups"
     ];
+
+    public static readonly string[] SupportedScopes =
+    [
+        "openid",
+        "profile",
+        "email",
+        "address",
+        "phone",
+        "groups",
+        OfflineAccessScope
+    ];
+
+    public static readonly string[] DefaultClientScopes = ClaimScopes;
 
     public static bool TryNormalize(string? scopes, bool allowAll, out string normalized, out string? error)
     {
@@ -75,8 +89,13 @@ public static class ScopePolicy
     public static string ExpandAllForExternalClient(string scopes)
     {
         return Split(scopes).Contains(AllScope, StringComparer.Ordinal)
-            ? string.Join(' ', SupportedScopes)
+            ? string.Join(' ', ClaimScopes)
             : scopes;
+    }
+
+    public static bool HasOfflineAccess(string scopes)
+    {
+        return Split(scopes).Contains(OfflineAccessScope, StringComparer.Ordinal);
     }
 
     public static string[] Split(string? scopes)

@@ -497,6 +497,7 @@ public partial class Login(
         return scope switch
         {
             "openid" => Strings.LOGIN_CONSENT_SCOPE_OPENID,
+            "offline_access" => Strings.LOGIN_CONSENT_SCOPE_OFFLINE_ACCESS,
             "profile" => Strings.LOGIN_CONSENT_SCOPE_PROFILE,
             "email" => Strings.LOGIN_CONSENT_SCOPE_EMAIL,
             "address" => Strings.LOGIN_CONSENT_SCOPE_ADDRESS,

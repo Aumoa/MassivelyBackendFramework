@@ -26,7 +26,7 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
         await connection.ExecuteAsync(command);
 
         const string QUERY3 = "INSERT INTO `client_claim` (`client_id`, `name`, `value`) VALUES(@id, 'scope', @value)";
-        command = new CommandDefinition(QUERY3, ScopePolicy.SupportedScopes.Select(value => new { id, value }), tx, cancellationToken: cancellationToken);
+        command = new CommandDefinition(QUERY3, ScopePolicy.DefaultClientScopes.Select(value => new { id, value }), tx, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);
 
         await tx.CommitAsync(cancellationToken);
