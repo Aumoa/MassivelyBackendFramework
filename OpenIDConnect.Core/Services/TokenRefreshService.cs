@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using OAuth2.DTO;
 
 namespace OpenIDConnect.Services;
@@ -10,7 +11,8 @@ internal class TokenRefreshService(
     IHttpContextAccessor httpContextAccessor,
     IOptions<OIDCOptions> oidcOptions,
     ILogger<TokenRefreshService> logger,
-    HttpClient httpClient)
+    HttpClient httpClient,
+    OidcTokenValidator tokenValidator)
 {
     public async Task<TokenResponse?> TryRefreshTokenAsync(CancellationToken cancellationToken = default)
     {
@@ -47,8 +49,7 @@ internal class TokenRefreshService(
                 logger.LogError("Token refresh failed: {StatusCode} - {Content}", response.StatusCode, errorContent);
 
                 // Refresh token invalid, delete cookies
-                httpContext.Response.Cookies.Delete("id_token");
-                httpContext.Response.Cookies.Delete("refresh_token");
+                ClearTokenCookies(httpContext);
                 return null;
             }
 
@@ -57,6 +58,20 @@ internal class TokenRefreshService(
             {
                 logger.LogError("Token response is null");
                 return null;
+            }
+
+            if (!string.IsNullOrEmpty(tokenResponse.IdToken))
+            {
+                try
+                {
+                    await tokenValidator.ValidateAsync(tokenResponse.IdToken, cancellationToken);
+                }
+                catch (SecurityTokenException ex)
+                {
+                    logger.LogWarning(ex, "Refreshed id_token validation failed");
+                    ClearTokenCookies(httpContext);
+                    return null;
+                }
             }
 
             // Update cookies with new tokens for subsequent requests
@@ -92,5 +107,15 @@ internal class TokenRefreshService(
             logger.LogError(ex, "Error refreshing token");
             return null;
         }
+    }
+
+    private static void ClearTokenCookies(HttpContext httpContext)
+    {
+        var cookieOptions = new CookieOptions
+        {
+            Path = "/"
+        };
+        httpContext.Response.Cookies.Delete("id_token", cookieOptions);
+        httpContext.Response.Cookies.Delete("refresh_token", cookieOptions);
     }
 }

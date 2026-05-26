@@ -11,6 +11,8 @@ public static class ServiceCollectionExtensions
     {
         s.Configure<OIDCOptions>(config.GetRequiredSection("OIDC"));
 
+        s.AddHttpClient(OidcTokenValidator.HttpClientName);
+        s.AddSingleton<OidcTokenValidator>();
         s.AddHttpClient<TokenRefreshService>();
         s.AddHttpClient<JwtAuthenticationStateProvider>();
         s.AddScoped<TokenRefreshService>();

@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using OAuth2;
 using OAuth2.DTO;
 
@@ -22,9 +23,14 @@ internal class JwtAuthenticationStateProvider(
     IOptions<OIDCOptions> options,
     TokenRefreshService tokenRefreshService,
     HttpClient http,
+    OidcTokenValidator tokenValidator,
     IDataProtectionProvider dataProtectionProvider) : AuthenticationStateProvider, IAuthenticationStateProvider
 {
     private const int PkceStateLifetimeMinutes = 10;
+    private static readonly JwtSecurityTokenHandler TokenReader = new()
+    {
+        MapInboundClaims = false
+    };
 
     private ClaimsPrincipal? m_CurrentUser;
     private string? m_LastSuccessfullyCode;
@@ -77,50 +83,14 @@ internal class JwtAuthenticationStateProvider(
 
         try
         {
-            var handler = new JwtSecurityTokenHandler();
-            var token = handler.ReadJwtToken(jwtToken);
-
-            // Convert ValidTo to UTC for proper comparison
-            var tokenExpiryUtc = token.ValidTo.ToUniversalTime();
-            var now = DateTime.UtcNow;
-            var bufferTime = now.AddSeconds(1);
-
-            if (logger.IsEnabled(LogLevel.Debug))
+            var validatedToken = await ValidateOrRefreshIdTokenAsync(jwtToken);
+            if (validatedToken == null)
             {
-                logger.LogDebug("Token expiry check - ValidTo: {ValidTo} (UTC: {ValidToUtc}), Now: {Now}, Buffer: {Buffer}", token.ValidTo, tokenExpiryUtc, now, bufferTime);
+                m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
+                return new AuthenticationState(m_CurrentUser);
             }
 
-            // Check if token is expired or near expiration (1 second buffer)
-            if (tokenExpiryUtc < bufferTime)
-            {
-                var timeRemaining = tokenExpiryUtc - now;
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.LogTrace("JWT token expired or near expiration (remaining: {TimeRemaining}), attempting refresh", timeRemaining);
-                }
-
-                // Try to refresh token - use the returned TokenResponse directly
-                // instead of re-reading from Request.Cookies (which contains stale values)
-                var tokenResponse = await tokenRefreshService.TryRefreshTokenAsync();
-                if (tokenResponse?.IdToken != null)
-                {
-                    jwtToken = tokenResponse.IdToken;
-                    token = handler.ReadJwtToken(jwtToken);
-                    if (logger.IsEnabled(LogLevel.Trace))
-                    {
-                        logger.LogTrace("Token refreshed successfully, new expiry: {ValidTo}", token.ValidTo);
-                    }
-                }
-                else
-                {
-                    // Refresh failed, user needs to re-login
-                    logger.LogWarning("Token refresh failed, user needs to re-login");
-                    m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
-                    return new AuthenticationState(m_CurrentUser);
-                }
-            }
-
-            var identity = new ClaimsIdentity(token.Claims, "JwtAuthType");
+            var identity = new ClaimsIdentity(validatedToken.Principal.Claims, "JwtAuthType");
             foreach (var claim in identity.FindAll("groups").ToArray())
             {
                 var role = claim.Value;
@@ -129,16 +99,21 @@ internal class JwtAuthenticationStateProvider(
 
             m_CurrentUser = new ClaimsPrincipal(identity);
 
-            tokenExpiryUtc = token.ValidTo.ToUniversalTime();
+            var tokenExpiryUtc = validatedToken.Token.ValidTo.ToUniversalTime();
             var timeUntilExpiry = tokenExpiryUtc - DateTime.UtcNow;
             if (logger.IsEnabled(LogLevel.Debug))
             {
                 logger.LogDebug("JWT token validated successfully. Expires at: {ValidTo} UTC (in {TimeRemaining})", tokenExpiryUtc, timeUntilExpiry);
             }
         }
+        catch (SecurityTokenException ex)
+        {
+            logger.LogWarning(ex, "Failed to validate JWT token");
+            m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
+        }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to parse JWT token");
+            logger.LogError(ex, "Failed to load JWT token validation state");
             m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
         }
 
@@ -208,6 +183,17 @@ internal class JwtAuthenticationStateProvider(
                 ?? throw new InvalidOperationException("Failed to parse token response");
             if (tokenResponse.IdToken != null)
             {
+                try
+                {
+                    await tokenValidator.ValidateAsync(tokenResponse.IdToken, cancellationToken);
+                }
+                catch (SecurityTokenException ex)
+                {
+                    logger.LogWarning(ex, "Received id_token validation failed.");
+                    m_LastSuccessfullyCode = null;
+                    return;
+                }
+
                 httpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
                 {
                     HttpOnly = true,
@@ -275,6 +261,63 @@ internal class JwtAuthenticationStateProvider(
             ["code_challenge"] = codeChallenge,
             ["code_challenge_method"] = "S256"
         });
+    }
+
+    private async Task<ValidatedIdToken?> ValidateOrRefreshIdTokenAsync(string jwtToken)
+    {
+        if (ShouldRefresh(jwtToken))
+        {
+            logger.LogTrace("JWT token is expired or near expiration, attempting refresh.");
+
+            var tokenResponse = await tokenRefreshService.TryRefreshTokenAsync();
+            if (tokenResponse?.IdToken == null)
+            {
+                logger.LogWarning("Token refresh failed, user needs to re-login");
+                return null;
+            }
+
+            jwtToken = tokenResponse.IdToken;
+        }
+
+        try
+        {
+            return await tokenValidator.ValidateAsync(jwtToken);
+        }
+        catch (SecurityTokenExpiredException)
+        {
+            logger.LogTrace("JWT token expired during validation, attempting refresh.");
+
+            var tokenResponse = await tokenRefreshService.TryRefreshTokenAsync();
+            if (tokenResponse?.IdToken == null)
+            {
+                logger.LogWarning("Token refresh failed, user needs to re-login");
+                return null;
+            }
+
+            return await tokenValidator.ValidateAsync(tokenResponse.IdToken);
+        }
+    }
+
+    private bool ShouldRefresh(string jwtToken)
+    {
+        try
+        {
+            var token = TokenReader.ReadJwtToken(jwtToken);
+            var tokenExpiryUtc = token.ValidTo.ToUniversalTime();
+            var now = DateTime.UtcNow;
+            var bufferTime = now.AddSeconds(1);
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                logger.LogDebug("Token expiry check - ValidTo: {ValidTo} (UTC: {ValidToUtc}), Now: {Now}, Buffer: {Buffer}", token.ValidTo, tokenExpiryUtc, now, bufferTime);
+            }
+
+            return tokenExpiryUtc < bufferTime;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private string ProtectCodeVerifier(string codeVerifier)
