@@ -31,32 +31,38 @@ public class InMemoryExpenseService(InMemorySettlementService settlements) : IEx
             CreatedAt = DateTimeOffset.UtcNow
         };
         settlement.Expenses.Add(expense);
+        await settlements.MarkAiSummaryDirtyAsync(settlementId, cancellationToken);
         return expense;
     }
 
-    public async Task RemoveExpenseAsync(Guid expenseId, CancellationToken cancellationToken = default)
+    public Task RemoveExpenseAsync(Guid expenseId, CancellationToken cancellationToken = default)
     {
-        foreach (var s in (await settlements.GetSettlementsAsync(string.Empty, cancellationToken)).ToList())
+        var settlement = settlements.FindSettlementByExpenseId(expenseId);
+        if (settlement is not null)
         {
-            var e = s.Expenses.FirstOrDefault(e => e.Id == expenseId);
+            var e = settlement.Expenses.FirstOrDefault(e => e.Id == expenseId);
             if (e is not null)
             {
-                s.Expenses.Remove(e);
-                return;
+                settlement.Expenses.Remove(e);
+                return settlements.MarkAiSummaryDirtyAsync(settlement.Id, cancellationToken);
             }
         }
+
+        return Task.CompletedTask;
     }
 
     public async Task UpdateExpenseAsync(Guid expenseId, decimal amount, Guid paidByParticipantId, IEnumerable<Guid>? splitAmong = null, CancellationToken cancellationToken = default)
     {
-        foreach (var s in (await settlements.GetSettlementsAsync(string.Empty, cancellationToken)).ToList())
+        var settlement = settlements.FindSettlementByExpenseId(expenseId);
+        if (settlement is not null)
         {
-            var e = s.Expenses.FirstOrDefault(e => e.Id == expenseId);
+            var e = settlement.Expenses.FirstOrDefault(e => e.Id == expenseId);
             if (e is not null)
             {
                 e.Amount = amount;
                 e.PaidByParticipantId = paidByParticipantId;
                 e.SplitAmongParticipantIds = splitAmong?.ToList() ?? [];
+                await settlements.MarkAiSummaryDirtyAsync(settlement.Id, cancellationToken);
                 return;
             }
         }

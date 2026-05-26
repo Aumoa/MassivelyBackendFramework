@@ -18,4 +18,8 @@ public interface ISettlementService
     Task DeleteSettlementAsync(Guid id, CancellationToken ct = default);
 
     Task SetAllowGuestExpenseEditAsync(Guid id, bool allow, CancellationToken ct = default);
+
+    Task MarkAiSummaryDirtyAsync(Guid id, CancellationToken ct = default);
+
+    Task<bool> SaveAiSummaryAsync(Guid id, string summary, int expectedRevision, CancellationToken ct = default);
 }

@@ -41,6 +41,14 @@ public class Settlement
     /// </summary>
     public bool AllowGuestExpenseEdit { get; set; } = true;
 
+    public string? AiSummary { get; set; }
+
+    public bool AiSummaryDirty { get; set; } = true;
+
+    public int AiSummaryRevision { get; set; }
+
+    public DateTimeOffset? AiSummaryUpdatedAt { get; set; }
+
     public IList<Participant> Participants { get; set; } = [];
 
     public IList<Expense> Expenses { get; set; } = [];

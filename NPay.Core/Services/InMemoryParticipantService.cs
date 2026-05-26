@@ -21,19 +21,23 @@ public class InMemoryParticipantService(InMemorySettlementService settlements) :
             Subject = subject
         };
         settlement.Participants.Add(participant);
+        await settlements.MarkAiSummaryDirtyAsync(settlementId, cancellationToken);
         return participant;
     }
 
-    public async Task RemoveParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
+    public Task RemoveParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
     {
-        foreach (var s in (await settlements.GetSettlementsAsync(string.Empty, cancellationToken)).ToList())
+        var settlement = settlements.FindSettlementByParticipantId(participantId);
+        if (settlement is not null)
         {
-            var p = s.Participants.FirstOrDefault(p => p.Id == participantId);
+            var p = settlement.Participants.FirstOrDefault(p => p.Id == participantId);
             if (p is not null)
             {
-                s.Participants.Remove(p);
-                return;
+                settlement.Participants.Remove(p);
+                return settlements.MarkAiSummaryDirtyAsync(settlement.Id, cancellationToken);
             }
         }
+
+        return Task.CompletedTask;
     }
 }

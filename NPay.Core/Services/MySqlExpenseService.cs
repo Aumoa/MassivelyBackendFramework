@@ -36,8 +36,16 @@ public class MySqlExpenseService(string connectionString, MySqlSettlementService
         const string splitSql = """
             INSERT INTO `npay_expense_split` (`expense_id`, `participant_id`) VALUES (@ExpenseId, @ParticipantId)
             """;
+        const string dirtySql = """
+            UPDATE `npay_settlement`
+            SET `ai_summary_dirty` = 1,
+                `ai_summary_revision` = `ai_summary_revision` + 1
+            WHERE `id` = @id
+            """;
 
         await using var conn = Open();
+        await conn.OpenAsync(cancellationToken);
+        await using var transaction = await conn.BeginTransactionAsync(cancellationToken);
         await conn.ExecuteAsync(expenseSql, new
         {
             Id = expense.Id.ToString(),
@@ -46,7 +54,7 @@ public class MySqlExpenseService(string connectionString, MySqlSettlementService
             expense.Amount,
             PaidBy = paidByParticipantId.ToString(),
             CreatedAt = expense.CreatedAt.UtcDateTime
-        });
+        }, transaction);
 
         foreach (var pid in expense.SplitAmongParticipantIds)
         {
@@ -54,37 +62,70 @@ public class MySqlExpenseService(string connectionString, MySqlSettlementService
             {
                 ExpenseId = expense.Id.ToString(),
                 ParticipantId = pid.ToString()
-            });
+            }, transaction);
         }
+
+        await conn.ExecuteAsync(dirtySql, new { id = settlementId.ToString() }, transaction);
+        await transaction.CommitAsync(cancellationToken);
 
         return expense;
     }
 
     public async Task RemoveExpenseAsync(Guid expenseId, CancellationToken cancellationToken = default)
     {
+        const string settlementSql = "SELECT `settlement_id` FROM `npay_expense` WHERE `id` = @id";
         const string sql = "DELETE FROM `npay_expense` WHERE `id` = @id";
+        const string dirtySql = """
+            UPDATE `npay_settlement`
+            SET `ai_summary_dirty` = 1,
+                `ai_summary_revision` = `ai_summary_revision` + 1
+            WHERE `id` = @id
+            """;
         await using var conn = Open();
-        await conn.ExecuteAsync(sql, new { id = expenseId.ToString() });
+        await conn.OpenAsync(cancellationToken);
+        await using var transaction = await conn.BeginTransactionAsync(cancellationToken);
+        var settlementId = await conn.QuerySingleOrDefaultAsync<string?>(settlementSql, new { id = expenseId.ToString() }, transaction);
+        await conn.ExecuteAsync(sql, new { id = expenseId.ToString() }, transaction);
+
+        if (Guid.TryParse(settlementId, out var parsedSettlementId))
+            await conn.ExecuteAsync(dirtySql, new { id = parsedSettlementId.ToString() }, transaction);
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task UpdateExpenseAsync(Guid expenseId, decimal amount, Guid paidByParticipantId, IEnumerable<Guid>? splitAmong = null, CancellationToken cancellationToken = default)
     {
+        const string settlementSql = "SELECT `settlement_id` FROM `npay_expense` WHERE `id` = @id";
         const string updateSql = "UPDATE `npay_expense` SET `amount` = @amount, `paid_by_participant_id` = @paidBy WHERE `id` = @id";
         const string deleteSplitSql = "DELETE FROM `npay_expense_split` WHERE `expense_id` = @expenseId";
         const string insertSplitSql = "INSERT INTO `npay_expense_split` (`expense_id`, `participant_id`) VALUES (@expenseId, @participantId)";
+        const string dirtySql = """
+            UPDATE `npay_settlement`
+            SET `ai_summary_dirty` = 1,
+                `ai_summary_revision` = `ai_summary_revision` + 1
+            WHERE `id` = @id
+            """;
 
         await using var conn = Open();
-        await conn.ExecuteAsync(updateSql, new { amount, paidBy = paidByParticipantId.ToString(), id = expenseId.ToString() });
+        await conn.OpenAsync(cancellationToken);
+        await using var transaction = await conn.BeginTransactionAsync(cancellationToken);
+        var settlementId = await conn.QuerySingleOrDefaultAsync<string?>(settlementSql, new { id = expenseId.ToString() }, transaction);
+        await conn.ExecuteAsync(updateSql, new { amount, paidBy = paidByParticipantId.ToString(), id = expenseId.ToString() }, transaction);
 
-        await conn.ExecuteAsync(deleteSplitSql, new { expenseId = expenseId.ToString() });
+        await conn.ExecuteAsync(deleteSplitSql, new { expenseId = expenseId.ToString() }, transaction);
 
         if (splitAmong is not null)
         {
             foreach (var pid in splitAmong)
             {
-                await conn.ExecuteAsync(insertSplitSql, new { expenseId = expenseId.ToString(), participantId = pid.ToString() });
+                await conn.ExecuteAsync(insertSplitSql, new { expenseId = expenseId.ToString(), participantId = pid.ToString() }, transaction);
             }
         }
+
+        if (Guid.TryParse(settlementId, out var parsedSettlementId))
+            await conn.ExecuteAsync(dirtySql, new { id = parsedSettlementId.ToString() }, transaction);
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<TransferInstruction>> CalculateTransfersAsync(

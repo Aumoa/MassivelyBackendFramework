@@ -28,23 +28,49 @@ public class MySqlParticipantService(string connectionString) : IParticipantServ
             INSERT INTO `npay_participant` (`id`, `settlement_id`, `name`, `subject`)
             VALUES (@Id, @SettlementId, @Name, @Subject)
             """;
+        const string dirtySql = """
+            UPDATE `npay_settlement`
+            SET `ai_summary_dirty` = 1,
+                `ai_summary_revision` = `ai_summary_revision` + 1
+            WHERE `id` = @id
+            """;
 
         await using var conn = Open();
+        await conn.OpenAsync(cancellationToken);
+        await using var transaction = await conn.BeginTransactionAsync(cancellationToken);
         await conn.ExecuteAsync(sql, new
         {
             Id = participant.Id.ToString(),
             SettlementId = settlementId.ToString(),
             participant.Name,
             participant.Subject
-        });
+        }, transaction);
+
+        await conn.ExecuteAsync(dirtySql, new { id = settlementId.ToString() }, transaction);
+        await transaction.CommitAsync(cancellationToken);
 
         return participant;
     }
 
     public async Task RemoveParticipantAsync(Guid participantId, CancellationToken cancellationToken = default)
     {
+        const string settlementSql = "SELECT `settlement_id` FROM `npay_participant` WHERE `id` = @id";
         const string sql = "DELETE FROM `npay_participant` WHERE `id` = @id";
+        const string dirtySql = """
+            UPDATE `npay_settlement`
+            SET `ai_summary_dirty` = 1,
+                `ai_summary_revision` = `ai_summary_revision` + 1
+            WHERE `id` = @id
+            """;
         await using var conn = Open();
-        await conn.ExecuteAsync(sql, new { id = participantId.ToString() });
+        await conn.OpenAsync(cancellationToken);
+        await using var transaction = await conn.BeginTransactionAsync(cancellationToken);
+        var settlementId = await conn.QuerySingleOrDefaultAsync<string?>(settlementSql, new { id = participantId.ToString() }, transaction);
+        await conn.ExecuteAsync(sql, new { id = participantId.ToString() }, transaction);
+
+        if (Guid.TryParse(settlementId, out var parsedSettlementId))
+            await conn.ExecuteAsync(dirtySql, new { id = parsedSettlementId.ToString() }, transaction);
+
+        await transaction.CommitAsync(cancellationToken);
     }
 }

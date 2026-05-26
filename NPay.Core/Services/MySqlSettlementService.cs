@@ -15,7 +15,8 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
     public async Task<IReadOnlyList<Settlement>> GetSettlementsAsync(string ownerSubject, CancellationToken cancellationToken = default)
     {
         const string sql = """
-            SELECT `id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `closed_at`, `allow_guest_expense_edit`
+            SELECT `id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `closed_at`,
+                   `allow_guest_expense_edit`, `ai_summary`, `ai_summary_dirty`, `ai_summary_revision`, `ai_summary_updated_at`
             FROM `npay_settlement`
             WHERE `owner_subject` = @ownerSubject
             ORDER BY `created_at` DESC
@@ -29,7 +30,8 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
     public async Task<Settlement?> GetSettlementAsync(Guid id, CancellationToken cancellationToken = default)
     {
         const string settlementSql = """
-            SELECT `id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `closed_at`, `allow_guest_expense_edit`
+            SELECT `id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `closed_at`,
+                   `allow_guest_expense_edit`, `ai_summary`, `ai_summary_dirty`, `ai_summary_revision`, `ai_summary_updated_at`
             FROM `npay_settlement`
             WHERE `id` = @id
             """;
@@ -82,8 +84,9 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
         };
 
         const string sql = """
-            INSERT INTO `npay_settlement` (`id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `allow_guest_expense_edit`)
-            VALUES (@Id, @OwnerSubject, @Title, @Description, 0, @CreatedAt, @AllowGuestExpenseEdit)
+            INSERT INTO `npay_settlement`
+                (`id`, `owner_subject`, `title`, `description`, `status`, `created_at`, `allow_guest_expense_edit`, `ai_summary_dirty`, `ai_summary_revision`)
+            VALUES (@Id, @OwnerSubject, @Title, @Description, 0, @CreatedAt, @AllowGuestExpenseEdit, 1, 0)
             """;
 
         await using var conn = Open();
@@ -101,7 +104,14 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
 
     public async Task CloseSettlementAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        const string sql = "UPDATE `npay_settlement` SET `status` = 1, `closed_at` = @now WHERE `id` = @id";
+        const string sql = """
+            UPDATE `npay_settlement`
+            SET `status` = 1,
+                `closed_at` = @now,
+                `ai_summary_dirty` = 1,
+                `ai_summary_revision` = `ai_summary_revision` + 1
+            WHERE `id` = @id
+            """;
         await using var conn = Open();
         await conn.ExecuteAsync(sql, new { id = id.ToString(), now = DateTime.UtcNow });
     }
@@ -120,6 +130,40 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
         await conn.ExecuteAsync(sql, new { id = id.ToString(), allow = allow ? 1 : 0 });
     }
 
+    public async Task MarkAiSummaryDirtyAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            UPDATE `npay_settlement`
+            SET `ai_summary_dirty` = 1,
+                `ai_summary_revision` = `ai_summary_revision` + 1
+            WHERE `id` = @id
+            """;
+        await using var conn = Open();
+        await conn.ExecuteAsync(sql, new { id = id.ToString() });
+    }
+
+    public async Task<bool> SaveAiSummaryAsync(Guid id, string summary, int expectedRevision, CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            UPDATE `npay_settlement`
+            SET `ai_summary` = @summary,
+                `ai_summary_dirty` = 0,
+                `ai_summary_updated_at` = @updatedAt
+            WHERE `id` = @id
+              AND `ai_summary_revision` = @expectedRevision
+              AND `ai_summary_dirty` = 1
+            """;
+        await using var conn = Open();
+        var rows = await conn.ExecuteAsync(sql, new
+        {
+            id = id.ToString(),
+            summary,
+            expectedRevision,
+            updatedAt = DateTime.UtcNow
+        });
+        return rows == 1;
+    }
+
     // ── Row DTOs ──────────────────────────────────────────────────────────────
 
     private class SettlementRow
@@ -132,6 +176,10 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
         public DateTime created_at { get; set; }
         public DateTime? closed_at { get; set; }
         public bool allow_guest_expense_edit { get; set; }
+        public string? ai_summary { get; set; }
+        public bool ai_summary_dirty { get; set; } = true;
+        public int ai_summary_revision { get; set; }
+        public DateTime? ai_summary_updated_at { get; set; }
 
         public Settlement ToModel(IList<Participant> participants, IList<Expense> expenses) => new()
         {
@@ -143,6 +191,10 @@ public class MySqlSettlementService(string connectionString) : ISettlementServic
             CreatedAt = new DateTimeOffset(created_at, TimeSpan.Zero),
             ClosedAt = closed_at.HasValue ? new DateTimeOffset(closed_at.Value, TimeSpan.Zero) : null,
             AllowGuestExpenseEdit = allow_guest_expense_edit,
+            AiSummary = ai_summary,
+            AiSummaryDirty = ai_summary_dirty,
+            AiSummaryRevision = ai_summary_revision,
+            AiSummaryUpdatedAt = ai_summary_updated_at.HasValue ? new DateTimeOffset(ai_summary_updated_at.Value, TimeSpan.Zero) : null,
             Participants = participants,
             Expenses = expenses
         };

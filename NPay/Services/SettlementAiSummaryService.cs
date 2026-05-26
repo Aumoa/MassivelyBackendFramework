@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using AI;
@@ -10,13 +11,61 @@ namespace NPay.Services;
 
 public sealed class SettlementAiSummaryService(
     IServiceProvider services,
+    ISettlementService settlementService,
     IOptions<SettlementAiSummaryOptions> options,
     IOptions<ClaudeChatClientOptions> claudeOptions,
     ILogger<SettlementAiSummaryService> logger) : ISettlementAiSummaryService
 {
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> SummaryLocks = new();
     private const int SummaryMaxLength = 180;
 
-    public async Task<string> GenerateSummaryAsync(Settlement settlement, CancellationToken cancellationToken = default)
+    public async Task<string> GetOrGenerateSummaryAsync(Guid settlementId, CancellationToken cancellationToken = default)
+    {
+        var settlement = await settlementService.GetSettlementAsync(settlementId, cancellationToken);
+        if (settlement is null)
+            return string.Empty;
+
+        if (TryGetStoredSummary(settlement, out var storedSummary))
+            return storedSummary;
+
+        var summaryLock = SummaryLocks.GetOrAdd(settlementId, _ => new SemaphoreSlim(1, 1));
+        await summaryLock.WaitAsync(cancellationToken);
+        try
+        {
+            while (true)
+            {
+                settlement = await settlementService.GetSettlementAsync(settlementId, cancellationToken);
+                if (settlement is null)
+                    return string.Empty;
+
+                if (TryGetStoredSummary(settlement, out storedSummary))
+                    return storedSummary;
+
+                var expectedRevision = settlement.AiSummaryRevision;
+                var summary = await GenerateSummaryTextAsync(settlement, cancellationToken);
+                if (await settlementService.SaveAiSummaryAsync(settlementId, summary, expectedRevision, cancellationToken))
+                    return summary;
+            }
+        }
+        finally
+        {
+            summaryLock.Release();
+        }
+    }
+
+    private static bool TryGetStoredSummary(Settlement settlement, out string summary)
+    {
+        if (!settlement.AiSummaryDirty && !string.IsNullOrWhiteSpace(settlement.AiSummary))
+        {
+            summary = settlement.AiSummary;
+            return true;
+        }
+
+        summary = string.Empty;
+        return false;
+    }
+
+    private async Task<string> GenerateSummaryTextAsync(Settlement settlement, CancellationToken cancellationToken)
     {
         var fallback = CreateFallbackSummary(settlement);
         var summaryOptions = options.Value;

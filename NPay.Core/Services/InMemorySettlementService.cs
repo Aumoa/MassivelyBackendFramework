@@ -48,6 +48,7 @@ public class InMemorySettlementService : ISettlementService
         {
             settlement.Status = SettlementStatus.Closed;
             settlement.ClosedAt = DateTimeOffset.UtcNow;
+            MarkAiSummaryDirty(settlement);
         }
         return Task.CompletedTask;
     }
@@ -64,5 +65,41 @@ public class InMemorySettlementService : ISettlementService
         if (settlement is not null)
             settlement.AllowGuestExpenseEdit = allow;
         return Task.CompletedTask;
+    }
+
+    public Task MarkAiSummaryDirtyAsync(Guid id, CancellationToken ct = default)
+    {
+        var settlement = _settlements.FirstOrDefault(s => s.Id == id);
+        if (settlement is not null)
+            MarkAiSummaryDirty(settlement);
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> SaveAiSummaryAsync(Guid id, string summary, int expectedRevision, CancellationToken ct = default)
+    {
+        var settlement = _settlements.FirstOrDefault(s => s.Id == id);
+        if (settlement is null || settlement.AiSummaryRevision != expectedRevision || !settlement.AiSummaryDirty)
+            return Task.FromResult(false);
+
+        settlement.AiSummary = summary;
+        settlement.AiSummaryDirty = false;
+        settlement.AiSummaryUpdatedAt = DateTimeOffset.UtcNow;
+        return Task.FromResult(true);
+    }
+
+    internal Settlement? FindSettlementByExpenseId(Guid expenseId)
+    {
+        return _settlements.FirstOrDefault(s => s.Expenses.Any(e => e.Id == expenseId));
+    }
+
+    internal Settlement? FindSettlementByParticipantId(Guid participantId)
+    {
+        return _settlements.FirstOrDefault(s => s.Participants.Any(p => p.Id == participantId));
+    }
+
+    private static void MarkAiSummaryDirty(Settlement settlement)
+    {
+        settlement.AiSummaryDirty = true;
+        settlement.AiSummaryRevision++;
     }
 }

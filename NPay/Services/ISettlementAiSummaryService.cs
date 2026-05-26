@@ -4,5 +4,5 @@ namespace NPay.Services;
 
 public interface ISettlementAiSummaryService
 {
-    Task<string> GenerateSummaryAsync(Settlement settlement, CancellationToken cancellationToken = default);
+    Task<string> GetOrGenerateSummaryAsync(Guid settlementId, CancellationToken cancellationToken = default);
 }

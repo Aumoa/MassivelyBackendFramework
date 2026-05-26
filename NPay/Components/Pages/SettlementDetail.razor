@@ -375,9 +375,7 @@ else
     private List<ParticipantAmountSummary> participantExpenseSummaries = [];
     private List<ParticipantAmountSummary> participantPaidSummaries = [];
     private string? aiSummary;
-    private bool aiSummaryDirty = true;
     private bool isAiSummaryLoading;
-    private int aiSummaryRevision;
 
     // Auth state
     private bool isAuthenticated = false;
@@ -437,8 +435,19 @@ else
             InitSplitAmong();
             RefreshParticipantPaidSummaries();
             RefreshParticipantExpenseSummaries();
+            SyncStoredAiSummary();
             await RefreshTransfersAsync();
+
+            if (activeTab == Tab.Result)
+                await RefreshAiSummaryIfNeededAsync();
         }
+    }
+
+    private void SyncStoredAiSummary()
+    {
+        aiSummary = settlement is { AiSummaryDirty: false } && !string.IsNullOrWhiteSpace(settlement.AiSummary)
+            ? settlement.AiSummary
+            : null;
     }
 
     private void RefreshParticipantPaidSummaries()
@@ -512,7 +521,6 @@ else
         newExpenseLabel = string.Empty;
         newExpenseAmount = 0;
         newExpensePaidBy = Guid.Empty;
-        MarkAiSummaryDirty();
         await LoadAsync();
     }
 
@@ -525,7 +533,6 @@ else
     private async Task RemoveExpenseAsync(Guid expenseId)
     {
         await ExpenseService.RemoveExpenseAsync(expenseId);
-        MarkAiSummaryDirty();
         await LoadAsync();
     }
 
@@ -534,14 +541,12 @@ else
         if (string.IsNullOrWhiteSpace(newParticipantName)) return;
         await ParticipantService.AddParticipantAsync(Id, newParticipantName.Trim());
         newParticipantName = string.Empty;
-        MarkAiSummaryDirty();
         await LoadAsync();
     }
 
     private async Task RemoveParticipantAsync(Guid participantId)
     {
         await ParticipantService.RemoveParticipantAsync(participantId);
-        MarkAiSummaryDirty();
         await LoadAsync();
     }
 
@@ -568,35 +573,42 @@ else
 
     private async Task OnExpenseDialogSavedAsync()
     {
-        MarkAiSummaryDirty();
         await LoadAsync();
     }
 
     private async Task RefreshAiSummaryIfNeededAsync()
     {
-        if (!aiSummaryDirty || isAiSummaryLoading || settlement is null)
+        if (isAiSummaryLoading || settlement is null)
             return;
 
-        var revision = aiSummaryRevision;
-        aiSummaryDirty = false;
+        if (!settlement.AiSummaryDirty && !string.IsNullOrWhiteSpace(settlement.AiSummary))
+        {
+            aiSummary = settlement.AiSummary;
+            return;
+        }
+
         isAiSummaryLoading = true;
         StateHasChanged();
 
-        var summary = await SettlementAiSummaryService.GenerateSummaryAsync(settlement);
+        try
+        {
+            aiSummary = await SettlementAiSummaryService.GetOrGenerateSummaryAsync(Id);
 
-        if (revision == aiSummaryRevision)
-            aiSummary = summary;
-        else
-            aiSummaryDirty = true;
-
-        isAiSummaryLoading = false;
-        StateHasChanged();
-    }
-
-    private void MarkAiSummaryDirty()
-    {
-        aiSummaryDirty = true;
-        aiSummaryRevision++;
+            var refreshedSettlement = await SettlementService.GetSettlementAsync(Id);
+            if (refreshedSettlement is not null)
+            {
+                settlement.AiSummary = refreshedSettlement.AiSummary;
+                settlement.AiSummaryDirty = refreshedSettlement.AiSummaryDirty;
+                settlement.AiSummaryRevision = refreshedSettlement.AiSummaryRevision;
+                settlement.AiSummaryUpdatedAt = refreshedSettlement.AiSummaryUpdatedAt;
+                SyncStoredAiSummary();
+            }
+        }
+        finally
+        {
+            isAiSummaryLoading = false;
+            StateHasChanged();
+        }
     }
 
     private string ParticipantName(Guid id) =>
