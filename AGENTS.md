@@ -9,6 +9,8 @@
 
 ## Design Theme Policy
 
+- Use OAuth2's current visual language as the default design baseline for services: calm surfaces, restrained borders, compact rounded corners, clear section hierarchy, and practical form/table layouts.
+- Preserve a service's own product identity when it has a clear domain-specific design need, but otherwise align new UI work with the OAuth2 design baseline.
 - Services with a user interface should respect the user's system color scheme by default.
 - Prefer `prefers-color-scheme` or equivalent platform support to select light or dark theme automatically.
 - Keep shared UI components theme-aware by using service-level design tokens instead of hard-coded light-only colors.
