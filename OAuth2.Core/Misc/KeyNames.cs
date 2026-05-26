@@ -12,6 +12,9 @@ internal static class KeyNames
     public static string Refresh(string id) => $"{Refreshes}:{id}";
     public static string UnwrapRefresh(string key) => key[(Refreshes.Length + 1)..];
 
+    public const string RefreshReplays = $"{Prefix}:refresh_replay";
+    public static string RefreshReplay(string id) => $"{RefreshReplays}:{id}";
+
     public const string AuthorizationCodes = $"{Prefix}:authorization_code";
     public static string AuthorizationCode(string code) => $"{AuthorizationCodes}:{code}";
     public static string UnwrapAuthorizationCode(string key) => key[(AuthorizationCodes.Length + 1)..];

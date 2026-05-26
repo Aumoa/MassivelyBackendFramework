@@ -8,6 +8,8 @@ namespace OAuth2.Services;
 
 internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses> logger) : IAccesses
 {
+    private static readonly TimeSpan RefreshReplayWindow = TimeSpan.FromSeconds(30);
+
     private const string RotateRefreshTokenScript = """
         local accessToken = redis.call('HGET', KEYS[1], 'access_token')
         if accessToken == false or accessToken == '' or accessToken ~= ARGV[6] then
@@ -20,6 +22,10 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         local clientId = redis.call('HGET', KEYS[1], 'client_id')
 
         if accountId == false or sub == false or scope == false or clientId == false then
+            return nil
+        end
+
+        if ARGV[7] ~= '' and clientId ~= ARGV[7] then
             return nil
         end
 
@@ -50,6 +56,15 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             'client_id', clientId,
             'gen', storedGen)
         redis.call('PEXPIRE', KEYS[3], ARGV[4])
+        redis.call('HSET', KEYS[6],
+            'access_token', ARGV[2],
+            'refresh_token', ARGV[1],
+            'account_id', accountId,
+            'sub', sub,
+            'scope', scope,
+            'client_id', clientId,
+            'gen', storedGen)
+        redis.call('PEXPIRE', KEYS[6], ARGV[8])
         redis.call('DEL', KEYS[5], KEYS[1])
 
         return { accountId, sub, scope, clientId }
@@ -62,6 +77,17 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         "sub",
         "scope",
         "client_id"
+    ];
+
+    private static readonly RedisValue[] ReplayFields =
+    [
+        "access_token",
+        "refresh_token",
+        "account_id",
+        "sub",
+        "scope",
+        "client_id",
+        "gen"
     ];
 
     public async ValueTask<Access> WriteAccessAsync(string id, string sub, string scope, string clientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default)
@@ -223,17 +249,33 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         };
     }
 
-    public async ValueTask<Access?> RefreshAccessAsync(string refreshToken, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default)
+    public ValueTask<Access?> RefreshAccessAsync(string refreshToken, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default)
+    {
+        return RefreshAccessCoreAsync(refreshToken, null, expire, refreshTokenExpire, cancellationToken);
+    }
+
+    public ValueTask<Access?> RefreshAccessAsync(string refreshToken, string clientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            throw new ArgumentException("Client ID is required.", nameof(clientId));
+        }
+
+        return RefreshAccessCoreAsync(refreshToken, clientId, expire, refreshTokenExpire, cancellationToken);
+    }
+
+    private async ValueTask<Access?> RefreshAccessCoreAsync(string refreshToken, string? expectedClientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken)
     {
         var db = multiplexer.GetDatabase();
         var refreshKey = KeyNames.Refresh(refreshToken);
+        var replayKey = KeyNames.RefreshReplay(refreshToken);
 
         var refreshFields = await db.HashGetAsync(refreshKey, ["access_token", "sub"]).WaitAsync(cancellationToken);
         var oldAccessToken = refreshFields[0];
         var sub = refreshFields[1];
         if (oldAccessToken.IsNullOrEmpty || sub.IsNullOrEmpty)
         {
-            return null;
+            return await ReadRefreshReplayAsync(db, refreshToken, expectedClientId, cancellationToken);
         }
 
         var newAccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
@@ -245,7 +287,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
                 KeyNames.Access(newAccessToken),
                 KeyNames.Refresh(newRefreshToken),
                 KeyNames.UserGen(sub!),
-                KeyNames.Access(oldAccessToken!)
+                KeyNames.Access(oldAccessToken!),
+                replayKey
             ],
             [
                 newRefreshToken,
@@ -253,12 +296,14 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
                 ToPositiveMilliseconds(expire),
                 ToPositiveMilliseconds(refreshTokenExpire),
                 sub!,
-                oldAccessToken!
+                oldAccessToken!,
+                expectedClientId ?? string.Empty,
+                ToPositiveMilliseconds(RefreshReplayWindow)
             ]).WaitAsync(cancellationToken);
 
         if (result.IsNull)
         {
-            return null;
+            return await ReadRefreshReplayAsync(db, refreshToken, expectedClientId, cancellationToken);
         }
 
         var accessFields = (RedisResult[]?)result;
@@ -285,6 +330,60 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             Sub = refreshedSub,
             AccessToken = newAccessToken,
             RefreshToken = newRefreshToken,
+            Scope = scope,
+            ClientId = clientId
+        };
+    }
+
+    private async ValueTask<Access?> ReadRefreshReplayAsync(IDatabase db, string refreshToken, string? expectedClientId, CancellationToken cancellationToken)
+    {
+        var replayKey = KeyNames.RefreshReplay(refreshToken);
+        var fields = await db.HashGetAsync(replayKey, ReplayFields).WaitAsync(cancellationToken);
+        if (fields.Length != ReplayFields.Length || fields.Any(static p => p.IsNullOrEmpty))
+        {
+            return null;
+        }
+
+        var accessToken = fields[0].ToString();
+        var replayedRefreshToken = fields[1].ToString();
+        var accountId = fields[2].ToString();
+        var sub = fields[3].ToString();
+        var scope = fields[4].ToString();
+        var clientId = fields[5].ToString();
+
+        if (!string.IsNullOrEmpty(expectedClientId) && clientId != expectedClientId)
+        {
+            return null;
+        }
+
+        var currentGenValue = await db.StringGetAsync(KeyNames.UserGen(sub)).WaitAsync(cancellationToken);
+        var storedGen = (long)fields[6];
+        var currentGen = currentGenValue.IsNullOrEmpty ? 0L : (long)currentGenValue;
+        if (storedGen != currentGen)
+        {
+            return null;
+        }
+
+        var activeRefreshToken = await db.StringGetAsync(KeyNames.Access(accessToken)).WaitAsync(cancellationToken);
+        if (activeRefreshToken != replayedRefreshToken)
+        {
+            return null;
+        }
+
+        var activeAccessToken = await db.HashGetAsync(KeyNames.Refresh(replayedRefreshToken), "access_token").WaitAsync(cancellationToken);
+        if (activeAccessToken != accessToken)
+        {
+            return null;
+        }
+
+        logger.LogDebug("Refresh token replay served from idempotent window. ClientId: {ClientId}", clientId);
+
+        return new Access
+        {
+            Id = accountId,
+            Sub = sub,
+            AccessToken = accessToken,
+            RefreshToken = replayedRefreshToken,
             Scope = scope,
             ClientId = clientId
         };

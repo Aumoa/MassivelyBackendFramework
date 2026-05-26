@@ -300,32 +300,13 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_request", error_description = "client_secret is required" });
         }
 
-        // Step 1: Query refresh token information without refreshing it yet
-        // We need to verify the client ID before actually generating new tokens
-        var oldAccess = await accesses.VerifyRefreshTokenAsync(request.RefreshToken, cancellationToken);
-        if (!oldAccess.HasValue)
-        {
-            logger.LogWarning("Invalid or expired refresh token");
-            return BadRequest(new { error = "invalid_grant", error_description = "refresh_token is invalid or expired" });
-        }
-
-        // Step 2: Verify Client ID match
-        if (oldAccess.Value.ClientId != request.ClientId)
-        {
-            logger.LogWarning("Client ID mismatch in refresh token. Token ClientId: {TokenClientId}, Request ClientId: {RequestClientId}", 
-                oldAccess.Value.ClientId, request.ClientId);
-            return BadRequest(new { error = "invalid_grant", error_description = "client_id does not match the original token" });
-        }
-
-        // Step 3: Validate client secret
         var validationError = await ValidateClientSecretAsync(request.ClientId, request.ClientSecret, cancellationToken);
         if (validationError != null)
         {
             return validationError;
         }
 
-        // Step 4: Generate new tokens after all validations pass
-        var newAccess = await accesses.RefreshAccessAsync(request.RefreshToken, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken);
+        var newAccess = await accesses.RefreshAccessAsync(request.RefreshToken, request.ClientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken);
         if (newAccess.HasValue == false)
         {
             logger.LogWarning("Failed to refresh access token");
