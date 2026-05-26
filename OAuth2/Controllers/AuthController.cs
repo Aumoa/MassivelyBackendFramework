@@ -297,7 +297,7 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
         
         IActionResult Login()
         {
-            return Redirect($"/login?client_id={EscapeDataString(client_id)}&redirect_uri={EscapeDataString(redirect_uri)}&response_type={EscapeDataString(response_type)}&scope={EscapeDataString(normalizedScope)}&state={EscapeDataString(state)}&nonce={EscapeDataString(nonce)}&code_challenge={EscapeDataString(code_challenge)}&code_challenge_method={EscapeDataString(code_challenge_method)}&client_name={EscapeDataString(clientName)}");
+            return Redirect($"/login?client_id={EscapeDataString(client_id)}&redirect_uri={EscapeDataString(redirect_uri)}&response_type={EscapeDataString(response_type)}&scope={EscapeDataString(normalizedScope)}&state={EscapeDataString(state)}&nonce={EscapeDataString(nonce)}&prompt={EscapeDataString(prompt)}&code_challenge={EscapeDataString(code_challenge)}&code_challenge_method={EscapeDataString(code_challenge_method)}&client_name={EscapeDataString(clientName)}");
         }
 
         IActionResult Error(string message)
