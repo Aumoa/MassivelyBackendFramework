@@ -11,7 +11,7 @@ namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/token")]
-public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IClientUserGroups groups, IOptions<HostOptions> hostOptions, IApiKeys apiKeys, ILogger<TokenController> logger) : ControllerBase
+public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IClientUserGroups groups, ITokenIssuer tokenIssuer, IOptions<HostOptions> hostOptions, IApiKeys apiKeys, ILogger<TokenController> logger) : ControllerBase
 {
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] TokenRequest request, CancellationToken cancellationToken)
@@ -398,26 +398,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
 
     private async ValueTask<TokenResponse> GenerateTokenResponseAsync(string accountId, RawAccount rawAccount, string clientId, string scope, string? nonce, CancellationToken cancellationToken)
     {
-        var sub = rawAccount.Sub;
-        var access = await accesses.WriteAccessAsync(accountId, sub, scope, clientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken);
-        var claims = await accountClaims.GetClaimsAsync(accountId, cancellationToken);
-        var groupsClaim = await groups.GetClientUserGroupsAsync(clientId, sub, cancellationToken);
-
-        string? idToken = null;
-        if (scope.Split(' ').Any(p => p is "openid" or "all"))
-        {
-            idToken = jwt.Issue(clientId, jwt.ConfigureClaims(rawAccount, scope, [.. claims, .. groupsClaim], nonce, true));
-        }
-
-        return new TokenResponse
-        {
-            AccessToken = access.AccessToken,
-            TokenType = "Bearer",
-            ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
-            Scope = access.Scope,
-            RefreshToken = access.RefreshToken,
-            RefreshExpiresIn = (int)jwt.RefreshTokenExpiresIn.TotalSeconds,
-            IdToken = idToken
-        };
+        var issueResult = await tokenIssuer.IssueAsync(accountId, rawAccount, clientId, scope, nonce, cancellationToken);
+        return issueResult.Response;
     }
 }

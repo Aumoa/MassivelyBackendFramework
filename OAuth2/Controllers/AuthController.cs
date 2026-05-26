@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using OAuth2.DTO;
 using OAuth2.Localizations;
 using OAuth2.Services;
 using HostOptions = OAuth2.Options.HostOptions;
@@ -14,7 +13,7 @@ using HostOptions = OAuth2.Options.HostOptions;
 namespace OAuth2.Controllers;
 
 [ApiController]
-public class AuthController(IOptions<HostOptions> options, HttpClient http, ILogger<AuthController> logger) : ControllerBase
+public class AuthController(IOptions<HostOptions> options, ILogger<AuthController> logger) : ControllerBase
 {
     private const string PkceVerifierCookieName = "oauth2_pkce_verifier";
     private const string PkceStateCookieName = "oauth2_pkce_state";
@@ -48,7 +47,9 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
     public async Task<IActionResult> RedirectAsync(
         [FromQuery] string code,
         [FromQuery] string? state,
-        [FromServices] IAccesses accesses,
+        [FromServices] IAuthorizationCodes authorizationCodes,
+        [FromServices] IAccounts accounts,
+        [FromServices] ITokenIssuer tokenIssuer,
         CancellationToken cancellationToken)
     {
         var deleteCookieOptions = CreatePkceDeleteCookieOptions();
@@ -68,28 +69,43 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
                 return BadRequest("OAuth state validation failed.");
             }
 
-            var formData = new Dictionary<string, string>()
+            var authorizationCode = await authorizationCodes.PopAsync(code, cancellationToken);
+            if (authorizationCode.HasValue == false)
             {
-                ["grant_type"] = "authorization_code",
-                ["code"] = code,
-                ["redirect_uri"] = GetInternalRedirectUri(),
-                ["client_id"] = options.Value.ClientId,
-                ["client_secret"] = options.Value.Secret,
-                ["code_verifier"] = codeVerifier
-            };
+                return BadRequest("Authorization code is invalid or already used.");
+            }
 
-            using var content = new FormUrlEncodedContent(formData);
-            using var response = await http.PostAsync(GetInternalTokenEndpoint(), content, cancellationToken);
-            response.EnsureSuccessStatusCode();
+            if (authorizationCode.Value.ClientId != options.Value.ClientId ||
+                authorizationCode.Value.RedirectUri != GetInternalRedirectUri())
+            {
+                return BadRequest("Authorization code is not valid for this client.");
+            }
 
-            var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: cancellationToken)
-                ?? throw new InvalidOperationException("Failed to parse token response.");
+            if (!ValidatePkce(codeVerifier, authorizationCode.Value.CodeChallenge, authorizationCode.Value.CodeChallengeMethod))
+            {
+                return BadRequest("PKCE validation failed.");
+            }
 
-            var access = await accesses.VerifyAsync(tokenResponse.AccessToken, cancellationToken);
-            if (access.HasValue == false)
+            if (!ScopePolicy.TryNormalize(authorizationCode.Value.Scope, true, out var normalizedScope, out _))
+            {
+                return BadRequest("Authorization code contains invalid scope.");
+            }
+
+            var rawAccount = await accounts.GetRawAccountAsync(authorizationCode.Value.AccountId, cancellationToken);
+            if (!rawAccount.HasValue)
             {
                 return Unauthorized();
             }
+
+            var issueResult = await tokenIssuer.IssueAsync(
+                authorizationCode.Value.AccountId,
+                rawAccount.Value,
+                authorizationCode.Value.ClientId,
+                normalizedScope,
+                authorizationCode.Value.Nonce,
+                cancellationToken);
+            var tokenResponse = issueResult.Response;
+            var access = issueResult.Access;
 
             HttpContext.Response.Cookies.Append("access_token", tokenResponse.AccessToken, new CookieOptions
             {
@@ -105,7 +121,7 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
                 SameSite = SameSiteMode.Strict
             });
 
-            HttpContext.Response.Cookies.Append("id", access.Value.Id, new CookieOptions
+            HttpContext.Response.Cookies.Append("id", access.Id, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
@@ -406,11 +422,6 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
         return options.Value.Uri.TrimEnd('/') + "/redirect";
     }
 
-    private Uri GetInternalTokenEndpoint()
-    {
-        return new Uri(new Uri(options.Value.Uri.TrimEnd('/') + "/", UriKind.Absolute), "api/v1/token");
-    }
-
     private static string CreateCodeVerifier()
     {
         return Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
@@ -427,6 +438,15 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
             .Replace('+', '-')
             .Replace('/', '_')
             .TrimEnd('=');
+    }
+
+    private static bool ValidatePkce(string codeVerifier, string? codeChallenge, string? codeChallengeMethod)
+    {
+        return codeChallengeMethod == "S256" &&
+               !string.IsNullOrWhiteSpace(codeChallenge) &&
+               IsValidPkceParameter(codeVerifier) &&
+               IsValidPkceParameter(codeChallenge) &&
+               string.Equals(CreateCodeChallenge(codeVerifier), codeChallenge, StringComparison.Ordinal);
     }
 
     private static bool IsValidPkceParameter(string value)

@@ -12,6 +12,7 @@ using SQLMigration;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
+ValidateProductionAllowedHosts(builder);
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -165,4 +166,19 @@ async ValueTask StartMigrationAsync(CancellationToken cancellationToken)
     var scripts = new Scripts();
     var logger = new LoggerTextWriter(app.Logger);
     await Executor.RunAsync(options.Value.ConnectionString, options.Value.Database, [.. scripts.GetScripts()], logger, cancellationToken);
+}
+
+static void ValidateProductionAllowedHosts(WebApplicationBuilder builder)
+{
+    if (builder.Environment.IsDevelopment())
+    {
+        return;
+    }
+
+    var allowedHosts = builder.Configuration["AllowedHosts"];
+    var hosts = allowedHosts?.Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    if (hosts is not { Length: > 0 } || hosts.Any(static host => host == "*"))
+    {
+        throw new InvalidOperationException("AllowedHosts must be configured with explicit host names outside Development.");
+    }
 }

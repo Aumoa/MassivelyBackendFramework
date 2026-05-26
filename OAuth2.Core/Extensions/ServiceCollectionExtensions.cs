@@ -11,7 +11,12 @@ public static class ServiceCollectionExtensions
     {
         s.Configure<MySqlOptions>(config.GetRequiredSection("MySql"));
         s.Configure<RedisOptions>(config.GetRequiredSection("Redis"));
-        s.Configure<HostOptions>(config.GetRequiredSection("Host"));
+        s.AddOptions<HostOptions>()
+            .Bind(config.GetRequiredSection("Host"))
+            .Validate(static options => !string.IsNullOrWhiteSpace(options.ClientId), "OAuth2:Host:ClientId is required.")
+            .Validate(static options => !string.IsNullOrWhiteSpace(options.Secret), "OAuth2:Host:Secret is required.")
+            .Validate(static options => IsAbsoluteHttpUri(options.Uri), "OAuth2:Host:Uri must be an absolute HTTP or HTTPS URI without query or fragment.")
+            .ValidateOnStart();
         s.Configure<JwtOptions>(config.GetRequiredSection("Jwt"));
 
         s.AddTransient<IAccounts, MySqlAccounts>();
@@ -25,9 +30,18 @@ public static class ServiceCollectionExtensions
         s.AddHostedService(p => p.GetRequiredService<RedisConnection>());
         s.AddTransient<IAccesses, RedisAccesses>();
         s.AddTransient<IAuthorizationCodes, RedisAuthorizationCodes>();
+        s.AddTransient<ITokenIssuer, TokenIssuer>();
 
         s.AddSingleton<IJwt, Jwt>();
         
         return s;
+    }
+
+    private static bool IsAbsoluteHttpUri(string uri)
+    {
+        return Uri.TryCreate(uri, UriKind.Absolute, out var parsedUri) &&
+               (parsedUri.Scheme == Uri.UriSchemeHttp || parsedUri.Scheme == Uri.UriSchemeHttps) &&
+               string.IsNullOrEmpty(parsedUri.Query) &&
+               string.IsNullOrEmpty(parsedUri.Fragment);
     }
 }
