@@ -43,9 +43,11 @@ public class WellKnownController(IJwt jwt) : ControllerBase
             id_token_signing_alg_values_supported = (string[])["RS256"],
             scopes_supported = ScopePolicy.SupportedScopes,
             token_endpoint_auth_methods_supported = new[] { "client_secret_basic", "client_secret_post", "none" },
-            claims_supported = (string[])["aud", "email", "exp", "name", "iss", "picture", "sub"],
+            claims_supported = (string[])["aud", "auth_time", "email", "exp", "name", "iss", "picture", "sub"],
             grant_types_supported = (string[])["authorization_code", "refresh_token"],
-            code_challenge_methods_supported = (string[])["S256"]
+            code_challenge_methods_supported = (string[])["S256"],
+            request_parameter_supported = false,
+            request_uri_parameter_supported = false
         });
     }
 }

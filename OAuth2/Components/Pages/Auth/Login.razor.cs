@@ -1,4 +1,5 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Globalization;
 using BlazorSharedComponent;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -80,6 +81,10 @@ public partial class Login(
     public string? Prompt { get; set; }
 
     [Parameter]
+    [SupplyParameterFromQuery(Name = "max_age")]
+    public string? MaxAge { get; set; }
+
+    [Parameter]
     [SupplyParameterFromQuery(Name = "code_challenge")]
     public string? CodeChallenge { get; set; }
 
@@ -102,12 +107,22 @@ public partial class Login(
     public static string GetCachedPicture(JwtSecurityToken jwt) =>
         jwt.Claims.FirstOrDefault(p => p.Type == JwtRegisteredClaimNames.Picture)?.Value ?? string.Empty;
 
+    private static long? GetCachedAuthTime(JwtSecurityToken jwt)
+    {
+        var authTime = jwt.Claims.FirstOrDefault(p => p.Type == "auth_time")?.Value;
+        return long.TryParse(authTime, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
+    }
+
     private RenderStates m_RenderState = RenderStates.Id;
     private string m_ID = string.Empty;
     private string m_Password = string.Empty;
     private string? m_ConsentAccountId;
+    private long? m_ConsentAuthTime;
     private bool m_ConsentRefreshCache;
     private string[] m_ConsentScopes = [];
+    private long? m_MaxAge;
     private int m_Requesting = 0;
     private string m_ErrorMessageId = string.Empty;
     private string m_ErrorMessagePassword = string.Empty;
@@ -125,6 +140,12 @@ public partial class Login(
             string.IsNullOrWhiteSpace(RedirectUri) ||
             string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope) ||
             string.IsNullOrWhiteSpace(ClientName))
+        {
+            Error(Strings.ERRORS_BAD_REQUEST);
+            return;
+        }
+
+        if (!TryParseMaxAge(MaxAge, out m_MaxAge))
         {
             Error(Strings.ERRORS_BAD_REQUEST);
             return;
@@ -215,7 +236,10 @@ public partial class Login(
                         var validationParams = jwt.GetValidationParameters();
                         var principal = handler.ValidateToken(cookie.Value, validationParams, out var validatedToken);
                         var cachedJwt = (JwtSecurityToken)validatedToken;
-                        m_CachedJwts.Add(cachedJwt);
+                        if (IsAuthenticationFresh(GetCachedAuthTime(cachedJwt)))
+                        {
+                            m_CachedJwts.Add(cachedJwt);
+                        }
                     }
                     catch (SecurityTokenException e)
                     {
@@ -321,12 +345,12 @@ public partial class Login(
             return;
         }
 
-        await ContinueWithAsync(m_ID, true);
+        await ContinueWithAsync(m_ID, true, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
     }
 
     private async Task ContinueWithCachedAsync(JwtSecurityToken jwt)
     {
-        await ContinueWithAsync(GetCachedId(jwt), false);
+        await ContinueWithAsync(GetCachedId(jwt), false, GetCachedAuthTime(jwt));
     }
 
     private void ContinueWithLoginRequiredAsync()
@@ -352,8 +376,15 @@ public partial class Login(
         nav.NavigateTo($"/authorize/remove-cached-account?id={Uri.EscapeDataString(id)}&return_url={Uri.EscapeDataString(currentUri.PathAndQuery)}", forceLoad: true);
     }
 
-    private async Task ContinueWithAsync(string id, bool refreshCache)
+    private async Task ContinueWithAsync(string id, bool refreshCache, long? authTime)
     {
+        if (!IsAuthenticationFresh(authTime))
+        {
+            m_ShowLoginForm = true;
+            StateHasChanged();
+            return;
+        }
+
         var consentScopes = await GetConsentScopesAsync(id);
         if (consentScopes.Length > 0)
         {
@@ -364,6 +395,7 @@ public partial class Login(
             }
 
             m_ConsentAccountId = id;
+            m_ConsentAuthTime = authTime;
             m_ConsentRefreshCache = refreshCache;
             m_ConsentScopes = consentScopes;
             m_RenderState = RenderStates.Consent;
@@ -372,10 +404,10 @@ public partial class Login(
             return;
         }
 
-        await IssueAuthorizationCodeAsync(id, refreshCache);
+        await IssueAuthorizationCodeAsync(id, refreshCache, authTime);
     }
 
-    private async Task IssueAuthorizationCodeAsync(string id, bool refreshCache)
+    private async Task IssueAuthorizationCodeAsync(string id, bool refreshCache, long? authTime)
     {
         var query = new Dictionary<string, string?>();
         if (string.IsNullOrEmpty(State) == false)
@@ -383,13 +415,13 @@ public partial class Login(
             query.Add("state", State);
         }
 
-        var authorizationCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, ClientId, Scope, RedirectUri, Nonce, CodeChallenge, CodeChallengeMethod));
+        var authorizationCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, ClientId, Scope, RedirectUri, Nonce, CodeChallenge, CodeChallengeMethod, authTime));
         query.Add("code", authorizationCode);
 
         var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query);
         if (refreshCache)
         {
-            var cacheCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", "/authorize/int", null));
+            var cacheCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", "/authorize/int", null, AuthTime: authTime));
 
             nav.NavigateTo($"/authorize/int?redirect_uri={Uri.EscapeDataString(redirect_uri)}&code={Uri.EscapeDataString(cacheCode)}", forceLoad: true);
         }
@@ -411,7 +443,7 @@ public partial class Login(
 
         var grantScope = string.Join(' ', m_ConsentScopes);
         await oauthGrants.GrantScopesAsync(m_ConsentAccountId, ClientId, grantScope);
-        await IssueAuthorizationCodeAsync(m_ConsentAccountId, m_ConsentRefreshCache);
+        await IssueAuthorizationCodeAsync(m_ConsentAccountId, m_ConsentRefreshCache, m_ConsentAuthTime);
     }
 
     private void OnConsentDeny()
@@ -490,6 +522,39 @@ public partial class Login(
         return Prompt?
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Contains(value, StringComparer.Ordinal) == true;
+    }
+
+    private bool IsAuthenticationFresh(long? authTime)
+    {
+        if (!m_MaxAge.HasValue)
+        {
+            return true;
+        }
+
+        if (!authTime.HasValue)
+        {
+            return false;
+        }
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return now - authTime.Value <= m_MaxAge.Value;
+    }
+
+    private static bool TryParseMaxAge(string? value, out long? maxAge)
+    {
+        maxAge = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) && parsed >= 0)
+        {
+            maxAge = parsed;
+            return true;
+        }
+
+        return false;
     }
 
     private static string GetScopeDescription(string scope)

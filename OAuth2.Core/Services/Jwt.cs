@@ -1,4 +1,5 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
@@ -77,7 +78,7 @@ internal class Jwt : IJwt
         };
     }
 
-    public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken)
+    public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken, long? authTime = null)
     {
         var idTokenClaims = new List<Claim>();
 
@@ -89,6 +90,11 @@ internal class Jwt : IJwt
                 new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
                 new(JwtRegisteredClaimNames.Nbf, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
             ]);
+
+            if (authTime.HasValue)
+            {
+                idTokenClaims.Add(new("auth_time", authTime.Value.ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Integer64));
+            }
         }
 
         HashSet<string> expectedClaims = [];

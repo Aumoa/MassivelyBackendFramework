@@ -13,4 +13,6 @@ public record struct Access
     public required string Scope { get; set; }
 
     public required string ClientId { get; set; }
+
+    public long? AuthTime { get; set; }
 }

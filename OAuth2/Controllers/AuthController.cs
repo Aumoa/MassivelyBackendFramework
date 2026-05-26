@@ -1,4 +1,5 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -17,6 +18,20 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
 {
     private const string PkceVerifierCookieName = "oauth2_pkce_verifier";
     private const string PkceStateCookieName = "oauth2_pkce_state";
+
+    private sealed record AuthorizeRequest(
+        string? ResponseType,
+        string? RedirectUri,
+        string? ClientId,
+        string? Scope,
+        string? State,
+        string? Nonce,
+        string? Prompt,
+        string? CodeChallenge,
+        string? CodeChallengeMethod,
+        string? MaxAge,
+        string? RequestObject,
+        string? RequestUri);
 
     [HttpGet("/auth/login")]
     public IActionResult StartLogin()
@@ -103,7 +118,8 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 authorizationCode.Value.ClientId,
                 normalizedScope,
                 authorizationCode.Value.Nonce,
-                cancellationToken);
+                cancellationToken,
+                authorizationCode.Value.AuthTime);
             var tokenResponse = issueResult.Response;
             var access = issueResult.Access;
 
@@ -148,41 +164,67 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
     }
 
     [HttpGet("/authorize")]
-    public async Task<IActionResult> AuthorizeAsync(
-        [FromQuery] string response_type,
-        [FromQuery] string redirect_uri,
-        [FromQuery] string client_id,
-        [FromQuery] string? scope,
-        [FromQuery] string? state,
-        [FromQuery] string? nonce,
-        [FromQuery] string? prompt,
-        [FromQuery] string? code_challenge,
-        [FromQuery] string? code_challenge_method,
+    public Task<IActionResult> AuthorizeGetAsync(
         [FromServices] IClients clients,
         [FromServices] IClientClaims clientClaims,
         [FromServices] IAccesses accesses,
         [FromServices] IJwt jwt,
         CancellationToken cancellationToken)
     {
-        scope ??= "profile";
+        return AuthorizeAsync(ReadAuthorizeRequest(Request.Query), clients, clientClaims, accesses, jwt, cancellationToken);
+    }
 
-        if (response_type != "code")
+    [HttpPost("/authorize")]
+    [Consumes("application/x-www-form-urlencoded")]
+    public async Task<IActionResult> AuthorizePostAsync(
+        [FromServices] IClients clients,
+        [FromServices] IClientClaims clientClaims,
+        [FromServices] IAccesses accesses,
+        [FromServices] IJwt jwt,
+        CancellationToken cancellationToken)
+    {
+        var form = await Request.ReadFormAsync(cancellationToken);
+        return await AuthorizeAsync(ReadAuthorizeRequest(form), clients, clientClaims, accesses, jwt, cancellationToken);
+    }
+
+    private async Task<IActionResult> AuthorizeAsync(
+        AuthorizeRequest request,
+        IClients clients,
+        IClientClaims clientClaims,
+        IAccesses accesses,
+        IJwt jwt,
+        CancellationToken cancellationToken)
+    {
+        var scope = string.IsNullOrWhiteSpace(request.Scope) ? "profile" : request.Scope;
+
+        if (request.ResponseType != "code")
         {
             return BadRequest("Unsupported response type.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.RedirectUri) ||
+            string.IsNullOrWhiteSpace(request.ClientId))
+        {
+            return BadRequest("Missing required authorization request parameter.");
+        }
+
+        if (!TryParseMaxAge(request.MaxAge, out _))
+        {
+            return BadRequest("max_age must be a non-negative integer.");
         }
 
         string clientName;
         string normalizedScope;
 
         // hosting service
-        if (client_id == options.Value.ClientId)
+        if (request.ClientId == options.Value.ClientId)
         {
             if (!ScopePolicy.TryNormalize(scope, true, out normalizedScope, out var scopeError))
             {
                 return BadRequest(scopeError);
             }
 
-            if (redirect_uri == GetInternalRedirectUri())
+            if (request.RedirectUri == GetInternalRedirectUri())
             {
                 clientName = "OAuth2";
             }
@@ -191,22 +233,22 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 return Error(Strings.ERRORS_INVALID_REDIRECT_URI);
             }
 
-            if (!IsValidPkceChallenge(code_challenge, code_challenge_method))
+            if (!IsValidPkceChallenge(request.CodeChallenge, request.CodeChallengeMethod))
             {
                 return BadRequest("PKCE S256 code challenge is required.");
             }
         }
         else
         {
-            var targetClient = await clients.GetClientAsync(client_id, cancellationToken);
+            var targetClient = await clients.GetClientAsync(request.ClientId, cancellationToken);
             if (targetClient == null)
             {
                 return Error(Strings.ERRORS_INVALID_CLIENT_ID);
             }
 
-            var claims = await clientClaims.GetClaimsAsync(client_id, cancellationToken);
+            var claims = await clientClaims.GetClaimsAsync(request.ClientId, cancellationToken);
             var allowedUris = claims.Where(p => p.Name == "redirect_uri");
-            if (allowedUris.Any(p => p.Value == redirect_uri) == false)
+            if (allowedUris.Any(p => p.Value == request.RedirectUri) == false)
             {
                 return Error(Strings.ERRORS_INVALID_REDIRECT_URI);
             }
@@ -222,9 +264,9 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 return Error("The requested scope is not allowed for this client.");
             }
 
-            var hasPkce = HasPkceParameters(code_challenge, code_challenge_method);
+            var hasPkce = HasPkceParameters(request.CodeChallenge, request.CodeChallengeMethod);
             var hasClientSecret = claims.Any(p => p.Name == "secret");
-            if ((hasPkce && !IsValidPkceChallenge(code_challenge, code_challenge_method)) ||
+            if ((hasPkce && !IsValidPkceChallenge(request.CodeChallenge, request.CodeChallengeMethod)) ||
                 (!hasPkce && !hasClientSecret))
             {
                 return BadRequest("PKCE S256 code challenge is required.");
@@ -233,7 +275,17 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             clientName = targetClient.Value.Name;
         }
 
-        if (prompt == "login")
+        if (!string.IsNullOrWhiteSpace(request.RequestObject))
+        {
+            return OAuthError("request_not_supported");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.RequestUri))
+        {
+            return OAuthError("request_uri_not_supported");
+        }
+
+        if (HasPrompt(request.Prompt, "login"))
         {
             return Login();
         }
@@ -315,26 +367,40 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
         }
 
         return Login();
-        
+
         IActionResult Login()
         {
-            return Redirect($"/login?client_id={EscapeDataString(client_id)}&redirect_uri={EscapeDataString(redirect_uri)}&response_type={EscapeDataString(response_type)}&scope={EscapeDataString(normalizedScope)}&state={EscapeDataString(state)}&nonce={EscapeDataString(nonce)}&prompt={EscapeDataString(prompt)}&code_challenge={EscapeDataString(code_challenge)}&code_challenge_method={EscapeDataString(code_challenge_method)}&client_name={EscapeDataString(clientName)}");
+            return Redirect(QueryHelpers.AddQueryString("/login", new Dictionary<string, string?>
+            {
+                ["client_id"] = request.ClientId,
+                ["redirect_uri"] = request.RedirectUri,
+                ["response_type"] = request.ResponseType,
+                ["scope"] = normalizedScope,
+                ["state"] = request.State,
+                ["nonce"] = request.Nonce,
+                ["prompt"] = request.Prompt,
+                ["code_challenge"] = request.CodeChallenge,
+                ["code_challenge_method"] = request.CodeChallengeMethod,
+                ["client_name"] = clientName,
+                ["max_age"] = request.MaxAge
+            }));
+        }
+
+        IActionResult OAuthError(string error)
+        {
+            return Redirect(QueryHelpers.AddQueryString(request.RedirectUri, new Dictionary<string, string?>
+            {
+                ["error"] = error,
+                ["state"] = request.State
+            }));
         }
 
         IActionResult Error(string message)
         {
-            message = EscapeDataString(message);
-            return Redirect($"/error?error={message}");
-        }
-
-        static string EscapeDataString(string? value)
-        {
-            if (value == null)
+            return Redirect(QueryHelpers.AddQueryString("/error", new Dictionary<string, string?>
             {
-                return "";
-            }
-
-            return Uri.EscapeDataString(value);
+                ["error"] = message
+            }));
         }
     }
 
@@ -370,13 +436,13 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 return Error(Strings.ERRORS_INVALID_ACCESS);
             }
 
-            var access = await accesses.WriteAccessAsync(authorizationCode.Value.AccountId, rawAccount.Value.Sub, authorizationCode.Value.Scope, authorizationCode.Value.ClientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken);
+            var access = await accesses.WriteAccessAsync(authorizationCode.Value.AccountId, rawAccount.Value.Sub, authorizationCode.Value.Scope, authorizationCode.Value.ClientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken, authorizationCode.Value.AuthTime);
             var claims = await accountClaims.GetClaimsAsync(authorizationCode.Value.AccountId, cancellationToken);
             var jwtToken = jwt.Issue(options.Value.ClientId, [
                 new("access_token", access.AccessToken),
                 new("refresh_token", access.RefreshToken),
                 new("id", authorizationCode.Value.AccountId),
-                .. jwt.ConfigureClaims(rawAccount.Value, authorizationCode.Value.Scope, claims, null, true)
+                .. jwt.ConfigureClaims(rawAccount.Value, authorizationCode.Value.Scope, claims, null, true, authorizationCode.Value.AuthTime)
             ]);
 
             HttpContext.Response.Cookies.Append($"cached_jwt_{authorizationCode.Value.AccountId}", jwtToken, new CookieOptions
@@ -421,6 +487,76 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
 
             return false;
         }
+    }
+
+    private static AuthorizeRequest ReadAuthorizeRequest(IQueryCollection values)
+    {
+        return new AuthorizeRequest(
+            GetValue(values, "response_type"),
+            GetValue(values, "redirect_uri"),
+            GetValue(values, "client_id"),
+            GetValue(values, "scope"),
+            GetValue(values, "state"),
+            GetValue(values, "nonce"),
+            GetValue(values, "prompt"),
+            GetValue(values, "code_challenge"),
+            GetValue(values, "code_challenge_method"),
+            GetValue(values, "max_age"),
+            GetValue(values, "request"),
+            GetValue(values, "request_uri"));
+    }
+
+    private static AuthorizeRequest ReadAuthorizeRequest(IFormCollection values)
+    {
+        return new AuthorizeRequest(
+            GetValue(values, "response_type"),
+            GetValue(values, "redirect_uri"),
+            GetValue(values, "client_id"),
+            GetValue(values, "scope"),
+            GetValue(values, "state"),
+            GetValue(values, "nonce"),
+            GetValue(values, "prompt"),
+            GetValue(values, "code_challenge"),
+            GetValue(values, "code_challenge_method"),
+            GetValue(values, "max_age"),
+            GetValue(values, "request"),
+            GetValue(values, "request_uri"));
+    }
+
+    private static string? GetValue(IQueryCollection values, string name)
+    {
+        var value = values[name].ToString();
+        return string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    private static string? GetValue(IFormCollection values, string name)
+    {
+        var value = values[name].ToString();
+        return string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    private static bool TryParseMaxAge(string? value, out long? maxAge)
+    {
+        maxAge = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) && parsed >= 0)
+        {
+            maxAge = parsed;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasPrompt(string? prompt, string value)
+    {
+        return prompt?
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Contains(value, StringComparer.Ordinal) == true;
     }
 
     private string GetInternalRedirectUri()

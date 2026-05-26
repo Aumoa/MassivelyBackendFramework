@@ -1,4 +1,5 @@
 ﻿using System.Security.Cryptography;
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using OAuth2.DTO;
 using OAuth2.Misc;
@@ -20,7 +21,8 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             'redirect_uri',
             'nonce',
             'code_challenge',
-            'code_challenge_method')
+            'code_challenge_method',
+            'auth_time')
 
         redis.call('DEL', KEYS[1])
         return values
@@ -39,7 +41,8 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             new("redirect_uri", body.RedirectUri),
             new("nonce", body.Nonce ?? string.Empty),
             new("code_challenge", body.CodeChallenge ?? string.Empty),
-            new("code_challenge_method", body.CodeChallengeMethod ?? string.Empty)
+            new("code_challenge_method", body.CodeChallengeMethod ?? string.Empty),
+            new("auth_time", body.AuthTime?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)
         ];
 
         await db.HashSetAsync(codeKey, entries).WaitAsync(cancellationToken);
@@ -58,7 +61,7 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
         }
 
         var entries = (RedisResult[]?)result;
-        if (entries is not { Length: 7 })
+        if (entries is not { Length: 8 })
         {
             logger.LogError("Invalid authorization code data: {Code}", code);
             return null;
@@ -71,6 +74,7 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
         var nonce = GetString(entries[4]);  // nonce is optional
         var codeChallenge = GetString(entries[5]);
         var codeChallengeMethod = GetString(entries[6]);
+        var authTimeValue = GetString(entries[7]);
 
         if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(scope) || string.IsNullOrWhiteSpace(redirectUri))
         {
@@ -85,7 +89,8 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             redirectUri,
             nonce,
             string.IsNullOrEmpty(codeChallenge) ? null : codeChallenge,
-            string.IsNullOrEmpty(codeChallengeMethod) ? null : codeChallengeMethod
+            string.IsNullOrEmpty(codeChallengeMethod) ? null : codeChallengeMethod,
+            long.TryParse(authTimeValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var authTime) ? authTime : null
         );
     }
 

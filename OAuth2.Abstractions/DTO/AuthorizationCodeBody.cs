@@ -7,5 +7,6 @@ public record struct AuthorizationCodeBody(
     string RedirectUri,
     string? Nonce,
     string? CodeChallenge = null,
-    string? CodeChallengeMethod = null
+    string? CodeChallengeMethod = null,
+    long? AuthTime = null
     );
