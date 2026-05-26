@@ -7,7 +7,7 @@
     {
         if (firstRender)
         {
-            Auth.NavigateToLogin(Nav, "auth/redirect", "all");
+            Auth.NavigateToLogin(Nav, "auth/redirect", "openid groups");
         }
         return base.OnAfterRenderAsync(firstRender);
     }
