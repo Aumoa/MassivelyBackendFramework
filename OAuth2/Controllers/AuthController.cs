@@ -51,7 +51,6 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
         [FromServices] IAccesses accesses,
         CancellationToken cancellationToken)
     {
-        var baseUri = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}{HttpContext.Request.PathBase}/";
         var deleteCookieOptions = CreatePkceDeleteCookieOptions();
 
         try
@@ -80,7 +79,7 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
             };
 
             using var content = new FormUrlEncodedContent(formData);
-            using var response = await http.PostAsync(baseUri + "api/v1/token", content, cancellationToken);
+            using var response = await http.PostAsync(GetInternalTokenEndpoint(), content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: cancellationToken)
@@ -405,6 +404,11 @@ public class AuthController(IOptions<HostOptions> options, HttpClient http, ILog
     private string GetInternalRedirectUri()
     {
         return options.Value.Uri.TrimEnd('/') + "/redirect";
+    }
+
+    private Uri GetInternalTokenEndpoint()
+    {
+        return new Uri(new Uri(options.Value.Uri.TrimEnd('/') + "/", UriKind.Absolute), "api/v1/token");
     }
 
     private static string CreateCodeVerifier()
