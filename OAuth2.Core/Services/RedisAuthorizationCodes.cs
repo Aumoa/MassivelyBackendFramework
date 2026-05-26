@@ -8,6 +8,24 @@ namespace OAuth2.Services;
 
 internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<RedisAuthorizationCodes> logger) : IAuthorizationCodes
 {
+    private const string PopScript = """
+        if redis.call('EXISTS', KEYS[1]) == 0 then
+            return nil
+        end
+
+        local values = redis.call('HMGET', KEYS[1],
+            'account_id',
+            'client_id',
+            'scope',
+            'redirect_uri',
+            'nonce',
+            'code_challenge',
+            'code_challenge_method')
+
+        redis.call('DEL', KEYS[1])
+        return values
+        """;
+
     public async ValueTask<string> PushAsync(AuthorizationCodeBody body, CancellationToken cancellationToken = default)
     {
         var db = multiplexer.GetDatabase();
@@ -33,49 +51,26 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
     {
         var db = multiplexer.GetDatabase();
         var codeKey = KeyNames.AuthorizationCode(code);
-        var entries = await db.HashGetAllAsync(codeKey).WaitAsync(cancellationToken);
-        if (entries.Length == 0)
+        var result = await db.ScriptEvaluateAsync(PopScript, [codeKey]).WaitAsync(cancellationToken);
+        if (result.IsNull)
         {
             return null;
         }
 
-        await db.KeyDeleteAsync(codeKey).WaitAsync(cancellationToken);
-
-        string? accountId = null;
-        string? clientId = null;
-        string? scope = null;
-        string? redirectUri = null;
-        string? nonce = null;  // nonce is optional
-        string? codeChallenge = null;
-        string? codeChallengeMethod = null;
-
-        foreach (var entry in entries)
+        var entries = (RedisResult[]?)result;
+        if (entries is not { Length: 7 })
         {
-            switch (entry.Name)
-            {
-                case "account_id":
-                    accountId = entry.Value;
-                    break;
-                case "client_id":
-                    clientId = entry.Value;
-                    break;
-                case "scope":
-                    scope = entry.Value;
-                    break;
-                case "redirect_uri":
-                    redirectUri = entry.Value;
-                    break;
-                case "nonce":
-                    nonce = entry.Value;
-                    break;
-                case "code_challenge":
-                    codeChallenge = entry.Value;
-                    break;
-                case "code_challenge_method":
-                    codeChallengeMethod = entry.Value;
-                    break;
-            }
+            logger.LogError("Invalid authorization code data: {Code}", code);
+            return null;
         }
+
+        var accountId = GetString(entries[0]);
+        var clientId = GetString(entries[1]);
+        var scope = GetString(entries[2]);
+        var redirectUri = GetString(entries[3]);
+        var nonce = GetString(entries[4]);  // nonce is optional
+        var codeChallenge = GetString(entries[5]);
+        var codeChallengeMethod = GetString(entries[6]);
 
         if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(scope) || string.IsNullOrWhiteSpace(redirectUri))
         {
@@ -92,5 +87,15 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             string.IsNullOrEmpty(codeChallenge) ? null : codeChallenge,
             string.IsNullOrEmpty(codeChallengeMethod) ? null : codeChallengeMethod
         );
+    }
+
+    private static string? GetString(RedisResult result)
+    {
+        if (result.IsNull)
+        {
+            return null;
+        }
+
+        return ((RedisValue)result).ToString();
     }
 }

@@ -8,6 +8,53 @@ namespace OAuth2.Services;
 
 internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses> logger) : IAccesses
 {
+    private const string RotateRefreshTokenScript = """
+        local accessToken = redis.call('HGET', KEYS[1], 'access_token')
+        if accessToken == false or accessToken == '' or accessToken ~= ARGV[6] then
+            return nil
+        end
+
+        local accountId = redis.call('HGET', KEYS[1], 'account_id')
+        local sub = redis.call('HGET', KEYS[1], 'sub')
+        local scope = redis.call('HGET', KEYS[1], 'scope')
+        local clientId = redis.call('HGET', KEYS[1], 'client_id')
+
+        if accountId == false or sub == false or scope == false or clientId == false then
+            return nil
+        end
+
+        if sub ~= ARGV[5] then
+            return nil
+        end
+
+        local storedGen = redis.call('HGET', KEYS[1], 'gen')
+        if storedGen == false or storedGen == '' then
+            storedGen = '0'
+        end
+
+        local currentGen = redis.call('GET', KEYS[4])
+        if currentGen == false or currentGen == '' then
+            currentGen = '0'
+        end
+
+        if storedGen ~= currentGen then
+            return nil
+        end
+
+        redis.call('SET', KEYS[2], ARGV[1], 'PX', ARGV[3])
+        redis.call('HSET', KEYS[3],
+            'access_token', ARGV[2],
+            'account_id', accountId,
+            'sub', sub,
+            'scope', scope,
+            'client_id', clientId,
+            'gen', storedGen)
+        redis.call('PEXPIRE', KEYS[3], ARGV[4])
+        redis.call('DEL', KEYS[5], KEYS[1])
+
+        return { accountId, sub, scope, clientId }
+        """;
+
     private static readonly RedisValue[] Fields =
     [
         "access_token",
@@ -181,73 +228,66 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         var db = multiplexer.GetDatabase();
         var refreshKey = KeyNames.Refresh(refreshToken);
 
-        // Read all needed fields in one call, including gen
-        var refreshFields = await db.HashGetAsync(refreshKey,
-            ["access_token", "gen", "account_id", "sub", "scope", "client_id"])
-            .WaitAsync(cancellationToken);
-
-        var accessToken = refreshFields[0];
-        if (accessToken.IsNullOrEmpty)
+        var refreshFields = await db.HashGetAsync(refreshKey, ["access_token", "sub"]).WaitAsync(cancellationToken);
+        var oldAccessToken = refreshFields[0];
+        var sub = refreshFields[1];
+        if (oldAccessToken.IsNullOrEmpty || sub.IsNullOrEmpty)
         {
             return null;
         }
-
-        // Validate generation: reject tokens that belong to an invalidated session
-        var sub = refreshFields[3]!.ToString();
-        var storedGen = refreshFields[1].IsNullOrEmpty ? 0L : (long)refreshFields[1];
-        var currentGenValue = await db.StringGetAsync(KeyNames.UserGen(sub)).WaitAsync(cancellationToken);
-        var currentGen = currentGenValue.IsNullOrEmpty ? 0L : (long)currentGenValue;
-        if (storedGen != currentGen)
-        {
-            return null;
-        }
-
-        var batch = db.CreateBatch();
 
         var newAccessToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         var newRefreshToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-
-        var accessKey = KeyNames.Access(newAccessToken);
-
-        _ = batch.StringSetAsync(accessKey, newRefreshToken, expire);
-        batch.Execute();
-
-        var prevRefreshKey = refreshKey;
-        refreshKey = KeyNames.Refresh(newRefreshToken);
-        await db.HashSetAsync(refreshKey, [
-            new("access_token", newAccessToken),
-            new("account_id", refreshFields[2]!),
-            new("sub", sub),
-            new("scope", refreshFields[4]!),
-            new("client_id", refreshFields[5]!),
-            new("gen", storedGen)
+        var result = await db.ScriptEvaluateAsync(
+            RotateRefreshTokenScript,
+            [
+                refreshKey,
+                KeyNames.Access(newAccessToken),
+                KeyNames.Refresh(newRefreshToken),
+                KeyNames.UserGen(sub!),
+                KeyNames.Access(oldAccessToken!)
+            ],
+            [
+                newRefreshToken,
+                newAccessToken,
+                ToPositiveMilliseconds(expire),
+                ToPositiveMilliseconds(refreshTokenExpire),
+                sub!,
+                oldAccessToken!
             ]).WaitAsync(cancellationToken);
-        
-        // Set TTL for new refresh token
-        await db.KeyExpireAsync(refreshKey, refreshTokenExpire).WaitAsync(cancellationToken);
 
-        CleanupAsync();
+        if (result.IsNull)
+        {
+            return null;
+        }
+
+        var accessFields = (RedisResult[]?)result;
+        if (accessFields is not { Length: 4 })
+        {
+            return null;
+        }
+
+        var accountId = GetString(accessFields[0]);
+        var refreshedSub = GetString(accessFields[1]);
+        var scope = GetString(accessFields[2]);
+        var clientId = GetString(accessFields[3]);
+        if (string.IsNullOrWhiteSpace(accountId) ||
+            string.IsNullOrWhiteSpace(refreshedSub) ||
+            string.IsNullOrWhiteSpace(scope) ||
+            string.IsNullOrWhiteSpace(clientId))
+        {
+            return null;
+        }
 
         return new Access
         {
-            Id = refreshFields[2]!,
-            Sub = sub,
+            Id = accountId,
+            Sub = refreshedSub,
             AccessToken = newAccessToken,
             RefreshToken = newRefreshToken,
-            Scope = refreshFields[4]!,
-            ClientId = refreshFields[5]!
+            Scope = scope,
+            ClientId = clientId
         };
-
-        async void CleanupAsync()
-        {
-            var batch = db.CreateBatch();
-
-            _ = batch.KeyDeleteAsync(KeyNames.Access(accessToken!));
-            var task = batch.KeyDeleteAsync(prevRefreshKey);
-
-            batch.Execute();
-            await task;
-        }
     }
 
     public async ValueTask RevokeAsync(string accessToken, CancellationToken cancellationToken = default)
@@ -284,5 +324,20 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
 
         // Keep the key alive long enough to outlast any existing long-lived refresh tokens.
         await db.KeyExpireAsync(userGenKey, TimeSpan.FromDays(90)).WaitAsync(cancellationToken);
+    }
+
+    private static long ToPositiveMilliseconds(TimeSpan value)
+    {
+        return Math.Max(1, (long)Math.Ceiling(value.TotalMilliseconds));
+    }
+
+    private static string? GetString(RedisResult result)
+    {
+        if (result.IsNull)
+        {
+            return null;
+        }
+
+        return ((RedisValue)result).ToString();
     }
 }
