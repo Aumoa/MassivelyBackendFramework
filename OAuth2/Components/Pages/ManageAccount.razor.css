@@ -3,7 +3,7 @@
     flex-direction: column;
     gap: 24px;
     width: 100%;
-    max-width: 760px;
+    max-width: 860px;
     margin-bottom: 20px;
 }
 
@@ -18,7 +18,7 @@
 .header-icon {
     width: 48px;
     height: 48px;
-    border-radius: 12px;
+    border-radius: 8px;
     background-color: #e8f0fe;
     display: flex;
     align-items: center;
@@ -65,13 +65,14 @@
     font-weight: 600;
     color: #5f6368;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0;
 }
 
 .info-card {
-    background: #fff;
+    background: var(--oauth-surface);
     border-radius: 8px;
-    border: 1px solid #dadce0;
+    border: 1px solid var(--oauth-border);
+    box-shadow: var(--oauth-shadow-sm);
     overflow: hidden;
 }
 
@@ -79,7 +80,7 @@
     display: flex;
     align-items: center;
     padding: 14px 20px;
-    border-bottom: 1px solid #f1f3f4;
+    border-bottom: 1px solid var(--oauth-border-soft);
     gap: 16px;
 }
 
@@ -103,7 +104,7 @@
 .code-value {
     font-family: ui-monospace, 'Cascadia Code', 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
     font-size: 0.8125rem;
-    background-color: #f1f3f4;
+    background-color: var(--oauth-surface-muted);
     padding: 2px 8px;
     border-radius: 4px;
     color: #3c4043;
@@ -121,7 +122,7 @@
     align-items: center;
     gap: 4px;
     padding: 2px 10px;
-    border-radius: 12px;
+    border-radius: 6px;
     font-size: 0.75rem;
     font-weight: 500;
 }
@@ -156,13 +157,25 @@
 }
 
 @media (max-width: 600px) {
+    .account-container {
+        gap: 20px;
+    }
+
+    .page-header {
+        align-items: flex-start;
+    }
+
     .info-label {
-        flex: 0 0 120px;
+        flex: 0 0 auto;
     }
 
     .info-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px;
         padding: 12px 16px;
     }
+
 }
 
 .apikeys-section .section-header {
@@ -170,8 +183,8 @@
     align-items: flex-start;
     justify-content: space-between;
     padding: 16px 24px;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #dadce0;
+    background-color: var(--oauth-surface-muted);
+    border-bottom: 1px solid var(--oauth-border);
 }
 
 .apikeys-section .section-header-text {
@@ -282,7 +295,7 @@
     flex-direction: column;
     gap: 12px;
     padding: 16px;
-    background-color: #f1f3f4;
+    background-color: var(--oauth-surface-muted);
     border-radius: 8px;
     border: 1px dashed #bdc1c6;
     max-width: 600px;
@@ -318,4 +331,14 @@
 
 .apikey-add-btn .material-symbols-outlined {
     font-size: 18px;
+}
+
+@media (max-width: 600px) {
+    .apikey-row {
+        align-items: flex-start;
+    }
+
+    .apikey-detail {
+        white-space: normal;
+    }
 }

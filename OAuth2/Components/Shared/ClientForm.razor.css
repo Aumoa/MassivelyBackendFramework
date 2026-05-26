@@ -6,11 +6,12 @@
 }
 
 .form-section {
-    border: 1px solid #dadce0;
+    border: 1px solid var(--oauth-border);
     border-radius: 8px;
     overflow: hidden;
     margin-bottom: 16px;
-    background: #fff;
+    background: var(--oauth-surface);
+    box-shadow: var(--oauth-shadow-sm);
 }
 
 .section-header {
@@ -18,8 +19,8 @@
     align-items: flex-start;
     justify-content: space-between;
     padding: 16px 24px;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #dadce0;
+    background-color: var(--oauth-surface-muted);
+    border-bottom: 1px solid var(--oauth-border);
 }
 
 .section-header-text {
@@ -235,7 +236,7 @@
     flex-direction: column;
     gap: 12px;
     padding: 16px;
-    background-color: #f1f3f4;
+    background-color: var(--oauth-surface-muted);
     border-radius: 8px;
     border: 1px dashed #bdc1c6;
     max-width: 600px;
@@ -368,7 +369,7 @@
     font-family: 'Roboto Mono', 'Courier New', monospace;
     font-size: 0.8125rem;
     color: #202124;
-    letter-spacing: 0.1em;
+    letter-spacing: 0;
 }
 
 .secret-created {
@@ -387,4 +388,34 @@
 
 .secrets-empty-icon {
     font-size: 20px;
+}
+
+@media (max-width: 700px) {
+    .section-header {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .section-body {
+        padding: 16px;
+    }
+
+    .uri-row,
+    .add-user-group-inputs {
+        flex-wrap: wrap;
+    }
+
+    .uri-input-wrap,
+    .add-user-group-inputs > * {
+        flex-basis: 100%;
+    }
+
+    .btn-icon-action {
+        width: 34px;
+        height: 34px;
+    }
+
+    .secrets-add-btn {
+        align-self: flex-start;
+    }
 }

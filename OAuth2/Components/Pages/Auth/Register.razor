@@ -2,12 +2,12 @@
 @layout AuthorizeLayout
 
 <div class="login-form">
-    <div style="display:flex; flex-direction:row; gap:10px; padding-bottom: 20px;">
+    <div class="login-form-content">
         <h2 class="title">
             @Strings.REGISTER_FORM_TITLE
         </h2>
         <form class="input-form" @onsubmit="OnContinueAsync">
-            <div style="display:flex; flex-direction:column; gap:10px;">
+            <div class="login-fields">
                 <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_ID" @bind-Value="m_ID" Input="@OnChangedAsync" HasError="@IdError" />
                 <FloatingInput Type="password" Placeholder="@Strings.LOGIN_LABEL_PW" @bind-Value="m_Password" Input="@OnChangedAsync" HasError="@PasswordError" />
                 <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_EMAIL" @bind-Value="m_Email" Input="@OnChangedAsync" HasError="@EmailError" />

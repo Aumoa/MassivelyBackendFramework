@@ -8,7 +8,7 @@
 .dlg-header-icon {
     width: 40px;
     height: 40px;
-    border-radius: 10px;
+    border-radius: 8px;
     background-color: #e8f0fe;
     display: flex;
     align-items: center;
@@ -53,7 +53,7 @@
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid #dadce0;
-    background-color: #f1f3f4;
+    background-color: var(--oauth-surface-muted);
 }
 
 .dlg-error {
@@ -120,7 +120,7 @@
 }
 
     .btn-ghost:hover:not(:disabled) {
-        background-color: #f1f3f4;
+        background-color: var(--oauth-surface-muted);
         color: #1a73e8;
     }
 

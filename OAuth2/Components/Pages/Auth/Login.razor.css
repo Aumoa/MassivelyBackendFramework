@@ -1,59 +1,93 @@
 .login-form {
-    padding: 32px 32px 4px 24px;
-    border-radius: 12px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    width: min(760px, 100%);
+    padding: 32px;
+    border: 1px solid var(--oauth-border);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: var(--oauth-shadow-md);
 }
 
-    .login-form .title {
-        min-width: 300px;
-    }
+.login-form-content {
+    display: grid;
+    grid-template-columns: minmax(220px, 300px) minmax(300px, 1fr);
+    gap: 28px;
+    align-items: start;
+}
 
-    .login-form .input-form {
-        display: flex;
-        flex-direction: column;
-        min-width: 300px;
-        position: relative;
-    }
+.login-form .title {
+    margin: 0;
+    color: var(--oauth-text);
+    font-size: 1.45rem;
+    font-weight: 650;
+    line-height: 1.25;
+}
 
-    .login-form .input-form .error-message {
-        margin: 0px;
-        margin-top: 0px;
-    }
+.login-form .input-form {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+}
 
-    .login-form .input-form .error-message:first-child {
-        margin-top: 4px;
-    }
+.login-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
 
-    .login-form .input-error {
-        color: red;
-        font-size: 14px;
-        animation: fade-in 0.4s ease;
-        min-height: 12px;
-        display: block;
-    }
+.login-form .input-form .error-message {
+    margin: 0;
+}
 
-    .login-form .error-icon {
-        color: red;
-        font-size: 13px;
-    }
+.login-form .input-form .error-message:first-child {
+    margin-top: 8px;
+}
 
-    .login-form .error-message {
-        color: red;
-        font-size: 13px;
-    }
+.login-form .input-error {
+    color: var(--oauth-danger);
+    font-size: 14px;
+    animation: fade-in 0.4s ease;
+    min-height: 12px;
+    display: block;
+}
+
+.login-form .error-icon {
+    color: var(--oauth-danger);
+    font-size: 13px;
+}
+
+.login-form .error-message {
+    color: var(--oauth-danger);
+    font-size: 13px;
+}
 
 .login-buttons-row {
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
-    margin-top: 12px;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.login-buttons-row button[type="submit"],
+.consent-container .login-buttons-row button:last-child {
+    background: var(--oauth-accent);
+    color: #fff;
+    border-color: var(--oauth-accent);
+    box-shadow: var(--oauth-shadow-sm);
+}
+
+.login-buttons-row button[type="submit"]:hover:not(:disabled),
+.consent-container .login-buttons-row button:last-child:hover:not(:disabled) {
+    background: var(--oauth-accent-hover);
+    border-color: var(--oauth-accent-hover);
+    color: #fff;
 }
 
 .cached-container {
     display: flex;
     flex-direction: column;
-    min-width: 300px;
-    gap: 2px;
+    min-width: 0;
+    gap: 4px;
 }
 
 .cached-account-row {
@@ -61,7 +95,7 @@
     flex-direction: row;
     align-items: stretch;
     gap: 4px;
-    border-radius: 12px;
+    border-radius: 8px;
     padding: 2px;
     transition: background-color 0.15s ease;
     animation: fade-in 0.25s ease;
@@ -70,14 +104,14 @@
 .cached-account-button {
     flex: 1;
     min-width: 0;
-    border-radius: 10px;
+    border-radius: 6px;
     text-align: left;
     padding: 8px 12px;
     display: flex;
     align-items: center;
     gap: 10px;
     font-size: 14px;
-    color: #222;
+    color: var(--oauth-text);
 }
 
 .cached-account-remove {
@@ -85,11 +119,11 @@
     min-width: unset;
     width: 36px;
     padding: 0;
-    border-radius: 10px;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #bbb;
+    color: #8a9490;
     transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -105,25 +139,25 @@
 
 .cached-divider {
     height: 1px;
-    background-color: #eeeeee;
-    margin: 6px 0;
+    background-color: var(--oauth-border-soft);
+    margin: 8px 0;
 }
 
 .cached-use-another {
     align-self: flex-end;
     min-width: unset;
     font-size: 13px;
-    color: #666;
-    padding: 4px 10px;
+    color: var(--oauth-text-muted);
+    padding: 5px 10px;
     margin-top: 8px;
 }
 
 .consent-container {
     display: flex;
     flex-direction: column;
-    min-width: 340px;
-    max-width: 420px;
-    gap: 12px;
+    min-width: 0;
+    max-width: 440px;
+    gap: 14px;
 }
 
 .consent-summary {
@@ -134,13 +168,13 @@
 }
 
 .consent-account {
-    color: #666;
+    color: var(--oauth-text-muted);
     font-size: 13px;
 }
 
 .consent-text {
-    color: #222;
-    font-weight: 600;
+    color: var(--oauth-text);
+    font-weight: 650;
 }
 
 .consent-scopes {
@@ -154,6 +188,10 @@
     grid-template-columns: minmax(72px, auto) 1fr;
     gap: 10px;
     align-items: start;
+    padding: 10px 12px;
+    border: 1px solid var(--oauth-border-soft);
+    border-radius: 6px;
+    background: var(--oauth-surface-muted);
     font-size: 13px;
     color: #444;
 }
@@ -168,9 +206,20 @@
     height: 32px;
     object-fit: cover;
     border-radius: 50%;
-    border: 1px solid #ddd;
+    border: 1px solid var(--oauth-border);
     cursor: pointer;
     flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+    .login-form {
+        padding: 24px;
+    }
+
+    .login-form-content {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
 }
 
 @keyframes fade-in {

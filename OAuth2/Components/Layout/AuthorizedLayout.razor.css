@@ -1,24 +1,63 @@
-﻿.page {
+.page {
     position: relative;
     display: flex;
     flex-direction: column;
+    min-height: 100vh;
+    background: var(--oauth-bg);
 }
 
 main {
     flex: 1;
+    min-width: 0;
 }
 
 .sidebar {
-    background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
+    background: #17201c;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 1px 0 0 rgba(18, 28, 23, 0.06);
+}
+
+.sidebar ::deep .top-row {
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar ::deep .navbar-brand {
+    color: #f8faf9;
+    font-weight: 650;
+}
+
+.sidebar ::deep .nav-scrollable {
+    padding-top: 0.75rem;
+}
+
+.sidebar ::deep .nav-item .nav-link {
+    min-height: 2.75rem;
+    height: auto;
+    line-height: 1.25;
+    border-radius: 8px;
+    color: rgba(248, 250, 249, 0.76);
+}
+
+.sidebar ::deep .nav-item a.active {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.12);
+    box-shadow: inset 3px 0 0 #81d8c3;
+}
+
+.sidebar ::deep .nav-item .nav-link:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.08);
 }
 
 .top-row {
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #d6d5d5;
+    background-color: rgba(255, 255, 255, 0.88);
+    border-bottom: 1px solid var(--oauth-border);
     justify-content: flex-end;
     height: 3.5rem;
     display: flex;
     align-items: center;
+    backdrop-filter: blur(12px);
 }
 
     .top-row ::deep a, .top-row ::deep .btn-link {
@@ -72,13 +111,13 @@ main {
 
     .top-row, article {
         padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
+        padding-right: 2rem !important;
     }
 }
 
 #blazor-error-ui {
     color-scheme: light only;
-    background: lightyellow;
+    background: #fff9db;
     bottom: 0;
     box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
     box-sizing: border-box;

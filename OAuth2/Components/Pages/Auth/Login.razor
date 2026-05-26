@@ -2,7 +2,7 @@
 @layout AuthorizeLayout
 
 <div class="login-form">
-    <div style="display:flex; flex-direction:row; gap:10px; padding-bottom: 20px;">
+    <div class="login-form-content">
         <h2 class="title">
             @string.Format(Strings.LOGIN_FORM_TITLE, ClientName)
         </h2>
@@ -61,7 +61,7 @@
                         <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_ID" @bind-Value="m_ID" Input="@OnChangedAsync" HasError="@IdError" />
                     </SelectorView>
                     <SelectorView Key="RenderStates.Login">
-                        <div style="display:flex; flex-direction:column; gap:10px;">
+                        <div class="login-fields">
                             <FloatingInput Type="text" Placeholder="@Strings.LOGIN_LABEL_ID" Value="@m_ID" Disabled="true" />
                             <FloatingInput @ref="m_InputPassword" Type="password" Placeholder="@Strings.LOGIN_LABEL_PW" @bind-Value="m_Password" Input="@OnChangedAsync" HasError="@PasswordError" />
                         </div>
