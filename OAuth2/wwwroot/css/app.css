@@ -1,4 +1,5 @@
 :root {
+    color-scheme: light;
     --oauth-bg: #f5f7f6;
     --oauth-surface: #ffffff;
     --oauth-surface-muted: #f8faf9;
@@ -8,10 +9,63 @@
     --oauth-text-muted: #626c66;
     --oauth-accent: #1a73e8;
     --oauth-accent-hover: #1765cc;
+    --oauth-accent-soft: #e8f0fe;
+    --oauth-on-accent: #ffffff;
     --oauth-focus: rgba(26, 115, 232, 0.26);
     --oauth-danger: #d93025;
+    --oauth-danger-bg: #fce8e6;
+    --oauth-success: #137333;
+    --oauth-success-bg: #e6f4ea;
+    --oauth-warning: #5f4600;
+    --oauth-warning-bg: #fef9e7;
+    --oauth-warning-border: #f9c74f;
+    --oauth-disabled: #bdc1c6;
     --oauth-shadow-sm: 0 1px 2px rgba(18, 28, 23, 0.06);
     --oauth-shadow-md: 0 12px 30px rgba(18, 28, 23, 0.12);
+    --app-bg: var(--oauth-bg);
+    --app-surface: var(--oauth-surface);
+    --app-surface-muted: var(--oauth-surface-muted);
+    --app-border: var(--oauth-border);
+    --app-border-strong: var(--oauth-border);
+    --app-text: var(--oauth-text);
+    --app-text-muted: var(--oauth-text-muted);
+    --app-accent: var(--oauth-accent);
+    --app-accent-hover: var(--oauth-accent-hover);
+    --app-on-accent: var(--oauth-on-accent);
+    --app-danger: var(--oauth-danger);
+    --app-danger-bg: var(--oauth-danger-bg);
+    --app-shadow-sm: var(--oauth-shadow-sm);
+    --app-shadow-md: var(--oauth-shadow-md);
+    --bs-body-bg: var(--oauth-bg);
+    --bs-body-color: var(--oauth-text);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+        --oauth-bg: #101312;
+        --oauth-surface: #171b1a;
+        --oauth-surface-muted: #1f2523;
+        --oauth-border: #313a37;
+        --oauth-border-soft: #26302d;
+        --oauth-text: #ecf1ef;
+        --oauth-text-muted: #a7b0ac;
+        --oauth-accent: #8ab4f8;
+        --oauth-accent-hover: #a8c7fa;
+        --oauth-accent-soft: rgba(138, 180, 248, 0.14);
+        --oauth-on-accent: #0b1b33;
+        --oauth-focus: rgba(138, 180, 248, 0.28);
+        --oauth-danger: #f28b82;
+        --oauth-danger-bg: rgba(242, 139, 130, 0.14);
+        --oauth-success: #6ee7b7;
+        --oauth-success-bg: rgba(52, 211, 153, 0.14);
+        --oauth-warning: #facc15;
+        --oauth-warning-bg: rgba(250, 204, 21, 0.12);
+        --oauth-warning-border: rgba(250, 204, 21, 0.32);
+        --oauth-disabled: #59645f;
+        --oauth-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+        --oauth-shadow-md: 0 12px 30px rgba(0, 0, 0, 0.42);
+    }
 }
 
 html, body {
@@ -43,12 +97,12 @@ button {
 }
 
     button:disabled {
-        color: #9aa3a0;
+        color: var(--oauth-text-muted);
         cursor: not-allowed;
     }
 
     button:not(:disabled):hover {
-        background-color: #edf1ef;
+        background-color: var(--oauth-border-soft);
         color: var(--oauth-text);
     }
 
@@ -78,7 +132,182 @@ button {
 }
 
 .link-button:disabled {
-    color: #999;
+    color: var(--oauth-text-muted);
     cursor: not-allowed;
     text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
+    body .top-row,
+    body .clients-table-header,
+    body .section-header,
+    body .apikeys-section .section-header {
+        background-color: var(--oauth-surface-muted) !important;
+        border-color: var(--oauth-border) !important;
+    }
+
+    body .login-form,
+    body .info-card,
+    body .clients-card,
+    body .form-section,
+    body .dialog-container {
+        background: var(--oauth-surface) !important;
+        border-color: var(--oauth-border) !important;
+        color: var(--oauth-text) !important;
+    }
+
+    body .info-row,
+    body .client-row,
+    body .page-header,
+    body .manage-header {
+        border-color: var(--oauth-border-soft) !important;
+    }
+
+    body .page-title,
+    body .manage-title,
+    body .dlg-title,
+    body .breadcrumb-current,
+    body .section-title,
+    body .info-value,
+    body .app-name,
+    body .field-value,
+    body .field-label,
+    body .secret-value,
+    body .secret-id,
+    body .scope-option code,
+    body .user-account-id,
+    body .empty-title,
+    body .consent-scope-row,
+    body .grant-name,
+    body .apikey-name {
+        color: var(--oauth-text) !important;
+    }
+
+    body .page-subtitle,
+    body .section-desc,
+    body .breadcrumb,
+    body .back-button,
+    body .breadcrumb-separator .material-symbols-outlined,
+    body .info-label,
+    body .client-id-text,
+    body .secret-field-label,
+    body .user-icon,
+    body .user-account-sub,
+    body .secret-created,
+    body .secrets-empty,
+    body .empty-subtitle,
+    body .arrow-icon,
+    body .empty-icon,
+    body .apikey-detail,
+    body .grant-detail,
+    body .grant-scopes,
+    body .manage-subtitle {
+        color: var(--oauth-text-muted) !important;
+    }
+
+    body .code-value,
+    body .manage-subtitle code,
+    body .secret-value-row,
+    body .grant-scopes code {
+        background: var(--oauth-surface-muted) !important;
+        border-color: var(--oauth-border) !important;
+        color: var(--oauth-text) !important;
+    }
+
+    body .client-row:hover,
+    body .apikey-row,
+    body .grant-row,
+    body .secret-row,
+    body .scope-option,
+    body .user-group-block,
+    body .add-user-group-panel,
+    body .add-apikey-panel {
+        background-color: var(--oauth-surface-muted) !important;
+        border-color: var(--oauth-border) !important;
+    }
+
+    body .dlg-header-icon,
+    body .app-icon,
+    body .manage-header-icon {
+        background-color: var(--oauth-accent-soft) !important;
+    }
+
+    body .dlg-header-icon .material-symbols-outlined,
+    body .app-icon .material-symbols-outlined,
+    body .manage-header-icon .material-symbols-outlined,
+    body .btn-save,
+    body .btn-text-add,
+    body .btn-secondary,
+    body .btn-ghost,
+    body .btn-copy,
+    body .consent-scope-row code {
+        color: var(--oauth-accent) !important;
+    }
+
+    body .btn-save:hover:not(:disabled),
+    body .btn-text-add:hover:not(:disabled),
+    body .btn-secondary:hover:not(:disabled),
+    body .btn-ghost:hover:not(:disabled),
+    body .btn-copy:hover {
+        background-color: var(--oauth-accent-soft) !important;
+        border-color: var(--oauth-accent) !important;
+        color: var(--oauth-accent-hover) !important;
+    }
+
+    body .btn-primary,
+    body .login-buttons-row button[type="submit"],
+    body .consent-container .login-buttons-row button:last-child {
+        background-color: var(--oauth-accent) !important;
+        border-color: var(--oauth-accent) !important;
+        color: var(--oauth-on-accent) !important;
+    }
+
+    body .btn-primary:hover:not(:disabled),
+    body .login-buttons-row button[type="submit"]:hover:not(:disabled),
+    body .consent-container .login-buttons-row button:last-child:hover:not(:disabled) {
+        background-color: var(--oauth-accent-hover) !important;
+        border-color: var(--oauth-accent-hover) !important;
+        color: var(--oauth-on-accent) !important;
+    }
+
+    body .btn-primary:disabled {
+        background-color: var(--oauth-disabled) !important;
+        border-color: var(--oauth-disabled) !important;
+        color: var(--oauth-text-muted) !important;
+    }
+
+    body .btn-secondary:disabled,
+    body .btn-ghost:disabled,
+    body .btn-text-add:disabled,
+    body .btn-save:disabled {
+        background-color: transparent !important;
+        border-color: var(--oauth-border) !important;
+        color: var(--oauth-text-muted) !important;
+    }
+
+    body .secret-warning {
+        background-color: var(--oauth-warning-bg) !important;
+        border-color: var(--oauth-warning-border) !important;
+    }
+
+    body .secret-warning-icon,
+    body .secret-warning-text {
+        color: var(--oauth-warning) !important;
+    }
+
+    body .badge-verified,
+    body .type-badge,
+    body .btn-copy.btn-copy--copied {
+        background-color: var(--oauth-success-bg) !important;
+        color: var(--oauth-success) !important;
+    }
+
+    body .badge-unverified,
+    body .btn-delete:hover:not(:disabled),
+    body .btn-delete-client:hover,
+    body .cached-account-remove:not(:disabled):hover,
+    body .apikey-delete-btn:hover:not(:disabled) {
+        background-color: var(--oauth-danger-bg) !important;
+        color: var(--oauth-danger) !important;
+    }
 }

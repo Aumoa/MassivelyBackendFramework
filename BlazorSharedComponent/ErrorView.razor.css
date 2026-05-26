@@ -1,5 +1,5 @@
 h4 {
-    color: red;
+    color: var(--app-danger, red);
 }
 
 @keyframes shake {
@@ -29,7 +29,7 @@ h4 {
 }
 
 .error-icon {
-    color: red;
+    color: var(--app-danger, red);
     font-size: 240px;
 }
 

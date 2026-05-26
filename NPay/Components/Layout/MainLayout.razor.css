@@ -2,6 +2,8 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    background: var(--app-bg);
+    color: var(--app-text);
 }
 
 main {
@@ -9,12 +11,13 @@ main {
 }
 
 .sidebar {
-    background-image: linear-gradient(180deg, #6d28d9 0%, #4f46e5 70%);
+    background-image: var(--app-sidebar-gradient, linear-gradient(180deg, #6d28d9 0%, #4f46e5 70%));
 }
 
 .top-row {
-    background-color: #f7f7f7;
-    border-bottom: 1px solid #d6d5d5;
+    background-color: var(--app-topbar-bg, var(--app-surface));
+    border-bottom: 1px solid var(--app-border);
+    color: var(--app-text);
     justify-content: flex-end;
     height: 3.5rem;
     display: flex;
@@ -77,11 +80,11 @@ main {
 }
 
 #blazor-error-ui {
-    color-scheme: light only;
-    background: lightyellow;
+    background: var(--app-danger-bg, #fff9db);
     bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--app-shadow-sm, 0 -1px 2px rgba(0, 0, 0, 0.2));
     box-sizing: border-box;
+    color: var(--app-text);
     display: none;
     left: 0;
     padding: 0.6rem 1.25rem 0.7rem 1.25rem;

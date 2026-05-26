@@ -6,41 +6,43 @@
         width: 100%;
         padding: 16px 8px 6px 8px;
         border: 1.5px solid;
-        border-color: #aaa;
+        border-color: var(--app-border-strong, #aaa);
         border-radius: 4px;
         font-size: 16px;
+        background: var(--app-surface, #fff);
+        color: var(--app-text, #222);
         outline: none;
         transition: 0.2s ease border-color;
     }
 
         .floating-group .floating-input:hover:not(:disabled) {
-            border-color: #444;
+            border-color: var(--app-text-muted, #444);
         }
 
         .floating-group .floating-input:focus,
         .floating-group .floating-input:focus:hover:not(:disabled) {
-            border-color: #4af;
+            border-color: var(--app-accent, #4af);
         }
 
         .floating-group .floating-input.error {
-            border-color: #faa;
+            border-color: color-mix(in srgb, var(--app-danger, #f00) 45%, var(--app-surface, #fff));
             animation: shake 0.3s;
         }
 
         .floating-group .floating-input:hover:not(:disabled).error {
-            border-color: #f66;
+            border-color: color-mix(in srgb, var(--app-danger, #f00) 70%, var(--app-surface, #fff));
         }
 
         .floating-group .floating-input:focus.error,
         .floating-group .floating-input:focus:hover:not(:disabled).error {
-            border-color: #f00;
+            border-color: var(--app-danger, #f00);
         }
 
         .floating-group .floating-input + .floating-label {
             position: absolute;
             left: 12px;
             top: 16px;
-            color: #aaa;
+            color: var(--app-text-muted, #aaa);
             font-size: 16px;
             pointer-events: none;
             transition: 0.2s ease all;
@@ -52,7 +54,7 @@
             }
 
         .floating-group .floating-input:focus + .floating-label {
-            color: #4af;
+            color: var(--app-accent, #4af);
         }
 
         .floating-group .floating-input:focus + .floating-label,
@@ -60,12 +62,12 @@
             top: -8px;
             left: 8px;
             font-size: 13px;
-            background: #fff;
+            background: var(--app-surface, #fff);
         }
 
             .floating-group .floating-input:focus + .floating-label.error,
             .floating-group .floating.floating-input:not(:placeholder-shown) + .floating-label.error {
-                color: red;
+                color: var(--app-danger, red);
             }
 
 @keyframes shake {

@@ -1,19 +1,71 @@
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background: var(--app-bg);
+    color: var(--app-text);
+}
+
+:root {
+    color-scheme: light;
+    --app-bg: #f6f8fb;
+    --app-surface: #ffffff;
+    --app-surface-muted: #eef2f7;
+    --app-border: #d8dee7;
+    --app-border-strong: #b7c0ce;
+    --app-text: #1f2937;
+    --app-text-muted: #64748b;
+    --app-accent: #2563eb;
+    --app-accent-hover: #1d4ed8;
+    --app-on-accent: #ffffff;
+    --app-danger: #dc2626;
+    --app-danger-bg: #fef2f2;
+    --app-success: #16a34a;
+    --app-focus-ring: rgba(37, 99, 235, 0.28);
+    --app-topbar-bg: rgba(255, 255, 255, 0.92);
+    --app-sidebar-gradient: linear-gradient(180deg, #123b72 0%, #51205d 70%);
+    --app-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+    --app-shadow-md: 0 12px 30px rgba(15, 23, 42, 0.12);
+    --bs-body-bg: var(--app-bg);
+    --bs-body-color: var(--app-text);
+    --bs-secondary-color: var(--app-text-muted);
+    --bs-border-color: var(--app-border);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+        --app-bg: #101114;
+        --app-surface: #181b20;
+        --app-surface-muted: #222833;
+        --app-border: #303846;
+        --app-border-strong: #465264;
+        --app-text: #edf2f7;
+        --app-text-muted: #a8b3c2;
+        --app-accent: #8ab4f8;
+        --app-accent-hover: #adc8ff;
+        --app-on-accent: #08162f;
+        --app-danger: #f87171;
+        --app-danger-bg: #3f1d22;
+        --app-success: #86efac;
+        --app-focus-ring: rgba(138, 180, 248, 0.32);
+        --app-topbar-bg: rgba(24, 27, 32, 0.92);
+        --app-sidebar-gradient: linear-gradient(180deg, #0f2948 0%, #2b1233 70%);
+        --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+        --app-shadow-md: 0 12px 30px rgba(0, 0, 0, 0.42);
+    }
 }
 
 a, .btn-link {
-    color: #006bb7;
+    color: var(--app-accent);
 }
 
 .btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    color: var(--app-on-accent);
+    background-color: var(--app-accent);
+    border-color: var(--app-accent);
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+  box-shadow: 0 0 0 0.1rem var(--app-surface), 0 0 0 0.25rem var(--app-focus-ring);
 }
 
 .content {
@@ -25,15 +77,15 @@ h1:focus {
 }
 
 .valid.modified:not([type=checkbox]) {
-    outline: 1px solid #26b050;
+    outline: 1px solid var(--app-success);
 }
 
 .invalid {
-    outline: 1px solid #e50000;
+    outline: 1px solid var(--app-danger);
 }
 
 .validation-message {
-    color: #e50000;
+    color: var(--app-danger);
 }
 
 .blazor-error-boundary {
@@ -47,7 +99,7 @@ h1:focus {
     }
 
 .darker-border-checkbox.form-check-input {
-    border-color: #929292;
+    border-color: var(--app-border-strong);
 }
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {

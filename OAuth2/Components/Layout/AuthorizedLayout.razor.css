@@ -4,6 +4,7 @@
     flex-direction: column;
     min-height: 100vh;
     background: var(--oauth-bg);
+    color: var(--oauth-text);
 }
 
 main {
@@ -51,8 +52,9 @@ main {
 }
 
 .top-row {
-    background-color: rgba(255, 255, 255, 0.88);
+    background-color: color-mix(in srgb, var(--oauth-surface) 88%, transparent);
     border-bottom: 1px solid var(--oauth-border);
+    color: var(--oauth-text);
     justify-content: flex-end;
     height: 3.5rem;
     display: flex;
@@ -116,11 +118,11 @@ main {
 }
 
 #blazor-error-ui {
-    color-scheme: light only;
-    background: #fff9db;
+    background: var(--oauth-warning-bg);
     bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--oauth-shadow-sm);
     box-sizing: border-box;
+    color: var(--oauth-text);
     display: none;
     left: 0;
     padding: 0.6rem 1.25rem 0.7rem 1.25rem;

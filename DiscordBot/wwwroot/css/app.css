@@ -4,6 +4,7 @@
    ============================================================= */
 
 :root {
+    color-scheme: light;
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
     --color-bg:          #ffffff;
@@ -19,6 +20,12 @@
     --color-accent-hover: #4752c4;
     --color-accent-light: #eef0fe;
     --color-accent-border:#d6dafe;
+    --color-topbar-bg: rgba(255,255,255,0.95);
+    --color-on-accent: #ffffff;
+    --app-sidebar-gradient: linear-gradient(180deg, #1d3f7a 0%, #4d1b63 70%);
+    --app-sidebar-top-bg: rgba(0, 0, 0, 0.28);
+    --app-sidebar-active-bg: rgba(255, 255, 255, 0.24);
+    --app-sidebar-hover-bg: rgba(255, 255, 255, 0.12);
 
     --color-success:      #059669;
     --color-success-bg:   #ecfdf5;
@@ -51,6 +58,51 @@
     --shadow-md: 0 4px 12px rgba(0,0,0,.08);
 
     --transition: 150ms ease;
+
+    --app-bg: var(--color-bg);
+    --app-surface: var(--color-bg);
+    --app-surface-muted: var(--color-surface);
+    --app-border: var(--color-border);
+    --app-border-strong: var(--color-border-dark);
+    --app-text: var(--color-text-primary);
+    --app-text-muted: var(--color-text-secondary);
+    --app-accent: var(--color-accent);
+    --app-accent-hover: var(--color-accent-hover);
+    --app-on-accent: var(--color-on-accent);
+    --app-danger: var(--color-danger);
+    --app-danger-bg: var(--color-danger-bg);
+    --app-shadow-sm: var(--shadow-sm);
+    --app-shadow-md: var(--shadow-md);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+        --color-bg: #101114;
+        --color-surface: #181b20;
+        --color-border: #2a2f38;
+        --color-border-dark: #3a414d;
+
+        --color-text-primary: #eef0f4;
+        --color-text-secondary: #b7beca;
+        --color-text-muted: #8d96a6;
+
+        --color-accent: #9aa3ff;
+        --color-accent-hover: #b7bdff;
+        --color-accent-light: rgba(154, 163, 255, 0.15);
+        --color-accent-border: rgba(154, 163, 255, 0.34);
+        --color-topbar-bg: rgba(16, 17, 20, 0.92);
+        --color-on-accent: #101114;
+        --app-sidebar-gradient: linear-gradient(180deg, #152545 0%, #2b1737 70%);
+
+        --color-success: #34d399;
+        --color-success-bg: rgba(52, 211, 153, 0.14);
+        --color-danger: #f87171;
+        --color-danger-bg: rgba(248, 113, 113, 0.14);
+
+        --shadow-sm: 0 1px 3px rgba(0,0,0,.28), 0 1px 2px rgba(0,0,0,.22);
+        --shadow-md: 0 8px 24px rgba(0,0,0,.36);
+    }
 }
 
 *, *::before, *::after {
@@ -112,14 +164,14 @@ button {
 
 .btn-primary {
     background: var(--color-accent);
-    color: #fff;
+    color: var(--color-on-accent);
     border-color: var(--color-accent);
 }
 
     .btn-primary:hover:not(:disabled) {
         background: var(--color-accent-hover);
         border-color: var(--color-accent-hover);
-        color: #fff;
+        color: var(--color-on-accent);
     }
 
 .btn-ghost {
@@ -146,7 +198,7 @@ button {
     top: 0;
     z-index: 100;
     height: 56px;
-    background: rgba(255,255,255,0.95);
+    background: var(--color-topbar-bg);
     backdrop-filter: saturate(180%) blur(8px);
     -webkit-backdrop-filter: saturate(180%) blur(8px);
     border-bottom: 1px solid var(--color-border);
@@ -266,8 +318,8 @@ button {
 }
 
 #blazor-error-ui {
-    color-scheme: light only;
-    background: #fef9c3;
+    background: var(--color-danger-bg);
+    color: var(--color-text-primary);
     bottom: 0;
     left: 0;
     right: 0;
@@ -275,7 +327,7 @@ button {
     padding: var(--space-3) var(--space-5);
     display: none;
     font-size: var(--text-sm);
-    border-top: 1px solid #fde68a;
+    border-top: 1px solid var(--color-danger);
     z-index: 1000;
 }
 

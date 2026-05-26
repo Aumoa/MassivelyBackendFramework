@@ -1,5 +1,59 @@
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background: var(--app-bg);
+    color: var(--app-text);
+}
+
+:root {
+    color-scheme: light;
+    --app-bg: #f6f8fb;
+    --app-surface: #ffffff;
+    --app-surface-muted: #eef2f7;
+    --app-border: #d8dee7;
+    --app-border-strong: #b7c0ce;
+    --app-text: #1f2937;
+    --app-text-muted: #64748b;
+    --app-accent: #0f766e;
+    --app-accent-hover: #115e59;
+    --app-on-accent: #ffffff;
+    --app-danger: #dc2626;
+    --app-danger-bg: #fef2f2;
+    --app-success: #16a34a;
+    --app-focus-ring: rgba(15, 118, 110, 0.28);
+    --app-topbar-bg: rgba(255, 255, 255, 0.92);
+    --app-sidebar-gradient: linear-gradient(180deg, #1e3a8a 0%, #065f46 70%);
+    --app-login-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --app-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.08);
+    --app-shadow-md: 0 12px 30px rgba(15, 23, 42, 0.12);
+    --bs-body-bg: var(--app-bg);
+    --bs-body-color: var(--app-text);
+    --bs-secondary-color: var(--app-text-muted);
+    --bs-border-color: var(--app-border);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+        --app-bg: #101312;
+        --app-surface: #171b1a;
+        --app-surface-muted: #202826;
+        --app-border: #303a37;
+        --app-border-strong: #46524e;
+        --app-text: #eef4f1;
+        --app-text-muted: #a8b3af;
+        --app-accent: #5eead4;
+        --app-accent-hover: #99f6e4;
+        --app-on-accent: #042f2e;
+        --app-danger: #f87171;
+        --app-danger-bg: #3f1d22;
+        --app-success: #86efac;
+        --app-focus-ring: rgba(94, 234, 212, 0.32);
+        --app-topbar-bg: rgba(23, 27, 26, 0.92);
+        --app-sidebar-gradient: linear-gradient(180deg, #172554 0%, #064e3b 70%);
+        --app-login-bg: linear-gradient(135deg, #172554 0%, #064e3b 100%);
+        --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+        --app-shadow-md: 0 12px 30px rgba(0, 0, 0, 0.42);
+    }
 }
 
 h1:focus {
@@ -7,17 +61,17 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #0071c1;
+    color: var(--app-accent);
 }
 
 .btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    color: var(--app-on-accent);
+    background-color: var(--app-accent);
+    border-color: var(--app-accent);
 }
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-    box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+    box-shadow: 0 0 0 0.1rem var(--app-surface), 0 0 0 0.25rem var(--app-focus-ring);
 }
 
 .content {
@@ -25,21 +79,22 @@ a, .btn-link {
 }
 
 .valid.modified:not([type=checkbox]) {
-    outline: 1px solid #26b050;
+    outline: 1px solid var(--app-success);
 }
 
 .invalid {
-    outline: 1px solid #e50000;
+    outline: 1px solid var(--app-danger);
 }
 
 .validation-message {
-    color: #e50000;
+    color: var(--app-danger);
 }
 
 #blazor-error-ui {
-    background: lightyellow;
+    background: var(--app-danger-bg);
     bottom: 0;
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--app-shadow-sm);
+    color: var(--app-text);
     display: none;
     left: 0;
     padding: 0.6rem 1.25rem 0.7rem 1.25rem;
