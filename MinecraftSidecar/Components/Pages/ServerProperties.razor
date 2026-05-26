@@ -1,15 +1,15 @@
 @page "/server-properties"
 @rendermode InteractiveServer
-@inject IOptions<ServerPropertiesOptions> Options
-@using Microsoft.Extensions.Options
-@using MinecraftSidecar.Options
+@inject ServerPropertiesService PropertiesService
+@inject RCONClient RconClient
+@inject ConsoleLogService ConsoleLog
 
 <PageTitle>@Strings.APP_TITLE - @Strings.SERVER_PROPERTIES_TITLE</PageTitle>
 
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-md-12">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center gap-3">
                 <div>
                     <h1>
                         <span class="material-symbols-outlined" style="vertical-align: middle;">settings</span>
@@ -17,15 +17,48 @@
                     </h1>
                     <p class="lead">@Strings.SERVER_PROPERTIES_SUBTITLE</p>
                 </div>
-                <div>
-                    <button class="btn btn-outline-primary" @onclick="OnRefreshClick">
+                <div class="d-flex align-items-center gap-2">
+                    @if (RconClient.IsConnected)
+                    {
+                        <span class="badge bg-success">@Strings.CONSOLE_STATUS_CONNECTED</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-danger">@Strings.CONSOLE_STATUS_DISCONNECTED</span>
+                    }
+                    <button class="btn btn-outline-primary" @onclick="OnRefreshClick" disabled="@IsBusy">
                         <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">refresh</span>
                         @Strings.BUTTON_REFRESH
+                    </button>
+                    <button class="btn btn-primary" @onclick="OnSaveClick" disabled="@(!hasChanges || IsBusy)">
+                        <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">save</span>
+                        @Strings.BUTTON_SAVE
+                    </button>
+                    <button class="btn btn-warning" @onclick="OnSaveAndRestartClick" disabled="@(!RconClient.IsConnected || IsBusy)">
+                        <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px;">restart_alt</span>
+                        @Strings.SERVER_PROPERTIES_BUTTON_SAVE_RESTART
                     </button>
                 </div>
             </div>
         </div>
     </div>
+
+    <div class="row mt-3">
+        <div class="col-md-12">
+            <small class="text-muted">@filePath</small>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <div class="alert @(statusIsError ? "alert-danger" : "alert-success") mb-0" role="alert">
+                    @statusMessage
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="row mt-4">
         <div class="col-md-12">
@@ -33,45 +66,90 @@
                 <div class="card-body">
                     @if (isLoading)
                     {
-                        <p class="text-muted">@Strings.SERVER_PROPERTIES_LOADING</p>
-                    }
-                    else if (fileNotFound)
-                    {
-                        <div class="alert alert-warning">
-                            <span class="material-symbols-outlined" style="vertical-align: middle;">warning</span>
-                            @Strings.SERVER_PROPERTIES_FILE_NOT_FOUND
-                            <br />
-                            <small class="text-muted">@filePath</small>
+                        <div class="text-center p-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">@Strings.LOADING</span>
+                            </div>
+                            <p class="mt-2">@Strings.SERVER_PROPERTIES_LOADING</p>
                         </div>
                     }
                     else
                     {
-                        <table class="table table-sm table-hover mb-0">
+                        <table class="table table-sm table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th style="width: 40%;">@Strings.SERVER_PROPERTIES_COL_KEY</th>
+                                    <th style="width: 36%;">@Strings.SERVER_PROPERTIES_COL_KEY</th>
                                     <th>@Strings.SERVER_PROPERTIES_COL_VALUE</th>
+                                    <th style="width: 1%;"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var entry in entries)
                                 {
-                                    @if (entry.IsComment)
+                                    @if (entry.Kind == ServerPropertyLineKind.Blank)
                                     {
-                                        <tr class="table-secondary">
-                                            <td colspan="2" class="text-muted fst-italic" style="font-size: 0.85em;">
+                                        <tr @key="entry.Id">
+                                            <td colspan="3" style="height: 0.75rem;"></td>
+                                        </tr>
+                                    }
+                                    else if (entry.Kind == ServerPropertyLineKind.Comment)
+                                    {
+                                        <tr class="table-secondary" @key="entry.Id">
+                                            <td colspan="3" class="text-muted fst-italic" style="font-size: 0.85em;">
                                                 @entry.Raw
                                             </td>
                                         </tr>
                                     }
                                     else
                                     {
-                                        <tr>
-                                            <td><code>@entry.Key</code></td>
-                                            <td>@entry.Value</td>
+                                        <tr @key="entry.Id">
+                                            <td>
+                                                <input class="form-control form-control-sm font-monospace"
+                                                       value="@entry.Key"
+                                                       @oninput="e => OnKeyChanged(entry, e.Value?.ToString() ?? string.Empty)"
+                                                       disabled="@IsBusy" />
+                                            </td>
+                                            <td>
+                                                <input class="form-control form-control-sm font-monospace"
+                                                       value="@entry.Value"
+                                                       @oninput="e => OnValueChanged(entry, e.Value?.ToString() ?? string.Empty)"
+                                                       disabled="@IsBusy" />
+                                            </td>
+                                            <td class="text-nowrap">
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        title="@Strings.BUTTON_DELETE"
+                                                        @onclick="() => OnDeleteClick(entry)"
+                                                        disabled="@IsBusy">
+                                                    <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">delete</span>
+                                                </button>
+                                            </td>
                                         </tr>
                                     }
                                 }
+                                <tr class="table-light">
+                                    <td>
+                                        <input class="form-control form-control-sm font-monospace"
+                                               placeholder="@Strings.SERVER_PROPERTIES_PLACEHOLDER_KEY"
+                                               @bind="newKey"
+                                               @bind:event="oninput"
+                                               disabled="@IsBusy" />
+                                    </td>
+                                    <td>
+                                        <input class="form-control form-control-sm font-monospace"
+                                               placeholder="@Strings.SERVER_PROPERTIES_PLACEHOLDER_VALUE"
+                                               @bind="newValue"
+                                               @bind:event="oninput"
+                                               disabled="@IsBusy" />
+                                    </td>
+                                    <td class="text-nowrap">
+                                        <button class="btn btn-sm btn-outline-primary"
+                                                title="@Strings.BUTTON_ADD"
+                                                @onclick="OnAddClick"
+                                                disabled="@(IsBusy || string.IsNullOrWhiteSpace(newKey))">
+                                            <span class="material-symbols-outlined" style="font-size: 16px; vertical-align: middle;">add</span>
+                                        </button>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     }
@@ -83,69 +161,88 @@
 
 @code {
     private bool isLoading = true;
-    private bool fileNotFound = false;
+    private bool isSaving;
+    private bool isRestarting;
+    private bool hasChanges;
+    private bool statusIsError;
     private string filePath = string.Empty;
-    private List<PropertyEntry> entries = new();
+    private string statusMessage = string.Empty;
+    private string newKey = string.Empty;
+    private string newValue = string.Empty;
+    private long nextId;
+    private List<PropertyEntry> entries = [];
+
+    private bool IsBusy => isLoading || isSaving || isRestarting;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadProperties();
+        await LoadProperties(clearStatus: true);
     }
 
     private async Task OnRefreshClick()
     {
-        await LoadProperties();
+        await LoadProperties(clearStatus: true);
     }
 
-    private async Task LoadProperties()
+    private async Task OnSaveClick()
+    {
+        await SaveProperties(Strings.SERVER_PROPERTIES_SAVE_SUCCESS);
+    }
+
+    private async Task OnSaveAndRestartClick()
+    {
+        if (!await SaveProperties(Strings.SERVER_PROPERTIES_SAVE_SUCCESS))
+        {
+            return;
+        }
+
+        if (!RconClient.IsConnected)
+        {
+            SetStatus(Strings.SERVER_PROPERTIES_RESTART_DISCONNECTED, true);
+            return;
+        }
+
+        isRestarting = true;
+        try
+        {
+            ConsoleLog.Append(ConsoleLogLevel.Info, "[INFO] Saving world before restart.");
+            var saveResponse = await RconClient.SendCommandAsync("save-all");
+            if (!string.IsNullOrWhiteSpace(saveResponse))
+            {
+                ConsoleLog.Append(ConsoleLogLevel.Response, saveResponse);
+            }
+
+            ConsoleLog.Append(ConsoleLogLevel.Command, "> stop");
+            await RconClient.SendCommandAsync("stop");
+            SetStatus(Strings.SERVER_PROPERTIES_RESTART_SENT, false);
+        }
+        catch (Exception ex)
+        {
+            SetStatus(string.Format(Strings.SERVER_PROPERTIES_RESTART_FAILED, ex.Message), true);
+        }
+        finally
+        {
+            isRestarting = false;
+        }
+    }
+
+    private async Task LoadProperties(bool clearStatus)
     {
         isLoading = true;
-        fileNotFound = false;
-        entries.Clear();
-
-        filePath = Options.Value.FilePath;
+        if (clearStatus)
+        {
+            statusMessage = string.Empty;
+        }
 
         try
         {
-            if (!File.Exists(filePath))
-            {
-                fileNotFound = true;
-                return;
-            }
-
-            var lines = await File.ReadAllLinesAsync(filePath);
-            foreach (var line in lines)
-            {
-                var trimmed = line.Trim();
-
-                if (string.IsNullOrEmpty(trimmed))
-                    continue;
-
-                if (trimmed.StartsWith('#'))
-                {
-                    entries.Add(new PropertyEntry { IsComment = true, Raw = trimmed });
-                    continue;
-                }
-
-                var eqIndex = trimmed.IndexOf('=');
-                if (eqIndex >= 0)
-                {
-                    entries.Add(new PropertyEntry
-                    {
-                        Key = trimmed[..eqIndex],
-                        Value = trimmed[(eqIndex + 1)..]
-                    });
-                }
-                else
-                {
-                    entries.Add(new PropertyEntry { Key = trimmed, Value = string.Empty });
-                }
-            }
+            await ReloadEntries();
+            hasChanges = false;
         }
         catch (Exception ex)
         {
             entries.Clear();
-            entries.Add(new PropertyEntry { IsComment = true, Raw = $"# Error: {ex.Message}" });
+            SetStatus(string.Format(Strings.SERVER_PROPERTIES_LOAD_FAILED, ex.Message), true);
         }
         finally
         {
@@ -153,9 +250,90 @@
         }
     }
 
+    private async Task<bool> SaveProperties(string successMessage)
+    {
+        isSaving = true;
+        try
+        {
+            var values = entries
+                .Where(static entry => entry.Kind == ServerPropertyLineKind.Property)
+                .Select(static entry => new ServerPropertyValue(entry.Key, entry.Value))
+                .ToArray();
+
+            await PropertiesService.SaveAsync(values);
+            await ReloadEntries();
+            hasChanges = false;
+            SetStatus(successMessage, false);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            SetStatus(string.Format(Strings.SERVER_PROPERTIES_SAVE_FAILED, ex.Message), true);
+            return false;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ReloadEntries()
+    {
+        var document = await PropertiesService.LoadAsync();
+        filePath = document.FilePath;
+        entries = [.. document.Lines.Select(line => new PropertyEntry
+        {
+            Id = ++nextId,
+            Kind = line.Kind,
+            Raw = line.Raw,
+            Key = line.Key,
+            Value = line.Value
+        })];
+    }
+
+    private void OnKeyChanged(PropertyEntry entry, string value)
+    {
+        entry.Key = value;
+        hasChanges = true;
+    }
+
+    private void OnValueChanged(PropertyEntry entry, string value)
+    {
+        entry.Value = value;
+        hasChanges = true;
+    }
+
+    private void OnAddClick()
+    {
+        entries.Add(new PropertyEntry
+        {
+            Id = ++nextId,
+            Kind = ServerPropertyLineKind.Property,
+            Key = newKey.Trim(),
+            Value = newValue
+        });
+
+        newKey = string.Empty;
+        newValue = string.Empty;
+        hasChanges = true;
+    }
+
+    private void OnDeleteClick(PropertyEntry entry)
+    {
+        entries.Remove(entry);
+        hasChanges = true;
+    }
+
+    private void SetStatus(string message, bool isError)
+    {
+        statusMessage = message;
+        statusIsError = isError;
+    }
+
     private sealed class PropertyEntry
     {
-        public bool IsComment { get; init; }
+        public long Id { get; init; }
+        public ServerPropertyLineKind Kind { get; init; }
         public string Raw { get; init; } = string.Empty;
         public string Key { get; set; } = string.Empty;
         public string Value { get; set; } = string.Empty;

@@ -51,6 +51,8 @@ builder.Services.AddSingleton<ServerLogService>();
 builder.Services.AddHostedService(p => p.GetRequiredService<ServerLogService>());
 
 builder.Services.Configure<ServerPropertiesOptions>(builder.Configuration.GetSection("ServerProperties"));
+builder.Services.AddSingleton<ServerPropertiesService>();
+builder.Services.AddHostedService<ServerPropertiesInitializer>();
 
 builder.Services.AddSingleton<ConsoleLogService>();
 

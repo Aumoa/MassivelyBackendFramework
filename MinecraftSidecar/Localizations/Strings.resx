@@ -123,6 +123,15 @@
   <data name="BUTTON_REFRESH" xml:space="preserve">
     <value>Refresh</value>
   </data>
+  <data name="BUTTON_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="BUTTON_ADD" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="BUTTON_DELETE" xml:space="preserve">
+    <value>Delete</value>
+  </data>
   <data name="CONSOLE_BUTTON_SEND" xml:space="preserve">
     <value>Send</value>
   </data>
@@ -247,7 +256,10 @@
     <value>Server Properties</value>
   </data>
   <data name="SERVER_PROPERTIES_SUBTITLE" xml:space="preserve">
-    <value>Read-only view of server.properties</value>
+    <value>Edit persistent server.properties settings</value>
+  </data>
+  <data name="SERVER_PROPERTIES_BUTTON_SAVE_RESTART" xml:space="preserve">
+    <value>Save and Restart</value>
   </data>
   <data name="SERVER_PROPERTIES_COL_KEY" xml:space="preserve">
     <value>Key</value>
@@ -255,11 +267,32 @@
   <data name="SERVER_PROPERTIES_COL_VALUE" xml:space="preserve">
     <value>Value</value>
   </data>
-  <data name="SERVER_PROPERTIES_FILE_NOT_FOUND" xml:space="preserve">
-    <value>server.properties file not found.</value>
+  <data name="SERVER_PROPERTIES_PLACEHOLDER_KEY" xml:space="preserve">
+    <value>property-key</value>
+  </data>
+  <data name="SERVER_PROPERTIES_PLACEHOLDER_VALUE" xml:space="preserve">
+    <value>value</value>
   </data>
   <data name="SERVER_PROPERTIES_LOADING" xml:space="preserve">
     <value>Loading server.properties...</value>
+  </data>
+  <data name="SERVER_PROPERTIES_LOAD_FAILED" xml:space="preserve">
+    <value>Failed to load server.properties: {0}</value>
+  </data>
+  <data name="SERVER_PROPERTIES_SAVE_SUCCESS" xml:space="preserve">
+    <value>server.properties saved.</value>
+  </data>
+  <data name="SERVER_PROPERTIES_SAVE_FAILED" xml:space="preserve">
+    <value>Failed to save server.properties: {0}</value>
+  </data>
+  <data name="SERVER_PROPERTIES_RESTART_DISCONNECTED" xml:space="preserve">
+    <value>server.properties saved, but RCON is disconnected.</value>
+  </data>
+  <data name="SERVER_PROPERTIES_RESTART_SENT" xml:space="preserve">
+    <value>Restart command sent. Kubernetes will restart the Minecraft container.</value>
+  </data>
+  <data name="SERVER_PROPERTIES_RESTART_FAILED" xml:space="preserve">
+    <value>Failed to restart the Minecraft server: {0}</value>
   </data>
   <data name="NAVMENU_LABEL_SERVER_PROPERTIES" xml:space="preserve">
     <value>Server Properties</value>

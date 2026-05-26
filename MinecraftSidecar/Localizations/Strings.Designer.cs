@@ -77,6 +77,24 @@ namespace MinecraftSidecar.Localizations {
                 return ResourceManager.GetString("BUTTON_REFRESH", resourceCulture);
             }
         }
+
+        internal static string BUTTON_SAVE {
+            get {
+                return ResourceManager.GetString("BUTTON_SAVE", resourceCulture);
+            }
+        }
+
+        internal static string BUTTON_ADD {
+            get {
+                return ResourceManager.GetString("BUTTON_ADD", resourceCulture);
+            }
+        }
+
+        internal static string BUTTON_DELETE {
+            get {
+                return ResourceManager.GetString("BUTTON_DELETE", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Send과(와) 유사한 지역화된 문자열을 찾습니다.
@@ -438,6 +456,12 @@ namespace MinecraftSidecar.Localizations {
             }
         }
 
+        internal static string SERVER_PROPERTIES_BUTTON_SAVE_RESTART {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_BUTTON_SAVE_RESTART", resourceCulture);
+            }
+        }
+
         internal static string SERVER_PROPERTIES_COL_KEY {
             get {
                 return ResourceManager.GetString("SERVER_PROPERTIES_COL_KEY", resourceCulture);
@@ -450,15 +474,57 @@ namespace MinecraftSidecar.Localizations {
             }
         }
 
-        internal static string SERVER_PROPERTIES_FILE_NOT_FOUND {
+        internal static string SERVER_PROPERTIES_PLACEHOLDER_KEY {
             get {
-                return ResourceManager.GetString("SERVER_PROPERTIES_FILE_NOT_FOUND", resourceCulture);
+                return ResourceManager.GetString("SERVER_PROPERTIES_PLACEHOLDER_KEY", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_PLACEHOLDER_VALUE {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_PLACEHOLDER_VALUE", resourceCulture);
             }
         }
 
         internal static string SERVER_PROPERTIES_LOADING {
             get {
                 return ResourceManager.GetString("SERVER_PROPERTIES_LOADING", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_LOAD_FAILED {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_LOAD_FAILED", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_SAVE_SUCCESS {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_SAVE_SUCCESS", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_SAVE_FAILED {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_SAVE_FAILED", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_RESTART_DISCONNECTED {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_RESTART_DISCONNECTED", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_RESTART_SENT {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_RESTART_SENT", resourceCulture);
+            }
+        }
+
+        internal static string SERVER_PROPERTIES_RESTART_FAILED {
+            get {
+                return ResourceManager.GetString("SERVER_PROPERTIES_RESTART_FAILED", resourceCulture);
             }
         }
 
