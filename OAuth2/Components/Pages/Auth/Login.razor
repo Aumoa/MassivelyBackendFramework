@@ -11,7 +11,7 @@
             <div class="consent-container">
                 <div class="consent-summary">
                     <span class="consent-account">@m_ConsentAccountId</span>
-                    <span class="consent-text">Allow @ClientName to access:</span>
+                    <span class="consent-text">@string.Format(Strings.LOGIN_CONSENT_SUMMARY, ClientName)</span>
                 </div>
                 <div class="consent-scopes">
                     @foreach (var scope in m_ConsentScopes)
@@ -23,8 +23,8 @@
                     }
                 </div>
                 <div class="login-buttons-row">
-                    <button type="button" @onclick="OnConsentDeny" disabled="@Requesting">Deny</button>
-                    <button type="button" @onclick="OnConsentApproveAsync" disabled="@Requesting">Allow</button>
+                    <button type="button" @onclick="OnConsentDeny" disabled="@Requesting">@Strings.LOGIN_CONSENT_DENY</button>
+                    <button type="button" @onclick="OnConsentApproveAsync" disabled="@Requesting">@Strings.LOGIN_CONSENT_ALLOW</button>
                 </div>
             </div>
         }

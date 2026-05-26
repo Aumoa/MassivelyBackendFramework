@@ -304,6 +304,96 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Allow과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_ALLOW {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_ALLOW", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Deny과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_DENY {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_DENY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Read your address information.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_SCOPE_ADDRESS {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_SCOPE_ADDRESS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Access this scope.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_SCOPE_DEFAULT {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_SCOPE_DEFAULT", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Read your email address.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_SCOPE_EMAIL {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_SCOPE_EMAIL", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Read groups assigned to you for this application.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_SCOPE_GROUPS {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_SCOPE_GROUPS", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Sign you in and identify your account.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_SCOPE_OPENID {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_SCOPE_OPENID", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Read your phone number.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_SCOPE_PHONE {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_SCOPE_PHONE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Read your profile information.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_SCOPE_PROFILE {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_SCOPE_PROFILE", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Allow {0} to access:과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string LOGIN_CONSENT_SUMMARY {
+            get {
+                return ResourceManager.GetString("LOGIN_CONSENT_SUMMARY", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Login to {0}과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string LOGIN_FORM_TITLE {

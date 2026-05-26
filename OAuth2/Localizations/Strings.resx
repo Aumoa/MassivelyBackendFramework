@@ -279,6 +279,36 @@
   <data name="LOGIN_CONTINUE_WITH_LOGIN" xml:space="preserve">
     <value>Use another account</value>
   </data>
+  <data name="LOGIN_CONSENT_ALLOW" xml:space="preserve">
+    <value>Allow</value>
+  </data>
+  <data name="LOGIN_CONSENT_DENY" xml:space="preserve">
+    <value>Deny</value>
+  </data>
+  <data name="LOGIN_CONSENT_SUMMARY" xml:space="preserve">
+    <value>Allow {0} to access:</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_ADDRESS" xml:space="preserve">
+    <value>Read your address information.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_DEFAULT" xml:space="preserve">
+    <value>Access this scope.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_EMAIL" xml:space="preserve">
+    <value>Read your email address.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_GROUPS" xml:space="preserve">
+    <value>Read groups assigned to you for this application.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_OPENID" xml:space="preserve">
+    <value>Sign you in and identify your account.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_PHONE" xml:space="preserve">
+    <value>Read your phone number.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_PROFILE" xml:space="preserve">
+    <value>Read your profile information.</value>
+  </data>
   <data name="LOGIN_REMOVE_CACHED_ACCOUNT" xml:space="preserve">
     <value>Remove account</value>
   </data>

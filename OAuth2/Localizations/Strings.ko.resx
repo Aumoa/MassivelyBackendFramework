@@ -279,6 +279,36 @@
   <data name="LOGIN_CONTINUE_WITH_LOGIN" xml:space="preserve">
     <value>다른 계정으로 계속</value>
   </data>
+  <data name="LOGIN_CONSENT_ALLOW" xml:space="preserve">
+    <value>허용</value>
+  </data>
+  <data name="LOGIN_CONSENT_DENY" xml:space="preserve">
+    <value>거부</value>
+  </data>
+  <data name="LOGIN_CONSENT_SUMMARY" xml:space="preserve">
+    <value>{0}에서 다음 정보에 접근하도록 허용합니다:</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_ADDRESS" xml:space="preserve">
+    <value>주소 정보를 읽습니다.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_DEFAULT" xml:space="preserve">
+    <value>이 스코프에 접근합니다.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_EMAIL" xml:space="preserve">
+    <value>이메일 주소를 읽습니다.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_GROUPS" xml:space="preserve">
+    <value>이 애플리케이션에 지정된 사용자 그룹을 읽습니다.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_OPENID" xml:space="preserve">
+    <value>로그인하고 계정을 식별합니다.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_PHONE" xml:space="preserve">
+    <value>전화번호를 읽습니다.</value>
+  </data>
+  <data name="LOGIN_CONSENT_SCOPE_PROFILE" xml:space="preserve">
+    <value>프로필 정보를 읽습니다.</value>
+  </data>
   <data name="LOGIN_REMOVE_CACHED_ACCOUNT" xml:space="preserve">
     <value>계정 제거</value>
   </data>

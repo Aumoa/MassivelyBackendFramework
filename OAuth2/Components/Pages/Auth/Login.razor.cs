@@ -496,13 +496,13 @@ public partial class Login(
     {
         return scope switch
         {
-            "openid" => "Sign you in and identify your account.",
-            "profile" => "Read your profile information.",
-            "email" => "Read your email address.",
-            "address" => "Read your address information.",
-            "phone" => "Read your phone number.",
-            "groups" => "Read groups assigned to you for this application.",
-            _ => "Access this scope."
+            "openid" => Strings.LOGIN_CONSENT_SCOPE_OPENID,
+            "profile" => Strings.LOGIN_CONSENT_SCOPE_PROFILE,
+            "email" => Strings.LOGIN_CONSENT_SCOPE_EMAIL,
+            "address" => Strings.LOGIN_CONSENT_SCOPE_ADDRESS,
+            "phone" => Strings.LOGIN_CONSENT_SCOPE_PHONE,
+            "groups" => Strings.LOGIN_CONSENT_SCOPE_GROUPS,
+            _ => Strings.LOGIN_CONSENT_SCOPE_DEFAULT
         };
     }
 
