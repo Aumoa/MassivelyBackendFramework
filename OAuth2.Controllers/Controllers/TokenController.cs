@@ -174,6 +174,17 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         return BadRequest(new { error = "invalid_client", error_description = "client authentication failed" });
     }
 
+    private async ValueTask<bool> HasClientSecretAsync(string clientId, CancellationToken cancellationToken)
+    {
+        if (clientId == hostOptions.Value.ClientId)
+        {
+            return !string.IsNullOrWhiteSpace(hostOptions.Value.Secret);
+        }
+
+        var cclaims = await clientClaims.GetClaimsAsync(clientId, cancellationToken);
+        return cclaims.Any(p => p.Name == "secret");
+    }
+
     private async ValueTask<IActionResult> HandleAuthorizeCodeAsync(TokenRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Code))
@@ -213,35 +224,40 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "redirect_uri_mismatch" });
         }
 
-        if (code.Value.CodeChallenge == null)
-        {
-            logger.LogWarning("Authorization code was issued without a PKCE challenge for client: {ClientId}", request.ClientId);
-            return BadRequest(new { error = "invalid_grant", error_description = "PKCE is required" });
-        }
-
-        if (string.IsNullOrWhiteSpace(request.CodeVerifier))
-        {
-            logger.LogWarning("PKCE code_verifier missing for client: {ClientId}", request.ClientId);
-            return BadRequest(new { error = "code_verifier_missing" });
-        }
-
-        var challengeMethod = code.Value.CodeChallengeMethod;
-        if (string.IsNullOrEmpty(challengeMethod))
-        {
-            logger.LogWarning("Stored code_challenge_method is missing for client: {ClientId}", request.ClientId);
-            return BadRequest(new { error = "invalid_code_verifier" });
-        }
-
-        if (!ValidatePkce(request.CodeVerifier, code.Value.CodeChallenge, challengeMethod))
-        {
-            logger.LogWarning("PKCE validation failed for client: {ClientId}", request.ClientId);
-            return BadRequest(new { error = "invalid_code_verifier" });
-        }
-
         var validationError = await ValidateAuthorizationCodeClientAsync(request.ClientId, request.ClientSecret, cancellationToken);
         if (validationError != null)
         {
             return validationError;
+        }
+
+        if (code.Value.CodeChallenge == null)
+        {
+            if (!await HasClientSecretAsync(request.ClientId, cancellationToken))
+            {
+                logger.LogWarning("Authorization code was issued without a PKCE challenge for public client: {ClientId}", request.ClientId);
+                return BadRequest(new { error = "invalid_grant", error_description = "PKCE is required for public clients" });
+            }
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(request.CodeVerifier))
+            {
+                logger.LogWarning("PKCE code_verifier missing for client: {ClientId}", request.ClientId);
+                return BadRequest(new { error = "code_verifier_missing" });
+            }
+
+            var challengeMethod = code.Value.CodeChallengeMethod;
+            if (string.IsNullOrEmpty(challengeMethod))
+            {
+                logger.LogWarning("Stored code_challenge_method is missing for client: {ClientId}", request.ClientId);
+                return BadRequest(new { error = "invalid_code_verifier" });
+            }
+
+            if (!ValidatePkce(request.CodeVerifier, code.Value.CodeChallenge, challengeMethod))
+            {
+                logger.LogWarning("PKCE validation failed for client: {ClientId}", request.ClientId);
+                return BadRequest(new { error = "invalid_code_verifier" });
+            }
         }
 
         if (!ScopePolicy.TryNormalize(code.Value.Scope, code.Value.ClientId == hostOptions.Value.ClientId, out var normalizedScope, out _))

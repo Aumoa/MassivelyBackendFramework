@@ -119,10 +119,7 @@ public partial class Login(
         if (string.IsNullOrWhiteSpace(ResponseType) || ResponseType != "code" ||
             string.IsNullOrWhiteSpace(RedirectUri) ||
             string.IsNullOrWhiteSpace(ClientId) || string.IsNullOrWhiteSpace(Scope) ||
-            string.IsNullOrWhiteSpace(ClientName) ||
-            string.IsNullOrWhiteSpace(CodeChallenge) ||
-            CodeChallengeMethod != "S256" ||
-            !IsValidPkceParameter(CodeChallenge))
+            string.IsNullOrWhiteSpace(ClientName))
         {
             Error(Strings.ERRORS_BAD_REQUEST);
             return;
@@ -144,6 +141,12 @@ public partial class Login(
             }
 
             ClientName = "OAuth2";
+
+            if (!IsValidPkceChallenge(CodeChallenge, CodeChallengeMethod))
+            {
+                Error(Strings.ERRORS_BAD_REQUEST);
+                return;
+            }
         }
         else
         {
@@ -163,6 +166,15 @@ public partial class Login(
 
             var allowedScopes = claims.Where(c => c.Name == "scope").Select(c => c.Value);
             if (!ScopePolicy.IsAllowedByClient(normalizedScope, allowedScopes))
+            {
+                Error(Strings.ERRORS_BAD_REQUEST);
+                return;
+            }
+
+            var hasPkce = HasPkceParameters(CodeChallenge, CodeChallengeMethod);
+            var hasClientSecret = claims.Any(c => c.Name == "secret");
+            if ((hasPkce && !IsValidPkceChallenge(CodeChallenge, CodeChallengeMethod)) ||
+                (!hasPkce && !hasClientSecret))
             {
                 Error(Strings.ERRORS_BAD_REQUEST);
                 return;
@@ -400,6 +412,18 @@ public partial class Login(
         m_ErrorMessageId = string.Empty;
         m_ErrorMessagePassword = string.Empty;
         return Task.CompletedTask;
+    }
+
+    private static bool HasPkceParameters(string? codeChallenge, string? codeChallengeMethod)
+    {
+        return !string.IsNullOrWhiteSpace(codeChallenge) || !string.IsNullOrWhiteSpace(codeChallengeMethod);
+    }
+
+    private static bool IsValidPkceChallenge(string? codeChallenge, string? codeChallengeMethod)
+    {
+        return codeChallengeMethod == "S256" &&
+               !string.IsNullOrWhiteSpace(codeChallenge) &&
+               IsValidPkceParameter(codeChallenge);
     }
 
     private static bool IsValidPkceParameter(string value)

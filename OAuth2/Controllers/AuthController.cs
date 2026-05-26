@@ -171,13 +171,6 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             return BadRequest("Unsupported response type.");
         }
 
-        if (string.IsNullOrWhiteSpace(code_challenge) ||
-            code_challenge_method != "S256" ||
-            !IsValidPkceParameter(code_challenge))
-        {
-            return BadRequest("PKCE S256 code challenge is required.");
-        }
-
         string clientName;
         string normalizedScope;
 
@@ -196,6 +189,11 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             else
             {
                 return Error(Strings.ERRORS_INVALID_REDIRECT_URI);
+            }
+
+            if (!IsValidPkceChallenge(code_challenge, code_challenge_method))
+            {
+                return BadRequest("PKCE S256 code challenge is required.");
             }
         }
         else
@@ -222,6 +220,14 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             if (!ScopePolicy.IsAllowedByClient(normalizedScope, allowedScopes))
             {
                 return Error("The requested scope is not allowed for this client.");
+            }
+
+            var hasPkce = HasPkceParameters(code_challenge, code_challenge_method);
+            var hasClientSecret = claims.Any(p => p.Name == "secret");
+            if ((hasPkce && !IsValidPkceChallenge(code_challenge, code_challenge_method)) ||
+                (!hasPkce && !hasClientSecret))
+            {
+                return BadRequest("PKCE S256 code challenge is required.");
             }
 
             clientName = targetClient.Value.Name;
@@ -442,11 +448,21 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
 
     private static bool ValidatePkce(string codeVerifier, string? codeChallenge, string? codeChallengeMethod)
     {
+        return IsValidPkceChallenge(codeChallenge, codeChallengeMethod) &&
+               IsValidPkceParameter(codeVerifier) &&
+               string.Equals(CreateCodeChallenge(codeVerifier), codeChallenge, StringComparison.Ordinal);
+    }
+
+    private static bool HasPkceParameters(string? codeChallenge, string? codeChallengeMethod)
+    {
+        return !string.IsNullOrWhiteSpace(codeChallenge) || !string.IsNullOrWhiteSpace(codeChallengeMethod);
+    }
+
+    private static bool IsValidPkceChallenge(string? codeChallenge, string? codeChallengeMethod)
+    {
         return codeChallengeMethod == "S256" &&
                !string.IsNullOrWhiteSpace(codeChallenge) &&
-               IsValidPkceParameter(codeVerifier) &&
-               IsValidPkceParameter(codeChallenge) &&
-               string.Equals(CreateCodeChallenge(codeVerifier), codeChallenge, StringComparison.Ordinal);
+               IsValidPkceParameter(codeChallenge);
     }
 
     private static bool IsValidPkceParameter(string value)
