@@ -16,7 +16,7 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
 
         await using var tx = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
-        string id = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        string id = CreateClientId();
         const string QUERY1 = "INSERT INTO `client` (`id`, `owner_id`, `name`) VALUES(@id, @ownerId, @name)";
         var command = new CommandDefinition(QUERY1, new { id, ownerId, name }, tx, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);
@@ -31,6 +31,19 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
 
         await tx.CommitAsync(cancellationToken);
         return id;
+    }
+
+    private static string CreateClientId()
+    {
+        return Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+    }
+
+    private static string Base64UrlEncode(byte[] bytes)
+    {
+        return Convert.ToBase64String(bytes)
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
     }
 
     public async ValueTask<ClientInfo?> GetClientAsync(string clientId, CancellationToken cancellationToken = default)
