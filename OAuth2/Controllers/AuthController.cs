@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using OAuth2.DTO;
 using OAuth2.Localizations;
 using OAuth2.Services;
 using HostOptions = OAuth2.Options.HostOptions;
@@ -197,33 +198,19 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
     {
         var scope = string.IsNullOrWhiteSpace(request.Scope) ? "profile" : request.Scope;
 
-        if (request.ResponseType != "code")
-        {
-            return BadRequest("Unsupported response type.");
-        }
-
         if (string.IsNullOrWhiteSpace(request.RedirectUri) ||
             string.IsNullOrWhiteSpace(request.ClientId))
         {
             return BadRequest("Missing required authorization request parameter.");
         }
 
-        if (!TryParseMaxAge(request.MaxAge, out _))
-        {
-            return BadRequest("max_age must be a non-negative integer.");
-        }
-
+        var isInternalClient = request.ClientId == options.Value.ClientId;
         string clientName;
         string normalizedScope;
+        ClientClaim[] claims = [];
 
-        // hosting service
-        if (request.ClientId == options.Value.ClientId)
+        if (isInternalClient)
         {
-            if (!ScopePolicy.TryNormalize(scope, true, out normalizedScope, out var scopeError))
-            {
-                return BadRequest(scopeError);
-            }
-
             if (request.RedirectUri == GetInternalRedirectUri())
             {
                 clientName = "OAuth2";
@@ -231,11 +218,6 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             else
             {
                 return Error(Strings.ERRORS_INVALID_REDIRECT_URI);
-            }
-
-            if (!IsValidPkceChallenge(request.CodeChallenge, request.CodeChallengeMethod))
-            {
-                return BadRequest("PKCE S256 code challenge is required.");
             }
         }
         else
@@ -246,13 +228,46 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 return Error(Strings.ERRORS_INVALID_CLIENT_ID);
             }
 
-            var claims = await clientClaims.GetClaimsAsync(request.ClientId, cancellationToken);
+            claims = await clientClaims.GetClaimsAsync(request.ClientId, cancellationToken);
             var allowedUris = claims.Where(p => p.Name == "redirect_uri");
             if (allowedUris.Any(p => p.Value == request.RedirectUri) == false)
             {
                 return Error(Strings.ERRORS_INVALID_REDIRECT_URI);
             }
 
+            clientName = targetClient.Value.Name;
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ResponseType))
+        {
+            return OAuthError("invalid_request");
+        }
+
+        if (request.ResponseType != "code")
+        {
+            return OAuthError("unsupported_response_type");
+        }
+
+        if (!TryParseMaxAge(request.MaxAge, out _))
+        {
+            return OAuthError("invalid_request");
+        }
+
+        // hosting service
+        if (isInternalClient)
+        {
+            if (!ScopePolicy.TryNormalize(scope, true, out normalizedScope, out var scopeError))
+            {
+                return BadRequest(scopeError);
+            }
+
+            if (!IsValidPkceChallenge(request.CodeChallenge, request.CodeChallengeMethod))
+            {
+                return BadRequest("PKCE S256 code challenge is required.");
+            }
+        }
+        else
+        {
             if (!ScopePolicy.TryNormalize(scope, false, out normalizedScope, out var scopeError))
             {
                 return Error(scopeError ?? Strings.ERRORS_BAD_REQUEST);
@@ -271,8 +286,6 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             {
                 return BadRequest("PKCE S256 code challenge is required.");
             }
-
-            clientName = targetClient.Value.Name;
         }
 
         if (!string.IsNullOrWhiteSpace(request.RequestObject))
