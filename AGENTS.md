@@ -1,5 +1,12 @@
 # Codex Workflow Rules
 
+## Authentication Scope Policy
+
+- Keep OpenID/OAuth scopes as narrow as the service can reasonably support.
+- When a service uses `ProfileCard`, prefer including `profile` and `email` in the requested scopes because the component displays user name, profile image, and email.
+- `profile` and `email` may still be omitted when there is a clear product, privacy, or technical reason, but make that tradeoff explicit.
+- Do not request unrelated scopes such as `address` or `phone` unless the service actually uses the corresponding claims.
+
 ## Git Commit Policy
 
 - When implementing a requested feature, split the work into meaningful feature-sized commits.
