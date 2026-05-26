@@ -10,7 +10,7 @@
     {
         if (firstRender)
         {
-            Auth.NavigateToLogin(Nav, "auth/redirect", "all");
+            Auth.NavigateToLogin(Nav, "auth/redirect", "openid profile email groups");
             return Task.CompletedTask;
         }
 
