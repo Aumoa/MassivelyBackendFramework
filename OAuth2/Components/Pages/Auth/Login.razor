@@ -6,7 +6,29 @@
         <h2 class="title">
             @string.Format(Strings.LOGIN_FORM_TITLE, ClientName)
         </h2>
-        @if (HasCachedAccounts && !ShowLoginForm)
+        @if (m_RenderState == RenderStates.Consent)
+        {
+            <div class="consent-container">
+                <div class="consent-summary">
+                    <span class="consent-account">@m_ConsentAccountId</span>
+                    <span class="consent-text">Allow @ClientName to access:</span>
+                </div>
+                <div class="consent-scopes">
+                    @foreach (var scope in m_ConsentScopes)
+                    {
+                        <div class="consent-scope-row">
+                            <code>@scope</code>
+                            <span>@GetScopeDescription(scope)</span>
+                        </div>
+                    }
+                </div>
+                <div class="login-buttons-row">
+                    <button type="button" @onclick="OnConsentDeny" disabled="@Requesting">Deny</button>
+                    <button type="button" @onclick="OnConsentApproveAsync" disabled="@Requesting">Allow</button>
+                </div>
+            </div>
+        }
+        else if (HasCachedAccounts && !ShowLoginForm)
         {
             <div class="cached-container">
                 @foreach (var cachedJwt in m_CachedJwts)

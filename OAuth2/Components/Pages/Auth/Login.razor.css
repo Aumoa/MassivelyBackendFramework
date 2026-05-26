@@ -118,6 +118,51 @@
     margin-top: 8px;
 }
 
+.consent-container {
+    display: flex;
+    flex-direction: column;
+    min-width: 340px;
+    max-width: 420px;
+    gap: 12px;
+}
+
+.consent-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 14px;
+}
+
+.consent-account {
+    color: #666;
+    font-size: 13px;
+}
+
+.consent-text {
+    color: #222;
+    font-weight: 600;
+}
+
+.consent-scopes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.consent-scope-row {
+    display: grid;
+    grid-template-columns: minmax(72px, auto) 1fr;
+    gap: 10px;
+    align-items: start;
+    font-size: 13px;
+    color: #444;
+}
+
+.consent-scope-row code {
+    color: #174ea6;
+    white-space: nowrap;
+}
+
 .profile-img {
     width: 32px;
     height: 32px;

@@ -17,6 +17,7 @@ public partial class Login(
     IAccounts accounts,
     IClients clients,
     IClientClaims clientClaims,
+    IOAuthGrants oauthGrants,
     IAuthorizationCodes authorizationCodes,
     IOptions<HostOptions> hostOptions,
     NavigationManager nav,
@@ -28,7 +29,8 @@ public partial class Login(
     private enum RenderStates
     {
         Id,
-        Login
+        Login,
+        Consent
     }
 
     private readonly struct RequestScope : IDisposable
@@ -103,6 +105,9 @@ public partial class Login(
     private RenderStates m_RenderState = RenderStates.Id;
     private string m_ID = string.Empty;
     private string m_Password = string.Empty;
+    private string? m_ConsentAccountId;
+    private bool m_ConsentRefreshCache;
+    private string[] m_ConsentScopes = [];
     private int m_Requesting = 0;
     private string m_ErrorMessageId = string.Empty;
     private string m_ErrorMessagePassword = string.Empty;
@@ -185,7 +190,7 @@ public partial class Login(
 
         Scope = normalizedScope;
 
-        if (Prompt == "login")
+        if (HasPrompt("login"))
         {
             return;
         }
@@ -225,7 +230,7 @@ public partial class Login(
         }
         finally
         {
-            if (Prompt == "none")
+            if (HasPrompt("none"))
             {
                 if (m_CachedJwts.Count > 0)
                 {
@@ -326,17 +331,7 @@ public partial class Login(
 
     private void ContinueWithLoginRequiredAsync()
     {
-        var query = new Dictionary<string, string?>
-        {
-            ["error"] = "login_required"
-        };
-
-        if (string.IsNullOrEmpty(State) == false)
-        {
-            query.Add("state", State);
-        }
-
-        nav.NavigateTo(QueryHelpers.AddQueryString(RedirectUri, query), forceLoad: true);
+        RedirectWithOAuthError("login_required");
     }
 
     private void UseAnotherAccount()
@@ -359,6 +354,29 @@ public partial class Login(
 
     private async Task ContinueWithAsync(string id, bool refreshCache)
     {
+        var consentScopes = await GetConsentScopesAsync(id);
+        if (consentScopes.Length > 0)
+        {
+            if (HasPrompt("none"))
+            {
+                RedirectWithOAuthError("consent_required");
+                return;
+            }
+
+            m_ConsentAccountId = id;
+            m_ConsentRefreshCache = refreshCache;
+            m_ConsentScopes = consentScopes;
+            m_RenderState = RenderStates.Consent;
+            m_ShowLoginForm = true;
+            StateHasChanged();
+            return;
+        }
+
+        await IssueAuthorizationCodeAsync(id, refreshCache);
+    }
+
+    private async Task IssueAuthorizationCodeAsync(string id, bool refreshCache)
+    {
         var query = new Dictionary<string, string?>();
         if (string.IsNullOrEmpty(State) == false)
         {
@@ -379,6 +397,26 @@ public partial class Login(
         {
             nav.NavigateTo(redirect_uri, forceLoad: true);
         }
+    }
+
+    private async Task OnConsentApproveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(m_ConsentAccountId))
+        {
+            RedirectWithOAuthError("access_denied");
+            return;
+        }
+
+        using var scope1 = new RequestScope(this);
+
+        var grantScope = string.Join(' ', m_ConsentScopes);
+        await oauthGrants.GrantScopesAsync(m_ConsentAccountId, ClientId, grantScope);
+        await IssueAuthorizationCodeAsync(m_ConsentAccountId, m_ConsentRefreshCache);
+    }
+
+    private void OnConsentDeny()
+    {
+        RedirectWithOAuthError("access_denied");
     }
 
     private async Task OnContinue_StateIdAsync()
@@ -412,6 +450,60 @@ public partial class Login(
         m_ErrorMessageId = string.Empty;
         m_ErrorMessagePassword = string.Empty;
         return Task.CompletedTask;
+    }
+
+    private async ValueTask<string[]> GetConsentScopesAsync(string accountId)
+    {
+        if (ClientId == hostOptions.Value.ClientId)
+        {
+            return [];
+        }
+
+        var requestedScopes = ScopePolicy.Split(Scope);
+        if (HasPrompt("consent"))
+        {
+            return requestedScopes;
+        }
+
+        var grantedScopes = await oauthGrants.GetGrantedScopesAsync(accountId, ClientId);
+        var grantedSet = new HashSet<string>(grantedScopes, StringComparer.Ordinal);
+        return [.. requestedScopes.Where(scope => !grantedSet.Contains(scope))];
+    }
+
+    private void RedirectWithOAuthError(string error)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["error"] = error
+        };
+
+        if (string.IsNullOrEmpty(State) == false)
+        {
+            query.Add("state", State);
+        }
+
+        nav.NavigateTo(QueryHelpers.AddQueryString(RedirectUri, query), forceLoad: true);
+    }
+
+    private bool HasPrompt(string value)
+    {
+        return Prompt?
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Contains(value, StringComparer.Ordinal) == true;
+    }
+
+    private static string GetScopeDescription(string scope)
+    {
+        return scope switch
+        {
+            "openid" => "Sign you in and identify your account.",
+            "profile" => "Read your profile information.",
+            "email" => "Read your email address.",
+            "address" => "Read your address information.",
+            "phone" => "Read your phone number.",
+            "groups" => "Read groups assigned to you for this application.",
+            _ => "Access this scope."
+        };
     }
 
     private static bool HasPkceParameters(string? codeChallenge, string? codeChallengeMethod)

@@ -79,7 +79,7 @@ public static class ScopePolicy
             : scopes;
     }
 
-    private static IEnumerable<string> Split(string? scopes)
+    public static string[] Split(string? scopes)
     {
         return (scopes ?? string.Empty)
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
