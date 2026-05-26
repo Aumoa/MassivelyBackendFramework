@@ -7,6 +7,13 @@
 - `profile` and `email` may still be omitted when there is a clear product, privacy, or technical reason, but make that tradeoff explicit.
 - Do not request unrelated scopes such as `address` or `phone` unless the service actually uses the corresponding claims.
 
+## Design Theme Policy
+
+- Services with a user interface should respect the user's system color scheme by default.
+- Prefer `prefers-color-scheme` or equivalent platform support to select light or dark theme automatically.
+- Keep shared UI components theme-aware by using service-level design tokens instead of hard-coded light-only colors.
+- If a service intentionally forces a single theme, make the product or technical reason explicit.
+
 ## Git Commit Policy
 
 - When implementing a requested feature, split the work into meaningful feature-sized commits.
