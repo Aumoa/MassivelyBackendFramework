@@ -144,4 +144,66 @@ WHERE `channel_id` = @channelId
         var results = await connection.QueryAsync<ChatLogData>(command);
         return results.ToList();
     }
+
+    public async ValueTask<IReadOnlyList<ChatLogData>> GetContextAsync(
+        string channelId,
+        long chatLogId,
+        int before,
+        int after,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string TARGET_QUERY = @"
+SELECT `id` AS Id, `message_id` AS MessageId, `guild_id` AS GuildId, `channel_id` AS ChannelId, `user_id` AS UserId, `content` AS Content, `created_at` AS CreatedAt
+FROM `chat_log`
+WHERE `channel_id` = @channelId
+  AND `id` = @chatLogId
+LIMIT 1";
+
+        var targetCommand = new CommandDefinition(
+            TARGET_QUERY,
+            new { channelId, chatLogId },
+            cancellationToken: cancellationToken);
+        var target = await connection.QueryFirstOrDefaultAsync<ChatLogData>(targetCommand);
+        if (target == null)
+        {
+            return [];
+        }
+
+        const string BEFORE_QUERY = @"
+SELECT `id` AS Id, `message_id` AS MessageId, `guild_id` AS GuildId, `channel_id` AS ChannelId, `user_id` AS UserId, `content` AS Content, `created_at` AS CreatedAt
+FROM `chat_log`
+WHERE `channel_id` = @channelId
+  AND (`created_at` < @createdAt OR (`created_at` = @createdAt AND `id` < @chatLogId))
+ORDER BY `created_at` DESC, `id` DESC
+LIMIT @before";
+
+        const string AFTER_QUERY = @"
+SELECT `id` AS Id, `message_id` AS MessageId, `guild_id` AS GuildId, `channel_id` AS ChannelId, `user_id` AS UserId, `content` AS Content, `created_at` AS CreatedAt
+FROM `chat_log`
+WHERE `channel_id` = @channelId
+  AND (`created_at` > @createdAt OR (`created_at` = @createdAt AND `id` > @chatLogId))
+ORDER BY `created_at` ASC, `id` ASC
+LIMIT @after";
+
+        var args = new
+        {
+            channelId,
+            chatLogId,
+            createdAt = target.CreatedAt,
+            before,
+            after
+        };
+
+        var beforeCommand = new CommandDefinition(BEFORE_QUERY, args, cancellationToken: cancellationToken);
+        var afterCommand = new CommandDefinition(AFTER_QUERY, args, cancellationToken: cancellationToken);
+        var beforeItems = (await connection.QueryAsync<ChatLogData>(beforeCommand)).Reverse();
+        var afterItems = await connection.QueryAsync<ChatLogData>(afterCommand);
+
+        return beforeItems
+            .Concat([target])
+            .Concat(afterItems)
+            .ToList();
+    }
 }

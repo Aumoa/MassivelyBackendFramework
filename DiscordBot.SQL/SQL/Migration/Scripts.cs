@@ -15,5 +15,6 @@ public partial class Scripts : IScripts
         yield return new _6__AddChatLogImages();
         yield return new _7__AddAllowedChannelRequests();
         yield return new _8__AddAppointments();
+        yield return new _9__AddAppointmentHasTime();
     }
 }

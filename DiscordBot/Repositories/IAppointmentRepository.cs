@@ -9,6 +9,7 @@ public record AppointmentData(
     string Title,
     string? Description,
     DateTime StartsAtUtc,
+    bool HasTime,
     string Timezone,
     string Status,
     DateTime CreatedAt,
@@ -23,6 +24,7 @@ public record AppointmentInput(
     string Title,
     string? Description,
     DateTime StartsAtUtc,
+    bool HasTime,
     string Timezone,
     DateTime ExpiresAtUtc);
 
@@ -45,6 +47,18 @@ public interface IAppointmentRepository
         string userId,
         string? guildId,
         DateTime nowUtc,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<bool> UpdateAsync(
+        long id,
+        string userId,
+        string? guildId,
+        string title,
+        string? description,
+        DateTime startsAtUtc,
+        bool hasTime,
+        string timezone,
+        DateTime expiresAtUtc,
         CancellationToken cancellationToken = default);
 
     ValueTask<bool> DeleteAsync(

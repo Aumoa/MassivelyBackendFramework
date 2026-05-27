@@ -62,6 +62,8 @@ internal class DiscordTools(SocketSelfUser selfUser, SocketMessage message, ICha
         Name = "search_chat_history",
         Description = @"현재 채팅방의 채팅 기록을 키워드로 검색합니다. 사용자 자연어 요청에서 검색에 도움이 될 키워드(동의어, 관련어 포함)를 여러 개 추출하여 콤마로 구분해 전달하세요. 각 키워드는 2글자 이상이어야 하며 OR 검색으로 동작합니다.
 
+약속, 결정, 주제처럼 의미가 주변 메시지에 나뉘어 있을 수 있으면 검색 결과의 ChatLogId로 get_chat_context를 호출해 앞뒤 대화를 확인하세요.
+
 [중요 — 결과 응답 작성 규칙]
 각 결과에는 'Link: https://...' 형식의 메시지 링크가 포함됩니다. 이 URL을 사용자에게 보여주는 답변 본문에 **반드시 그대로(전체 URL을) 복사해서 적어야** Discord가 자동으로 원본 메시지를 인용 카드로 표시합니다.
 
@@ -116,12 +118,67 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
             var author = log.UserId == selfId ? "나의 응답" : $"사용자 {log.UserId}의 메시지";
             var reference = BuildMessageReference(log);
             lines.Add($"--- 결과 #{index} ---");
+            lines.Add($"ChatLogId: {log.Id}");
             lines.Add($"Time: {localTime:yyyy-MM-dd HH:mm:ss}");
             lines.Add($"Author: {author}");
             lines.Add($"Link: {reference}");
             lines.Add($"Content: {log.Content}");
             lines.Add("");
             index++;
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    [ToolFunction(
+        Name = "get_chat_context",
+        Description = """
+현재 채팅방에서 특정 채팅 로그 주변 대화를 조회합니다. search_chat_history 결과의 ChatLogId를 chat_log_id로 넣으면, 그 메시지 앞뒤 대화를 함께 볼 수 있습니다.
+
+사용자가 '방탈'처럼 짧은 키워드만 언급했거나, 약속/결정/주제가 여러 메시지에 나뉘어 있을 때는 먼저 search_chat_history로 핵심 메시지를 찾고 이 도구로 주변 대화를 확인하세요.
+이 도구는 현재 채팅방의 메시지만 조회하며, 다른 채널의 대화는 볼 수 없습니다.
+""")]
+    public async Task<string> GetChatContextAsync(
+        [ToolParameterInfo(Description = "search_chat_history 결과의 ChatLogId.")]
+        int chat_log_id,
+        [ToolParameterInfo(Description = "대상 메시지 이전으로 가져올 메시지 수. 0~20, 기본 5.")]
+        int before = 5,
+        [ToolParameterInfo(Description = "대상 메시지 이후로 가져올 메시지 수. 0~20, 기본 5.")]
+        int after = 5,
+        [ToolParameterInfo(Description = "IANA 타임존 ID (예: Asia/Seoul, America/New_York). 기본값: UTC")]
+        string? timezone = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (chat_log_id <= 0)
+        {
+            return "조회할 ChatLogId가 필요합니다.";
+        }
+
+        before = Math.Clamp(before, 0, 20);
+        after = Math.Clamp(after, 0, 20);
+
+        var tz = ResolveTimeZone(timezone);
+        var channelId = message.Channel.Id.ToString();
+        var logs = await chatLogRepository.GetContextAsync(channelId, chat_log_id, before, after, cancellationToken);
+        if (logs.Count == 0)
+        {
+            return "해당 채팅 로그를 현재 채팅방에서 찾지 못했습니다.";
+        }
+
+        var selfId = selfUser.Id.ToString();
+        List<string> lines = [$"채팅 로그 {chat_log_id} 주변 대화:"];
+        foreach (var log in logs)
+        {
+            var marker = log.Id == chat_log_id ? " <== 검색된 메시지" : "";
+            var localTime = TimeZoneInfo.ConvertTimeFromUtc(log.CreatedAt, tz);
+            var author = log.UserId == selfId ? "나의 응답" : $"사용자 {log.UserId}의 메시지";
+            var reference = BuildMessageReference(log);
+            lines.Add("");
+            lines.Add($"ChatLogId: {log.Id}{marker}");
+            lines.Add($"Time: {localTime:yyyy-MM-dd HH:mm:ss}");
+            lines.Add($"Author: {author}");
+            lines.Add($"Link: {reference}");
+            lines.Add($"Content: {log.Content}");
         }
 
         return string.Join("\n", lines);
@@ -144,7 +201,10 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
 [중요]
 - starts_at에는 반드시 사용자의 자연어 날짜를 해석한 정식 날짜/시간을 ISO 형식으로 넣으세요. 예: 2026-05-28T15:00:00
 - '내일', '다음 주 금요일', '저녁'처럼 상대적이거나 애매한 표현은 현재 날짜를 기준으로 해석하세요. 현재 날짜를 모르면 먼저 get_current_date를 호출하세요.
-- 날짜나 시간이 불분명하면 이 도구를 호출하지 말고 사용자에게 정확한 날짜/시간을 물어보세요.
+- 현재 메시지에 약속 제목/날짜가 충분하지 않으면 먼저 search_chat_history와 get_chat_context로 현재 채팅방의 주변 대화를 확인하세요. 예: 사용자가 '방탈 약속 기억해줘'라고만 말하면 '방탈'을 검색하고 주변 대화에서 날짜를 찾으세요.
+- 날짜가 불분명하면 이 도구를 호출하지 말고 사용자에게 정확한 날짜를 물어보세요.
+- 시간이 정해지지 않은 약속은 저장할 수 있습니다. 이 경우 starts_at에는 날짜만 넣고 has_time=false로 호출하세요. 임의로 오후 2시 같은 시간을 만들지 마세요.
+- search_chat_history/get_chat_context로 약속 근거가 된 과거 메시지를 찾았다면 source_chat_log_id에 해당 ChatLogId를 넣으세요. 그러면 약속 조회 시 원본 약속 대화로 링크됩니다.
 - 약속 저장은 사용자 본인 전용입니다. user_id, guild_id, channel_id는 프로그램이 현재 메시지에서 자동으로 고정합니다.
 - 저장된 약속에는 원본 Discord 메시지 링크가 함께 보존됩니다. 조회 응답에는 해당 링크를 그대로 보여주세요.
 - 지난 약속은 기본적으로 약속 시간 30일 뒤 자동으로 잊어버립니다.
@@ -154,10 +214,14 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         string title,
         [ToolParameterInfo(Description = "약속 시작 날짜/시간. ISO 형식 권장. 예: 2026-05-28T15:00:00 또는 2026-05-28T15:00:00+09:00")]
         string starts_at,
+        [ToolParameterInfo(Description = "약속 시간이 명확히 정해졌으면 true, 날짜만 정해지고 시간이 미정이면 false.")]
+        bool has_time = true,
         [ToolParameterInfo(Description = "IANA 타임존 ID. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
         string timezone = "Asia/Seoul",
         [ToolParameterInfo(Description = "약속에 대한 추가 설명. 없으면 빈 문자열.")]
         string description = "",
+        [ToolParameterInfo(Description = "약속 근거가 된 과거 메시지의 ChatLogId. search_chat_history/get_chat_context로 찾은 경우에만 지정하고, 없으면 0.")]
+        int source_chat_log_id = 0,
         [ToolParameterInfo(Description = "약속 시간이 지난 뒤 며칠 후 잊어버릴지. 기본 30일, 최대 365일.")]
         int forget_after_days = DefaultAppointmentRetentionDays,
         CancellationToken cancellationToken = default)
@@ -169,13 +233,13 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         }
 
         var tz = ResolveTimeZone(string.IsNullOrWhiteSpace(timezone) ? "Asia/Seoul" : timezone);
-        if (!TryParseAppointmentDateTime(starts_at, tz, out var startsAtUtc, out var parseError))
+        if (!TryParseAppointmentDateTime(starts_at, tz, has_time, out var startsAtUtc, out var effectiveHasTime, out var parseError))
         {
             return parseError;
         }
 
         var nowUtc = DateTime.UtcNow;
-        if (startsAtUtc < nowUtc.AddMinutes(-5))
+        if (!IsFutureOrToday(startsAtUtc, effectiveHasTime, tz, nowUtc))
         {
             return "이미 지난 시간으로 보입니다. 앞으로 있을 약속의 날짜와 시간을 다시 확인해 주세요.";
         }
@@ -183,28 +247,49 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         forget_after_days = Math.Clamp(forget_after_days, 1, MaxAppointmentRetentionDays);
         var expiresAtUtc = startsAtUtc.AddDays(forget_after_days);
         var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var sourceGuildId = guildId;
+        var sourceChannelId = message.Channel.Id.ToString();
+        var sourceMessageId = message.Id.ToString();
+        if (source_chat_log_id > 0)
+        {
+            var sourceLogs = await chatLogRepository.GetContextAsync(
+                message.Channel.Id.ToString(),
+                source_chat_log_id,
+                0,
+                0,
+                cancellationToken);
+            var sourceLog = sourceLogs.FirstOrDefault(log => log.Id == source_chat_log_id);
+            if (sourceLog != null)
+            {
+                sourceGuildId = sourceLog.GuildId;
+                sourceChannelId = sourceLog.ChannelId;
+                sourceMessageId = sourceLog.MessageId;
+            }
+        }
+
         var input = new AppointmentInput(
-            guildId,
-            message.Channel.Id.ToString(),
+            sourceGuildId,
+            sourceChannelId,
             message.Author.Id.ToString(),
-            message.Id.ToString(),
+            sourceMessageId,
             normalizedTitle,
             NormalizeNullable(description, 2048),
             startsAtUtc,
+            effectiveHasTime,
             tz.Id,
             expiresAtUtc);
 
         await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
         var id = await appointmentRepository.AddAsync(input, cancellationToken);
-        var localStart = TimeZoneInfo.ConvertTimeFromUtc(startsAtUtc, tz);
+        var startText = FormatAppointmentStart(startsAtUtc, effectiveHasTime, tz);
         var localExpire = TimeZoneInfo.ConvertTimeFromUtc(expiresAtUtc, tz);
-        var reference = BuildAppointmentReference(guildId, message.Channel.Id.ToString(), message.Id.ToString());
+        var reference = BuildAppointmentReference(sourceGuildId, sourceChannelId, sourceMessageId);
 
         return $"""
 약속을 저장했습니다.
 ID: {id}
 제목: {normalizedTitle}
-일시: {localStart:yyyy-MM-dd HH:mm:ss} ({tz.Id})
+일시: {startText}
 원본: {reference}
 잊는 시점: {localExpire:yyyy-MM-dd HH:mm:ss} ({tz.Id})
 응답 규칙: 사용자에게 약속을 기억했다고 짧게 알려주고, 날짜/시간과 원본 메시지 링크를 함께 확인해 주세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요.
@@ -268,12 +353,12 @@ ID: {id}
         foreach (var appointment in appointments)
         {
             var appointmentTz = ResolveTimeZone(appointment.Timezone);
-            var localStart = TimeZoneInfo.ConvertTimeFromUtc(EnsureUtc(appointment.StartsAtUtc), appointmentTz);
+            var startText = FormatAppointmentStart(EnsureUtc(appointment.StartsAtUtc), appointment.HasTime, appointmentTz);
             var reference = BuildAppointmentReference(appointment);
             lines.Add("");
             lines.Add($"ID: {appointment.Id}");
             lines.Add($"제목: {appointment.Title}");
-            lines.Add($"일시: {localStart:yyyy-MM-dd HH:mm:ss} ({appointmentTz.Id})");
+            lines.Add($"일시: {startText}");
             if (!string.IsNullOrWhiteSpace(appointment.Description))
             {
                 lines.Add($"설명: {appointment.Description}");
@@ -329,14 +414,123 @@ id는 list_appointments 결과의 ID를 사용하세요. 사용자가 특정 약
         }
 
         var appointmentTz = ResolveTimeZone(appointment.Timezone);
-        var localStart = TimeZoneInfo.ConvertTimeFromUtc(EnsureUtc(appointment.StartsAtUtc), appointmentTz);
+        var startText = FormatAppointmentStart(EnsureUtc(appointment.StartsAtUtc), appointment.HasTime, appointmentTz);
         return $"""
 약속을 삭제했습니다.
 ID: {appointment.Id}
 제목: {appointment.Title}
-일시: {localStart:yyyy-MM-dd HH:mm:ss} ({appointmentTz.Id})
+일시: {startText}
 삭제 이유: {(string.IsNullOrWhiteSpace(reason) ? "미지정" : reason)}
 응답 규칙: 사용자에게 삭제 완료를 짧게 알려주세요.
+""";
+    }
+
+    [ToolFunction(
+        Name = "update_appointment",
+        Description = """
+저장된 약속의 제목, 날짜, 시간, 설명을 수정합니다.
+id는 list_appointments 결과의 ID를 사용하세요. ID가 불분명하면 먼저 list_appointments로 후보를 조회하거나 사용자에게 확인하세요.
+
+시간만 나중에 정해진 경우 time에 HH:mm 값을 넣으세요. 예: '방탈출 약속은 오후 3시로 정해졌어' -> 기존 날짜 유지, time='15:00'.
+시간이 다시 미정이 된 경우 time_unspecified=true로 호출하세요. 임의의 시간을 만들지 마세요.
+date가 비어 있으면 기존 날짜를 유지하고, time이 비어 있으면 기존 시간 상태를 유지합니다.
+""")]
+    public async Task<string> UpdateAppointmentAsync(
+        [ToolParameterInfo(Description = "수정할 약속 ID. list_appointments 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "새 제목. 변경하지 않으려면 빈 문자열.")]
+        string title = "",
+        [ToolParameterInfo(Description = "새 날짜. 예: 2026-05-31. 변경하지 않으려면 빈 문자열.")]
+        string date = "",
+        [ToolParameterInfo(Description = "새 시간. 24시간 HH:mm 권장. 예: 15:00. 변경하지 않으려면 빈 문자열.")]
+        string time = "",
+        [ToolParameterInfo(Description = "시간을 미정으로 바꿀지 여부.")]
+        bool time_unspecified = false,
+        [ToolParameterInfo(Description = "새 설명. 변경하지 않으려면 빈 문자열.")]
+        string description = "",
+        [ToolParameterInfo(Description = "IANA 타임존 ID. 비워두면 기존 약속의 timezone을 유지합니다.")]
+        string timezone = "",
+        [ToolParameterInfo(Description = "수정된 약속 시간이 지난 뒤 며칠 후 잊어버릴지. 기본 30일, 최대 365일.")]
+        int forget_after_days = DefaultAppointmentRetentionDays,
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "수정할 약속 ID가 필요합니다. 먼저 약속을 조회해서 ID를 확인해 주세요.";
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var appointment = await appointmentRepository.GetActiveByIdAsync(
+            id,
+            message.Author.Id.ToString(),
+            guildId,
+            nowUtc,
+            cancellationToken);
+        if (appointment == null)
+        {
+            return "해당 ID의 활성 약속을 찾지 못했습니다.";
+        }
+
+        var oldTz = ResolveTimeZone(appointment.Timezone);
+        var effectiveTz = ResolveTimeZone(string.IsNullOrWhiteSpace(timezone) ? appointment.Timezone : timezone);
+        var oldLocalStart = TimeZoneInfo.ConvertTimeFromUtc(EnsureUtc(appointment.StartsAtUtc), oldTz);
+
+        if (!TryBuildUpdatedLocalDateTime(
+                oldLocalStart,
+                appointment.HasTime,
+                date,
+                time,
+                time_unspecified,
+                effectiveTz,
+                out var localStart,
+                out var hasTime,
+                out var updateError))
+        {
+            return updateError;
+        }
+
+        var startsAtUtc = TimeZoneInfo.ConvertTimeToUtc(localStart, effectiveTz);
+        if (!IsFutureOrToday(startsAtUtc, hasTime, effectiveTz, nowUtc))
+        {
+            return "수정하려는 약속 시간이 이미 지난 시간으로 보입니다. 앞으로 있을 날짜와 시간을 다시 확인해 주세요.";
+        }
+
+        var normalizedTitle = string.IsNullOrWhiteSpace(title)
+            ? appointment.Title
+            : NormalizeAppointmentTitle(title);
+        var normalizedDescription = string.IsNullOrWhiteSpace(description)
+            ? appointment.Description
+            : NormalizeNullable(description, 2048);
+        forget_after_days = Math.Clamp(forget_after_days, 1, MaxAppointmentRetentionDays);
+        var expiresAtUtc = startsAtUtc.AddDays(forget_after_days);
+
+        var updated = await appointmentRepository.UpdateAsync(
+            id,
+            message.Author.Id.ToString(),
+            guildId,
+            normalizedTitle,
+            normalizedDescription,
+            startsAtUtc,
+            hasTime,
+            effectiveTz.Id,
+            expiresAtUtc,
+            cancellationToken);
+        if (!updated)
+        {
+            return "약속 수정에 실패했습니다. 이미 삭제되었거나 찾을 수 없습니다.";
+        }
+
+        var startText = FormatAppointmentStart(startsAtUtc, hasTime, effectiveTz);
+        var reference = BuildAppointmentReference(appointment);
+        return $"""
+약속을 수정했습니다.
+ID: {appointment.Id}
+제목: {normalizedTitle}
+일시: {startText}
+원본: {reference}
+응답 규칙: 사용자에게 수정 완료를 짧게 알려주고, 변경된 날짜/시간을 확인해 주세요.
 """;
     }
 
@@ -411,7 +605,7 @@ ID: {appointment.Id}
             return true;
         }
 
-        if (!TryParseAppointmentDateTime(dateString, timezone, out var parsed, out error))
+        if (!TryParseDateTimeInTimeZone(dateString, timezone, out var parsed, out error))
         {
             return false;
         }
@@ -420,7 +614,7 @@ ID: {appointment.Id}
         return true;
     }
 
-    private static bool TryParseAppointmentDateTime(
+    private static bool TryParseDateTimeInTimeZone(
         string dateString,
         TimeZoneInfo timezone,
         out DateTime utcDateTime,
@@ -476,6 +670,171 @@ ID: {appointment.Id}
             error = "해당 시간대에서 사용할 수 없는 날짜/시간입니다. 다른 시간으로 다시 지정해 주세요.";
             return false;
         }
+    }
+
+    private static bool TryParseAppointmentDateTime(
+        string dateString,
+        TimeZoneInfo timezone,
+        bool requestedHasTime,
+        out DateTime utcDateTime,
+        out bool hasTime,
+        out string error)
+    {
+        utcDateTime = default;
+        hasTime = false;
+        error = string.Empty;
+        if (!TryParseDateTimeInTimeZone(dateString, timezone, out var parsedUtc, out error))
+        {
+            return false;
+        }
+
+        var explicitTime = HasExplicitTime(dateString);
+        hasTime = requestedHasTime && explicitTime;
+        if (requestedHasTime && !explicitTime)
+        {
+            error = "약속 날짜는 확인했지만 시간이 없습니다. 시간이 미정이면 has_time=false로 저장하고, 시간이 필요하면 사용자에게 확인해 주세요.";
+            return false;
+        }
+
+        if (!hasTime)
+        {
+            var local = TimeZoneInfo.ConvertTimeFromUtc(parsedUtc, timezone).Date;
+            parsedUtc = TimeZoneInfo.ConvertTimeToUtc(local, timezone);
+        }
+
+        utcDateTime = parsedUtc;
+        return true;
+    }
+
+    private static bool TryBuildUpdatedLocalDateTime(
+        DateTime oldLocalStart,
+        bool oldHasTime,
+        string date,
+        string time,
+        bool timeUnspecified,
+        TimeZoneInfo timezone,
+        out DateTime localStart,
+        out bool hasTime,
+        out string error)
+    {
+        error = string.Empty;
+        var localDate = oldLocalStart.Date;
+        var localTime = oldHasTime ? oldLocalStart.TimeOfDay : TimeSpan.Zero;
+        hasTime = oldHasTime;
+
+        if (!string.IsNullOrWhiteSpace(date))
+        {
+            if (!TryParseLocalDate(date, timezone, out localDate, out error))
+            {
+                localStart = default;
+                return false;
+            }
+        }
+
+        if (timeUnspecified)
+        {
+            hasTime = false;
+            localTime = TimeSpan.Zero;
+        }
+        else if (!string.IsNullOrWhiteSpace(time))
+        {
+            if (!TryParseLocalTime(time, out localTime, out error))
+            {
+                localStart = default;
+                return false;
+            }
+
+            hasTime = true;
+        }
+
+        localStart = DateTime.SpecifyKind(localDate.Add(localTime), DateTimeKind.Unspecified);
+        return true;
+    }
+
+    private static bool TryParseLocalDate(string value, TimeZoneInfo timezone, out DateTime date, out string error)
+    {
+        date = default;
+        error = string.Empty;
+        if (!TryParseDateTimeInTimeZone(value, timezone, out var parsedUtc, out error))
+        {
+            error = "날짜를 해석하지 못했습니다. 예: 2026-05-31";
+            return false;
+        }
+
+        date = TimeZoneInfo.ConvertTimeFromUtc(parsedUtc, timezone).Date;
+        return true;
+    }
+
+    private static bool TryParseLocalTime(string value, out TimeSpan time, out string error)
+    {
+        time = default;
+        error = string.Empty;
+        var normalized = value.Trim();
+        if (TimeSpan.TryParse(normalized, CultureInfo.InvariantCulture, out time))
+        {
+            return true;
+        }
+
+        if (DateTime.TryParse(normalized, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var parsed)
+            || DateTime.TryParse(normalized, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces, out parsed))
+        {
+            time = parsed.TimeOfDay;
+            return true;
+        }
+
+        error = "시간을 해석하지 못했습니다. 24시간 형식으로 다시 지정해 주세요. 예: 15:00";
+        return false;
+    }
+
+    private static bool IsFutureOrToday(DateTime startsAtUtc, bool hasTime, TimeZoneInfo timezone, DateTime nowUtc)
+    {
+        if (hasTime)
+        {
+            return startsAtUtc >= nowUtc.AddMinutes(-5);
+        }
+
+        var startDate = TimeZoneInfo.ConvertTimeFromUtc(startsAtUtc, timezone).Date;
+        var today = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, timezone).Date;
+        return startDate >= today;
+    }
+
+    private static string FormatAppointmentStart(DateTime startsAtUtc, bool hasTime, TimeZoneInfo timezone)
+    {
+        var localStart = TimeZoneInfo.ConvertTimeFromUtc(EnsureUtc(startsAtUtc), timezone);
+        if (hasTime)
+        {
+            return $"{localStart:yyyy-MM-dd HH:mm:ss} ({timezone.Id})";
+        }
+
+        return $"{localStart:yyyy-MM-dd} ({GetKoreanDayOfWeek(localStart.DayOfWeek)}, {timezone.Id}), 시간은 아직 정해지지 않았어요.";
+    }
+
+    private static string GetKoreanDayOfWeek(DayOfWeek dayOfWeek)
+    {
+        return dayOfWeek switch
+        {
+            DayOfWeek.Sunday => "일요일",
+            DayOfWeek.Monday => "월요일",
+            DayOfWeek.Tuesday => "화요일",
+            DayOfWeek.Wednesday => "수요일",
+            DayOfWeek.Thursday => "목요일",
+            DayOfWeek.Friday => "금요일",
+            DayOfWeek.Saturday => "토요일",
+            _ => dayOfWeek.ToString()
+        };
+    }
+
+    private static bool HasExplicitTime(string value)
+    {
+        var trimmed = value.Trim();
+        var separatorIndex = Math.Max(trimmed.LastIndexOf('T'), trimmed.LastIndexOf(' '));
+        if (separatorIndex < 0 || separatorIndex == trimmed.Length - 1)
+        {
+            return false;
+        }
+
+        var timePart = trimmed[(separatorIndex + 1)..];
+        return timePart.Contains(':') || timePart.Contains("시", StringComparison.Ordinal);
     }
 
     private static bool HasExplicitOffset(string value)

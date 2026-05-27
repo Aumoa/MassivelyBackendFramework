@@ -14,9 +14,9 @@ internal sealed class MySqlAppointmentRepository(IOptions<MySqlOptions> options)
 
         const string QUERY = @"
 INSERT INTO `appointment`
-    (`guild_id`, `channel_id`, `user_id`, `source_message_id`, `title`, `description`, `starts_at_utc`, `timezone`, `expires_at_utc`)
+    (`guild_id`, `channel_id`, `user_id`, `source_message_id`, `title`, `description`, `starts_at_utc`, `has_time`, `timezone`, `expires_at_utc`)
 VALUES
-    (@GuildId, @ChannelId, @UserId, @SourceMessageId, @Title, @Description, @StartsAtUtc, @Timezone, @ExpiresAtUtc)";
+    (@GuildId, @ChannelId, @UserId, @SourceMessageId, @Title, @Description, @StartsAtUtc, @HasTime, @Timezone, @ExpiresAtUtc)";
 
         var command = new CommandDefinition(QUERY, input, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);
@@ -49,6 +49,7 @@ SELECT
     `title` AS Title,
     `description` AS Description,
     `starts_at_utc` AS StartsAtUtc,
+    `has_time` AS HasTime,
     `timezone` AS Timezone,
     `status` AS Status,
     `created_at` AS CreatedAt,
@@ -105,6 +106,7 @@ SELECT
     `title` AS Title,
     `description` AS Description,
     `starts_at_utc` AS StartsAtUtc,
+    `has_time` AS HasTime,
     `timezone` AS Timezone,
     `status` AS Status,
     `created_at` AS CreatedAt,
@@ -123,6 +125,42 @@ LIMIT 1";
             new { id, userId, guildId, nowUtc },
             cancellationToken: cancellationToken);
         return await connection.QueryFirstOrDefaultAsync<AppointmentData>(command);
+    }
+
+    public async ValueTask<bool> UpdateAsync(
+        long id,
+        string userId,
+        string? guildId,
+        string title,
+        string? description,
+        DateTime startsAtUtc,
+        bool hasTime,
+        string timezone,
+        DateTime expiresAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = @"
+UPDATE `appointment`
+SET
+    `title` = @title,
+    `description` = @description,
+    `starts_at_utc` = @startsAtUtc,
+    `has_time` = @hasTime,
+    `timezone` = @timezone,
+    `expires_at_utc` = @expiresAtUtc,
+    `updated_at` = NOW()
+WHERE `id` = @id
+  AND `user_id` = @userId
+  AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = @guildId)
+  AND `status` = 'active'";
+
+        var command = new CommandDefinition(
+            QUERY,
+            new { id, userId, guildId, title, description, startsAtUtc, hasTime, timezone, expiresAtUtc },
+            cancellationToken: cancellationToken);
+        return await connection.ExecuteAsync(command) > 0;
     }
 
     public async ValueTask<bool> DeleteAsync(
