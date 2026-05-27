@@ -33,6 +33,13 @@
         httpContext.Response.Cookies.Delete("access_token", cookieOptions);
         httpContext.Response.Cookies.Delete("refresh_token", cookieOptions);
         httpContext.Response.Cookies.Delete("id", cookieOptions);
+        httpContext.Response.Cookies.Delete("op_session", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Path = "/"
+        });
 
         foreach (var cookie in httpContext.Request.Cookies)
         {

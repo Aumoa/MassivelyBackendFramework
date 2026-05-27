@@ -17,6 +17,7 @@ namespace OAuth2.Controllers;
 [ApiController]
 public class AuthController(IOptions<HostOptions> options, ILogger<AuthController> logger) : ControllerBase
 {
+    private const string OpSessionCookieName = "op_session";
     private const string PkceVerifierCookieName = "oauth2_pkce_verifier";
     private const string PkceStateCookieName = "oauth2_pkce_state";
 
@@ -453,6 +454,30 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
 
         async ValueTask<AuthorizationSession?> GetCurrentAuthorizationSessionAsync()
         {
+            var opSession = HttpContext.Request.Cookies[OpSessionCookieName];
+            if (!string.IsNullOrWhiteSpace(opSession))
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var validationParams = jwt.GetValidationParameters();
+
+                try
+                {
+                    handler.ValidateToken(opSession, validationParams, out var validatedToken);
+                    var sessionToken = (JwtSecurityToken)validatedToken;
+                    var accountId = sessionToken.Claims.FirstOrDefault(p => p.Type == "id")?.Value;
+                    if (!string.IsNullOrWhiteSpace(accountId))
+                    {
+                        return new AuthorizationSession(accountId, GetAuthTime(sessionToken));
+                    }
+                }
+                catch (SecurityTokenException e)
+                {
+                    logger.LogWarning("OP session validation failed: {Message}", e.Message);
+                    HttpContext.Response.Cookies.Delete(OpSessionCookieName, CreateOpSessionCookieOptions());
+                    return null;
+                }
+            }
+
             var accessToken = HttpContext.Request.Cookies["access_token"];
             if (string.IsNullOrWhiteSpace(accessToken))
             {
@@ -573,6 +598,12 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 Path = "/",
                 Expires = DateTimeOffset.UtcNow.AddYears(10)
             });
+
+            HttpContext.Response.Cookies.Append(OpSessionCookieName, jwt.Issue(options.Value.ClientId, [
+                new("id", authorizationCode.Value.AccountId),
+                new(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
+                new("auth_time", authorizationCode.Value.AuthTime?.ToString(CultureInfo.InvariantCulture) ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Integer64)
+            ]), CreateOpSessionCookieOptions(DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)));
         }
         catch (Exception e)
         {
@@ -782,6 +813,18 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             Secure = true,
             SameSite = SameSiteMode.Lax,
             Path = "/redirect"
+        };
+    }
+
+    private static CookieOptions CreateOpSessionCookieOptions(DateTimeOffset? expires = null)
+    {
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Lax,
+            Path = "/",
+            Expires = expires
         };
     }
 }
