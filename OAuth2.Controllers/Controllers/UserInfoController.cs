@@ -12,8 +12,18 @@ namespace OAuth2.Controllers;
 public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccountClaims claims, IJwt jwt, IClientUserGroups groups) : AuthorizedControllerBase(accesses)
 {
     [HttpGet]
-    [HttpPost]
     public async ValueTask<IActionResult> GetAsync(CancellationToken cancellationToken)
+    {
+        return await GetUserInfoAsync(null, cancellationToken);
+    }
+
+    [HttpPost]
+    public async ValueTask<IActionResult> PostAsync([FromForm(Name = "access_token")] string? accessToken, CancellationToken cancellationToken)
+    {
+        return await GetUserInfoAsync(accessToken, cancellationToken);
+    }
+
+    private async ValueTask<IActionResult> GetUserInfoAsync(string? accessToken, CancellationToken cancellationToken)
     {
         return await VerifiedAsync(async access =>
         {
@@ -21,7 +31,7 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
             AccountClaim[] accountClaims = [.. await claims.GetClaimsAsync(access.Id, cancellationToken), .. await groups.GetClientUserGroupsAsync(access.ClientId, access.Sub)];
             var scopedClaims = jwt.ConfigureClaims(rawAccount, access.Scope, accountClaims, null, false);
             return Ok(scopedClaims.ToDictionary(c => c.Type, c => GetClaimValue(c)));
-        }, null, cancellationToken);
+        }, accessToken, cancellationToken);
 
         static object? GetClaimValue(Claim claim)
         {
