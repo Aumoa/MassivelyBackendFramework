@@ -21,7 +21,15 @@
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Lax
+                SameSite = SameSiteMode.Lax,
+                Path = "/"
+            });
+            httpContext.Response.Cookies.Delete($"cached_jwt_{Id}", new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Lax,
+                Path = "/authorize"
             });
         }
 

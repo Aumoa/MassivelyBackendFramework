@@ -34,6 +34,8 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
         string? RequestObject,
         string? RequestUri);
 
+    private sealed record CachedAuthorizationSession(string AccountId, JwtSecurityToken Token);
+
     [HttpGet("/auth/login")]
     public IActionResult StartLogin()
     {
@@ -168,11 +170,13 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
     public Task<IActionResult> AuthorizeGetAsync(
         [FromServices] IClients clients,
         [FromServices] IClientClaims clientClaims,
+        [FromServices] IAuthorizationCodes authorizationCodes,
+        [FromServices] IOAuthGrants oauthGrants,
         [FromServices] IAccesses accesses,
         [FromServices] IJwt jwt,
         CancellationToken cancellationToken)
     {
-        return AuthorizeAsync(ReadAuthorizeRequest(Request.Query), clients, clientClaims, accesses, jwt, cancellationToken);
+        return AuthorizeAsync(ReadAuthorizeRequest(Request.Query), clients, clientClaims, authorizationCodes, oauthGrants, accesses, jwt, cancellationToken);
     }
 
     [HttpPost("/authorize")]
@@ -180,18 +184,22 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
     public async Task<IActionResult> AuthorizePostAsync(
         [FromServices] IClients clients,
         [FromServices] IClientClaims clientClaims,
+        [FromServices] IAuthorizationCodes authorizationCodes,
+        [FromServices] IOAuthGrants oauthGrants,
         [FromServices] IAccesses accesses,
         [FromServices] IJwt jwt,
         CancellationToken cancellationToken)
     {
         var form = await Request.ReadFormAsync(cancellationToken);
-        return await AuthorizeAsync(ReadAuthorizeRequest(form), clients, clientClaims, accesses, jwt, cancellationToken);
+        return await AuthorizeAsync(ReadAuthorizeRequest(form), clients, clientClaims, authorizationCodes, oauthGrants, accesses, jwt, cancellationToken);
     }
 
     private async Task<IActionResult> AuthorizeAsync(
         AuthorizeRequest request,
         IClients clients,
         IClientClaims clientClaims,
+        IAuthorizationCodes authorizationCodes,
+        IOAuthGrants oauthGrants,
         IAccesses accesses,
         IJwt jwt,
         CancellationToken cancellationToken)
@@ -248,7 +256,7 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             return OAuthError("unsupported_response_type");
         }
 
-        if (!TryParseMaxAge(request.MaxAge, out _))
+        if (!TryParseMaxAge(request.MaxAge, out var maxAge))
         {
             return OAuthError("invalid_request");
         }
@@ -298,12 +306,18 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             return OAuthError("request_uri_not_supported");
         }
 
+        if (IsPromptNoneCombined(request.Prompt))
+        {
+            return OAuthError("invalid_request");
+        }
+
         if (HasPrompt(request.Prompt, "login"))
         {
             return Login();
         }
 
         const string CachedJwtPrefix = "cached_jwt_";
+        var cachedSessions = new List<CachedAuthorizationSession>();
         foreach (var cookie in HttpContext.Request.Cookies)
         {
             if (!cookie.Key.StartsWith(CachedJwtPrefix, StringComparison.Ordinal))
@@ -318,6 +332,12 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 var validationParams = jwt.GetValidationParameters();
                 var principal = handler.ValidateToken(cookie.Value, validationParams, out var validatedToken);
                 var cachedJwt = (JwtSecurityToken)validatedToken;
+                var cachedAccountId = cachedJwt.Claims.FirstOrDefault(p => p.Type == "id")?.Value;
+                if (string.IsNullOrWhiteSpace(cachedAccountId) || cachedAccountId != accountId)
+                {
+                    DeleteCachedAccount(accountId);
+                    continue;
+                }
 
                 var access_token = cachedJwt.Claims.FirstOrDefault(p => p.Type == "access_token")?.Value;
                 if (access_token == null)
@@ -351,10 +371,16 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                         HttpOnly = true,
                         Secure = true,
                         SameSite = SameSiteMode.Lax,
+                        Path = "/",
                         Expires = DateTimeOffset.UtcNow.AddYears(10)
                     });
 
                     cachedJwt = handler.ReadJwtToken(newCachedJwt);
+                }
+
+                if (IsAuthenticationFresh(GetAuthTime(cachedJwt), maxAge))
+                {
+                    cachedSessions.Add(new CachedAuthorizationSession(accountId, cachedJwt));
                 }
             }
             catch (SecurityTokenException e)
@@ -374,12 +400,60 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 {
                     HttpOnly = true,
                     Secure = true,
-                    SameSite = SameSiteMode.Lax
+                    SameSite = SameSiteMode.Lax,
+                    Path = "/"
+                });
+                HttpContext.Response.Cookies.Delete($"cached_jwt_{id}", new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Lax,
+                    Path = "/authorize"
                 });
             }
         }
 
+        if (HasPrompt(request.Prompt, "none"))
+        {
+            return await HandlePromptNoneAsync();
+        }
+
         return Login();
+
+        async Task<IActionResult> HandlePromptNoneAsync()
+        {
+            foreach (var cachedSession in cachedSessions)
+            {
+                if (!isInternalClient)
+                {
+                    var requestedScopes = ScopePolicy.Split(normalizedScope);
+                    var grantedScopes = await oauthGrants.GetGrantedScopesAsync(cachedSession.AccountId, request.ClientId!, cancellationToken);
+                    var grantedSet = new HashSet<string>(grantedScopes, StringComparer.Ordinal);
+                    if (requestedScopes.Any(scope => !grantedSet.Contains(scope)))
+                    {
+                        return OAuthError("consent_required");
+                    }
+                }
+
+                var authorizationCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(
+                    cachedSession.AccountId,
+                    request.ClientId!,
+                    normalizedScope,
+                    request.RedirectUri!,
+                    request.Nonce,
+                    request.CodeChallenge,
+                    request.CodeChallengeMethod,
+                    GetAuthTime(cachedSession.Token)), cancellationToken);
+
+                return Redirect(QueryHelpers.AddQueryString(request.RedirectUri!, new Dictionary<string, string?>
+                {
+                    ["code"] = authorizationCode,
+                    ["state"] = request.State
+                }));
+            }
+
+            return OAuthError("login_required");
+        }
 
         IActionResult Login()
         {
@@ -463,6 +537,7 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 HttpOnly = true,
                 Secure = true,
                 SameSite = SameSiteMode.Lax,
+                Path = "/",
                 Expires = DateTimeOffset.UtcNow.AddYears(10)
             });
         }
@@ -565,11 +640,42 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
         return false;
     }
 
+    private static long? GetAuthTime(JwtSecurityToken jwt)
+    {
+        var authTime = jwt.Claims.FirstOrDefault(p => p.Type == "auth_time")?.Value;
+        return long.TryParse(authTime, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
+    }
+
+    private static bool IsAuthenticationFresh(long? authTime, long? maxAge)
+    {
+        if (!maxAge.HasValue)
+        {
+            return true;
+        }
+
+        if (maxAge.Value <= 0 || !authTime.HasValue)
+        {
+            return false;
+        }
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        return now - authTime.Value < maxAge.Value;
+    }
+
     private static bool HasPrompt(string? prompt, string value)
     {
         return prompt?
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Contains(value, StringComparer.Ordinal) == true;
+    }
+
+    private static bool IsPromptNoneCombined(string? prompt)
+    {
+        var values = prompt?
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return values is { Length: > 1 } && values.Contains("none", StringComparer.Ordinal);
     }
 
     private string GetInternalRedirectUri()

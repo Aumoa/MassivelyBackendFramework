@@ -531,13 +531,13 @@ public partial class Login(
             return true;
         }
 
-        if (!authTime.HasValue)
+        if (m_MaxAge.Value <= 0 || !authTime.HasValue)
         {
             return false;
         }
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        return now - authTime.Value <= m_MaxAge.Value;
+        return now - authTime.Value < m_MaxAge.Value;
     }
 
     private static bool TryParseMaxAge(string? value, out long? maxAge)

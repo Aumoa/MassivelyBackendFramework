@@ -34,6 +34,29 @@
         httpContext.Response.Cookies.Delete("refresh_token", cookieOptions);
         httpContext.Response.Cookies.Delete("id", cookieOptions);
 
+        foreach (var cookie in httpContext.Request.Cookies)
+        {
+            if (!cookie.Key.StartsWith("cached_jwt_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            httpContext.Response.Cookies.Delete(cookie.Key, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Lax,
+                Path = "/"
+            });
+            httpContext.Response.Cookies.Delete(cookie.Key, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Lax,
+                Path = "/authorize"
+            });
+        }
+
         if (!string.IsNullOrEmpty(accessToken))
         {
             try
