@@ -129,7 +129,8 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
         var chatLogRepository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
         var chatImageRepository = scope.ServiceProvider.GetRequiredService<IChatImageRepository>();
-        var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository);
+        var appointmentRepository = scope.ServiceProvider.GetRequiredService<IAppointmentRepository>();
+        var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository, appointmentRepository);
         var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
         var chatImageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatImageTools>>();
         var chessToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChessTools>>();
