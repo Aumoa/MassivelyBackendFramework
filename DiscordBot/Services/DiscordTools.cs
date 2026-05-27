@@ -10,6 +10,16 @@ internal class DiscordTools(SocketSelfUser selfUser, SocketMessage message, ICha
 {
     private const int DefaultAppointmentRetentionDays = 30;
     private const int MaxAppointmentRetentionDays = 365;
+    private static readonly (DayOfWeek Day, string[] Aliases)[] KoreanDayOfWeekAliases =
+    [
+        (DayOfWeek.Sunday, ["일요일", "일욜"]),
+        (DayOfWeek.Monday, ["월요일", "월욜"]),
+        (DayOfWeek.Tuesday, ["화요일", "화욜"]),
+        (DayOfWeek.Wednesday, ["수요일", "수욜"]),
+        (DayOfWeek.Thursday, ["목요일", "목욜"]),
+        (DayOfWeek.Friday, ["금요일", "금욜"]),
+        (DayOfWeek.Saturday, ["토요일", "토욜"])
+    ];
 
     [ToolFunction(
         Name = "get_chat_history",
@@ -201,9 +211,10 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
 [중요]
 - starts_at에는 반드시 사용자의 자연어 날짜를 해석한 정식 날짜/시간을 ISO 형식으로 넣으세요. 예: 2026-05-28T15:00:00
 - '내일', '다음 주 금요일', '저녁'처럼 상대적이거나 애매한 표현은 현재 날짜를 기준으로 해석하세요. 현재 날짜를 모르면 먼저 get_current_date를 호출하세요.
+- original_date_text에는 날짜 해석에 사용한 사용자의 원문 표현을 넣으세요. 예: '이번주 일요일', '내일', '5월 31일'. 요일이 포함되어 있으면 starts_at의 실제 요일과 반드시 일치해야 합니다.
 - 현재 메시지에 약속 제목/날짜가 충분하지 않으면 먼저 search_chat_history와 get_chat_context로 현재 채팅방의 주변 대화를 확인하세요. 예: 사용자가 '방탈 약속 기억해줘'라고만 말하면 '방탈'을 검색하고 주변 대화에서 날짜를 찾으세요.
 - 날짜가 불분명하면 이 도구를 호출하지 말고 사용자에게 정확한 날짜를 물어보세요.
-- 시간이 정해지지 않은 약속은 저장할 수 있습니다. 이 경우 starts_at에는 날짜만 넣고 has_time=false로 호출하세요. 임의로 오후 2시 같은 시간을 만들지 마세요.
+- 시간이 정해지지 않은 약속은 저장할 수 있습니다. 이 경우 starts_at에는 timezone offset이나 시간을 붙이지 않은 날짜만 넣고 has_time=false로 호출하세요. 임의로 오후 2시 같은 시간을 만들지 마세요.
 - search_chat_history/get_chat_context로 약속 근거가 된 과거 메시지를 찾았다면 source_chat_log_id에 해당 ChatLogId를 넣으세요. 그러면 약속 조회 시 원본 약속 대화로 링크됩니다.
 - 약속 저장은 사용자 본인 전용입니다. user_id, guild_id, channel_id는 프로그램이 현재 메시지에서 자동으로 고정합니다.
 - 저장된 약속에는 원본 Discord 메시지 링크가 함께 보존됩니다. 조회 응답에는 해당 링크를 그대로 보여주세요.
@@ -214,6 +225,8 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         string title,
         [ToolParameterInfo(Description = "약속 시작 날짜/시간. ISO 형식 권장. 예: 2026-05-28T15:00:00 또는 2026-05-28T15:00:00+09:00")]
         string starts_at,
+        [ToolParameterInfo(Description = "날짜 해석에 사용한 사용자의 원문 표현. 예: 이번주 일요일, 다음 주 금요일, 5월 31일")]
+        string original_date_text,
         [ToolParameterInfo(Description = "약속 시간이 명확히 정해졌으면 true, 날짜만 정해지고 시간이 미정이면 false.")]
         bool has_time = true,
         [ToolParameterInfo(Description = "IANA 타임존 ID. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
@@ -239,6 +252,12 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         }
 
         var nowUtc = DateTime.UtcNow;
+        var localStart = TimeZoneInfo.ConvertTimeFromUtc(startsAtUtc, tz);
+        if (!TryValidateOriginalDateText(original_date_text, localStart, tz, nowUtc, out var dateTextError))
+        {
+            return dateTextError;
+        }
+
         if (!IsFutureOrToday(startsAtUtc, effectiveHasTime, tz, nowUtc))
         {
             return "이미 지난 시간으로 보입니다. 앞으로 있을 약속의 날짜와 시간을 다시 확인해 주세요.";
@@ -683,12 +702,21 @@ ID: {appointment.Id}
         utcDateTime = default;
         hasTime = false;
         error = string.Empty;
+        var explicitTime = HasExplicitTime(dateString);
+        if (!requestedHasTime)
+        {
+            if (explicitTime || HasExplicitOffset(dateString))
+            {
+                error = "시간이 정해지지 않은 약속은 starts_at에 날짜만 넣어야 합니다. 예: 2026-05-31. 시간이나 timezone offset을 임의로 넣지 말고 has_time=false로 다시 호출하세요.";
+                return false;
+            }
+        }
+
         if (!TryParseDateTimeInTimeZone(dateString, timezone, out var parsedUtc, out error))
         {
             return false;
         }
 
-        var explicitTime = HasExplicitTime(dateString);
         hasTime = requestedHasTime && explicitTime;
         if (requestedHasTime && !explicitTime)
         {
@@ -704,6 +732,104 @@ ID: {appointment.Id}
 
         utcDateTime = parsedUtc;
         return true;
+    }
+
+    private static bool TryValidateOriginalDateText(
+        string? originalDateText,
+        DateTime localStart,
+        TimeZoneInfo timezone,
+        DateTime nowUtc,
+        out string error)
+    {
+        error = string.Empty;
+        if (!TryGetReferencedDayOfWeek(originalDateText, out var expectedDayOfWeek))
+        {
+            return true;
+        }
+
+        if (localStart.DayOfWeek != expectedDayOfWeek)
+        {
+            error = $"날짜 표현과 실제 날짜의 요일이 맞지 않습니다. 원문 표현은 '{originalDateText}'이고, 저장하려는 날짜 {localStart:yyyy-MM-dd}은 {GetKoreanDayOfWeek(localStart.DayOfWeek)}입니다. 날짜를 다시 확인한 뒤 호출하세요.";
+            return false;
+        }
+
+        if (!TryGetRelativeWeekOffset(originalDateText, out var weekOffset))
+        {
+            return true;
+        }
+
+        var today = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, timezone).Date;
+        var expectedDate = GetWeekDate(today, expectedDayOfWeek, weekOffset);
+        if (localStart.Date == expectedDate)
+        {
+            return true;
+        }
+
+        var relativeWeekText = weekOffset switch
+        {
+            0 => "이번 주",
+            1 => "다음 주",
+            2 => "다다음 주",
+            _ => $"{weekOffset}주 뒤"
+        };
+        error = $"날짜 표현과 저장하려는 날짜가 맞지 않습니다. {timezone.Id} 기준 오늘은 {today:yyyy-MM-dd}이고, '{relativeWeekText} {GetKoreanDayOfWeek(expectedDayOfWeek)}'은 {expectedDate:yyyy-MM-dd}입니다. 저장하려는 날짜는 {localStart:yyyy-MM-dd}이므로 다시 확인해 주세요.";
+        return false;
+    }
+
+    private static bool TryGetReferencedDayOfWeek(string? value, out DayOfWeek dayOfWeek)
+    {
+        var normalized = NormalizeDateExpression(value);
+        foreach (var (day, aliases) in KoreanDayOfWeekAliases)
+        {
+            if (aliases.Any(normalized.Contains))
+            {
+                dayOfWeek = day;
+                return true;
+            }
+        }
+
+        dayOfWeek = default;
+        return false;
+    }
+
+    private static bool TryGetRelativeWeekOffset(string? value, out int weekOffset)
+    {
+        var normalized = NormalizeDateExpression(value);
+        if (normalized.Contains("다다음주"))
+        {
+            weekOffset = 2;
+            return true;
+        }
+
+        if (normalized.Contains("다음주") || normalized.Contains("담주"))
+        {
+            weekOffset = 1;
+            return true;
+        }
+
+        if (normalized.Contains("이번주"))
+        {
+            weekOffset = 0;
+            return true;
+        }
+
+        weekOffset = default;
+        return false;
+    }
+
+    private static DateTime GetWeekDate(DateTime today, DayOfWeek dayOfWeek, int weekOffset)
+    {
+        var daysSinceMonday = ((int)today.DayOfWeek + 6) % 7;
+        var monday = today.AddDays(-daysSinceMonday).AddDays(weekOffset * 7);
+        var targetOffset = dayOfWeek == DayOfWeek.Sunday ? 6 : (int)dayOfWeek - 1;
+        return monday.AddDays(targetOffset);
+    }
+
+    private static string NormalizeDateExpression(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Replace(" ", string.Empty).Trim().ToLowerInvariant();
     }
 
     private static bool TryBuildUpdatedLocalDateTime(
