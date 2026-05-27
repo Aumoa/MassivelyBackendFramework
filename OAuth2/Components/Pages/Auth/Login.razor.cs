@@ -256,14 +256,7 @@ public partial class Login(
         {
             if (HasPrompt("none"))
             {
-                if (m_CachedJwts.Count > 0)
-                {
-                    await ContinueWithCachedAsync(m_CachedJwts[0]);
-                }
-                else
-                {
-                    ContinueWithLoginRequiredAsync();
-                }
+                ContinueWithLoginRequiredAsync();
             }
             else
             {

@@ -34,7 +34,7 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
         string? RequestObject,
         string? RequestUri);
 
-    private sealed record CachedAuthorizationSession(string AccountId, JwtSecurityToken Token);
+    private sealed record AuthorizationSession(string AccountId, long? AuthTime);
 
     [HttpGet("/auth/login")]
     public IActionResult StartLogin()
@@ -316,8 +316,12 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             return Login();
         }
 
+        if (HasPrompt(request.Prompt, "none"))
+        {
+            return await HandlePromptNoneAsync();
+        }
+
         const string CachedJwtPrefix = "cached_jwt_";
-        var cachedSessions = new List<CachedAuthorizationSession>();
         foreach (var cookie in HttpContext.Request.Cookies)
         {
             if (!cookie.Key.StartsWith(CachedJwtPrefix, StringComparison.Ordinal))
@@ -378,10 +382,6 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                     cachedJwt = handler.ReadJwtToken(newCachedJwt);
                 }
 
-                if (IsAuthenticationFresh(GetAuthTime(cachedJwt), maxAge))
-                {
-                    cachedSessions.Add(new CachedAuthorizationSession(accountId, cachedJwt));
-                }
             }
             catch (SecurityTokenException e)
             {
@@ -413,46 +413,79 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             }
         }
 
-        if (HasPrompt(request.Prompt, "none"))
-        {
-            return await HandlePromptNoneAsync();
-        }
-
         return Login();
 
         async Task<IActionResult> HandlePromptNoneAsync()
         {
-            foreach (var cachedSession in cachedSessions)
+            var session = await GetCurrentAuthorizationSessionAsync();
+            if (session == null || !IsAuthenticationFresh(session.AuthTime, maxAge))
             {
-                if (!isInternalClient)
-                {
-                    var requestedScopes = ScopePolicy.Split(normalizedScope);
-                    var grantedScopes = await oauthGrants.GetGrantedScopesAsync(cachedSession.AccountId, request.ClientId!, cancellationToken);
-                    var grantedSet = new HashSet<string>(grantedScopes, StringComparer.Ordinal);
-                    if (requestedScopes.Any(scope => !grantedSet.Contains(scope)))
-                    {
-                        return OAuthError("consent_required");
-                    }
-                }
-
-                var authorizationCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(
-                    cachedSession.AccountId,
-                    request.ClientId!,
-                    normalizedScope,
-                    request.RedirectUri!,
-                    request.Nonce,
-                    request.CodeChallenge,
-                    request.CodeChallengeMethod,
-                    GetAuthTime(cachedSession.Token)), cancellationToken);
-
-                return Redirect(QueryHelpers.AddQueryString(request.RedirectUri!, new Dictionary<string, string?>
-                {
-                    ["code"] = authorizationCode,
-                    ["state"] = request.State
-                }));
+                return OAuthError("login_required");
             }
 
-            return OAuthError("login_required");
+            if (!isInternalClient)
+            {
+                var requestedScopes = ScopePolicy.Split(normalizedScope);
+                var grantedScopes = await oauthGrants.GetGrantedScopesAsync(session.AccountId, request.ClientId!, cancellationToken);
+                var grantedSet = new HashSet<string>(grantedScopes, StringComparer.Ordinal);
+                if (requestedScopes.Any(scope => !grantedSet.Contains(scope)))
+                {
+                    return OAuthError("consent_required");
+                }
+            }
+
+            var authorizationCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(
+                session.AccountId,
+                request.ClientId!,
+                normalizedScope,
+                request.RedirectUri!,
+                request.Nonce,
+                request.CodeChallenge,
+                request.CodeChallengeMethod,
+                session.AuthTime), cancellationToken);
+
+            return Redirect(QueryHelpers.AddQueryString(request.RedirectUri!, new Dictionary<string, string?>
+            {
+                ["code"] = authorizationCode,
+                ["state"] = request.State
+            }));
+        }
+
+        async ValueTask<AuthorizationSession?> GetCurrentAuthorizationSessionAsync()
+        {
+            var accessToken = HttpContext.Request.Cookies["access_token"];
+            if (string.IsNullOrWhiteSpace(accessToken))
+            {
+                return null;
+            }
+
+            var access = await accesses.VerifyAsync(accessToken, cancellationToken);
+            if (!access.HasValue)
+            {
+                return null;
+            }
+
+            long? authTime = null;
+            var idToken = HttpContext.Request.Cookies["id_token"];
+            if (!string.IsNullOrWhiteSpace(idToken))
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var validationParams = jwt.GetValidationParameters();
+                validationParams.ValidateLifetime = false;
+
+                try
+                {
+                    handler.ValidateToken(idToken, validationParams, out var validatedToken);
+                    authTime = GetAuthTime((JwtSecurityToken)validatedToken);
+                }
+                catch (SecurityTokenException e)
+                {
+                    logger.LogWarning("Current OP session id_token validation failed: {Message}", e.Message);
+                    return null;
+                }
+            }
+
+            return new AuthorizationSession(access.Value.Id, authTime);
         }
 
         IActionResult Login()
