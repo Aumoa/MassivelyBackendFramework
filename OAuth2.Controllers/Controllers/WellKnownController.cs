@@ -42,9 +42,11 @@ public class WellKnownController(IJwt jwt) : ControllerBase
             subject_types_supported = (string[])["public"],
             id_token_signing_alg_values_supported = (string[])["RS256"],
             scopes_supported = ScopePolicy.SupportedScopes,
+            acr_values_supported = OidcPolicy.SupportedAcrValues,
             token_endpoint_auth_methods_supported = new[] { "client_secret_basic", "client_secret_post", "none" },
             claims_supported = (string[])
             [
+                "acr",
                 "address",
                 "aud",
                 "auth_time",

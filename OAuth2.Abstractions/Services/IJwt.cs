@@ -13,7 +13,7 @@ public interface IJwt
     TimeSpan ExpiresIn { get; }
     TimeSpan RefreshTokenExpiresIn { get; }
 
-    Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken, long? authTime = null);
+    Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken, long? authTime = null, string? acr = null);
     string Issue(string audience, params Claim[] claims);
     TokenValidationParameters GetValidationParameters();
 }

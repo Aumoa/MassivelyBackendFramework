@@ -22,7 +22,8 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             'nonce',
             'code_challenge',
             'code_challenge_method',
-            'auth_time')
+            'auth_time',
+            'acr')
 
         redis.call('DEL', KEYS[1])
         return values
@@ -42,7 +43,8 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             new("nonce", body.Nonce ?? string.Empty),
             new("code_challenge", body.CodeChallenge ?? string.Empty),
             new("code_challenge_method", body.CodeChallengeMethod ?? string.Empty),
-            new("auth_time", body.AuthTime?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)
+            new("auth_time", body.AuthTime?.ToString(CultureInfo.InvariantCulture) ?? string.Empty),
+            new("acr", body.Acr ?? string.Empty)
         ];
 
         await db.HashSetAsync(codeKey, entries).WaitAsync(cancellationToken);
@@ -61,7 +63,7 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
         }
 
         var entries = (RedisResult[]?)result;
-        if (entries is not { Length: 8 })
+        if (entries is not { Length: 9 })
         {
             logger.LogError("Invalid authorization code data: {Code}", code);
             return null;
@@ -75,6 +77,7 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
         var codeChallenge = GetString(entries[5]);
         var codeChallengeMethod = GetString(entries[6]);
         var authTimeValue = GetString(entries[7]);
+        var acr = GetString(entries[8]);
 
         if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(scope) || string.IsNullOrWhiteSpace(redirectUri))
         {
@@ -90,7 +93,8 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             nonce,
             string.IsNullOrEmpty(codeChallenge) ? null : codeChallenge,
             string.IsNullOrEmpty(codeChallengeMethod) ? null : codeChallengeMethod,
-            long.TryParse(authTimeValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var authTime) ? authTime : null
+            long.TryParse(authTimeValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var authTime) ? authTime : null,
+            string.IsNullOrEmpty(acr) ? null : acr
         );
     }
 

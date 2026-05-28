@@ -8,5 +8,6 @@ public record struct AuthorizationCodeBody(
     string? Nonce,
     string? CodeChallenge = null,
     string? CodeChallengeMethod = null,
-    long? AuthTime = null
+    long? AuthTime = null,
+    string? Acr = null
     );
