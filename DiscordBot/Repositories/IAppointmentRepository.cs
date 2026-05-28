@@ -33,7 +33,7 @@ public interface IAppointmentRepository
     ValueTask<long> AddAsync(AppointmentInput input, CancellationToken cancellationToken = default);
 
     ValueTask<IReadOnlyList<AppointmentData>> GetActiveAsync(
-        string userId,
+        string channelId,
         string? guildId,
         DateTime nowUtc,
         int limit,
@@ -44,14 +44,14 @@ public interface IAppointmentRepository
 
     ValueTask<AppointmentData?> GetActiveByIdAsync(
         long id,
-        string userId,
+        string channelId,
         string? guildId,
         DateTime nowUtc,
         CancellationToken cancellationToken = default);
 
     ValueTask<bool> UpdateAsync(
         long id,
-        string userId,
+        string channelId,
         string? guildId,
         string title,
         string? description,
@@ -63,7 +63,7 @@ public interface IAppointmentRepository
 
     ValueTask<bool> DeleteAsync(
         long id,
-        string userId,
+        string channelId,
         string? guildId,
         CancellationToken cancellationToken = default);
 

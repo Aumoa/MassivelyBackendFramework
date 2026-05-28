@@ -206,7 +206,7 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
     [ToolFunction(
         Name = "remember_appointment",
         Description = """
-사용자의 약속 또는 일정을 기억해야 할 때 사용합니다. 사용자가 '약속 기억해줘', '내일 3시 회의 저장해줘', '다음 주 금요일 저녁 약속 잊지 마'처럼 말하면 호출하세요.
+현재 채널의 공유 약속 또는 일정을 기억해야 할 때 사용합니다. 사용자가 '약속 기억해줘', '내일 3시 회의 저장해줘', '다음 주 금요일 저녁 약속 잊지 마'처럼 말하면 호출하세요.
 
 [중요]
 - starts_at에는 반드시 사용자의 자연어 날짜를 해석한 정식 날짜/시간을 ISO 형식으로 넣으세요. 예: 2026-05-28T15:00:00
@@ -216,7 +216,8 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
 - 날짜가 불분명하면 이 도구를 호출하지 말고 사용자에게 정확한 날짜를 물어보세요.
 - 시간이 정해지지 않은 약속은 저장할 수 있습니다. 이 경우 starts_at에는 timezone offset이나 시간을 붙이지 않은 날짜만 넣고 has_time=false로 호출하세요. 임의로 오후 2시 같은 시간을 만들지 마세요.
 - search_chat_history/get_chat_context로 약속 근거가 된 과거 메시지를 찾았다면 source_chat_log_id에 해당 ChatLogId를 넣으세요. 그러면 약속 조회 시 원본 약속 대화로 링크됩니다.
-- 약속 저장은 사용자 본인 전용입니다. user_id, guild_id, channel_id는 프로그램이 현재 메시지에서 자동으로 고정합니다.
+- 약속 저장은 현재 채널 공유용입니다. 같은 채널의 사용자는 이 약속을 조회, 수정, 삭제할 수 있습니다. 다른 채널에서는 보이지 않습니다.
+- user_id는 만든 사람 기록으로만 저장됩니다. guild_id, channel_id, user_id는 프로그램이 현재 메시지에서 자동으로 고정합니다.
 - 저장된 약속에는 원본 Discord 메시지 링크가 함께 보존됩니다. 조회 응답에는 해당 링크를 그대로 보여주세요.
 - 지난 약속은 기본적으로 약속 시간 30일 뒤 자동으로 잊어버립니다.
 """)]
@@ -318,9 +319,9 @@ ID: {id}
     [ToolFunction(
         Name = "list_appointments",
         Description = """
-현재 사용자 본인이 저장한 약속을 조회합니다. 사용자가 '내 약속 알려줘', '이번 주 약속 뭐 있어?', '내일 일정 알려줘'처럼 말하면 호출하세요.
+현재 채널에 저장된 공유 약속을 조회합니다. 사용자가 '약속 알려줘', '이번 주 약속 뭐 있어?', '내일 일정 알려줘'처럼 말하면 호출하세요.
 
-조회 범위는 현재 Discord 서버 또는 DM 범위로 제한됩니다. 다른 사용자나 다른 서버의 약속은 조회할 수 없습니다.
+조회 범위는 현재 Discord 채널로 제한됩니다. 다른 채널이나 다른 서버의 약속은 조회할 수 없습니다.
 날짜 범위를 지정할 때 from_date/to_date는 timezone 기준으로 해석됩니다.
 결과의 원본 URL은 사용자 응답 본문에 그대로 적어야 Discord가 원본 메시지를 인용 카드로 표시합니다.
 """)]
@@ -352,9 +353,10 @@ ID: {id}
 
         var nowUtc = DateTime.UtcNow;
         var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
         await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
         var appointments = await appointmentRepository.GetActiveAsync(
-            message.Author.Id.ToString(),
+            channelId,
             guildId,
             nowUtc,
             limit,
@@ -386,14 +388,14 @@ ID: {id}
         }
 
         lines.Add("");
-        lines.Add("응답 규칙: 사용자에게 필요한 약속만 간결하게 정리하세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요. 삭제가 필요하면 ID를 기준으로 forget_appointment를 사용할 수 있습니다.");
+        lines.Add("응답 규칙: 현재 채널의 공유 약속 중 사용자에게 필요한 약속만 간결하게 정리하세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요. 삭제가 필요하면 ID를 기준으로 forget_appointment를 사용할 수 있습니다.");
         return string.Join("\n", lines);
     }
 
     [ToolFunction(
         Name = "forget_appointment",
         Description = """
-사용자가 저장된 약속을 삭제하거나 잊어달라고 요청할 때 사용합니다.
+사용자가 현재 채널에 저장된 공유 약속을 삭제하거나 잊어달라고 요청할 때 사용합니다.
 id는 list_appointments 결과의 ID를 사용하세요. 사용자가 특정 약속을 자연어로만 말해 ID가 불분명하면 먼저 list_appointments로 후보를 조회하거나 사용자에게 확인하세요.
 """)]
     public async Task<string> ForgetAppointmentAsync(
@@ -410,10 +412,11 @@ id는 list_appointments 결과의 ID를 사용하세요. 사용자가 특정 약
 
         var nowUtc = DateTime.UtcNow;
         var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
         await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
         var appointment = await appointmentRepository.GetActiveByIdAsync(
             id,
-            message.Author.Id.ToString(),
+            channelId,
             guildId,
             nowUtc,
             cancellationToken);
@@ -424,7 +427,7 @@ id는 list_appointments 결과의 ID를 사용하세요. 사용자가 특정 약
 
         var deleted = await appointmentRepository.DeleteAsync(
             id,
-            message.Author.Id.ToString(),
+            channelId,
             guildId,
             cancellationToken);
         if (!deleted)
@@ -447,7 +450,7 @@ ID: {appointment.Id}
     [ToolFunction(
         Name = "update_appointment",
         Description = """
-저장된 약속의 제목, 날짜, 시간, 설명을 수정합니다.
+현재 채널에 저장된 공유 약속의 제목, 날짜, 시간, 설명을 수정합니다.
 id는 list_appointments 결과의 ID를 사용하세요. ID가 불분명하면 먼저 list_appointments로 후보를 조회하거나 사용자에게 확인하세요.
 
 시간만 나중에 정해진 경우 time에 HH:mm 값을 넣으세요. 예: '방탈출 약속은 오후 3시로 정해졌어' -> 기존 날짜 유지, time='15:00'.
@@ -480,10 +483,11 @@ date가 비어 있으면 기존 날짜를 유지하고, time이 비어 있으면
 
         var nowUtc = DateTime.UtcNow;
         var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
         await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
         var appointment = await appointmentRepository.GetActiveByIdAsync(
             id,
-            message.Author.Id.ToString(),
+            channelId,
             guildId,
             nowUtc,
             cancellationToken);
@@ -527,7 +531,7 @@ date가 비어 있으면 기존 날짜를 유지하고, time이 비어 있으면
 
         var updated = await appointmentRepository.UpdateAsync(
             id,
-            message.Author.Id.ToString(),
+            channelId,
             guildId,
             normalizedTitle,
             normalizedDescription,

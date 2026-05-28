@@ -28,7 +28,7 @@ VALUES
     }
 
     public async ValueTask<IReadOnlyList<AppointmentData>> GetActiveAsync(
-        string userId,
+        string channelId,
         string? guildId,
         DateTime nowUtc,
         int limit,
@@ -56,7 +56,7 @@ SELECT
     `updated_at` AS UpdatedAt,
     `expires_at_utc` AS ExpiresAtUtc
 FROM `appointment`
-WHERE `user_id` = @userId
+WHERE `channel_id` = @channelId
   AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = @guildId)
   AND `status` = 'active'
   AND `expires_at_utc` > @nowUtc");
@@ -80,7 +80,7 @@ WHERE `user_id` = @userId
 
         var command = new CommandDefinition(
             queryBuilder.ToString(),
-            new { userId, guildId, nowUtc, limit, fromUtc, toUtc },
+            new { channelId, guildId, nowUtc, limit, fromUtc, toUtc },
             cancellationToken: cancellationToken);
 
         var results = await connection.QueryAsync<AppointmentData>(command);
@@ -89,7 +89,7 @@ WHERE `user_id` = @userId
 
     public async ValueTask<AppointmentData?> GetActiveByIdAsync(
         long id,
-        string userId,
+        string channelId,
         string? guildId,
         DateTime nowUtc,
         CancellationToken cancellationToken = default)
@@ -114,7 +114,7 @@ SELECT
     `expires_at_utc` AS ExpiresAtUtc
 FROM `appointment`
 WHERE `id` = @id
-  AND `user_id` = @userId
+  AND `channel_id` = @channelId
   AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = @guildId)
   AND `status` = 'active'
   AND `expires_at_utc` > @nowUtc
@@ -122,14 +122,14 @@ LIMIT 1";
 
         var command = new CommandDefinition(
             QUERY,
-            new { id, userId, guildId, nowUtc },
+            new { id, channelId, guildId, nowUtc },
             cancellationToken: cancellationToken);
         return await connection.QueryFirstOrDefaultAsync<AppointmentData>(command);
     }
 
     public async ValueTask<bool> UpdateAsync(
         long id,
-        string userId,
+        string channelId,
         string? guildId,
         string title,
         string? description,
@@ -152,20 +152,20 @@ SET
     `expires_at_utc` = @expiresAtUtc,
     `updated_at` = NOW()
 WHERE `id` = @id
-  AND `user_id` = @userId
+  AND `channel_id` = @channelId
   AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = @guildId)
   AND `status` = 'active'";
 
         var command = new CommandDefinition(
             QUERY,
-            new { id, userId, guildId, title, description, startsAtUtc, hasTime, timezone, expiresAtUtc },
+            new { id, channelId, guildId, title, description, startsAtUtc, hasTime, timezone, expiresAtUtc },
             cancellationToken: cancellationToken);
         return await connection.ExecuteAsync(command) > 0;
     }
 
     public async ValueTask<bool> DeleteAsync(
         long id,
-        string userId,
+        string channelId,
         string? guildId,
         CancellationToken cancellationToken = default)
     {
@@ -177,13 +177,13 @@ SET
     `status` = 'deleted',
     `updated_at` = NOW()
 WHERE `id` = @id
-  AND `user_id` = @userId
+  AND `channel_id` = @channelId
   AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = @guildId)
   AND `status` = 'active'";
 
         var command = new CommandDefinition(
             QUERY,
-            new { id, userId, guildId },
+            new { id, channelId, guildId },
             cancellationToken: cancellationToken);
         return await connection.ExecuteAsync(command) > 0;
     }
