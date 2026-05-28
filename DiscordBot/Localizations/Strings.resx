@@ -82,6 +82,9 @@
   <data name="NAVMENU_LABEL_TOOLS" xml:space="preserve">
     <value>Tools</value>
   </data>
+  <data name="NAVMENU_LABEL_SERVER_LOGS" xml:space="preserve">
+    <value>Logs</value>
+  </data>
   <data name="NAVMENU_LABEL_CLAUDE_SETTINGS" xml:space="preserve">
     <value>Claude</value>
   </data>
@@ -399,5 +402,46 @@
   </data>
   <data name="TOOLS_TOOL_CALCULATE_PARAM_EXPRESSION" xml:space="preserve">
     <value>The math expression to evaluate.</value>
+  </data>
+
+  <!-- ServerLogs -->
+  <data name="SERVER_LOGS_TITLE" xml:space="preserve">
+    <value>Server Logs</value>
+  </data>
+  <data name="SERVER_LOGS_SUBTITLE" xml:space="preserve">
+    <value>Recent ASP.NET runtime logs</value>
+  </data>
+  <data name="SERVER_LOGS_LABEL_SEARCH" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="SERVER_LOGS_LABEL_CATEGORY" xml:space="preserve">
+    <value>Category</value>
+  </data>
+  <data name="SERVER_LOGS_LABEL_MIN_LEVEL" xml:space="preserve">
+    <value>Minimum Level</value>
+  </data>
+  <data name="SERVER_LOGS_LABEL_AUTO_SCROLL" xml:space="preserve">
+    <value>Auto scroll</value>
+  </data>
+  <data name="SERVER_LOGS_PLACEHOLDER_SEARCH" xml:space="preserve">
+    <value>Message, exception, scope</value>
+  </data>
+  <data name="SERVER_LOGS_PLACEHOLDER_CATEGORY" xml:space="preserve">
+    <value>Namespace or category</value>
+  </data>
+  <data name="SERVER_LOGS_BUTTON_REFRESH" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="SERVER_LOGS_BUTTON_CLEAR" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="SERVER_LOGS_STATUS_COUNT" xml:space="preserve">
+    <value>{0} shown / {1} captured</value>
+  </data>
+  <data name="SERVER_LOGS_STATUS_UPDATED" xml:space="preserve">
+    <value>Updated {0}</value>
+  </data>
+  <data name="SERVER_LOGS_EMPTY" xml:space="preserve">
+    <value>No matching log entries.</value>
   </data>
 </root>

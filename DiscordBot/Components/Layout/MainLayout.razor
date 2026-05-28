@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@using System.Globalization
 @using Microsoft.AspNetCore.Components.Routing
 
 <AuthorizeView Roles="admin">
@@ -19,6 +20,10 @@
                     <NavLink class="bot-nav-link" href="/tools">
                         <span class="material-symbols-outlined">extension</span>
                         <span>@Strings.NAVMENU_LABEL_TOOLS</span>
+                    </NavLink>
+                    <NavLink class="bot-nav-link" href="/server-logs">
+                        <span class="material-symbols-outlined">article</span>
+                        <span>@T("NAVMENU_LABEL_SERVER_LOGS")</span>
                     </NavLink>
                     <NavLink class="bot-nav-link" href="/claude-settings">
                         <span class="material-symbols-outlined">tune</span>
@@ -53,3 +58,10 @@
         }
     </NotAuthorized>
 </AuthorizeView>
+
+@code {
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+}

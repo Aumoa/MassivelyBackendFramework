@@ -1,0 +1,223 @@
+.server-logs-page {
+    --log-viewer-bg: #111827;
+    --log-viewer-text: #e5e7eb;
+    --log-viewer-muted: #9ca3af;
+    --log-viewer-border: #374151;
+    --log-entry-bg: rgba(255, 255, 255, 0.03);
+    --log-entry-hover: rgba(255, 255, 255, 0.06);
+}
+
+.log-toolbar {
+    display: grid;
+    grid-template-columns: minmax(13rem, 1.2fr) minmax(12rem, 1fr) minmax(9rem, 0.6fr);
+    gap: var(--space-4);
+    align-items: end;
+    margin-bottom: var(--space-4);
+}
+
+.log-toolbar label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    margin: 0;
+}
+
+.log-toolbar input,
+.log-toolbar select {
+    width: 100%;
+    min-width: 0;
+    height: 2.25rem;
+    border: 1px solid var(--color-border-dark);
+    border-radius: var(--radius-md);
+    padding: 0 var(--space-3);
+    color: var(--color-text-primary);
+    background: var(--color-bg);
+    font: inherit;
+}
+
+.log-toolbar input:focus,
+.log-toolbar select:focus {
+    outline: 2px solid var(--color-accent-border);
+    border-color: var(--color-accent);
+}
+
+.auto-scroll-field {
+    flex-direction: row !important;
+    align-items: center;
+    height: 2.25rem;
+}
+
+.auto-scroll-field input {
+    width: 1rem;
+    height: 1rem;
+}
+
+.log-actions {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    justify-content: flex-end;
+    grid-column: span 2;
+}
+
+.log-actions button {
+    height: 2.25rem;
+}
+
+.log-actions .danger {
+    color: var(--color-danger);
+}
+
+.log-summary {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    margin-bottom: var(--space-3);
+}
+
+.log-viewer {
+    height: min(68vh, 46rem);
+    min-height: 28rem;
+    overflow: auto;
+    border: 1px solid var(--log-viewer-border);
+    border-radius: var(--radius-md);
+    background: var(--log-viewer-bg);
+    color: var(--log-viewer-text);
+    padding: var(--space-3);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--text-xs);
+}
+
+.log-empty {
+    color: var(--log-viewer-muted);
+    padding: var(--space-4);
+}
+
+.log-entry {
+    border-left: 3px solid var(--log-viewer-border);
+    border-radius: var(--radius-sm);
+    background: var(--log-entry-bg);
+    padding: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-2);
+}
+
+.log-entry:hover {
+    background: var(--log-entry-hover);
+}
+
+.log-entry-header {
+    display: grid;
+    grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+    gap: var(--space-2);
+    align-items: center;
+    color: var(--log-viewer-muted);
+    line-height: 1.4;
+    margin-bottom: var(--space-1);
+}
+
+.level-badge,
+.event-id {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.35rem;
+    border-radius: var(--radius-sm);
+    padding: 0 var(--space-2);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--log-viewer-text);
+    font-weight: 700;
+}
+
+.log-category {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.log-message,
+.log-exception {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--log-viewer-text);
+    font: inherit;
+    line-height: 1.45;
+}
+
+.log-exception {
+    margin-top: var(--space-2);
+    color: #fecaca;
+}
+
+.log-scopes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+}
+
+.log-scopes span {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--radius-sm);
+    padding: 0 var(--space-2);
+    color: var(--log-viewer-muted);
+}
+
+.level-trace,
+.level-debug {
+    border-left-color: #9ca3af;
+}
+
+.level-information {
+    border-left-color: #60a5fa;
+}
+
+.level-warning {
+    border-left-color: #fbbf24;
+}
+
+.level-error {
+    border-left-color: #f87171;
+}
+
+.level-critical {
+    border-left-color: #fb7185;
+}
+
+.material-symbols-outlined {
+    font-size: 18px;
+}
+
+@media (max-width: 760px) {
+    .log-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .log-actions {
+        justify-content: stretch;
+        grid-column: auto;
+    }
+
+    .log-actions button {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .log-summary {
+        flex-direction: column;
+    }
+
+    .log-entry-header {
+        grid-template-columns: 1fr;
+        gap: var(--space-1);
+    }
+
+    .log-category {
+        white-space: normal;
+    }
+}

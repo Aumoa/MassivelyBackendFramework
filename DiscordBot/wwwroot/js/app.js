@@ -8,3 +8,8 @@ window.openExternalUrl = (url) => {
     a.click();
     document.body.removeChild(a);
 };
+
+window.scrollToBottom = (element) => {
+    if (!element) return;
+    element.scrollTop = element.scrollHeight;
+};

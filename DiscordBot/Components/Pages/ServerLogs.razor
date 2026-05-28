@@ -1,0 +1,250 @@
+@page "/server-logs"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DiscordBot.Services.Logging
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.Logging
+@attribute [Authorize(Roles = "admin")]
+@inject ServerLogStore LogStore
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+@{
+    var visibleEntries = GetVisibleEntries();
+}
+
+<PageTitle>@T("SERVER_LOGS_TITLE") - @Strings.APP_TITLE</PageTitle>
+
+<div class="server-logs-page">
+    <div class="page-header">
+        <h1 class="page-title">@T("SERVER_LOGS_TITLE")</h1>
+        <p class="page-subtitle">@T("SERVER_LOGS_SUBTITLE")</p>
+    </div>
+
+    <div class="log-toolbar">
+        <label>
+            <span>@T("SERVER_LOGS_LABEL_SEARCH")</span>
+            <input type="search" @bind="searchText" @bind:event="oninput" placeholder='@T("SERVER_LOGS_PLACEHOLDER_SEARCH")' />
+        </label>
+        <label>
+            <span>@T("SERVER_LOGS_LABEL_CATEGORY")</span>
+            <input type="search" @bind="categoryText" @bind:event="oninput" placeholder='@T("SERVER_LOGS_PLACEHOLDER_CATEGORY")' />
+        </label>
+        <label>
+            <span>@T("SERVER_LOGS_LABEL_MIN_LEVEL")</span>
+            <select @bind="minimumLevelText">
+                @foreach (var level in LogLevels)
+                {
+                    <option value="@level">@level</option>
+                }
+            </select>
+        </label>
+        <label class="auto-scroll-field">
+            <input type="checkbox" @bind="autoScroll" />
+            <span>@T("SERVER_LOGS_LABEL_AUTO_SCROLL")</span>
+        </label>
+        <div class="log-actions">
+            <button class="btn-ghost" type="button" @onclick="Refresh">
+                <span class="material-symbols-outlined">refresh</span>
+                @T("SERVER_LOGS_BUTTON_REFRESH")
+            </button>
+            <button class="btn-ghost danger" type="button" @onclick="Clear">
+                <span class="material-symbols-outlined">delete</span>
+                @T("SERVER_LOGS_BUTTON_CLEAR")
+            </button>
+        </div>
+    </div>
+
+    <div class="log-summary">
+        <span>@string.Format(CultureInfo.CurrentCulture, T("SERVER_LOGS_STATUS_COUNT"), visibleEntries.Count, entries.Count)</span>
+        <span>@string.Format(CultureInfo.CurrentCulture, T("SERVER_LOGS_STATUS_UPDATED"), FormatTimestamp(lastUpdatedAt))</span>
+    </div>
+
+    <section class="log-viewer" @ref="logViewer" aria-live="polite">
+        @if (visibleEntries.Count == 0)
+        {
+            <div class="log-empty">@T("SERVER_LOGS_EMPTY")</div>
+        }
+        else
+        {
+            @foreach (var entry in visibleEntries)
+            {
+                <article class="log-entry @GetLevelClass(entry.Level)" @key="entry.Sequence">
+                    <header class="log-entry-header">
+                        <time datetime="@(entry.Timestamp.ToString("O", CultureInfo.InvariantCulture))">@FormatTimestamp(entry.Timestamp)</time>
+                        <span class="level-badge">@entry.Level</span>
+                        <span class="log-category">@entry.Category</span>
+                        @if (entry.EventId.Id != 0 || !string.IsNullOrWhiteSpace(entry.EventId.Name))
+                        {
+                            <span class="event-id">@FormatEventId(entry.EventId)</span>
+                        }
+                    </header>
+                    <pre class="log-message">@entry.Message</pre>
+                    @if (!string.IsNullOrWhiteSpace(entry.Exception))
+                    {
+                        <pre class="log-exception">@entry.Exception</pre>
+                    }
+                    @if (entry.Scopes.Count > 0)
+                    {
+                        <div class="log-scopes">
+                            @foreach (var scope in entry.Scopes)
+                            {
+                                <span>@scope</span>
+                            }
+                        </div>
+                    }
+                </article>
+            }
+        }
+    </section>
+</div>
+
+@code {
+    private static readonly LogLevel[] LogLevels =
+    [
+        LogLevel.Trace,
+        LogLevel.Debug,
+        LogLevel.Information,
+        LogLevel.Warning,
+        LogLevel.Error,
+        LogLevel.Critical
+    ];
+
+    private IReadOnlyList<ServerLogEntry> entries = [];
+    private IDisposable? subscription;
+    private ElementReference logViewer;
+    private string searchText = string.Empty;
+    private string categoryText = string.Empty;
+    private string minimumLevelText = LogLevel.Trace.ToString();
+    private bool autoScroll = true;
+    private bool pendingScroll;
+    private bool disposed;
+    private DateTimeOffset lastUpdatedAt = DateTimeOffset.Now;
+
+    protected override void OnInitialized()
+    {
+        entries = LogStore.GetSnapshot();
+        subscription = LogStore.Subscribe(OnLogsChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!autoScroll || (!firstRender && !pendingScroll))
+        {
+            return;
+        }
+
+        pendingScroll = false;
+        await ScrollToBottomAsync();
+    }
+
+    public void Dispose()
+    {
+        disposed = true;
+        subscription?.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    private void OnLogsChanged()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            Refresh();
+        });
+    }
+
+    private void Refresh()
+    {
+        entries = LogStore.GetSnapshot();
+        lastUpdatedAt = DateTimeOffset.Now;
+        pendingScroll = autoScroll;
+        StateHasChanged();
+    }
+
+    private void Clear()
+    {
+        LogStore.Clear();
+    }
+
+    private List<ServerLogEntry> GetVisibleEntries()
+    {
+        var minimumLevel = GetMinimumLevel();
+        return entries
+            .Where(entry => entry.Level >= minimumLevel)
+            .Where(MatchesCategory)
+            .Where(MatchesSearch)
+            .ToList();
+    }
+
+    private bool MatchesCategory(ServerLogEntry entry)
+    {
+        return string.IsNullOrWhiteSpace(categoryText)
+            || entry.Category.Contains(categoryText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool MatchesSearch(ServerLogEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return true;
+        }
+
+        return entry.Message.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || entry.Category.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+            || (entry.Exception?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false)
+            || entry.Scopes.Any(scope => scope.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private LogLevel GetMinimumLevel()
+    {
+        return Enum.TryParse<LogLevel>(minimumLevelText, out var level)
+            ? level
+            : LogLevel.Trace;
+    }
+
+    private async Task ScrollToBottomAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("scrollToBottom", logViewer);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private static string FormatTimestamp(DateTimeOffset timestamp)
+    {
+        return timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff zzz", CultureInfo.CurrentCulture);
+    }
+
+    private static string FormatEventId(EventId eventId)
+    {
+        return string.IsNullOrWhiteSpace(eventId.Name)
+            ? $"#{eventId.Id}"
+            : $"#{eventId.Id} {eventId.Name}";
+    }
+
+    private static string GetLevelClass(LogLevel level)
+    {
+        return $"level-{level.ToString().ToLowerInvariant()}";
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+}

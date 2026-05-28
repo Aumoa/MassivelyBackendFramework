@@ -82,6 +82,9 @@
   <data name="NAVMENU_LABEL_TOOLS" xml:space="preserve">
     <value>도구</value>
   </data>
+  <data name="NAVMENU_LABEL_SERVER_LOGS" xml:space="preserve">
+    <value>로그</value>
+  </data>
   <data name="NAVMENU_LABEL_CLAUDE_SETTINGS" xml:space="preserve">
     <value>Claude</value>
   </data>
@@ -399,5 +402,46 @@
   </data>
   <data name="TOOLS_TOOL_CALCULATE_PARAM_EXPRESSION" xml:space="preserve">
     <value>계산할 수식입니다.</value>
+  </data>
+
+  <!-- ServerLogs -->
+  <data name="SERVER_LOGS_TITLE" xml:space="preserve">
+    <value>서버 로그</value>
+  </data>
+  <data name="SERVER_LOGS_SUBTITLE" xml:space="preserve">
+    <value>최근 ASP.NET 런타임 로그</value>
+  </data>
+  <data name="SERVER_LOGS_LABEL_SEARCH" xml:space="preserve">
+    <value>검색</value>
+  </data>
+  <data name="SERVER_LOGS_LABEL_CATEGORY" xml:space="preserve">
+    <value>카테고리</value>
+  </data>
+  <data name="SERVER_LOGS_LABEL_MIN_LEVEL" xml:space="preserve">
+    <value>최소 레벨</value>
+  </data>
+  <data name="SERVER_LOGS_LABEL_AUTO_SCROLL" xml:space="preserve">
+    <value>자동 스크롤</value>
+  </data>
+  <data name="SERVER_LOGS_PLACEHOLDER_SEARCH" xml:space="preserve">
+    <value>메시지, 예외, 스코프</value>
+  </data>
+  <data name="SERVER_LOGS_PLACEHOLDER_CATEGORY" xml:space="preserve">
+    <value>네임스페이스 또는 카테고리</value>
+  </data>
+  <data name="SERVER_LOGS_BUTTON_REFRESH" xml:space="preserve">
+    <value>새로고침</value>
+  </data>
+  <data name="SERVER_LOGS_BUTTON_CLEAR" xml:space="preserve">
+    <value>비우기</value>
+  </data>
+  <data name="SERVER_LOGS_STATUS_COUNT" xml:space="preserve">
+    <value>{0}개 표시 / {1}개 캡처</value>
+  </data>
+  <data name="SERVER_LOGS_STATUS_UPDATED" xml:space="preserve">
+    <value>업데이트 {0}</value>
+  </data>
+  <data name="SERVER_LOGS_EMPTY" xml:space="preserve">
+    <value>조건에 맞는 로그가 없습니다.</value>
   </data>
 </root>

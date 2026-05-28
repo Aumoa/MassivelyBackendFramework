@@ -7,15 +7,20 @@ using DiscordBot.Options;
 using DiscordBot.Repositories;
 using DiscordBot.Services;
 using DiscordBot.Services.ImageGeneration;
+using DiscordBot.Services.Logging;
 using DiscordBot.SQL.Migration;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using OpenIDConnect.Extensions;
 using SQLMigration;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddSingleton<ServerLogStore>();
+builder.Logging.Services.TryAddEnumerable(ServiceDescriptor.Singleton<ILoggerProvider, ServerLogLoggerProvider>());
 
 // Add services to the container.
 builder.Services.AddControllers();
