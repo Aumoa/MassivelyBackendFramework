@@ -140,7 +140,6 @@ button {
 @media (prefers-color-scheme: dark) {
     body .top-row,
     body .clients-table-header,
-    body .section-header,
     body .apikeys-section .section-header {
         background-color: var(--oauth-surface-muted) !important;
         border-color: var(--oauth-border) !important;
