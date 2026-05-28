@@ -16,6 +16,9 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] TokenRequest request, CancellationToken cancellationToken)
     {
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers.Pragma = "no-cache";
+
         switch (request.GrantType)
         {
             case "authorization_code":
@@ -189,7 +192,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
     {
         if (string.IsNullOrWhiteSpace(request.Code))
         {
-            return BadRequest(new { error = "code_missing" });
+            return BadRequest(new { error = "invalid_request", error_description = "code is required" });
         }
 
         // Parse Basic authentication header
@@ -197,7 +200,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
 
         if (string.IsNullOrWhiteSpace(request.ClientId))
         {
-            return BadRequest(new { error = "client_id_missing" });
+            return BadRequest(new { error = "invalid_request", error_description = "client_id is required" });
         }
 
         // Verify and remove authorization code (one-time use)
@@ -205,7 +208,13 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         if (code.HasValue == false)
         {
             logger.LogWarning("Authorization code not found or already used");
-            return BadRequest(new { error = "code_not_exists" });
+            var issuedAccessToken = await authorizationCodes.GetIssuedAccessTokenAsync(request.Code, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(issuedAccessToken))
+            {
+                await accesses.RevokeAsync(issuedAccessToken, cancellationToken);
+            }
+
+            return BadRequest(new { error = "invalid_grant", error_description = "authorization code is invalid or already used" });
         }
 
         // Verify Client ID match
@@ -221,7 +230,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         {
             logger.LogWarning("Redirect URI mismatch. Expected: {Expected}, Actual: {Actual}", 
                 code.Value.RedirectUri, request.RedirectUri);
-            return BadRequest(new { error = "redirect_uri_mismatch" });
+            return BadRequest(new { error = "invalid_grant", error_description = "redirect_uri does not match authorization code" });
         }
 
         var validationError = await ValidateAuthorizationCodeClientAsync(request.ClientId, request.ClientSecret, cancellationToken);
@@ -243,20 +252,20 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             if (string.IsNullOrWhiteSpace(request.CodeVerifier))
             {
                 logger.LogWarning("PKCE code_verifier missing for client: {ClientId}", request.ClientId);
-                return BadRequest(new { error = "code_verifier_missing" });
+                return BadRequest(new { error = "invalid_request", error_description = "code_verifier is required" });
             }
 
             var challengeMethod = code.Value.CodeChallengeMethod;
             if (string.IsNullOrEmpty(challengeMethod))
             {
                 logger.LogWarning("Stored code_challenge_method is missing for client: {ClientId}", request.ClientId);
-                return BadRequest(new { error = "invalid_code_verifier" });
+                return BadRequest(new { error = "invalid_grant", error_description = "code_verifier is invalid" });
             }
 
             if (!ValidatePkce(request.CodeVerifier, code.Value.CodeChallenge, challengeMethod))
             {
                 logger.LogWarning("PKCE validation failed for client: {ClientId}", request.ClientId);
-                return BadRequest(new { error = "invalid_code_verifier" });
+                return BadRequest(new { error = "invalid_grant", error_description = "code_verifier is invalid" });
             }
         }
 
@@ -271,10 +280,11 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         if (!rawAccount.HasValue)
         {
             logger.LogError("Account not found: {AccountId}", code.Value.AccountId);
-            return BadRequest(new { error = "account_not_found" });
+            return BadRequest(new { error = "invalid_grant", error_description = "authorization code account is invalid" });
         }
 
-        var tokenResponse = await GenerateTokenResponseAsync(code.Value.AccountId, rawAccount.Value, code.Value.ClientId, normalizedScope, code.Value.Nonce, code.Value.AuthTime, cancellationToken);
+        var tokenResponse = await GenerateTokenResponseAsync(code.Value.AccountId, rawAccount.Value, code.Value.ClientId, normalizedScope, code.Value.Nonce, code.Value.AuthTime, code.Value.Acr, code.Value.UserInfoClaims, cancellationToken);
+        await authorizationCodes.StoreIssuedAccessTokenAsync(request.Code, tokenResponse.AccessToken, cancellationToken);
 
         logger.LogInformation("Token issued successfully for client: {ClientId}, account: {AccountId}", request.ClientId, code.Value.AccountId);
         return Ok(tokenResponse);
@@ -387,15 +397,15 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_grant", error_description = "api_key scope is invalid" });
         }
 
-        var tokenResponse = await GenerateTokenResponseAsync(accountId, rawAccount.Value, request.ClientId, normalizedScope, null, null, cancellationToken);
+        var tokenResponse = await GenerateTokenResponseAsync(accountId, rawAccount.Value, request.ClientId, normalizedScope, null, null, null, null, cancellationToken);
 
         logger.LogInformation("Token issued successfully for client: {ClientId}, account: {AccountId} using API key.", request.ClientId, accountId);
         return Ok(tokenResponse);
     }
 
-    private async ValueTask<TokenResponse> GenerateTokenResponseAsync(string accountId, RawAccount rawAccount, string clientId, string scope, string? nonce, long? authTime, CancellationToken cancellationToken)
+    private async ValueTask<TokenResponse> GenerateTokenResponseAsync(string accountId, RawAccount rawAccount, string clientId, string scope, string? nonce, long? authTime, string? acr, string? userInfoClaims, CancellationToken cancellationToken)
     {
-        var issueResult = await tokenIssuer.IssueAsync(accountId, rawAccount, clientId, scope, nonce, cancellationToken, authTime);
+        var issueResult = await tokenIssuer.IssueAsync(accountId, rawAccount, clientId, scope, nonce, cancellationToken, authTime, acr, userInfoClaims);
         return issueResult.Response;
     }
 }

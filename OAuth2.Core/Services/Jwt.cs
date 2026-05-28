@@ -78,7 +78,7 @@ internal class Jwt : IJwt
         };
     }
 
-    public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken, long? authTime = null)
+    public Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken, long? authTime = null, string? acr = null, string? additionalClaims = null)
     {
         var idTokenClaims = new List<Claim>();
 
@@ -94,6 +94,11 @@ internal class Jwt : IJwt
             if (authTime.HasValue)
             {
                 idTokenClaims.Add(new("auth_time", authTime.Value.ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Integer64));
+            }
+
+            if (!string.IsNullOrWhiteSpace(acr))
+            {
+                idTokenClaims.Add(new("acr", acr));
             }
         }
 
@@ -174,6 +179,11 @@ internal class Jwt : IJwt
             {
                 expectedClaims.Add("groups");
             }
+        }
+
+        foreach (var claim in ScopePolicy.Split(additionalClaims))
+        {
+            expectedClaims.Add(claim);
         }
 
         var claimNames = accountClaims.ToDictionary(v => v.Name, v => v.Value);

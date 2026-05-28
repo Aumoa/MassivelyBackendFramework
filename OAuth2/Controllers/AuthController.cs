@@ -32,6 +32,8 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
         string? CodeChallenge,
         string? CodeChallengeMethod,
         string? MaxAge,
+        string? AcrValues,
+        string? Claims,
         string? RequestObject,
         string? RequestUri);
 
@@ -312,6 +314,9 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             return OAuthError("invalid_request");
         }
 
+        var selectedAcr = OidcPolicy.SelectAcrValue(request.AcrValues);
+        var userInfoClaims = OidcPolicy.SelectUserInfoClaims(request.Claims);
+
         if (HasPrompt(request.Prompt, "login"))
         {
             return Login();
@@ -443,7 +448,9 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 request.Nonce,
                 request.CodeChallenge,
                 request.CodeChallengeMethod,
-                session.AuthTime), cancellationToken);
+                session.AuthTime,
+                selectedAcr,
+                userInfoClaims), cancellationToken);
 
             return Redirect(QueryHelpers.AddQueryString(request.RedirectUri!, new Dictionary<string, string?>
             {
@@ -527,7 +534,9 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 ["code_challenge"] = request.CodeChallenge,
                 ["code_challenge_method"] = request.CodeChallengeMethod,
                 ["client_name"] = clientName,
-                ["max_age"] = request.MaxAge
+                ["max_age"] = request.MaxAge,
+                ["acr_values"] = request.AcrValues,
+                ["claims"] = request.Claims
             }));
         }
 
@@ -654,6 +663,8 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             GetValue(values, "code_challenge"),
             GetValue(values, "code_challenge_method"),
             GetValue(values, "max_age"),
+            GetValue(values, "acr_values"),
+            GetValue(values, "claims"),
             GetValue(values, "request"),
             GetValue(values, "request_uri"));
     }
@@ -671,6 +682,8 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             GetValue(values, "code_challenge"),
             GetValue(values, "code_challenge_method"),
             GetValue(values, "max_age"),
+            GetValue(values, "acr_values"),
+            GetValue(values, "claims"),
             GetValue(values, "request"),
             GetValue(values, "request_uri"));
     }
