@@ -8,12 +8,17 @@ public static class Executor
 {
     public static async ValueTask RunAsync(string connectionString, string databaseName, IScript[] scripts, TextWriter logger, CancellationToken cancellationToken = default)
     {
-        using var connection = new MySqlConnection(connectionString);
+        var builder = new MySqlConnectionStringBuilder(connectionString)
+        {
+            Database = string.Empty
+        };
+        using var connection = new MySqlConnection(builder.ConnectionString);
         await connection.OpenAsync(cancellationToken);
 
+        var escapedDatabaseName = databaseName.Replace("`", "``");
         string QUERY1 = @$"
-CREATE SCHEMA IF NOT EXISTS `{databaseName}`;
-USE `{databaseName}`;
+CREATE SCHEMA IF NOT EXISTS `{escapedDatabaseName}`;
+USE `{escapedDatabaseName}`;
 ";
 
         var commandDef = new CommandDefinition(QUERY1, cancellationToken: cancellationToken);
