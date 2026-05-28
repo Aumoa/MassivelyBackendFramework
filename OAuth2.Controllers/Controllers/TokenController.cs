@@ -189,7 +189,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
     {
         if (string.IsNullOrWhiteSpace(request.Code))
         {
-            return BadRequest(new { error = "code_missing" });
+            return BadRequest(new { error = "invalid_request", error_description = "code is required" });
         }
 
         // Parse Basic authentication header
@@ -197,7 +197,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
 
         if (string.IsNullOrWhiteSpace(request.ClientId))
         {
-            return BadRequest(new { error = "client_id_missing" });
+            return BadRequest(new { error = "invalid_request", error_description = "client_id is required" });
         }
 
         // Verify and remove authorization code (one-time use)
@@ -205,7 +205,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         if (code.HasValue == false)
         {
             logger.LogWarning("Authorization code not found or already used");
-            return BadRequest(new { error = "code_not_exists" });
+            return BadRequest(new { error = "invalid_grant", error_description = "authorization code is invalid or already used" });
         }
 
         // Verify Client ID match
@@ -221,7 +221,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         {
             logger.LogWarning("Redirect URI mismatch. Expected: {Expected}, Actual: {Actual}", 
                 code.Value.RedirectUri, request.RedirectUri);
-            return BadRequest(new { error = "redirect_uri_mismatch" });
+            return BadRequest(new { error = "invalid_grant", error_description = "redirect_uri does not match authorization code" });
         }
 
         var validationError = await ValidateAuthorizationCodeClientAsync(request.ClientId, request.ClientSecret, cancellationToken);
@@ -243,20 +243,20 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             if (string.IsNullOrWhiteSpace(request.CodeVerifier))
             {
                 logger.LogWarning("PKCE code_verifier missing for client: {ClientId}", request.ClientId);
-                return BadRequest(new { error = "code_verifier_missing" });
+                return BadRequest(new { error = "invalid_request", error_description = "code_verifier is required" });
             }
 
             var challengeMethod = code.Value.CodeChallengeMethod;
             if (string.IsNullOrEmpty(challengeMethod))
             {
                 logger.LogWarning("Stored code_challenge_method is missing for client: {ClientId}", request.ClientId);
-                return BadRequest(new { error = "invalid_code_verifier" });
+                return BadRequest(new { error = "invalid_grant", error_description = "code_verifier is invalid" });
             }
 
             if (!ValidatePkce(request.CodeVerifier, code.Value.CodeChallenge, challengeMethod))
             {
                 logger.LogWarning("PKCE validation failed for client: {ClientId}", request.ClientId);
-                return BadRequest(new { error = "invalid_code_verifier" });
+                return BadRequest(new { error = "invalid_grant", error_description = "code_verifier is invalid" });
             }
         }
 
@@ -271,7 +271,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         if (!rawAccount.HasValue)
         {
             logger.LogError("Account not found: {AccountId}", code.Value.AccountId);
-            return BadRequest(new { error = "account_not_found" });
+            return BadRequest(new { error = "invalid_grant", error_description = "authorization code account is invalid" });
         }
 
         var tokenResponse = await GenerateTokenResponseAsync(code.Value.AccountId, rawAccount.Value, code.Value.ClientId, normalizedScope, code.Value.Nonce, code.Value.AuthTime, code.Value.Acr, cancellationToken);
