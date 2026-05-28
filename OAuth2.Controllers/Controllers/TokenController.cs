@@ -16,6 +16,9 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] TokenRequest request, CancellationToken cancellationToken)
     {
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers.Pragma = "no-cache";
+
         switch (request.GrantType)
         {
             case "authorization_code":
