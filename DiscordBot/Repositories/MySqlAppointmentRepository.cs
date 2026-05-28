@@ -56,8 +56,8 @@ SELECT
     `updated_at` AS UpdatedAt,
     `expires_at_utc` AS ExpiresAtUtc
 FROM `appointment`
-WHERE `channel_id` = @channelId
-  AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = @guildId)
+WHERE `channel_id` = CONVERT(@channelId USING utf8mb4) COLLATE utf8mb4_unicode_ci
+  AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = CONVERT(@guildId USING utf8mb4) COLLATE utf8mb4_unicode_ci)
   AND `status` = 'active'
   AND `expires_at_utc` > @nowUtc");
 
@@ -114,8 +114,8 @@ SELECT
     `expires_at_utc` AS ExpiresAtUtc
 FROM `appointment`
 WHERE `id` = @id
-  AND `channel_id` = @channelId
-  AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = @guildId)
+  AND `channel_id` = CONVERT(@channelId USING utf8mb4) COLLATE utf8mb4_unicode_ci
+  AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = CONVERT(@guildId USING utf8mb4) COLLATE utf8mb4_unicode_ci)
   AND `status` = 'active'
   AND `expires_at_utc` > @nowUtc
 LIMIT 1";
@@ -152,8 +152,8 @@ SET
     `expires_at_utc` = @expiresAtUtc,
     `updated_at` = NOW()
 WHERE `id` = @id
-  AND `channel_id` = @channelId
-  AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = @guildId)
+  AND `channel_id` = CONVERT(@channelId USING utf8mb4) COLLATE utf8mb4_unicode_ci
+  AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = CONVERT(@guildId USING utf8mb4) COLLATE utf8mb4_unicode_ci)
   AND `status` = 'active'";
 
         var command = new CommandDefinition(
@@ -177,8 +177,8 @@ SET
     `status` = 'deleted',
     `updated_at` = NOW()
 WHERE `id` = @id
-  AND `channel_id` = @channelId
-  AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = @guildId)
+  AND `channel_id` = CONVERT(@channelId USING utf8mb4) COLLATE utf8mb4_unicode_ci
+  AND ((@guildId IS NULL AND `guild_id` IS NULL) OR `guild_id` = CONVERT(@guildId USING utf8mb4) COLLATE utf8mb4_unicode_ci)
   AND `status` = 'active'";
 
         var command = new CommandDefinition(
