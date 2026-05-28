@@ -4,10 +4,10 @@ namespace OAuth2.Services;
 
 internal class TokenIssuer(IAccesses accesses, IAccountClaims accountClaims, IClientUserGroups groups, IJwt jwt) : ITokenIssuer
 {
-    public async ValueTask<TokenIssueResult> IssueAsync(string accountId, RawAccount rawAccount, string clientId, string scope, string? nonce, CancellationToken cancellationToken = default, long? authTime = null, string? acr = null)
+    public async ValueTask<TokenIssueResult> IssueAsync(string accountId, RawAccount rawAccount, string clientId, string scope, string? nonce, CancellationToken cancellationToken = default, long? authTime = null, string? acr = null, string? userInfoClaims = null)
     {
         var sub = rawAccount.Sub;
-        var access = await accesses.WriteAccessAsync(accountId, sub, scope, clientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken, authTime);
+        var access = await accesses.WriteAccessAsync(accountId, sub, scope, clientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken, authTime, userInfoClaims);
         var claims = await accountClaims.GetClaimsAsync(accountId, cancellationToken);
         var groupsClaim = await groups.GetClientUserGroupsAsync(clientId, sub, cancellationToken);
 

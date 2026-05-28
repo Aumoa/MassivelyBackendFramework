@@ -34,6 +34,10 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         if authTime == false then
             authTime = ''
         end
+        local userInfoClaims = redis.call('HGET', KEYS[1], 'userinfo_claims')
+        if userInfoClaims == false then
+            userInfoClaims = ''
+        end
 
         if accountId == false or sub == false or scope == false or clientId == false then
             return nil
@@ -76,7 +80,7 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             redis.call('HSET', KEYS[1], 'access_token', ARGV[2])
             redis.call('PEXPIRE', KEYS[1], ARGV[4])
 
-            return { accountId, sub, scope, clientId, ARGV[9], authTime }
+            return { accountId, sub, scope, clientId, ARGV[9], authTime, userInfoClaims }
         end
 
         redis.call('SET', KEYS[2], ARGV[1], 'PX', ARGV[3])
@@ -89,7 +93,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             'gen', storedGen,
             'client_gen', storedClientGen,
             'stable_refresh', stableRefresh,
-            'auth_time', authTime)
+            'auth_time', authTime,
+            'userinfo_claims', userInfoClaims)
         redis.call('PEXPIRE', KEYS[3], ARGV[4])
         redis.call('HSET', KEYS[6],
             'access_token', ARGV[2],
@@ -100,11 +105,12 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             'client_id', clientId,
             'gen', storedGen,
             'client_gen', storedClientGen,
-            'auth_time', authTime)
+            'auth_time', authTime,
+            'userinfo_claims', userInfoClaims)
         redis.call('PEXPIRE', KEYS[6], ARGV[8])
         redis.call('DEL', KEYS[5], KEYS[1])
 
-        return { accountId, sub, scope, clientId, ARGV[1], authTime }
+        return { accountId, sub, scope, clientId, ARGV[1], authTime, userInfoClaims }
         """;
 
     private static readonly RedisValue[] Fields =
@@ -115,7 +121,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         "scope",
         "client_id",
         "stable_refresh",
-        "auth_time"
+        "auth_time",
+        "userinfo_claims"
     ];
 
     private static readonly RedisValue[] ReplayFields =
@@ -128,10 +135,11 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         "client_id",
         "gen",
         "client_gen",
-        "auth_time"
+        "auth_time",
+        "userinfo_claims"
     ];
 
-    public async ValueTask<Access> WriteAccessAsync(string id, string sub, string scope, string clientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default, long? authTime = null)
+    public async ValueTask<Access> WriteAccessAsync(string id, string sub, string scope, string clientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default, long? authTime = null, string? userInfoClaims = null)
     {
         var db = multiplexer.GetDatabase();
 
@@ -160,7 +168,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             new("gen", gen),
             new("client_gen", clientGen),
             new("stable_refresh", stableRefresh ? "1" : "0"),
-            new("auth_time", authTime?.ToString(CultureInfo.InvariantCulture) ?? string.Empty)
+            new("auth_time", authTime?.ToString(CultureInfo.InvariantCulture) ?? string.Empty),
+            new("userinfo_claims", userInfoClaims ?? string.Empty)
             ]).WaitAsync(cancellationToken);
         
         // Set TTL for refresh token
@@ -176,7 +185,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             RefreshToken = refreshToken,
             Scope = scope,
             ClientId = clientId,
-            AuthTime = authTime
+            AuthTime = authTime,
+            UserInfoClaims = userInfoClaims
         };
     }
 
@@ -237,7 +247,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             RefreshToken = refreshToken!,
             Scope = fields[3]!,
             ClientId = clientId,
-            AuthTime = ParseAuthTime(fields[6])
+            AuthTime = ParseAuthTime(fields[6]),
+            UserInfoClaims = fields[7]
         };
     }
 
@@ -315,7 +326,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             RefreshToken = refreshToken,
             Scope = fields[3]!,
             ClientId = fields[4]!,
-            AuthTime = ParseAuthTime(fields[6])
+            AuthTime = ParseAuthTime(fields[6]),
+            UserInfoClaims = fields[7]
         };
     }
 
@@ -380,7 +392,7 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         }
 
         var accessFields = (RedisResult[]?)result;
-        if (accessFields is not { Length: 6 })
+        if (accessFields is not { Length: 7 })
         {
             return null;
         }
@@ -391,6 +403,7 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         var clientId = GetString(accessFields[3]);
         var refreshedRefreshToken = GetString(accessFields[4]);
         var authTime = ParseAuthTime(GetString(accessFields[5]));
+        var userInfoClaims = GetString(accessFields[6]);
         if (string.IsNullOrWhiteSpace(accountId) ||
             string.IsNullOrWhiteSpace(refreshedSub) ||
             string.IsNullOrWhiteSpace(scope) ||
@@ -408,7 +421,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             RefreshToken = refreshedRefreshToken,
             Scope = scope,
             ClientId = clientId,
-            AuthTime = authTime
+            AuthTime = authTime,
+            UserInfoClaims = userInfoClaims
         };
     }
 
@@ -428,6 +442,7 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         var scope = fields[4].ToString();
         var clientId = fields[5].ToString();
         var authTime = ParseAuthTime(fields[8]);
+        var userInfoClaims = fields[9].ToString();
 
         if (!string.IsNullOrEmpty(expectedClientId) && clientId != expectedClientId)
         {
@@ -472,7 +487,8 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
             RefreshToken = replayedRefreshToken,
             Scope = scope,
             ClientId = clientId,
-            AuthTime = authTime
+            AuthTime = authTime,
+            UserInfoClaims = userInfoClaims
         };
     }
 

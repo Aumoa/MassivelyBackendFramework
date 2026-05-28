@@ -28,7 +28,8 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             'code_challenge',
             'code_challenge_method',
             'auth_time',
-            'acr')
+            'acr',
+            'userinfo_claims')
 
         redis.call('HSET', KEYS[1], 'consumed', '1')
         return values
@@ -50,6 +51,7 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             new("code_challenge_method", body.CodeChallengeMethod ?? string.Empty),
             new("auth_time", body.AuthTime?.ToString(CultureInfo.InvariantCulture) ?? string.Empty),
             new("acr", body.Acr ?? string.Empty),
+            new("userinfo_claims", body.UserInfoClaims ?? string.Empty),
             new("consumed", "0")
         ];
 
@@ -69,7 +71,7 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
         }
 
         var entries = (RedisResult[]?)result;
-        if (entries is not { Length: 9 })
+        if (entries is not { Length: 10 })
         {
             logger.LogError("Invalid authorization code data: {Code}", code);
             return null;
@@ -84,6 +86,7 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
         var codeChallengeMethod = GetString(entries[6]);
         var authTimeValue = GetString(entries[7]);
         var acr = GetString(entries[8]);
+        var userInfoClaims = GetString(entries[9]);
 
         if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(scope) || string.IsNullOrWhiteSpace(redirectUri))
         {
@@ -100,7 +103,8 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             string.IsNullOrEmpty(codeChallenge) ? null : codeChallenge,
             string.IsNullOrEmpty(codeChallengeMethod) ? null : codeChallengeMethod,
             long.TryParse(authTimeValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var authTime) ? authTime : null,
-            string.IsNullOrEmpty(acr) ? null : acr
+            string.IsNullOrEmpty(acr) ? null : acr,
+            string.IsNullOrEmpty(userInfoClaims) ? null : userInfoClaims
         );
     }
 

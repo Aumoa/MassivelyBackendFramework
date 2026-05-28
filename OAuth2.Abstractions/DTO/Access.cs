@@ -15,4 +15,6 @@ public record struct Access
     public required string ClientId { get; set; }
 
     public long? AuthTime { get; set; }
+
+    public string? UserInfoClaims { get; set; }
 }

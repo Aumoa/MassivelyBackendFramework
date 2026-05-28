@@ -89,6 +89,10 @@ public partial class Login(
     public string? AcrValues { get; set; }
 
     [Parameter]
+    [SupplyParameterFromQuery(Name = "claims")]
+    public string? Claims { get; set; }
+
+    [Parameter]
     [SupplyParameterFromQuery(Name = "code_challenge")]
     public string? CodeChallenge { get; set; }
 
@@ -412,7 +416,7 @@ public partial class Login(
             query.Add("state", State);
         }
 
-        var authorizationCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, ClientId, Scope, RedirectUri, Nonce, CodeChallenge, CodeChallengeMethod, authTime, OidcPolicy.SelectAcrValue(AcrValues)));
+        var authorizationCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, ClientId, Scope, RedirectUri, Nonce, CodeChallenge, CodeChallengeMethod, authTime, OidcPolicy.SelectAcrValue(AcrValues), OidcPolicy.SelectUserInfoClaims(Claims)));
         query.Add("code", authorizationCode);
 
         var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query);

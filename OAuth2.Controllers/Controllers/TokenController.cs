@@ -280,7 +280,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_grant", error_description = "authorization code account is invalid" });
         }
 
-        var tokenResponse = await GenerateTokenResponseAsync(code.Value.AccountId, rawAccount.Value, code.Value.ClientId, normalizedScope, code.Value.Nonce, code.Value.AuthTime, code.Value.Acr, cancellationToken);
+        var tokenResponse = await GenerateTokenResponseAsync(code.Value.AccountId, rawAccount.Value, code.Value.ClientId, normalizedScope, code.Value.Nonce, code.Value.AuthTime, code.Value.Acr, code.Value.UserInfoClaims, cancellationToken);
         await authorizationCodes.StoreIssuedAccessTokenAsync(request.Code, tokenResponse.AccessToken, cancellationToken);
 
         logger.LogInformation("Token issued successfully for client: {ClientId}, account: {AccountId}", request.ClientId, code.Value.AccountId);
@@ -394,15 +394,15 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_grant", error_description = "api_key scope is invalid" });
         }
 
-        var tokenResponse = await GenerateTokenResponseAsync(accountId, rawAccount.Value, request.ClientId, normalizedScope, null, null, null, cancellationToken);
+        var tokenResponse = await GenerateTokenResponseAsync(accountId, rawAccount.Value, request.ClientId, normalizedScope, null, null, null, null, cancellationToken);
 
         logger.LogInformation("Token issued successfully for client: {ClientId}, account: {AccountId} using API key.", request.ClientId, accountId);
         return Ok(tokenResponse);
     }
 
-    private async ValueTask<TokenResponse> GenerateTokenResponseAsync(string accountId, RawAccount rawAccount, string clientId, string scope, string? nonce, long? authTime, string? acr, CancellationToken cancellationToken)
+    private async ValueTask<TokenResponse> GenerateTokenResponseAsync(string accountId, RawAccount rawAccount, string clientId, string scope, string? nonce, long? authTime, string? acr, string? userInfoClaims, CancellationToken cancellationToken)
     {
-        var issueResult = await tokenIssuer.IssueAsync(accountId, rawAccount, clientId, scope, nonce, cancellationToken, authTime, acr);
+        var issueResult = await tokenIssuer.IssueAsync(accountId, rawAccount, clientId, scope, nonce, cancellationToken, authTime, acr, userInfoClaims);
         return issueResult.Response;
     }
 }
