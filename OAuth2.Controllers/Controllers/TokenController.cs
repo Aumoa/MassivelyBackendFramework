@@ -205,6 +205,12 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         if (code.HasValue == false)
         {
             logger.LogWarning("Authorization code not found or already used");
+            var issuedAccessToken = await authorizationCodes.GetIssuedAccessTokenAsync(request.Code, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(issuedAccessToken))
+            {
+                await accesses.RevokeAsync(issuedAccessToken, cancellationToken);
+            }
+
             return BadRequest(new { error = "invalid_grant", error_description = "authorization code is invalid or already used" });
         }
 
@@ -275,6 +281,7 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
         }
 
         var tokenResponse = await GenerateTokenResponseAsync(code.Value.AccountId, rawAccount.Value, code.Value.ClientId, normalizedScope, code.Value.Nonce, code.Value.AuthTime, code.Value.Acr, cancellationToken);
+        await authorizationCodes.StoreIssuedAccessTokenAsync(request.Code, tokenResponse.AccessToken, cancellationToken);
 
         logger.LogInformation("Token issued successfully for client: {ClientId}, account: {AccountId}", request.ClientId, code.Value.AccountId);
         return Ok(tokenResponse);

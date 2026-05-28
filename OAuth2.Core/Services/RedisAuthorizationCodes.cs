@@ -14,6 +14,11 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             return nil
         end
 
+        local consumed = redis.call('HGET', KEYS[1], 'consumed')
+        if consumed == '1' then
+            return nil
+        end
+
         local values = redis.call('HMGET', KEYS[1],
             'account_id',
             'client_id',
@@ -25,7 +30,7 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             'auth_time',
             'acr')
 
-        redis.call('DEL', KEYS[1])
+        redis.call('HSET', KEYS[1], 'consumed', '1')
         return values
         """;
 
@@ -44,7 +49,8 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             new("code_challenge", body.CodeChallenge ?? string.Empty),
             new("code_challenge_method", body.CodeChallengeMethod ?? string.Empty),
             new("auth_time", body.AuthTime?.ToString(CultureInfo.InvariantCulture) ?? string.Empty),
-            new("acr", body.Acr ?? string.Empty)
+            new("acr", body.Acr ?? string.Empty),
+            new("consumed", "0")
         ];
 
         await db.HashSetAsync(codeKey, entries).WaitAsync(cancellationToken);
@@ -96,6 +102,28 @@ internal class RedisAuthorizationCodes(RedisConnection multiplexer, ILogger<Redi
             long.TryParse(authTimeValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var authTime) ? authTime : null,
             string.IsNullOrEmpty(acr) ? null : acr
         );
+    }
+
+    public async ValueTask<string?> GetIssuedAccessTokenAsync(string code, CancellationToken cancellationToken = default)
+    {
+        var db = multiplexer.GetDatabase();
+        var codeKey = KeyNames.AuthorizationCode(code);
+
+        var fields = await db.HashGetAsync(codeKey, ["consumed", "issued_access_token"]).WaitAsync(cancellationToken);
+        if (fields.Length != 2 || fields[0] != "1" || fields[1].IsNullOrEmpty)
+        {
+            return null;
+        }
+
+        return fields[1].ToString();
+    }
+
+    public async ValueTask StoreIssuedAccessTokenAsync(string code, string accessToken, CancellationToken cancellationToken = default)
+    {
+        var db = multiplexer.GetDatabase();
+        var codeKey = KeyNames.AuthorizationCode(code);
+
+        await db.HashSetAsync(codeKey, "issued_access_token", accessToken).WaitAsync(cancellationToken);
     }
 
     private static string? GetString(RedisResult result)
