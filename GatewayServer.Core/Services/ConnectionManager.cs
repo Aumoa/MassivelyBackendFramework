@@ -11,7 +11,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PacketCore;
-using PacketCore.Utility;
 
 namespace GatewayServer.Services;
 
@@ -89,13 +88,14 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
                 s = networkStream;
             }
 
-            using (PacketPool.Get(out var p))
-            {
-                var handshakeNotify = new GatewayHandshakeNotify
-                {
-                    LoginUri = "https://accounts.ayla.r-e.kr/authorize"
-                };
-            }
+            var handshakeNotify = new GatewayHandshakeNotify("https://accounts.ayla.r-e.kr/authorize");
+            using var handshakeFrame = PacketCodec.Encode(
+                PacketKind.Notify,
+                Pid.GATE_HANDSHAKE_NOTIFY,
+                version: 1,
+                handshakeNotify,
+                GatewayHandshakeNotify.Codec);
+            await PacketFrameWriter.WriteAsync(s, handshakeFrame, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception e)
         {
@@ -152,13 +152,16 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
         {
             await foreach (var packet in client.ReadPacketsAsync(cancellationToken))
             {
-                var payloadString = Encoding.UTF8.GetString(packet.Payload);
+                var payloadString = Encoding.UTF8.GetString(packet.Payload.Span);
                 Console.WriteLine(payloadString);
 
-                var response = PacketPool.Get();
                 var responseMessage = $"Response: {payloadString}";
-                using var rentArray = RentUtility.RentFor(responseMessage);
-                response.Initialize(Packet.PROTOCOL_TYPE_ACK, 1, 1, rentArray);
+                using var response = PacketFrame.Create(
+                    PacketKind.Response,
+                    packet.Header.PacketId,
+                    packet.Header.Version,
+                    Encoding.UTF8.GetBytes(responseMessage));
+                await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (Exception e)
