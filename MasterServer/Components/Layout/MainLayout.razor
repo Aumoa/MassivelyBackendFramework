@@ -1,0 +1,36 @@
+@inherits LayoutComponentBase
+
+<AuthorizeView>
+    <Authorized>
+        <div class="page">
+            <AuthorizeView Policy="@MasterAuthorizationPolicies.Admin" Context="SidebarAuth">
+                <Authorized>
+                    <aside class="sidebar">
+                        <NavMenu />
+                    </aside>
+                </Authorized>
+            </AuthorizeView>
+
+            <main>
+                <div class="top-row px-4">
+                    <span>@Strings.TOPBAR_SECTION_BACKEND</span>
+                    <BlazorSharedComponent.ProfileCard />
+                </div>
+
+                <article class="content px-4">
+                    <AuthorizeView Policy="@MasterAuthorizationPolicies.Admin" Context="ContentAuth">
+                        <Authorized>
+                            @Body
+                        </Authorized>
+                        <NotAuthorized>
+                            <BlazorSharedComponent.ErrorView ErrorTextBody="@Strings.ACCESS_DENIED_TITLE" ErrorText="@Strings.ACCESS_DENIED_DESCRIPTION" />
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </article>
+            </main>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <RedirectToLogin />
+    </NotAuthorized>
+</AuthorizeView>
