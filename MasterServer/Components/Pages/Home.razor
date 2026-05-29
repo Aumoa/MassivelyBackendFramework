@@ -1,50 +1,48 @@
 @page "/"
 @inject IConnectionManager ConnectionManager
 
-<PageTitle>MasterServer</PageTitle>
+<PageTitle>@Strings.APP_TITLE</PageTitle>
 
 <section class="dashboard-header">
     <div>
-        <p class="eyebrow">MasterServer</p>
-        <h1>Control Plane</h1>
-        <p class="summary">
-            Gateway and Dedicated nodes connect here for control-plane state. Packet relay and game data stay outside Master.
-        </p>
+        <p class="eyebrow">@Strings.HOME_EYEBROW</p>
+        <h1>@Strings.HOME_TITLE</h1>
+        <p class="summary">@Strings.HOME_SUMMARY</p>
     </div>
 </section>
 
-<section class="metrics-grid" aria-label="Master summary">
+<section class="metrics-grid" aria-label="@Strings.HOME_SUMMARY_ARIA">
     <article class="metric-card">
-        <span class="metric-label">Socket endpoint</span>
+        <span class="metric-label">@Strings.METRIC_SOCKET_ENDPOINT</span>
         <strong>@EndpointText</strong>
         <span class="metric-detail">@TlsText</span>
     </article>
     <article class="metric-card">
-        <span class="metric-label">Active connections</span>
+        <span class="metric-label">@Strings.METRIC_ACTIVE_CONNECTIONS</span>
         <strong>@Connections.Count</strong>
-        <span class="metric-detail">Gateway/Dedicated role handshake pending</span>
+        <span class="metric-detail">@Strings.METRIC_ACTIVE_CONNECTIONS_DETAIL</span>
     </article>
     <article class="metric-card">
-        <span class="metric-label">Control mode</span>
-        <strong>Single Master</strong>
-        <span class="metric-detail">Ready for lease and ownership extensions</span>
+        <span class="metric-label">@Strings.METRIC_CONTROL_MODE</span>
+        <strong>@Strings.METRIC_CONTROL_MODE_VALUE</strong>
+        <span class="metric-detail">@Strings.METRIC_CONTROL_MODE_DETAIL</span>
     </article>
 </section>
 
 <section class="connection-panel">
     <div class="panel-heading">
         <div>
-            <h2>Node Connections</h2>
-            <p>Current socket peers observed by the Master hosted service.</p>
+            <h2>@Strings.CONNECTIONS_TITLE</h2>
+            <p>@Strings.CONNECTIONS_DESCRIPTION</p>
         </div>
-        <span class="status-pill">@Connections.Count active</span>
+        <span class="status-pill">@string.Format(Strings.CONNECTIONS_ACTIVE_FORMAT, Connections.Count)</span>
     </div>
 
     @if (Connections.Count == 0)
     {
         <div class="empty-state">
-            <strong>No node connections</strong>
-            <span>Gateway and Dedicated registration can be added on top of this socket surface.</span>
+            <strong>@Strings.CONNECTIONS_EMPTY_TITLE</strong>
+            <span>@Strings.CONNECTIONS_EMPTY_DESCRIPTION</span>
         </div>
     }
     else
@@ -53,11 +51,11 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Connection</th>
-                        <th>Role</th>
-                        <th>Remote endpoint</th>
-                        <th>Connected</th>
-                        <th>Last seen</th>
+                        <th>@Strings.CONNECTIONS_TABLE_CONNECTION</th>
+                        <th>@Strings.CONNECTIONS_TABLE_ROLE</th>
+                        <th>@Strings.CONNECTIONS_TABLE_REMOTE_ENDPOINT</th>
+                        <th>@Strings.CONNECTIONS_TABLE_CONNECTED</th>
+                        <th>@Strings.CONNECTIONS_TABLE_LAST_SEEN</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -65,7 +63,7 @@
                     {
                         <tr>
                             <td><code>@connection.ConnectionId.ToString("N")[..8]</code></td>
-                            <td>@connection.NodeKind</td>
+                            <td>@GetNodeKindText(connection.NodeKind)</td>
                             <td>@connection.RemoteEndPoint</td>
                             <td>@connection.ConnectedAt.LocalDateTime</td>
                             <td>@connection.LastSeenAt.LocalDateTime</td>
@@ -84,11 +82,21 @@
 
     private string EndpointText => $"{Endpoint.IPAddress}:{Endpoint.Port}";
 
-    private string TlsText => Endpoint.UseTls ? "TLS enabled" : "TLS disabled";
+    private string TlsText => Endpoint.UseTls ? Strings.TLS_ENABLED : Strings.TLS_DISABLED;
 
     protected override void OnInitialized()
     {
         Endpoint = ConnectionManager.GetSocketEndpoint();
         Connections = ConnectionManager.GetConnectionSnapshots();
+    }
+
+    private static string GetNodeKindText(MasterNodeKind nodeKind)
+    {
+        return nodeKind switch
+        {
+            MasterNodeKind.Gateway => Strings.NODE_KIND_GATEWAY,
+            MasterNodeKind.Dedicated => Strings.NODE_KIND_DEDICATED,
+            _ => Strings.NODE_KIND_UNKNOWN
+        };
     }
 }

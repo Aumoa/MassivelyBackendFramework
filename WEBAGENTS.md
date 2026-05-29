@@ -15,3 +15,9 @@
 - Prefer `prefers-color-scheme` or equivalent platform support to select light or dark theme automatically.
 - Keep shared UI components theme-aware by using service-level design tokens instead of hard-coded light-only colors.
 - If a service intentionally forces a single theme, make the product or technical reason explicit.
+
+## Localization Policy
+
+- Web services with user-visible UI should route display text through service-local resources instead of hard-coded strings.
+- Follow the existing service pattern: keep resources under `Localizations`, provide a neutral `Strings.resx` and Korean `Strings.ko.resx`, expose generated `Strings` members, register `AddLocalization`, configure supported cultures, and call `UseRequestLocalization`.
+- Keep protocol names, product names, identifiers, and code-like values untranslated when translation would reduce clarity.
