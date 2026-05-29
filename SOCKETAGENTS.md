@@ -1,0 +1,65 @@
+# High-Performance Socket Server Instructions
+
+## Architecture
+
+- Socket server work targets a high-performance real-time server design that is distinct from the ASP.NET/Web API service model.
+- The socket server architecture is divided into Master, Gateway, and Dedicated services.
+- Master is the control plane. It observes and provides Gateway and Dedicated connection state, service locations, channel ownership, and external dependency status such as MySQL or Redis.
+- Master provides connection and ownership information only. Do not use Master as a relay server or data plane for actual game packets.
+- Gateway is a lightweight data relay/proxy between clients and Dedicated servers. It handles client authentication, authorization checks, session management, packet validation, and Dedicated routing.
+- Gateway should be horizontally scalable, similar to a high-performance web service. Gateway must not process game logic or authoritative game state.
+- Dedicated is the authoritative server where core game logic runs. Final game-state decisions and mutations happen in Dedicated.
+- Dedicated primarily targets MMORPG workloads where performance is extremely important.
+
+## Master Design
+
+- The long-term Master goal is a Kubernetes-like control plane that can scale to multiple instances.
+- A staged approach is acceptable, including a single Master, active-standby Master, or lease-based failover.
+- Master failure must not immediately terminate existing game sessions.
+- Gateway and Dedicated should be able to cache routing and ownership information from Master for a bounded time or hold it through a lease model.
+- Model channel ownership explicitly, such as `ChannelId -> Owner Dedicated`, so Gateway can route clients to the correct Dedicated server.
+
+## Gateway Batching
+
+- Gateway normally forwards packets immediately.
+- Gateway batching is a defensive optimization used when network sends become a bottleneck and packets accumulate in the send queue before the next send.
+- Small and frequent packets, such as movement packets, may be grouped under a shared protocol header when queued together.
+- Do not casually batch packets that require immediate handling or strict correctness, such as authentication, authorization, payment, session control, or important combat input.
+
+## Dedicated Execution Model
+
+- Treat each game channel as a single logical execution flow owned by a channel owner lane.
+- Game state mutations must happen only on the owning channel lane.
+- Parallelizable work may use TPL, worker pools, background workers, or similar mechanisms.
+- Worker code must not directly mutate world state or entity state.
+- Pass required data to workers as snapshots, commands, or immutable data, then post results back to the channel mailbox.
+- Keep the central rule: mutate game state only on the channel owner lane, and return external or parallel work results through messages.
+
+## .NET Performance Policy
+
+- Use .NET for productivity, but apply .NET performance optimization aggressively in Dedicated hot paths.
+- Use Dependency Injection for server composition, service wiring, and lifetime management.
+- Do not use Dependency Injection as part of real-time packet processing or game-logic hot paths.
+- In hot paths, minimize allocation, locks, blocking calls, scheduler overhead, reflection, and unnecessary async state machine creation.
+- Consider high-performance .NET primitives when appropriate, including `System.IO.Pipelines`, `SocketAsyncEventArgs`, `ArrayPool<T>`, `MemoryPool<T>`, `Span<T>`, `Memory<T>`, `ValueTask`, bounded queues, and custom schedulers.
+
+## Async Work And SynchronizationContext
+
+- Dedicated may call web APIs or external services, but the main game tick must not wait on those responses.
+- Avoid unmanaged fire-and-forget patterns where exceptions are unobserved or shutdown cannot track pending work.
+- Async branches should be managed with whole-operation try-catch, timeout, cancellation, logging, and shutdown tracking.
+- A channel `SynchronizationContext` may post continuations back to the original channel mailbox.
+- Apply results from external async work only after returning to the channel's safe execution flow.
+
+## Backend Web Services
+
+- Ranking, user data, inventory, payment, logging, analytics, and operations APIs may be implemented as separate web services.
+- Dedicated may use those APIs, but it must not block the game main tick while waiting for web API responses.
+- Prefer event-driven processing, async workers, cached snapshots, and eventual consistency when exact immediate results are not required by gameplay.
+
+## Dedicated Server Boundaries
+
+- When multiple Dedicated servers exist, real-time interaction across different Dedicated servers is not supported by default.
+- Server migration or state copying may move a player from server A to server B to create a continuous user experience.
+- Without an explicit migration process, avoid designs where multiple Dedicated servers share or interfere with one real-time game state.
+- If load increases, split ownership by channel or world area so a fully independent Dedicated server can own that slice.
