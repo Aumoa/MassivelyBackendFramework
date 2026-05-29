@@ -1,63 +1,33 @@
-﻿using System;
-using System.Buffers;
-using System.IO;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using GatewayServer.Utility;
 using PacketCore;
 
 namespace GatewayServer.Protocols;
 
-public struct GatewayHandshakeNotify : IProtocolStructure
+public readonly struct GatewayHandshakeNotify
 {
-    public string LoginUri { get; set; }
-
-    public readonly int CalculateSize()
+    public GatewayHandshakeNotify(string loginUri)
     {
-        return BufferUtility.CalculateSizeForString(LoginUri);
+        LoginUri = loginUri;
     }
 
-    public readonly async ValueTask WriteToAsync(Stream stream, int calculatedSize, CancellationToken cancellationToken = default)
-    {
-        var buffer = ArrayPool<byte>.Shared.Rent(calculatedSize);
-        try
-        {
-            await BufferUtility.WriteAsync(stream, buffer, LoginUri, cancellationToken);
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
-    }
+    public string LoginUri { get; }
 
-    public static async ValueTask<GatewayHandshakeNotify> ReadFromAsync(Stream stream, CancellationToken cancellationToken = default)
+    public static IPacketCodec<GatewayHandshakeNotify> Codec { get; } = new GatewayHandshakeNotifyCodec();
+
+    private sealed class GatewayHandshakeNotifyCodec : IPacketCodec<GatewayHandshakeNotify>
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(4);
-        int bytesRead;
-        try
+        public int GetPayloadSize(GatewayHandshakeNotify value)
         {
-            await stream.ReadExactly2Async(buffer, cancellationToken);
-            bytesRead = BitConverter.ToInt32(buffer, 0);
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
+            return PacketWriter.GetStringSize(value.LoginUri);
         }
 
-        var stringBuffer = ArrayPool<byte>.Shared.Rent(bytesRead);
-        try
+        public void Encode(GatewayHandshakeNotify value, ref PacketWriter writer)
         {
-            await stream.ReadExactly2Async(buffer, cancellationToken);
-            string s = Encoding.UTF8.GetString(stringBuffer);
-            return new GatewayHandshakeNotify
-            {
-                LoginUri = s
-            };
+            writer.WriteString(value.LoginUri);
         }
-        finally
+
+        public GatewayHandshakeNotify Decode(ref PacketReader reader)
         {
-            ArrayPool<byte>.Shared.Return(stringBuffer);
+            return new GatewayHandshakeNotify(reader.ReadString());
         }
     }
 }

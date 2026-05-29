@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Security;
@@ -10,6 +9,7 @@ using MasterServer.Options;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using PacketCore;
 
 namespace MasterServer.Services;
 
@@ -184,25 +184,22 @@ internal sealed class ConnectionManager(
 
     private async Task DrainUntilClosedAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)
     {
-        var receiveBufferSize = Math.Max(1, m_Options.ReceiveBufferSize);
-        var buffer = ArrayPool<byte>.Shared.Rent(receiveBufferSize);
-
-        try
+        while (!cancellationToken.IsCancellationRequested)
         {
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, receiveBufferSize), cancellationToken).ConfigureAwait(false);
-                if (bytesRead == 0)
-                {
-                    return;
-                }
+            var frame = await PacketFrameReader.ReadAsync(
+                stream,
+                PacketReadPolicy.TrustedServer,
+                cancellationToken).ConfigureAwait(false);
 
+            if (frame == null)
+            {
+                return;
+            }
+
+            using (frame)
+            {
                 connection.MarkSeen();
             }
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 
