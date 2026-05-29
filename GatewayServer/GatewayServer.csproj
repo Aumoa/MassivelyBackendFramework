@@ -9,8 +9,25 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ASPNETUtility\ASPNETUtility.csproj" />
+    <ProjectReference Include="..\BlazorSharedComponent\BlazorSharedComponent.csproj" />
     <ProjectReference Include="..\GatewayServer.Core\GatewayServer.Core.csproj" />
     <ProjectReference Include="..\GatewayServer.SQL\GatewayServer.SQL.csproj" />
+    <ProjectReference Include="..\OpenIDConnect.Core\OpenIDConnect.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Localizations\Strings.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Strings.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Localizations\Strings.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Strings.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

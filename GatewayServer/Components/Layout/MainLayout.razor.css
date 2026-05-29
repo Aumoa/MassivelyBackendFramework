@@ -8,6 +8,7 @@
 
 main {
     flex: 1;
+    min-width: 0;
 }
 
 .sidebar {
@@ -18,10 +19,12 @@ main {
     background-color: var(--app-topbar-bg, var(--app-surface));
     border-bottom: 1px solid var(--app-border);
     color: var(--app-text);
-    justify-content: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
     height: 3.5rem;
     display: flex;
     align-items: center;
+    font-size: 0.9rem;
 }
 
     .top-row ::deep a, .top-row ::deep .btn-link {
