@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GatewayServer.Abstractions\GatewayServer.Abstractions.csproj" />
+    <ProjectReference Include="..\MasterServer.Abstractions\MasterServer.Abstractions.csproj" />
     <ProjectReference Include="..\PacketCore\PacketCore.csproj" />
   </ItemGroup>
 
