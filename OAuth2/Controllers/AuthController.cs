@@ -127,7 +127,6 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 cancellationToken,
                 authorizationCode.Value.AuthTime);
             var tokenResponse = issueResult.Response;
-            var access = issueResult.Access;
 
             HttpContext.Response.Cookies.Append("access_token", tokenResponse.AccessToken, new CookieOptions
             {
@@ -143,7 +142,7 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 SameSite = SameSiteMode.Strict
             });
 
-            HttpContext.Response.Cookies.Append("id", access.Id, new CookieOptions
+            HttpContext.Response.Cookies.Delete("id", new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,

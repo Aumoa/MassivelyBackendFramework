@@ -2,23 +2,18 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.IdentityModel.Tokens;
+using OAuth2.DTO;
 
 namespace OAuth2.Services;
 
 public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAccesses accesses, IJwt jwt, ScopedSemaphore sem) : AuthenticationStateProvider
 {
     private ClaimsPrincipal? m_CurrentUser;
+    private Access? m_CurrentAccess;
 
-    public string? Id
-    {
-        get
-        {
-            var httpContext = accessor.HttpContext;
-            return httpContext?.Request.Cookies["id"];
-        }
-    }
+    public string? Id => m_CurrentAccess?.Id;
 
-    public string ? AccessToken
+    public string? AccessToken
     {
         get
         {
@@ -69,21 +64,8 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                         catch (Exception)
                         {
                             // JWT is cryptographically invalid (not just expired) - clear cookies
-                            m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
-                            if (httpContext != null && !httpContext.Response.HasStarted)
-                            {
-                                var cookieOptions = new CookieOptions
-                                {
-                                    HttpOnly = true,
-                                    Secure = true,
-                                    SameSite = SameSiteMode.Strict
-                                };
-                                httpContext.Response.Cookies.Delete("id_token", cookieOptions);
-                                httpContext.Response.Cookies.Delete("access_token", cookieOptions);
-                                httpContext.Response.Cookies.Delete("refresh_token", cookieOptions);
-                                httpContext.Response.Cookies.Delete("id", cookieOptions);
-                            }
-                            return new AuthenticationState(m_CurrentUser);
+                            ClearAuthenticationState(httpContext);
+                            return new AuthenticationState(m_CurrentUser ?? new ClaimsPrincipal());
                         }
                     }
                 }
@@ -93,13 +75,22 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
 
             if (m_CurrentUser?.Identity?.IsAuthenticated == true)
             {
+                m_CurrentAccess = null;
+                var idTokenSub = GetClaimValue(JwtRegisteredClaimNames.Sub);
                 var at = AccessToken;
                 if (string.IsNullOrEmpty(at) == false)
                 {
                     var access = await accesses.VerifyAsync(at);
                     if (access.HasValue)
                     {
-                        return new AuthenticationState(m_CurrentUser);
+                        if (IsMatchingTokenSubject(idTokenSub, access.Value) == false)
+                        {
+                            ClearAuthenticationState(accessor.HttpContext);
+                            return new AuthenticationState(m_CurrentUser ?? new ClaimsPrincipal());
+                        }
+
+                        m_CurrentAccess = access.Value;
+                        return new AuthenticationState(m_CurrentUser ?? new ClaimsPrincipal());
                     }
                 }
 
@@ -109,6 +100,12 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                     var access = await accesses.RefreshAccessAsync(rt, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn);
                     if (access.HasValue)
                     {
+                        if (IsMatchingTokenSubject(idTokenSub, access.Value) == false)
+                        {
+                            ClearAuthenticationState(accessor.HttpContext);
+                            return new AuthenticationState(m_CurrentUser ?? new ClaimsPrincipal());
+                        }
+
                         var httpContext = accessor.HttpContext;
                         if (httpContext != null)
                         {
@@ -128,13 +125,14 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
                                 Expires = DateTimeOffset.UtcNow.Add(jwt.RefreshTokenExpiresIn)
                             };
                             httpContext.Response.Cookies.Append("refresh_token", access.Value.RefreshToken, refreshCookieOptions);
-                            return new AuthenticationState(m_CurrentUser);
+                            m_CurrentAccess = access.Value;
+                            return new AuthenticationState(m_CurrentUser ?? new ClaimsPrincipal());
                         }
                     }
                 }
 
                 // Both access_token and refresh_token are invalid; clear session
-                m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
+                ClearAuthenticationState(accessor.HttpContext);
             }
 
             return new AuthenticationState(m_CurrentUser ?? new ClaimsPrincipal());
@@ -145,24 +143,24 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
         }
     }
 
-    public string? Sub => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value;
-    public string? Name => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Name)?.Value;
-    public string? Email => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Email)?.Value;
-    public string? Picture => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Picture)?.Value;
-    public string? GivenName => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.GivenName)?.Value;
-    public string? FamilyName => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.FamilyName)?.Value;
-    public string? Nickname => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Nickname)?.Value;
-    public string? PreferredUsername => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.PreferredUsername)?.Value;
-    public string? Website => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Website)?.Value;
-    public string? Gender => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Gender)?.Value;
-    public string? Birthdate => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Birthdate)?.Value;
-    public string? ZoneInfo => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.ZoneInfo)?.Value;
-    public string? Locale => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Locale)?.Value;
+    public string? Sub => m_CurrentAccess?.Sub;
+    public string? Name => GetClaimValue(JwtRegisteredClaimNames.Name);
+    public string? Email => GetClaimValue(JwtRegisteredClaimNames.Email);
+    public string? Picture => GetClaimValue(JwtRegisteredClaimNames.Picture);
+    public string? GivenName => GetClaimValue(JwtRegisteredClaimNames.GivenName);
+    public string? FamilyName => GetClaimValue(JwtRegisteredClaimNames.FamilyName);
+    public string? Nickname => GetClaimValue(JwtRegisteredClaimNames.Nickname);
+    public string? PreferredUsername => GetClaimValue(JwtRegisteredClaimNames.PreferredUsername);
+    public string? Website => GetClaimValue(JwtRegisteredClaimNames.Website);
+    public string? Gender => GetClaimValue(JwtRegisteredClaimNames.Gender);
+    public string? Birthdate => GetClaimValue(JwtRegisteredClaimNames.Birthdate);
+    public string? ZoneInfo => GetClaimValue(JwtRegisteredClaimNames.ZoneInfo);
+    public string? Locale => GetClaimValue(JwtRegisteredClaimNames.Locale);
     public bool? EmailVerified
     {
         get
         {
-            var value = m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.EmailVerified)?.Value;
+            var value = GetClaimValue(JwtRegisteredClaimNames.EmailVerified);
             return bool.TryParse(value, out var result) ? result : null;
         }
     }
@@ -170,8 +168,38 @@ public class JwtAuthenticationStateProvider(IHttpContextAccessor accessor, IAcce
     {
         get
         {
-            var value = m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.UpdatedAt)?.Value;
+            var value = GetClaimValue(JwtRegisteredClaimNames.UpdatedAt);
             return long.TryParse(value, out var seconds) ? DateTimeOffset.FromUnixTimeSeconds(seconds) : null;
         }
+    }
+
+    private string? GetClaimValue(string type) => m_CurrentUser?.Claims.FirstOrDefault(c => c.Type == type)?.Value;
+
+    private static bool IsMatchingTokenSubject(string? idTokenSub, Access access)
+    {
+        return !string.IsNullOrWhiteSpace(idTokenSub) &&
+               string.Equals(idTokenSub, access.Sub, StringComparison.Ordinal);
+    }
+
+    private void ClearAuthenticationState(HttpContext? httpContext)
+    {
+        m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
+        m_CurrentAccess = null;
+
+        if (httpContext == null || httpContext.Response.HasStarted)
+        {
+            return;
+        }
+
+        var cookieOptions = new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict
+        };
+        httpContext.Response.Cookies.Delete("id_token", cookieOptions);
+        httpContext.Response.Cookies.Delete("access_token", cookieOptions);
+        httpContext.Response.Cookies.Delete("refresh_token", cookieOptions);
+        httpContext.Response.Cookies.Delete("id", cookieOptions);
     }
 }
