@@ -45,6 +45,12 @@
   <data name="TOPBAR_SECTION_BACKEND" xml:space="preserve">
     <value>Backend</value>
   </data>
+  <data name="ACCESS_DENIED_TITLE" xml:space="preserve">
+    <value>접근 거부</value>
+  </data>
+  <data name="ACCESS_DENIED_DESCRIPTION" xml:space="preserve">
+    <value>이 관리 페이지에는 admin 역할이 필요합니다.</value>
+  </data>
   <data name="NAV_TOGGLE_TITLE" xml:space="preserve">
     <value>탐색 메뉴</value>
   </data>

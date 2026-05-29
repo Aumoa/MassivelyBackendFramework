@@ -45,6 +45,12 @@
   <data name="TOPBAR_SECTION_BACKEND" xml:space="preserve">
     <value>Backend</value>
   </data>
+  <data name="ACCESS_DENIED_TITLE" xml:space="preserve">
+    <value>Access denied</value>
+  </data>
+  <data name="ACCESS_DENIED_DESCRIPTION" xml:space="preserve">
+    <value>This management page requires the admin role.</value>
+  </data>
   <data name="NAV_TOGGLE_TITLE" xml:space="preserve">
     <value>Navigation menu</value>
   </data>

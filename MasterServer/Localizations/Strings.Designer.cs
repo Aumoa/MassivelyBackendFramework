@@ -68,6 +68,24 @@ namespace MasterServer.Localizations {
                 return ResourceManager.GetString("APP_TITLE", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   This management page requires the admin role.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ACCESS_DENIED_DESCRIPTION {
+            get {
+                return ResourceManager.GetString("ACCESS_DENIED_DESCRIPTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Access denied과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string ACCESS_DENIED_TITLE {
+            get {
+                return ResourceManager.GetString("ACCESS_DENIED_TITLE", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   {0} active과(와) 유사한 지역화된 문자열을 찾습니다.
