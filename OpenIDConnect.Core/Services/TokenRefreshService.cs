@@ -80,8 +80,8 @@ internal class TokenRefreshService(
                 httpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = httpContext.Request.IsHttps,
-                    SameSite = SameSiteMode.Lax,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
                     Path = "/",
                     Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn)
                 });
@@ -92,8 +92,8 @@ internal class TokenRefreshService(
                 httpContext.Response.Cookies.Append("refresh_token", tokenResponse.RefreshToken, new CookieOptions
                 {
                     HttpOnly = true,
-                    Secure = httpContext.Request.IsHttps,
-                    SameSite = SameSiteMode.Lax,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
                     Path = "/",
                     Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn)
                 });
@@ -113,6 +113,9 @@ internal class TokenRefreshService(
     {
         var cookieOptions = new CookieOptions
         {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
             Path = "/"
         };
         httpContext.Response.Cookies.Delete("id_token", cookieOptions);
