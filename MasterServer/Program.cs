@@ -32,7 +32,7 @@ builder.Services.AddAuthorizationCore(options =>
     options.AddPolicy(MasterAuthorizationPolicies.Admin, policy =>
     {
         policy.RequireAuthenticatedUser();
-        policy.RequireRole("admin");
+        policy.RequireAssertion(context => MasterAuthorizationPolicies.HasAdminGroup(context.User));
     });
 });
 builder.Services.AddHttpContextAccessor();
