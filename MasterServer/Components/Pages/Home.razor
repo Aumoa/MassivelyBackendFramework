@@ -1,0 +1,94 @@
+@page "/"
+@inject IConnectionManager ConnectionManager
+
+<PageTitle>MasterServer</PageTitle>
+
+<section class="dashboard-header">
+    <div>
+        <p class="eyebrow">MasterServer</p>
+        <h1>Control Plane</h1>
+        <p class="summary">
+            Gateway and Dedicated nodes connect here for control-plane state. Packet relay and game data stay outside Master.
+        </p>
+    </div>
+</section>
+
+<section class="metrics-grid" aria-label="Master summary">
+    <article class="metric-card">
+        <span class="metric-label">Socket endpoint</span>
+        <strong>@EndpointText</strong>
+        <span class="metric-detail">@TlsText</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label">Active connections</span>
+        <strong>@Connections.Count</strong>
+        <span class="metric-detail">Gateway/Dedicated role handshake pending</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label">Control mode</span>
+        <strong>Single Master</strong>
+        <span class="metric-detail">Ready for lease and ownership extensions</span>
+    </article>
+</section>
+
+<section class="connection-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>Node Connections</h2>
+            <p>Current socket peers observed by the Master hosted service.</p>
+        </div>
+        <span class="status-pill">@Connections.Count active</span>
+    </div>
+
+    @if (Connections.Count == 0)
+    {
+        <div class="empty-state">
+            <strong>No node connections</strong>
+            <span>Gateway and Dedicated registration can be added on top of this socket surface.</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Connection</th>
+                        <th>Role</th>
+                        <th>Remote endpoint</th>
+                        <th>Connected</th>
+                        <th>Last seen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var connection in Connections)
+                    {
+                        <tr>
+                            <td><code>@connection.ConnectionId.ToString("N")[..8]</code></td>
+                            <td>@connection.NodeKind</td>
+                            <td>@connection.RemoteEndPoint</td>
+                            <td>@connection.ConnectedAt.LocalDateTime</td>
+                            <td>@connection.LastSeenAt.LocalDateTime</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private MasterSocketEndpoint Endpoint { get; set; } = new("unknown", 0, false);
+
+    private IReadOnlyCollection<MasterConnectionSnapshot> Connections { get; set; } = [];
+
+    private string EndpointText => $"{Endpoint.IPAddress}:{Endpoint.Port}";
+
+    private string TlsText => Endpoint.UseTls ? "TLS enabled" : "TLS disabled";
+
+    protected override void OnInitialized()
+    {
+        Endpoint = ConnectionManager.GetSocketEndpoint();
+        Connections = ConnectionManager.GetConnectionSnapshots();
+    }
+}
