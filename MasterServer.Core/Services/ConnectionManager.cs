@@ -174,6 +174,7 @@ internal sealed class ConnectionManager(
 
             await AuthenticateNodeAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
             await DrainUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
+            LogNodeDisconnected(connection);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -181,9 +182,19 @@ internal sealed class ConnectionManager(
         catch (IOException) when (cancellationToken.IsCancellationRequested)
         {
         }
+        catch (Exception e) when (IsRemoteDisconnect(e))
+        {
+            LogNodeDisconnectedAbruptly(connection, e);
+        }
         catch (Exception e)
         {
-            logger.LogWarning(e, "Master node connection ended with an error.");
+            logger.LogWarning(
+                e,
+                "Master node connection ended with an unexpected error. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}, RemoteEndPoint={RemoteEndPoint}.",
+                connection.ConnectionId,
+                connection.NodeKind,
+                connection.NodeId,
+                connection.RemoteEndPoint);
         }
         finally
         {
@@ -307,6 +318,58 @@ internal sealed class ConnectionManager(
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(nonce);
         return new NodeAuthChallenge(Guid.NewGuid().ToString("N"), nonce);
+    }
+
+    private void LogNodeDisconnected(MasterConnection connection)
+    {
+        if (connection.IsTrusted)
+        {
+            logger.LogInformation(
+                "Master node disconnected. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}, RemoteEndPoint={RemoteEndPoint}.",
+                connection.ConnectionId,
+                connection.NodeKind,
+                connection.NodeId,
+                connection.RemoteEndPoint);
+            return;
+        }
+
+        logger.LogInformation(
+            "Unauthenticated Master node connection closed. ConnectionId={ConnectionId}, RemoteEndPoint={RemoteEndPoint}.",
+            connection.ConnectionId,
+            connection.RemoteEndPoint);
+    }
+
+    private void LogNodeDisconnectedAbruptly(MasterConnection connection, Exception exception)
+    {
+        if (connection.IsTrusted)
+        {
+            logger.LogWarning(
+                "Master node disconnected abruptly. The remote process likely stopped or reset the socket. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}, RemoteEndPoint={RemoteEndPoint}.",
+                connection.ConnectionId,
+                connection.NodeKind,
+                connection.NodeId,
+                connection.RemoteEndPoint);
+        }
+        else
+        {
+            logger.LogWarning(
+                "Unauthenticated Master node connection was reset before handshake completed. RemoteEndPoint={RemoteEndPoint}.",
+                connection.RemoteEndPoint);
+        }
+
+        logger.LogDebug(exception, "Remote disconnect details.");
+    }
+
+    private static bool IsRemoteDisconnect(Exception exception)
+    {
+        return exception is EndOfStreamException ||
+               exception is IOException { InnerException: SocketException innerSocketException } && IsRemoteDisconnect(innerSocketException) ||
+               exception is SocketException socketException && IsRemoteDisconnect(socketException);
+    }
+
+    private static bool IsRemoteDisconnect(SocketException exception)
+    {
+        return exception.SocketErrorCode is SocketError.ConnectionReset or SocketError.ConnectionAborted or SocketError.Shutdown;
     }
 
     private void NotifyConnectionsChanged()
