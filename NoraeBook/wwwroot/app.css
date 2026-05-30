@@ -236,6 +236,15 @@ h2 {
     border-bottom: 1px solid var(--app-border);
 }
 
+.panel-heading-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+}
+
 .panel-heading p {
     margin-bottom: 0;
     color: var(--app-text-muted);

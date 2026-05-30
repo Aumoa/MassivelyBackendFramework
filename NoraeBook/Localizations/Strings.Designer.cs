@@ -80,7 +80,7 @@ namespace NoraeBook.Localizations
 
         internal static string SONG_ARTIST_LABEL => ResourceManager.GetString("SONG_ARTIST_LABEL", resourceCulture)!;
 
-        internal static string SONG_CANCEL_EDIT_BUTTON => ResourceManager.GetString("SONG_CANCEL_EDIT_BUTTON", resourceCulture)!;
+        internal static string SONG_CANCEL_BUTTON => ResourceManager.GetString("SONG_CANCEL_BUTTON", resourceCulture)!;
 
         internal static string SONG_COUNT_FORMAT => ResourceManager.GetString("SONG_COUNT_FORMAT", resourceCulture)!;
 

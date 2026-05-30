@@ -21,58 +21,64 @@
                         <h2>@Strings.HOME_QUEUE_TITLE</h2>
                         <p>@Strings.HOME_QUEUE_DESCRIPTION</p>
                     </div>
-                    <span class="status-pill">@SongCountText</span>
-                </div>
-
-                <form class="song-form" @onsubmit="SaveSongAsync" @onsubmit:preventDefault="true">
-                    @if (!string.IsNullOrWhiteSpace(m_ErrorMessage))
-                    {
-                        <p class="form-error">@m_ErrorMessage</p>
-                    }
-
-                    <div class="form-grid">
-                        <label class="field">
-                            <span>@Strings.SONG_NUMBER_LABEL</span>
-                            <input class="form-input" type="number" min="1" step="1" @bind="m_Form.SongNumber" />
-                        </label>
-                        <label class="field">
-                            <span>@Strings.SONG_ARTIST_LABEL</span>
-                            <input class="form-input" type="text" maxlength="120" @bind="m_Form.Artist" />
-                        </label>
-                        <label class="field">
-                            <span>@Strings.SONG_TITLE_LABEL</span>
-                            <input class="form-input" type="text" maxlength="160" @bind="m_Form.Title" />
-                        </label>
-                    </div>
-
-                    <fieldset class="tag-fieldset">
-                        <legend>@Strings.SONG_TAGS_LABEL</legend>
-                        <div class="tag-options">
-                            @foreach (var tagId in DefaultTagIds)
-                            {
-                                <button type="button"
-                                        class="@GetTagButtonClass(tagId)"
-                                        aria-pressed="@m_SelectedDefaultTagIds.Contains(tagId)"
-                                        @onclick="() => ToggleDefaultTag(tagId)">
-                                    @GetDefaultTagLabel(tagId)
-                                </button>
-                            }
-                        </div>
-                    </fieldset>
-
-                    <label class="field">
-                        <span>@Strings.SONG_CUSTOM_TAGS_LABEL</span>
-                        <input class="form-input" type="text" maxlength="160" placeholder="@Strings.SONG_CUSTOM_TAGS_PLACEHOLDER" @bind="m_Form.CustomTags" />
-                    </label>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary">@SaveButtonText</button>
-                        @if (m_Form.Id.HasValue)
+                    <div class="panel-heading-actions">
+                        <span class="status-pill">@SongCountText</span>
+                        @if (!m_IsFormVisible)
                         {
-                            <button type="button" class="btn-secondary" @onclick="ResetForm">@Strings.SONG_CANCEL_EDIT_BUTTON</button>
+                            <button type="button" class="btn-primary" @onclick="ShowNewSongForm">@Strings.SONG_SAVE_BUTTON</button>
                         }
                     </div>
-                </form>
+                </div>
+
+                @if (m_IsFormVisible)
+                {
+                    <form class="song-form" @onsubmit="SaveSongAsync" @onsubmit:preventDefault="true">
+                        @if (!string.IsNullOrWhiteSpace(m_ErrorMessage))
+                        {
+                            <p class="form-error">@m_ErrorMessage</p>
+                        }
+
+                        <div class="form-grid">
+                            <label class="field">
+                                <span>@Strings.SONG_NUMBER_LABEL</span>
+                                <input class="form-input" type="number" min="1" step="1" @bind="m_Form.SongNumber" />
+                            </label>
+                            <label class="field">
+                                <span>@Strings.SONG_ARTIST_LABEL</span>
+                                <input class="form-input" type="text" maxlength="120" @bind="m_Form.Artist" />
+                            </label>
+                            <label class="field">
+                                <span>@Strings.SONG_TITLE_LABEL</span>
+                                <input class="form-input" type="text" maxlength="160" @bind="m_Form.Title" />
+                            </label>
+                        </div>
+
+                        <fieldset class="tag-fieldset">
+                            <legend>@Strings.SONG_TAGS_LABEL</legend>
+                            <div class="tag-options">
+                                @foreach (var tagId in DefaultTagIds)
+                                {
+                                    <button type="button"
+                                            class="@GetTagButtonClass(tagId)"
+                                            aria-pressed="@m_SelectedDefaultTagIds.Contains(tagId)"
+                                            @onclick="() => ToggleDefaultTag(tagId)">
+                                        @GetDefaultTagLabel(tagId)
+                                    </button>
+                                }
+                            </div>
+                        </fieldset>
+
+                        <label class="field">
+                            <span>@Strings.SONG_CUSTOM_TAGS_LABEL</span>
+                            <input class="form-input" type="text" maxlength="160" placeholder="@Strings.SONG_CUSTOM_TAGS_PLACEHOLDER" @bind="m_Form.CustomTags" />
+                        </label>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">@SaveButtonText</button>
+                            <button type="button" class="btn-secondary" @onclick="CancelForm">@Strings.SONG_CANCEL_BUTTON</button>
+                        </div>
+                    </form>
+                }
 
                 @if (m_IsLoading)
                 {
@@ -149,6 +155,7 @@
     private string? m_OwnerId;
     private string? m_ErrorMessage;
     private bool m_IsLoading = true;
+    private bool m_IsFormVisible;
 
     private string SongCountText => string.Format(Strings.SONG_COUNT_FORMAT, m_Songs.Count);
 
@@ -201,7 +208,7 @@
             BuildTagList());
 
         await SongRepository.SaveSongAsync(m_OwnerId, edit);
-        ResetForm();
+        HideForm();
         await LoadSongsAsync();
     }
 
@@ -215,16 +222,23 @@
         await SongRepository.DeleteSongAsync(m_OwnerId, songId);
         if (m_Form.Id == songId)
         {
-            ResetForm();
+            HideForm();
         }
 
         await LoadSongsAsync();
+    }
+
+    private void ShowNewSongForm()
+    {
+        ClearForm();
+        m_IsFormVisible = true;
     }
 
     private void EditSong(KaraokeSongEntry song)
     {
         m_ErrorMessage = null;
         m_SelectedDefaultTagIds.Clear();
+        m_IsFormVisible = true;
         var customTags = new List<string>();
 
         foreach (var tag in song.Tags)
@@ -249,7 +263,18 @@
         };
     }
 
-    private void ResetForm()
+    private void CancelForm()
+    {
+        HideForm();
+    }
+
+    private void HideForm()
+    {
+        ClearForm();
+        m_IsFormVisible = false;
+    }
+
+    private void ClearForm()
     {
         m_ErrorMessage = null;
         m_SelectedDefaultTagIds.Clear();

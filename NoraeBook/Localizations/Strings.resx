@@ -102,8 +102,8 @@
   <data name="SONG_UPDATE_BUTTON" xml:space="preserve">
     <value>Update song</value>
   </data>
-  <data name="SONG_CANCEL_EDIT_BUTTON" xml:space="preserve">
-    <value>Cancel edit</value>
+  <data name="SONG_CANCEL_BUTTON" xml:space="preserve">
+    <value>Cancel</value>
   </data>
   <data name="SONG_LOADING_TITLE" xml:space="preserve">
     <value>Loading songs</value>

@@ -102,8 +102,8 @@
   <data name="SONG_UPDATE_BUTTON" xml:space="preserve">
     <value>곡 수정</value>
   </data>
-  <data name="SONG_CANCEL_EDIT_BUTTON" xml:space="preserve">
-    <value>수정 취소</value>
+  <data name="SONG_CANCEL_BUTTON" xml:space="preserve">
+    <value>취소</value>
   </data>
   <data name="SONG_LOADING_TITLE" xml:space="preserve">
     <value>목록을 불러오는 중</value>
