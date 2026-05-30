@@ -15,14 +15,21 @@ using PacketCore;
 
 namespace DedicatedServer.Services;
 
+internal interface IGatewayConnectionStatusProvider
+{
+    ServiceAdminStatusItem[] GetStatusItems();
+}
+
 internal sealed class GatewayConnectionManager(
     IOptions<GatewayListenerOptions> options,
     IDedicatedWorldRuntime worldRuntime,
-    ILogger<GatewayConnectionManager> logger) : IHostedService
+    ILogger<GatewayConnectionManager> logger) : IHostedService, IGatewayConnectionStatusProvider
 {
     private readonly GatewayListenerOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
+    private readonly ConcurrentDictionary<Guid, string> m_GatewayConnectionStates = [];
+    private readonly ConcurrentDictionary<Guid, string> m_GatewayNodeIds = [];
     private Socket? m_Socket;
     private Task? m_AcceptTask;
     private X509Certificate2? m_Cert;
@@ -110,6 +117,8 @@ internal sealed class GatewayConnectionManager(
             completed =>
             {
                 m_ConnectionTasks.TryRemove(connectionId, out _);
+                m_GatewayConnectionStates.TryRemove(connectionId, out _);
+                m_GatewayNodeIds.TryRemove(connectionId, out _);
                 socket.Dispose();
 
                 if (completed.Exception != null)
@@ -128,6 +137,7 @@ internal sealed class GatewayConnectionManager(
         SslStream? sslStream = null;
         Stream activeStream = networkStream;
         string gatewayNodeId = string.Empty;
+        m_GatewayConnectionStates[connectionId] = "Handshaking";
 
         try
         {
@@ -144,6 +154,8 @@ internal sealed class GatewayConnectionManager(
 
             var acceptedGateway = await AuthenticateGatewayAsync(connectionId, activeStream, cancellationToken).ConfigureAwait(false);
             gatewayNodeId = acceptedGateway.NodeId;
+            m_GatewayNodeIds[connectionId] = gatewayNodeId;
+            m_GatewayConnectionStates[connectionId] = "Trusted";
             logger.LogInformation(
                 "Dedicated accepted Gateway direct connection. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, RemoteEndPoint={RemoteEndPoint}.",
                 connectionId,
@@ -163,6 +175,7 @@ internal sealed class GatewayConnectionManager(
         }
         catch (Exception e) when (IsRemoteDisconnect(e))
         {
+            m_GatewayConnectionStates[connectionId] = "Disconnected";
             logger.LogInformation(
                 "Gateway direct connection was closed by the remote peer. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, RemoteEndPoint={RemoteEndPoint}.",
                 connectionId,
@@ -172,6 +185,7 @@ internal sealed class GatewayConnectionManager(
         }
         catch (Exception e)
         {
+            m_GatewayConnectionStates[connectionId] = "Error";
             logger.LogWarning(
                 e,
                 "Gateway direct connection ended with an unexpected error. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, RemoteEndPoint={RemoteEndPoint}.",
@@ -316,6 +330,27 @@ internal sealed class GatewayConnectionManager(
         {
             throw new InvalidOperationException("GatewayListener:SharedSecret must be configured before accepting Gateway connections.");
         }
+    }
+
+    public ServiceAdminStatusItem[] GetStatusItems()
+    {
+        var items = new List<ServiceAdminStatusItem>
+        {
+            new("Gateway", "Listener", $"{m_Options.IPAddress}:{m_Options.Port}"),
+            new("Gateway", "TLS", m_Options.UseTls ? "Enabled" : "Disabled"),
+            new("Gateway", "Active connections", m_GatewayConnectionStates.Count.ToString())
+        };
+
+        foreach (var pair in m_GatewayConnectionStates.OrderBy(static pair => pair.Key))
+        {
+            var group = $"Gateway {pair.Key:N}"[..24];
+            var nodeId = m_GatewayNodeIds.TryGetValue(pair.Key, out var value) ? value : "unknown";
+            items.Add(new ServiceAdminStatusItem(group, "State", pair.Value));
+            items.Add(new ServiceAdminStatusItem(group, "Node", nodeId));
+            items.Add(new ServiceAdminStatusItem(group, "Connection", pair.Key.ToString("N")));
+        }
+
+        return [.. items];
     }
 
     private static bool IsRemoteDisconnect(Exception exception)

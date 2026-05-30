@@ -171,6 +171,72 @@
   <data name="NODE_KIND_MASTER_ADMIN" xml:space="preserve">
     <value>Master Admin</value>
   </data>
+  <data name="NODE_PAGE_TITLE" xml:space="preserve">
+    <value>노드 관리</value>
+  </data>
+  <data name="NODE_PAGE_EYEBROW" xml:space="preserve">
+    <value>Master Relay</value>
+  </data>
+  <data name="NODE_PAGE_SUMMARY" xml:space="preserve">
+    <value>서비스에 직접 연결하지 않고 Master 제어 소켓을 통해 서비스 상태를 요청합니다.</value>
+  </data>
+  <data name="NODE_BACK_TO_OVERVIEW" xml:space="preserve">
+    <value>개요로 돌아가기</value>
+  </data>
+  <data name="NODE_SUMMARY_ARIA" xml:space="preserve">
+    <value>노드 요약</value>
+  </data>
+  <data name="NODE_STATUS_RELAY" xml:space="preserve">
+    <value>Relay 상태</value>
+  </data>
+  <data name="NODE_STATUS_TITLE" xml:space="preserve">
+    <value>서비스 상태</value>
+  </data>
+  <data name="NODE_STATUS_DESCRIPTION" xml:space="preserve">
+    <value>선택한 서비스가 Master를 통해 반환한 현재 관리 데이터입니다.</value>
+  </data>
+  <data name="NODE_STATUS_ERROR_TITLE" xml:space="preserve">
+    <value>상태 확인 불가</value>
+  </data>
+  <data name="NODE_STATUS_LOADING_TITLE" xml:space="preserve">
+    <value>상태 로딩 중</value>
+  </data>
+  <data name="NODE_STATUS_LOADING_DESCRIPTION" xml:space="preserve">
+    <value>선택한 서비스가 Master를 통해 응답하기를 기다리는 중입니다.</value>
+  </data>
+  <data name="NODE_STATUS_EMPTY_TITLE" xml:space="preserve">
+    <value>상태 항목 없음</value>
+  </data>
+  <data name="NODE_STATUS_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>서비스는 연결되어 있지만 아직 추가 관리 데이터를 제공하지 않습니다.</value>
+  </data>
+  <data name="NODE_UNKNOWN_CONNECTION" xml:space="preserve">
+    <value>알 수 없는 연결</value>
+  </data>
+  <data name="NODE_STATUS_LOADING" xml:space="preserve">
+    <value>로딩 중</value>
+  </data>
+  <data name="NODE_STATUS_ERROR" xml:space="preserve">
+    <value>오류</value>
+  </data>
+  <data name="NODE_STATUS_CONNECTED" xml:space="preserve">
+    <value>연결됨</value>
+  </data>
+  <data name="NODE_STATUS_UNAVAILABLE" xml:space="preserve">
+    <value>사용 불가</value>
+  </data>
+  <data name="NODE_REFRESH" xml:space="preserve">
+    <value>새로고침</value>
+  </data>
+  <data name="NODE_REFRESHING" xml:space="preserve">
+    <value>새로고침 중</value>
+  </data>
+  <data name="NODE_STATUS_INVALID_CONNECTION" xml:space="preserve">
+    <value>연결 ID가 올바르지 않습니다.</value>
+  </data>
+  <data name="NODE_STATUS_TIMEOUT" xml:space="preserve">
+    <value>요청 시간이 만료되기 전에 서비스가 응답하지 않았습니다.</value>
+  </data>
   <data name="NOTFOUND_TITLE" xml:space="preserve">
     <value>페이지 없음</value>
   </data>

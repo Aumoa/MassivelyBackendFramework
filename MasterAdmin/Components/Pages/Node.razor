@@ -1,0 +1,211 @@
+@page "/nodes/{ConnectionId}"
+@implements IDisposable
+@inject IMasterOverviewProvider MasterOverview
+
+<PageTitle>@Strings.NODE_PAGE_TITLE</PageTitle>
+
+<section class="node-header">
+    <div>
+        <p class="eyebrow">@Strings.NODE_PAGE_EYEBROW</p>
+        <h1>@NodeTitle</h1>
+        <p class="summary">@Strings.NODE_PAGE_SUMMARY</p>
+    </div>
+    <a class="back-link" href="">@Strings.NODE_BACK_TO_OVERVIEW</a>
+</section>
+
+<section class="node-metrics" aria-label="@Strings.NODE_SUMMARY_ARIA">
+    <article class="metric-card">
+        <span class="metric-label">@Strings.CONNECTIONS_TABLE_CONNECTION</span>
+        <strong>@ConnectionHash</strong>
+        <span class="metric-detail">@ConnectionId</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label">@Strings.CONNECTIONS_TABLE_ROLE</span>
+        <strong>@GetNodeKindText(NodeConnection?.NodeKind ?? Status?.NodeKind ?? MasterNodeKind.Unknown)</strong>
+        <span class="metric-detail">@NodeConnection?.RemoteEndPoint</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label">@Strings.NODE_STATUS_RELAY</span>
+        <strong>@RelayStateText</strong>
+        <span class="metric-detail">@Status?.ObservedAt.LocalDateTime</span>
+    </article>
+</section>
+
+<section class="status-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>@Strings.NODE_STATUS_TITLE</h2>
+            <p>@Strings.NODE_STATUS_DESCRIPTION</p>
+        </div>
+        <button type="button" class="refresh-button" @onclick="RefreshStatusAsync" disabled="@IsLoading">
+            @RefreshButtonText
+        </button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="empty-state">
+            <strong>@Strings.NODE_STATUS_ERROR_TITLE</strong>
+            <span>@ErrorMessage</span>
+        </div>
+    }
+    else if (Status == null)
+    {
+        <div class="empty-state">
+            <strong>@Strings.NODE_STATUS_LOADING_TITLE</strong>
+            <span>@Strings.NODE_STATUS_LOADING_DESCRIPTION</span>
+        </div>
+    }
+    else if (Status.Items.Length == 0)
+    {
+        <div class="empty-state">
+            <strong>@Strings.NODE_STATUS_EMPTY_TITLE</strong>
+            <span>@Strings.NODE_STATUS_EMPTY_DESCRIPTION</span>
+        </div>
+    }
+    else
+    {
+        <div class="status-groups">
+            @foreach (var group in Status.Items.GroupBy(static item => item.Group))
+            {
+                <section class="status-group">
+                    <h3>@group.Key</h3>
+                    <dl>
+                        @foreach (var item in group)
+                        {
+                            <div>
+                                <dt>@item.Name</dt>
+                                <dd>@item.Value</dd>
+                            </div>
+                        }
+                    </dl>
+                </section>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public string? ConnectionId { get; set; }
+
+    private readonly CancellationTokenSource m_DisposeCancellation = new();
+
+    private ServiceAdminStatusResponse? Status { get; set; }
+
+    private string? ErrorMessage { get; set; }
+
+    private bool IsLoading { get; set; }
+
+    private MasterConnectionSnapshot? NodeConnection => TryGetConnection(out var connection) ? connection : null;
+
+    private string ConnectionHash => !string.IsNullOrWhiteSpace(ConnectionId) && ConnectionId.Length >= 8
+        ? ConnectionId[..8]
+        : Strings.NODE_UNKNOWN_CONNECTION;
+
+    private string NodeTitle
+    {
+        get
+        {
+            if (Status != null && !string.IsNullOrWhiteSpace(Status.DisplayName))
+            {
+                return Status.DisplayName;
+            }
+
+            var connection = NodeConnection;
+            return connection != null
+                ? GetNodeKindText(connection.NodeKind)
+                : Strings.NODE_UNKNOWN_CONNECTION;
+        }
+    }
+
+    private string RelayStateText
+    {
+        get
+        {
+            if (IsLoading)
+            {
+                return Strings.NODE_STATUS_LOADING;
+            }
+
+            if (!string.IsNullOrWhiteSpace(ErrorMessage))
+            {
+                return Strings.NODE_STATUS_ERROR;
+            }
+
+            return Status?.Success == true ? Strings.NODE_STATUS_CONNECTED : Strings.NODE_STATUS_UNAVAILABLE;
+        }
+    }
+
+    private string RefreshButtonText => IsLoading ? Strings.NODE_REFRESHING : Strings.NODE_REFRESH;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await RefreshStatusAsync();
+    }
+
+    private async Task RefreshStatusAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ConnectionId))
+        {
+            ErrorMessage = Strings.NODE_STATUS_INVALID_CONNECTION;
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(m_DisposeCancellation.Token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(5));
+            var response = await MasterOverview.RequestServiceAdminStatusAsync(ConnectionId, timeout.Token);
+            Status = response;
+            ErrorMessage = response.Success ? null : response.ErrorMessage;
+        }
+        catch (OperationCanceledException) when (m_DisposeCancellation.IsCancellationRequested)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+            ErrorMessage = Strings.NODE_STATUS_TIMEOUT;
+        }
+        catch (Exception e)
+        {
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private bool TryGetConnection([NotNullWhen(true)] out MasterConnectionSnapshot? connection)
+    {
+        connection = null;
+        if (!Guid.TryParse(ConnectionId, out var connectionId))
+        {
+            return false;
+        }
+
+        connection = MasterOverview.GetState().Snapshot.Connections.FirstOrDefault(item => item.ConnectionId == connectionId);
+        return connection != null;
+    }
+
+    public void Dispose()
+    {
+        m_DisposeCancellation.Cancel();
+        m_DisposeCancellation.Dispose();
+    }
+
+    private static string GetNodeKindText(MasterNodeKind nodeKind)
+    {
+        return nodeKind switch
+        {
+            MasterNodeKind.Gateway => Strings.NODE_KIND_GATEWAY,
+            MasterNodeKind.Dedicated => Strings.NODE_KIND_DEDICATED,
+            MasterNodeKind.MasterAdmin => Strings.NODE_KIND_MASTER_ADMIN,
+            _ => Strings.NODE_KIND_UNKNOWN
+        };
+    }
+}

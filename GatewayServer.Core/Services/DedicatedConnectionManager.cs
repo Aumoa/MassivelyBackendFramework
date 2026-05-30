@@ -12,17 +12,23 @@ using PacketCore;
 
 namespace GatewayServer.Services;
 
+internal interface IDedicatedConnectionStatusProvider
+{
+    ServiceAdminStatusItem[] GetStatusItems();
+}
+
 internal sealed class DedicatedConnectionManager(
     IOptions<DedicatedConnectionOptions> options,
     IOptions<MasterConnectionOptions> gatewayIdentity,
     IDedicatedNodeCatalog catalog,
-    ILogger<DedicatedConnectionManager> logger) : IHostedService
+    ILogger<DedicatedConnectionManager> logger) : IHostedService, IDedicatedConnectionStatusProvider
 {
     private readonly DedicatedConnectionOptions m_Options = options.Value;
     private readonly MasterConnectionOptions m_GatewayIdentity = gatewayIdentity.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly object m_PeersSync = new();
     private readonly Dictionary<string, DedicatedPeer> m_Peers = [];
+    private readonly ConcurrentDictionary<string, string> m_PeerStates = [];
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -83,6 +89,7 @@ internal sealed class DedicatedConnectionManager(
                     !HasSameEndpoint(current.Node, next))
                 {
                     m_Peers.Remove(current.Node.MasterConnectionId);
+                    m_PeerStates.TryRemove(current.Node.MasterConnectionId, out _);
                     removed.Add(current);
                 }
             }
@@ -97,6 +104,7 @@ internal sealed class DedicatedConnectionManager(
                 var peerCancellation = CancellationTokenSource.CreateLinkedTokenSource(m_Shutdown.Token);
                 var task = RunPeerAsync(node, peerCancellation.Token);
                 m_Peers[node.MasterConnectionId] = new DedicatedPeer(node, peerCancellation, task);
+                m_PeerStates[node.MasterConnectionId] = "Discovered";
             }
         }
 
@@ -112,7 +120,9 @@ internal sealed class DedicatedConnectionManager(
         {
             try
             {
+                m_PeerStates[node.MasterConnectionId] = "Connecting";
                 await RunSessionAsync(node, cancellationToken).ConfigureAwait(false);
+                m_PeerStates[node.MasterConnectionId] = "Disconnected";
                 logger.LogInformation(
                     "Dedicated direct connection closed. DedicatedNodeId={NodeId}, Endpoint={Address}:{Port}.",
                     node.NodeId,
@@ -125,6 +135,7 @@ internal sealed class DedicatedConnectionManager(
             }
             catch (TimeoutException e)
             {
+                m_PeerStates[node.MasterConnectionId] = "Handshake timeout";
                 logger.LogWarning(
                     "Dedicated direct handshake timed out. DedicatedNodeId={NodeId}, Message={Message}.",
                     node.NodeId,
@@ -132,6 +143,7 @@ internal sealed class DedicatedConnectionManager(
             }
             catch (Exception e)
             {
+                m_PeerStates[node.MasterConnectionId] = "Reconnecting";
                 logger.LogWarning(
                     e,
                     "Dedicated direct connection failed. DedicatedNodeId={NodeId}, Endpoint={Address}:{Port}.",
@@ -161,6 +173,7 @@ internal sealed class DedicatedConnectionManager(
         socket.NoDelay = true;
 
         await socket.ConnectAsync(new IPEndPoint(address, endpoint.Port), cancellationToken).ConfigureAwait(false);
+        m_PeerStates[node.MasterConnectionId] = "Connected";
         logger.LogInformation(
             "Gateway connected to Dedicated node. DedicatedNodeId={NodeId}, Endpoint={Address}:{Port}.",
             node.NodeId,
@@ -185,6 +198,7 @@ internal sealed class DedicatedConnectionManager(
             }
 
             var accepted = await CompleteHandshakeAsync(activeStream, cancellationToken).ConfigureAwait(false);
+            m_PeerStates[node.MasterConnectionId] = "Trusted";
             logger.LogInformation(
                 "Gateway Dedicated direct session trusted. DedicatedNodeId={DedicatedNodeId}, GatewayNodeId={GatewayNodeId}, DedicatedConnectionId={ConnectionId}.",
                 node.NodeId,
@@ -327,6 +341,35 @@ internal sealed class DedicatedConnectionManager(
         {
             throw new InvalidOperationException("DedicatedConnection:SharedSecret must be configured.");
         }
+    }
+
+    public ServiceAdminStatusItem[] GetStatusItems()
+    {
+        DedicatedPeer[] peers;
+        lock (m_PeersSync)
+        {
+            peers = [.. m_Peers.Values];
+        }
+
+        var items = new List<ServiceAdminStatusItem>
+        {
+            new("Dedicated", "Configured", m_Options.Enabled ? "Enabled" : "Disabled"),
+            new("Dedicated", "Discovered nodes", peers.Length.ToString())
+        };
+
+        foreach (var peer in peers.OrderBy(static peer => peer.Node.NodeId, StringComparer.Ordinal))
+        {
+            var state = m_PeerStates.TryGetValue(peer.Node.MasterConnectionId, out var peerState)
+                ? peerState
+                : "Unknown";
+            var group = $"Dedicated {peer.Node.NodeId}";
+            items.Add(new ServiceAdminStatusItem(group, "State", state));
+            items.Add(new ServiceAdminStatusItem(group, "Endpoint", $"{peer.Node.GatewayEndpoint.IPAddress}:{peer.Node.GatewayEndpoint.Port}"));
+            items.Add(new ServiceAdminStatusItem(group, "TLS", peer.Node.GatewayEndpoint.UseTls ? "Enabled" : "Disabled"));
+            items.Add(new ServiceAdminStatusItem(group, "Master connection", peer.Node.MasterConnectionId));
+        }
+
+        return [.. items];
     }
 
     private static bool HasSameEndpoint(DedicatedNodeEndpoint left, DedicatedNodeEndpoint right)

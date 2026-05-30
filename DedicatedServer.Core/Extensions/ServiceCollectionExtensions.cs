@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IDedicatedWorldRuntime, NoOpDedicatedWorldRuntime>();
         services.AddHostedService<DedicatedWorldHostedService>();
         services.AddSingleton<GatewayConnectionManager>();
+        services.AddSingleton<IGatewayConnectionStatusProvider>(static provider => provider.GetRequiredService<GatewayConnectionManager>());
         services.AddHostedService(static provider => provider.GetRequiredService<GatewayConnectionManager>());
         services.AddSingleton<MasterConnectionManager>();
         services.AddHostedService(static provider => provider.GetRequiredService<MasterConnectionManager>());

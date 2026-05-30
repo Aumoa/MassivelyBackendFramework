@@ -15,6 +15,7 @@ namespace GatewayServer.Services;
 internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
     IDedicatedNodeCatalogWriter dedicatedNodeCatalog,
+    IDedicatedConnectionStatusProvider dedicatedConnectionStatusProvider,
     ILogger<MasterConnectionManager> logger) : IHostedService, IMasterConnectionStatusProvider
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
@@ -298,9 +299,68 @@ internal sealed class MasterConnectionManager(
                     var snapshot = PacketCodec.Decode(frame, DedicatedNodeSnapshot.Codec);
                     dedicatedNodeCatalog.Publish(snapshot);
                     logger.LogInformation("Gateway received Dedicated discovery snapshot. DedicatedCount={Count}.", snapshot.Nodes.Length);
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.ServiceAdminStatusRequest)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.ServiceAdminStatusRequest);
+                    var request = PacketCodec.Decode(frame, ServiceAdminStatusRequest.Codec);
+                    await WriteServiceAdminStatusResponseAsync(stream, request, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
+    }
+
+    private async Task WriteServiceAdminStatusResponseAsync(
+        Stream stream,
+        ServiceAdminStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        var status = GetStatus();
+        var items = new List<ServiceAdminStatusItem>
+        {
+            new("Master", "State", status.State.ToString()),
+            new("Master", "Trusted", status.IsTrusted ? "Yes" : "No"),
+            new("Master", "Endpoint", status.Endpoint),
+            new("Master", "Last changed", status.LastChangedAt.LocalDateTime.ToString("O"))
+        };
+
+        if (status.LastConnectedAt.HasValue)
+        {
+            items.Add(new ServiceAdminStatusItem("Master", "Last connected", status.LastConnectedAt.Value.LocalDateTime.ToString("O")));
+        }
+
+        if (status.LastTrustedAt.HasValue)
+        {
+            items.Add(new ServiceAdminStatusItem("Master", "Last trusted", status.LastTrustedAt.Value.LocalDateTime.ToString("O")));
+        }
+
+        if (!string.IsNullOrWhiteSpace(status.LastError))
+        {
+            items.Add(new ServiceAdminStatusItem("Master", "Last error", status.LastError));
+        }
+
+        items.AddRange(dedicatedConnectionStatusProvider.GetStatusItems());
+
+        var response = new ServiceAdminStatusResponse(
+            request.RequestId,
+            success: true,
+            MasterNodeKind.Gateway,
+            status.NodeId,
+            status.DisplayName,
+            status.MasterConnectionId ?? request.TargetConnectionId,
+            [.. items],
+            string.Empty,
+            DateTimeOffset.UtcNow);
+        using var frame = PacketCodec.Encode(
+            PacketKind.Control,
+            MasterControlPacketIds.ServiceAdminStatusResponse,
+            MasterControlProtocol.SchemaVersion,
+            response,
+            ServiceAdminStatusResponse.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
     }
 
     private void EnsureConfigured()

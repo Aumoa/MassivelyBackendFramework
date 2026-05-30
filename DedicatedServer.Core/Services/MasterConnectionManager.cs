@@ -14,17 +14,26 @@ namespace DedicatedServer.Services;
 internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
     IOptions<GatewayListenerOptions> gatewayListenerOptions,
+    IGatewayConnectionStatusProvider gatewayConnectionStatusProvider,
     ILogger<MasterConnectionManager> logger) : IHostedService
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
     private readonly GatewayListenerOptions m_GatewayListenerOptions = gatewayListenerOptions.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
+    private readonly object m_StatusSync = new();
     private Task? m_RunTask;
+    private string m_State = "Disconnected";
+    private string? m_MasterConnectionId;
+    private string? m_LastError;
+    private DateTimeOffset m_LastChangedAt = DateTimeOffset.UtcNow;
+    private DateTimeOffset? m_LastConnectedAt;
+    private DateTimeOffset? m_LastTrustedAt;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
         if (!m_Options.Enabled)
         {
+            SetStatus("Disabled");
             logger.LogInformation("Dedicated Master control-plane connection is disabled.");
             return Task.CompletedTask;
         }
@@ -51,6 +60,7 @@ internal sealed class MasterConnectionManager(
             try
             {
                 await RunSessionAsync(cancellationToken).ConfigureAwait(false);
+                SetStatus("Disconnected");
                 logger.LogInformation("Dedicated Master control-plane connection closed.");
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -59,6 +69,7 @@ internal sealed class MasterConnectionManager(
             }
             catch (TimeoutException e)
             {
+                SetStatus("Reconnecting", lastError: e.Message);
                 logger.LogWarning(
                     "Dedicated Master handshake timed out: {Message} Endpoint={Address}:{Port}.",
                     e.Message,
@@ -67,6 +78,7 @@ internal sealed class MasterConnectionManager(
             }
             catch (Exception e)
             {
+                SetStatus("Reconnecting", lastError: e.Message);
                 logger.LogWarning(
                     e,
                     "Dedicated Master control-plane session ended before it could be maintained. Endpoint={Address}:{Port}.",
@@ -93,7 +105,9 @@ internal sealed class MasterConnectionManager(
         using var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         socket.NoDelay = true;
 
+        SetStatus("Connecting");
         await socket.ConnectAsync(new IPEndPoint(address, m_Options.Port), cancellationToken).ConfigureAwait(false);
+        SetStatus("Handshaking", markConnected: true);
         logger.LogInformation("Dedicated connected to Master socket at {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
 
         await using var networkStream = new NetworkStream(socket, ownsSocket: false);
@@ -114,6 +128,7 @@ internal sealed class MasterConnectionManager(
             }
 
             var accepted = await CompleteHandshakeAsync(activeStream, cancellationToken).ConfigureAwait(false);
+            SetStatus("Trusted", masterConnectionId: accepted.ConnectionId, markTrusted: true);
             logger.LogInformation(
                 "Dedicated Master control-plane session trusted. NodeId={NodeId}, MasterConnectionId={ConnectionId}.",
                 accepted.NodeId,
@@ -246,7 +261,7 @@ internal sealed class MasterConnectionManager(
         }
     }
 
-    private static async Task DrainTrustedFramesAsync(Stream stream, CancellationToken cancellationToken)
+    private async Task DrainTrustedFramesAsync(Stream stream, CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -262,8 +277,80 @@ internal sealed class MasterConnectionManager(
 
             using (frame)
             {
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.ServiceAdminStatusRequest)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.ServiceAdminStatusRequest);
+                    var request = PacketCodec.Decode(frame, ServiceAdminStatusRequest.Codec);
+                    await WriteServiceAdminStatusResponseAsync(stream, request, cancellationToken).ConfigureAwait(false);
+                }
             }
         }
+    }
+
+    private async Task WriteServiceAdminStatusResponseAsync(
+        Stream stream,
+        ServiceAdminStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        string state;
+        string? masterConnectionId;
+        string? lastError;
+        DateTimeOffset lastChangedAt;
+        DateTimeOffset? lastConnectedAt;
+        DateTimeOffset? lastTrustedAt;
+
+        lock (m_StatusSync)
+        {
+            state = m_State;
+            masterConnectionId = m_MasterConnectionId;
+            lastError = m_LastError;
+            lastChangedAt = m_LastChangedAt;
+            lastConnectedAt = m_LastConnectedAt;
+            lastTrustedAt = m_LastTrustedAt;
+        }
+
+        var items = new List<ServiceAdminStatusItem>
+        {
+            new("Master", "State", state),
+            new("Master", "Endpoint", $"{m_Options.IPAddress}:{m_Options.Port}"),
+            new("Master", "Last changed", lastChangedAt.LocalDateTime.ToString("O"))
+        };
+
+        if (lastConnectedAt.HasValue)
+        {
+            items.Add(new ServiceAdminStatusItem("Master", "Last connected", lastConnectedAt.Value.LocalDateTime.ToString("O")));
+        }
+
+        if (lastTrustedAt.HasValue)
+        {
+            items.Add(new ServiceAdminStatusItem("Master", "Last trusted", lastTrustedAt.Value.LocalDateTime.ToString("O")));
+        }
+
+        if (!string.IsNullOrWhiteSpace(lastError))
+        {
+            items.Add(new ServiceAdminStatusItem("Master", "Last error", lastError));
+        }
+
+        items.AddRange(gatewayConnectionStatusProvider.GetStatusItems());
+
+        var response = new ServiceAdminStatusResponse(
+            request.RequestId,
+            success: true,
+            MasterNodeKind.Dedicated,
+            m_Options.NodeId,
+            m_Options.DisplayName,
+            masterConnectionId ?? request.TargetConnectionId,
+            [.. items],
+            string.Empty,
+            DateTimeOffset.UtcNow);
+        using var frame = PacketCodec.Encode(
+            PacketKind.Control,
+            MasterControlPacketIds.ServiceAdminStatusResponse,
+            MasterControlProtocol.SchemaVersion,
+            response,
+            ServiceAdminStatusResponse.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
     }
 
     private void EnsureConfigured()
@@ -276,6 +363,39 @@ internal sealed class MasterConnectionManager(
         if (string.IsNullOrWhiteSpace(m_Options.SharedSecret))
         {
             throw new InvalidOperationException("MasterConnection:SharedSecret must be configured.");
+        }
+    }
+
+    private void SetStatus(
+        string state,
+        string? masterConnectionId = null,
+        string? lastError = null,
+        bool markConnected = false,
+        bool markTrusted = false)
+    {
+        var now = DateTimeOffset.UtcNow;
+        lock (m_StatusSync)
+        {
+            m_State = state;
+            m_LastChangedAt = now;
+            m_LastError = state is "Connecting" or "Handshaking" or "Trusted"
+                ? null
+                : lastError;
+
+            if (masterConnectionId != null)
+            {
+                m_MasterConnectionId = masterConnectionId;
+            }
+
+            if (markConnected)
+            {
+                m_LastConnectedAt = now;
+            }
+
+            if (markTrusted)
+            {
+                m_LastTrustedAt = now;
+            }
         }
     }
 
