@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using MasterServer.ControlPlane;
 using MasterServer.Options;
@@ -40,6 +41,11 @@ internal sealed class ConnectionManager(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(m_Options.NodeAuthSecret))
+        {
+            throw new InvalidOperationException("MasterSocket:NodeAuthSecret must be configured before accepting node connections.");
+        }
+
         if (m_Options.UseTls)
         {
             m_Cert = await LoadCertificateAsync(m_Options, cancellationToken).ConfigureAwait(false);
@@ -161,6 +167,7 @@ internal sealed class ConnectionManager(
                 activeStream = sslStream;
             }
 
+            await AuthenticateNodeAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
             await DrainUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -188,7 +195,7 @@ internal sealed class ConnectionManager(
         {
             var frame = await PacketFrameReader.ReadAsync(
                 stream,
-                PacketReadPolicy.TrustedServer,
+                MasterControlProtocol.TrustedControlPlanePolicy,
                 cancellationToken).ConfigureAwait(false);
 
             if (frame == null)
@@ -201,6 +208,98 @@ internal sealed class ConnectionManager(
                 connection.MarkSeen();
             }
         }
+    }
+
+    private async Task AuthenticateNodeAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)
+    {
+        using var handshakeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        handshakeTimeout.CancelAfter(TimeSpan.FromMilliseconds(Math.Max(1, m_Options.HandshakeTimeoutMilliseconds)));
+
+        var challenge = CreateChallenge();
+        using (var challengeFrame = PacketCodec.Encode(
+                   PacketKind.Control,
+                   MasterControlPacketIds.NodeAuthChallenge,
+                   MasterControlProtocol.SchemaVersion,
+                   challenge,
+                   NodeAuthChallenge.Codec))
+        {
+            await PacketFrameWriter.WriteAsync(stream, challengeFrame, handshakeTimeout.Token).ConfigureAwait(false);
+        }
+
+        using var helloFrame = await ReadRequiredHandshakeFrameAsync(
+            stream,
+            MasterControlPacketIds.NodeHello,
+            handshakeTimeout.Token).ConfigureAwait(false);
+        var hello = PacketCodec.Decode(helloFrame, NodeHello.Codec);
+
+        if (hello.ProtocolVersion != MasterControlProtocol.SchemaVersion)
+        {
+            throw new InvalidOperationException($"Unsupported node protocol version {hello.ProtocolVersion}.");
+        }
+
+        using var proofFrame = await ReadRequiredHandshakeFrameAsync(
+            stream,
+            MasterControlPacketIds.NodeAuthProof,
+            handshakeTimeout.Token).ConfigureAwait(false);
+        var proof = PacketCodec.Decode(proofFrame, NodeAuthProof.Codec);
+
+        if (!MasterNodeAuthenticator.VerifyProof(challenge, hello, proof, m_Options.NodeAuthSecret))
+        {
+            throw new UnauthorizedAccessException($"Node authentication proof was rejected for node '{hello.NodeId}'.");
+        }
+
+        var accepted = new NodeAccepted(hello.NodeId, connection.ConnectionId.ToString("N"));
+        using (var acceptedFrame = PacketCodec.Encode(
+                   PacketKind.Control,
+                   MasterControlPacketIds.NodeAccepted,
+                   MasterControlProtocol.SchemaVersion,
+                   accepted,
+                   NodeAccepted.Codec))
+        {
+            await PacketFrameWriter.WriteAsync(stream, acceptedFrame, handshakeTimeout.Token).ConfigureAwait(false);
+        }
+
+        connection.MarkAccepted(hello.NodeKind, hello.NodeId);
+        logger.LogInformation(
+            "Master node accepted. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
+            connection.ConnectionId,
+            hello.NodeKind,
+            hello.NodeId);
+    }
+
+    private static async Task<PacketFrame> ReadRequiredHandshakeFrameAsync(
+        Stream stream,
+        ushort expectedPacketId,
+        CancellationToken cancellationToken)
+    {
+        var frame = await PacketFrameReader.ReadAsync(
+            stream,
+            MasterControlProtocol.UntrustedHandshakePolicy,
+            cancellationToken).ConfigureAwait(false);
+
+        if (frame == null)
+        {
+            throw new EndOfStreamException("Node connection closed before Master handshake completed.");
+        }
+
+        try
+        {
+            MasterControlProtocol.ValidateControlFrame(frame, expectedPacketId);
+            return frame;
+        }
+        catch
+        {
+            frame.Dispose();
+            throw;
+        }
+    }
+
+    private static NodeAuthChallenge CreateChallenge()
+    {
+        byte[] nonce = new byte[MasterControlProtocol.AuthNonceLength];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(nonce);
+        return new NodeAuthChallenge(Guid.NewGuid().ToString("N"), nonce);
     }
 
     private static async Task WaitForShutdownAsync(Task task, CancellationToken cancellationToken)
@@ -240,14 +339,29 @@ internal sealed class ConnectionManager(
     private sealed class MasterConnection(Socket socket) : IDisposable
     {
         private long m_LastSeenAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        private int m_Trusted;
 
         public Guid ConnectionId { get; } = Guid.NewGuid();
 
         public Socket Socket { get; } = socket;
 
+        public MasterNodeKind NodeKind { get; private set; } = MasterNodeKind.Unknown;
+
+        public string NodeId { get; private set; } = string.Empty;
+
         public string RemoteEndPoint { get; } = socket.RemoteEndPoint?.ToString() ?? "unknown";
 
         public DateTimeOffset ConnectedAt { get; } = DateTimeOffset.UtcNow;
+
+        public bool IsTrusted => Volatile.Read(ref m_Trusted) == 1;
+
+        public void MarkAccepted(MasterNodeKind nodeKind, string nodeId)
+        {
+            NodeKind = nodeKind;
+            NodeId = nodeId;
+            MarkSeen();
+            Volatile.Write(ref m_Trusted, 1);
+        }
 
         public void MarkSeen()
         {
@@ -259,7 +373,7 @@ internal sealed class ConnectionManager(
             return new MasterConnectionSnapshot(
                 ConnectionId,
                 RemoteEndPoint,
-                MasterNodeKind.Unknown,
+                IsTrusted ? NodeKind : MasterNodeKind.Unknown,
                 ConnectedAt,
                 DateTimeOffset.FromUnixTimeMilliseconds(Interlocked.Read(ref m_LastSeenAt)));
         }
