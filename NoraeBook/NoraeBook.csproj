@@ -8,7 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="MySql.Data" Version="9.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ASPNETUtility\ASPNETUtility.csproj" />
+    <ProjectReference Include="..\NoraeBook.SQL\NoraeBook.SQL.csproj" />
     <ProjectReference Include="..\OpenIDConnect.Core\OpenIDConnect.Core.csproj" />
+    <ProjectReference Include="..\SQLMigration\SQLMigration.csproj" />
   </ItemGroup>
 
   <ItemGroup>

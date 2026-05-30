@@ -1,8 +1,13 @@
+using ASPNETUtility;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using NoraeBook.Components;
+using NoraeBook.Options;
+using NoraeBook.Repositories;
 using NoraeBook.Services;
+using NoraeBook.SQL.Migration;
 using OpenIDConnect.Extensions;
+using SQLMigration;
 
 var builder = WebApplication.CreateBuilder(args);
 ValidateProductionAllowedHosts(builder);
@@ -19,7 +24,8 @@ ConfigureDataProtection(builder);
 builder.Services.AddAuthorizationCore();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenIDConnect(builder.Configuration);
-builder.Services.AddSingleton<IKaraokeSongRepository, InMemoryKaraokeSongRepository>();
+builder.Services.Configure<MySqlOptions>(builder.Configuration.GetRequiredSection("MySql"));
+builder.Services.AddScoped<IKaraokeSongRepository, MySqlKaraokeSongRepository>();
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
@@ -54,7 +60,14 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+if (app.Environment.IsDevelopment())
+{
+    await StartMigrationAsync(app.Lifetime.ApplicationStopping);
+}
+
 app.Run();
+
+return;
 
 static void ValidateProductionAllowedHosts(WebApplicationBuilder builder)
 {
@@ -91,4 +104,12 @@ static void ConfigureDataProtection(WebApplicationBuilder builder)
     builder.Services.AddDataProtection()
         .PersistKeysToFileSystem(new DirectoryInfo(resolvedKeyPath))
         .SetApplicationName("NoraeBook");
+}
+
+async ValueTask StartMigrationAsync(CancellationToken cancellationToken)
+{
+    var options = app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<MySqlOptions>>();
+    var scripts = new Scripts();
+    var logger = new LoggerTextWriter(app.Logger);
+    await Executor.RunAsync(options.Value.ConnectionString, options.Value.Database, [.. scripts.GetScripts()], logger, cancellationToken);
 }
