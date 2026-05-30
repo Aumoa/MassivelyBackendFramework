@@ -60,9 +60,6 @@
   <data name="HOME_TITLE" xml:space="preserve">
     <value>Playlist shelf</value>
   </data>
-  <data name="HOME_SUMMARY" xml:space="preserve">
-    <value>A small web service foundation for saving karaoke song picks and playlist drafts.</value>
-  </data>
   <data name="HOME_WORKSPACE_ARIA" xml:space="preserve">
     <value>NoraeBook workspace</value>
   </data>
@@ -77,21 +74,6 @@
   </data>
   <data name="HOME_EMPTY_DESCRIPTION" xml:space="preserve">
     <value>Add the first song to start building this list.</value>
-  </data>
-  <data name="HOME_NEXT_TITLE" xml:space="preserve">
-    <value>Tag presets</value>
-  </data>
-  <data name="HOME_NEXT_AUTH" xml:space="preserve">
-    <value>Male, female, and mixed tags are built in</value>
-  </data>
-  <data name="HOME_NEXT_PLAYLISTS" xml:space="preserve">
-    <value>Custom tags can be added per song</value>
-  </data>
-  <data name="HOME_NEXT_STORAGE" xml:space="preserve">
-    <value>The in-memory store can be replaced with persistence later</value>
-  </data>
-  <data name="STATUS_PLANNED" xml:space="preserve">
-    <value>Planned</value>
   </data>
   <data name="SONG_COUNT_FORMAT" xml:space="preserve">
     <value>{0} songs</value>

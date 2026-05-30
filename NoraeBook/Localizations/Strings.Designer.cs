@@ -66,19 +66,9 @@ namespace NoraeBook.Localizations
 
         internal static string HOME_EYEBROW => ResourceManager.GetString("HOME_EYEBROW", resourceCulture)!;
 
-        internal static string HOME_NEXT_AUTH => ResourceManager.GetString("HOME_NEXT_AUTH", resourceCulture)!;
-
-        internal static string HOME_NEXT_PLAYLISTS => ResourceManager.GetString("HOME_NEXT_PLAYLISTS", resourceCulture)!;
-
-        internal static string HOME_NEXT_STORAGE => ResourceManager.GetString("HOME_NEXT_STORAGE", resourceCulture)!;
-
-        internal static string HOME_NEXT_TITLE => ResourceManager.GetString("HOME_NEXT_TITLE", resourceCulture)!;
-
         internal static string HOME_QUEUE_DESCRIPTION => ResourceManager.GetString("HOME_QUEUE_DESCRIPTION", resourceCulture)!;
 
         internal static string HOME_QUEUE_TITLE => ResourceManager.GetString("HOME_QUEUE_TITLE", resourceCulture)!;
-
-        internal static string HOME_SUMMARY => ResourceManager.GetString("HOME_SUMMARY", resourceCulture)!;
 
         internal static string HOME_TITLE => ResourceManager.GetString("HOME_TITLE", resourceCulture)!;
 
@@ -140,6 +130,5 @@ namespace NoraeBook.Localizations
 
         internal static string SONG_VALIDATION_TITLE => ResourceManager.GetString("SONG_VALIDATION_TITLE", resourceCulture)!;
 
-        internal static string STATUS_PLANNED => ResourceManager.GetString("STATUS_PLANNED", resourceCulture)!;
     }
 }
