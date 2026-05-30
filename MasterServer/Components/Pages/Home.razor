@@ -1,4 +1,5 @@
 @page "/"
+@implements IDisposable
 @inject IConnectionManager ConnectionManager
 
 <PageTitle>@Strings.APP_TITLE</PageTitle>
@@ -87,7 +88,27 @@
     protected override void OnInitialized()
     {
         Endpoint = ConnectionManager.GetSocketEndpoint();
+        RefreshConnections();
+        ConnectionManager.ConnectionsChanged += OnConnectionsChanged;
+    }
+
+    private void OnConnectionsChanged()
+    {
+        _ = InvokeAsync(() =>
+        {
+            RefreshConnections();
+            StateHasChanged();
+        });
+    }
+
+    private void RefreshConnections()
+    {
         Connections = ConnectionManager.GetConnectionSnapshots();
+    }
+
+    public void Dispose()
+    {
+        ConnectionManager.ConnectionsChanged -= OnConnectionsChanged;
     }
 
     private static string GetNodeKindText(MasterNodeKind nodeKind)

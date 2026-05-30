@@ -27,6 +27,8 @@ internal sealed class ConnectionManager(
     private Task? m_AcceptTask;
     private X509Certificate2? m_Cert;
 
+    public event Action? ConnectionsChanged;
+
     public MasterSocketEndpoint GetSocketEndpoint()
     {
         return new MasterSocketEndpoint(m_Options.IPAddress, m_Options.Port, m_Options.UseTls);
@@ -128,6 +130,8 @@ internal sealed class ConnectionManager(
             return;
         }
 
+        NotifyConnectionsChanged();
+
         var task = HandleConnectionAsync(connection, cancellationToken);
         m_ConnectionTasks.TryAdd(connection.ConnectionId, task);
 
@@ -137,6 +141,7 @@ internal sealed class ConnectionManager(
                 m_ConnectionTasks.TryRemove(connection.ConnectionId, out _);
                 m_Connections.TryRemove(connection.ConnectionId, out _);
                 connection.Dispose();
+                NotifyConnectionsChanged();
 
                 if (completed.Exception != null)
                 {
@@ -206,6 +211,7 @@ internal sealed class ConnectionManager(
             using (frame)
             {
                 connection.MarkSeen();
+                NotifyConnectionsChanged();
             }
         }
     }
@@ -260,6 +266,7 @@ internal sealed class ConnectionManager(
         }
 
         connection.MarkAccepted(hello.NodeKind, hello.NodeId);
+        NotifyConnectionsChanged();
         logger.LogInformation(
             "Master node accepted. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
             connection.ConnectionId,
@@ -300,6 +307,27 @@ internal sealed class ConnectionManager(
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(nonce);
         return new NodeAuthChallenge(Guid.NewGuid().ToString("N"), nonce);
+    }
+
+    private void NotifyConnectionsChanged()
+    {
+        var handlers = ConnectionsChanged;
+        if (handlers == null)
+        {
+            return;
+        }
+
+        foreach (Action handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler();
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Master connection change subscriber failed.");
+            }
+        }
     }
 
     private static async Task WaitForShutdownAsync(Task task, CancellationToken cancellationToken)
