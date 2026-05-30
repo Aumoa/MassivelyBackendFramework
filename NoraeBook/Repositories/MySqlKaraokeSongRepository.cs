@@ -49,8 +49,7 @@ ORDER BY `tag` ASC";
             .GroupBy(static tag => tag.SongId)
             .ToDictionary(
                 static group => group.Key,
-                static group => (IReadOnlyList<string>)[.. group.Select(static tag => tag.Tag)],
-                StringComparer.Ordinal);
+                static group => (IReadOnlyList<string>)[.. group.Select(static tag => tag.Tag)]);
 
         return songRows
             .Select(song => song.ToEntry(tagsBySongId.GetValueOrDefault(song.Id, [])))
@@ -248,7 +247,7 @@ ORDER BY `tag` ASC";
 
     private sealed class SongRow
     {
-        public string Id { get; set; } = string.Empty;
+        public Guid Id { get; set; }
 
         public int SongNumber { get; set; }
 
@@ -263,7 +262,7 @@ ORDER BY `tag` ASC";
         public KaraokeSongEntry ToEntry(IReadOnlyList<string> tags)
         {
             return new KaraokeSongEntry(
-                Guid.Parse(Id),
+                Id,
                 SongNumber,
                 Artist,
                 Title,
@@ -275,7 +274,7 @@ ORDER BY `tag` ASC";
 
     private sealed class TagRow
     {
-        public string SongId { get; set; } = string.Empty;
+        public Guid SongId { get; set; }
 
         public string Tag { get; set; } = string.Empty;
     }
