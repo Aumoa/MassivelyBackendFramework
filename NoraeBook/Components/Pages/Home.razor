@@ -1,0 +1,35 @@
+@page "/"
+
+<PageTitle>@Strings.APP_TITLE</PageTitle>
+
+<section class="page-header">
+    <p class="eyebrow">@Strings.HOME_EYEBROW</p>
+    <h1>@Strings.HOME_TITLE</h1>
+    <p class="summary">@Strings.HOME_SUMMARY</p>
+</section>
+
+<section class="workspace-grid" aria-label="@Strings.HOME_WORKSPACE_ARIA">
+    <article class="panel">
+        <div class="panel-heading">
+            <div>
+                <h2>@Strings.HOME_QUEUE_TITLE</h2>
+                <p>@Strings.HOME_QUEUE_DESCRIPTION</p>
+            </div>
+            <span class="status-pill">@Strings.STATUS_PLANNED</span>
+        </div>
+
+        <div class="empty-state">
+            <strong>@Strings.HOME_EMPTY_TITLE</strong>
+            <span>@Strings.HOME_EMPTY_DESCRIPTION</span>
+        </div>
+    </article>
+
+    <aside class="panel side-panel">
+        <h2>@Strings.HOME_NEXT_TITLE</h2>
+        <ul class="roadmap">
+            <li>@Strings.HOME_NEXT_AUTH</li>
+            <li>@Strings.HOME_NEXT_PLAYLISTS</li>
+            <li>@Strings.HOME_NEXT_STORAGE</li>
+        </ul>
+    </aside>
+</section>

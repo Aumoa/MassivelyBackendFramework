@@ -81,6 +81,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DedicatedServer.Core", "Ded
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DedicatedServer", "DedicatedServer\DedicatedServer.csproj", "{A34C552C-5625-454B-9384-39D56A0949AB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NoraeBook", "NoraeBook\NoraeBook.csproj", "{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -511,6 +513,18 @@ Global
 		{A34C552C-5625-454B-9384-39D56A0949AB}.Release|x64.Build.0 = Release|Any CPU
 		{A34C552C-5625-454B-9384-39D56A0949AB}.Release|x86.ActiveCfg = Release|Any CPU
 		{A34C552C-5625-454B-9384-39D56A0949AB}.Release|x86.Build.0 = Release|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Debug|x64.Build.0 = Debug|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Debug|x86.Build.0 = Debug|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Release|x64.ActiveCfg = Release|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Release|x64.Build.0 = Release|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Release|x86.ActiveCfg = Release|Any CPU
+		{FCDDEB6C-02C0-476A-92A2-3B19A710EFEE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
