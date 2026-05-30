@@ -30,6 +30,8 @@ internal sealed class GatewayConnectionManager(
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
     private readonly ConcurrentDictionary<Guid, string> m_GatewayConnectionStates = [];
     private readonly ConcurrentDictionary<Guid, string> m_GatewayNodeIds = [];
+    private readonly ConcurrentDictionary<Guid, string> m_GatewayDisplayNames = [];
+    private readonly ConcurrentDictionary<Guid, string> m_GatewayMasterConnectionIds = [];
     private Socket? m_Socket;
     private Task? m_AcceptTask;
     private X509Certificate2? m_Cert;
@@ -119,6 +121,8 @@ internal sealed class GatewayConnectionManager(
                 m_ConnectionTasks.TryRemove(connectionId, out _);
                 m_GatewayConnectionStates.TryRemove(connectionId, out _);
                 m_GatewayNodeIds.TryRemove(connectionId, out _);
+                m_GatewayDisplayNames.TryRemove(connectionId, out _);
+                m_GatewayMasterConnectionIds.TryRemove(connectionId, out _);
                 socket.Dispose();
 
                 if (completed.Exception != null)
@@ -154,7 +158,6 @@ internal sealed class GatewayConnectionManager(
 
             var acceptedGateway = await AuthenticateGatewayAsync(connectionId, activeStream, cancellationToken).ConfigureAwait(false);
             gatewayNodeId = acceptedGateway.NodeId;
-            m_GatewayNodeIds[connectionId] = gatewayNodeId;
             m_GatewayConnectionStates[connectionId] = "Trusted";
             logger.LogInformation(
                 "Dedicated accepted Gateway direct connection. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, RemoteEndPoint={RemoteEndPoint}.",
@@ -231,6 +234,13 @@ internal sealed class GatewayConnectionManager(
         if (hello.ProtocolVersion != MasterControlProtocol.SchemaVersion)
         {
             throw new InvalidOperationException($"Unsupported Gateway protocol version {hello.ProtocolVersion}.");
+        }
+
+        m_GatewayNodeIds[connectionId] = hello.NodeId;
+        m_GatewayDisplayNames[connectionId] = hello.DisplayName;
+        if (!string.IsNullOrWhiteSpace(hello.MasterConnectionId))
+        {
+            m_GatewayMasterConnectionIds[connectionId] = hello.MasterConnectionId;
         }
 
         using var proofFrame = await ReadRequiredHandshakeFrameAsync(
@@ -345,9 +355,20 @@ internal sealed class GatewayConnectionManager(
         {
             var group = $"Gateway {pair.Key:N}"[..24];
             var nodeId = m_GatewayNodeIds.TryGetValue(pair.Key, out var value) ? value : "unknown";
+            var displayName = m_GatewayDisplayNames.TryGetValue(pair.Key, out var name) ? name : string.Empty;
             items.Add(new ServiceAdminStatusItem(group, "State", pair.Value));
             items.Add(new ServiceAdminStatusItem(group, "Node", nodeId));
-            items.Add(new ServiceAdminStatusItem(group, "Connection", pair.Key.ToString("N")));
+            if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                items.Add(new ServiceAdminStatusItem(group, "Display name", displayName));
+            }
+
+            if (m_GatewayMasterConnectionIds.TryGetValue(pair.Key, out var masterConnectionId))
+            {
+                items.Add(new ServiceAdminStatusItem(group, "Master connection", masterConnectionId));
+            }
+
+            items.Add(new ServiceAdminStatusItem(group, "Direct connection", pair.Key.ToString("N")));
         }
 
         return [.. items];

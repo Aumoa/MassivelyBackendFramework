@@ -82,6 +82,16 @@ h1 {
     overflow: hidden;
 }
 
+.related-panel {
+    max-width: 1120px;
+    margin: 0 auto 1rem;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow-sm);
+    overflow: hidden;
+}
+
 .panel-heading {
     display: flex;
     align-items: center;
@@ -126,6 +136,62 @@ h1 {
 
 .empty-state strong {
     color: var(--app-text);
+}
+
+.related-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 0.75rem;
+    padding: 1rem;
+}
+
+.related-card {
+    display: flex;
+    min-height: 8rem;
+    flex-direction: column;
+    gap: 0.75rem;
+    justify-content: space-between;
+    padding: 0.9rem;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface-muted);
+}
+
+.related-card-heading,
+.related-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.75rem;
+    align-items: center;
+}
+
+.related-card-heading span,
+.related-meta {
+    color: var(--app-text-muted);
+    font-size: 0.86rem;
+}
+
+.related-card strong {
+    font-size: 1rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.connection-link {
+    color: var(--app-accent);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.connection-link:hover {
+    text-decoration: underline;
+}
+
+.connection-full {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--app-text-muted);
+    font-size: 0.78rem;
 }
 
 .status-groups {

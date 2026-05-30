@@ -16,6 +16,7 @@ internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
     IDedicatedNodeCatalogWriter dedicatedNodeCatalog,
     IDedicatedConnectionStatusProvider dedicatedConnectionStatusProvider,
+    IGatewayMasterConnectionIdentitySink gatewayMasterConnectionIdentitySink,
     ILogger<MasterConnectionManager> logger) : IHostedService, IMasterConnectionStatusProvider
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
@@ -412,6 +413,7 @@ internal sealed class MasterConnectionManager(
         }
 
         Volatile.Write(ref m_Trusted, status.IsTrusted ? 1 : 0);
+        gatewayMasterConnectionIdentitySink.SetMasterConnectionId(status.IsTrusted ? status.MasterConnectionId : null);
         StatusChanged?.Invoke(status);
     }
 

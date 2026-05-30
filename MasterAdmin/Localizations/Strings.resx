@@ -189,6 +189,18 @@
   <data name="NODE_STATUS_RELAY" xml:space="preserve">
     <value>Relay status</value>
   </data>
+  <data name="NODE_RELATED_TITLE" xml:space="preserve">
+    <value>Connected Services</value>
+  </data>
+  <data name="NODE_RELATED_DESCRIPTION" xml:space="preserve">
+    <value>Related nodes that can be opened through the Master relay path.</value>
+  </data>
+  <data name="NODE_RELATED_EMPTY_TITLE" xml:space="preserve">
+    <value>No connected services</value>
+  </data>
+  <data name="NODE_RELATED_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>This service has no related Gateway or Dedicated connection to show.</value>
+  </data>
   <data name="NODE_STATUS_TITLE" xml:space="preserve">
     <value>Service Status</value>
   </data>

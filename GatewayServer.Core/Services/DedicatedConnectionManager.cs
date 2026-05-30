@@ -17,11 +17,16 @@ internal interface IDedicatedConnectionStatusProvider
     ServiceAdminStatusItem[] GetStatusItems();
 }
 
+internal interface IGatewayMasterConnectionIdentitySink
+{
+    void SetMasterConnectionId(string? masterConnectionId);
+}
+
 internal sealed class DedicatedConnectionManager(
     IOptions<DedicatedConnectionOptions> options,
     IOptions<MasterConnectionOptions> gatewayIdentity,
     IDedicatedNodeCatalog catalog,
-    ILogger<DedicatedConnectionManager> logger) : IHostedService, IDedicatedConnectionStatusProvider
+    ILogger<DedicatedConnectionManager> logger) : IHostedService, IDedicatedConnectionStatusProvider, IGatewayMasterConnectionIdentitySink
 {
     private readonly DedicatedConnectionOptions m_Options = options.Value;
     private readonly MasterConnectionOptions m_GatewayIdentity = gatewayIdentity.Value;
@@ -29,6 +34,8 @@ internal sealed class DedicatedConnectionManager(
     private readonly object m_PeersSync = new();
     private readonly Dictionary<string, DedicatedPeer> m_Peers = [];
     private readonly ConcurrentDictionary<string, string> m_PeerStates = [];
+    private readonly ConcurrentDictionary<string, string> m_PeerDirectConnectionIds = [];
+    private string? m_MasterConnectionId;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -151,6 +158,10 @@ internal sealed class DedicatedConnectionManager(
                     node.GatewayEndpoint.IPAddress,
                     node.GatewayEndpoint.Port);
             }
+            finally
+            {
+                m_PeerDirectConnectionIds.TryRemove(node.MasterConnectionId, out _);
+            }
 
             try
             {
@@ -198,6 +209,7 @@ internal sealed class DedicatedConnectionManager(
             }
 
             var accepted = await CompleteHandshakeAsync(activeStream, cancellationToken).ConfigureAwait(false);
+            m_PeerDirectConnectionIds[node.MasterConnectionId] = accepted.ConnectionId;
             m_PeerStates[node.MasterConnectionId] = "Trusted";
             logger.LogInformation(
                 "Gateway Dedicated direct session trusted. DedicatedNodeId={DedicatedNodeId}, GatewayNodeId={GatewayNodeId}, DedicatedConnectionId={ConnectionId}.",
@@ -235,7 +247,8 @@ internal sealed class DedicatedConnectionManager(
                 MasterNodeKind.Gateway,
                 m_GatewayIdentity.NodeId,
                 m_GatewayIdentity.DisplayName,
-                MasterControlProtocol.SchemaVersion);
+                MasterControlProtocol.SchemaVersion,
+                m_MasterConnectionId ?? string.Empty);
 
             handshakeStep = "NodeHello";
             using (var helloFrame = PacketCodec.Encode(
@@ -363,13 +376,26 @@ internal sealed class DedicatedConnectionManager(
                 ? peerState
                 : "Unknown";
             var group = $"Dedicated {peer.Node.NodeId}";
+            items.Add(new ServiceAdminStatusItem(group, "Node", peer.Node.NodeId));
+            items.Add(new ServiceAdminStatusItem(group, "Display name", peer.Node.DisplayName));
             items.Add(new ServiceAdminStatusItem(group, "State", state));
             items.Add(new ServiceAdminStatusItem(group, "Endpoint", $"{peer.Node.GatewayEndpoint.IPAddress}:{peer.Node.GatewayEndpoint.Port}"));
             items.Add(new ServiceAdminStatusItem(group, "TLS", peer.Node.GatewayEndpoint.UseTls ? "Enabled" : "Disabled"));
             items.Add(new ServiceAdminStatusItem(group, "Master connection", peer.Node.MasterConnectionId));
+            if (m_PeerDirectConnectionIds.TryGetValue(peer.Node.MasterConnectionId, out var directConnectionId))
+            {
+                items.Add(new ServiceAdminStatusItem(group, "Direct connection", directConnectionId));
+            }
         }
 
         return [.. items];
+    }
+
+    public void SetMasterConnectionId(string? masterConnectionId)
+    {
+        m_MasterConnectionId = string.IsNullOrWhiteSpace(masterConnectionId)
+            ? null
+            : masterConnectionId;
     }
 
     private static bool HasSameEndpoint(DedicatedNodeEndpoint left, DedicatedNodeEndpoint right)

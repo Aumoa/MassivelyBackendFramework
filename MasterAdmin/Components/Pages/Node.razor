@@ -31,6 +31,57 @@
     </article>
 </section>
 
+@if (Status?.Success == true)
+{
+    <section class="related-panel">
+        <div class="panel-heading">
+            <div>
+                <h2>@Strings.NODE_RELATED_TITLE</h2>
+                <p>@Strings.NODE_RELATED_DESCRIPTION</p>
+            </div>
+        </div>
+
+        @if (RelatedConnections.Count == 0)
+        {
+            <div class="empty-state">
+                <strong>@Strings.NODE_RELATED_EMPTY_TITLE</strong>
+                <span>@Strings.NODE_RELATED_EMPTY_DESCRIPTION</span>
+            </div>
+        }
+        else
+        {
+            <div class="related-list">
+                @foreach (var related in RelatedConnections)
+                {
+                    <article class="related-card">
+                        <div class="related-card-heading">
+                            <span>@RelatedNodeKindText</span>
+                            <a class="connection-link" href="@related.Href" title="@related.ConnectionId">
+                                <code>@related.Hash</code>
+                            </a>
+                        </div>
+                        <strong>@related.Title</strong>
+                        <div class="related-meta">
+                            @if (!string.IsNullOrWhiteSpace(related.NodeId))
+                            {
+                                <span>@related.NodeId</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(related.State))
+                            {
+                                <span>@related.State</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(related.Endpoint))
+                            {
+                                <span>@related.Endpoint</span>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+}
+
 <section class="status-panel">
     <div class="panel-heading">
         <div>
@@ -75,7 +126,19 @@
                         {
                             <div>
                                 <dt>@item.Name</dt>
-                                <dd>@item.Value</dd>
+                                <dd>
+                                    @if (TryGetStatusItemLink(item, out var href, out var hash))
+                                    {
+                                        <a class="connection-link" href="@href" title="@item.Value">
+                                            <code>@hash</code>
+                                        </a>
+                                        <span class="connection-full">@item.Value</span>
+                                    }
+                                    else
+                                    {
+                                        @item.Value
+                                    }
+                                </dd>
                             </div>
                         }
                     </dl>
@@ -138,6 +201,15 @@
     }
 
     private string RefreshButtonText => IsLoading ? Strings.NODE_REFRESHING : Strings.NODE_REFRESH;
+
+    private IReadOnlyList<RelatedConnectionLink> RelatedConnections => BuildRelatedConnections();
+
+    private string RelatedNodeKindText => Status?.NodeKind switch
+    {
+        MasterNodeKind.Gateway => Strings.NODE_KIND_DEDICATED,
+        MasterNodeKind.Dedicated => Strings.NODE_KIND_GATEWAY,
+        _ => Strings.NODE_KIND_UNKNOWN
+    };
 
     protected override async Task OnParametersSetAsync()
     {
@@ -208,4 +280,96 @@
             _ => Strings.NODE_KIND_UNKNOWN
         };
     }
+
+    private IReadOnlyList<RelatedConnectionLink> BuildRelatedConnections()
+    {
+        if (Status == null)
+        {
+            return Array.Empty<RelatedConnectionLink>();
+        }
+
+        var links = new List<RelatedConnectionLink>();
+        foreach (var group in Status.Items.GroupBy(static item => item.Group))
+        {
+            if (string.Equals(group.Key, "Master", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var masterConnection = group.FirstOrDefault(IsMasterConnectionItem);
+            if (masterConnection == null ||
+                !TryParseConnectionId(masterConnection.Value, out var connectionId))
+            {
+                continue;
+            }
+
+            string title = group.FirstOrDefault(static item => string.Equals(item.Name, "Display name", StringComparison.OrdinalIgnoreCase))?.Value
+                ?? group.Key;
+            string nodeId = group.FirstOrDefault(static item => string.Equals(item.Name, "Node", StringComparison.OrdinalIgnoreCase))?.Value
+                ?? string.Empty;
+            string state = group.FirstOrDefault(static item => string.Equals(item.Name, "State", StringComparison.OrdinalIgnoreCase))?.Value
+                ?? string.Empty;
+            string endpoint = group.FirstOrDefault(static item => string.Equals(item.Name, "Endpoint", StringComparison.OrdinalIgnoreCase))?.Value
+                ?? string.Empty;
+
+            links.Add(new RelatedConnectionLink(
+                title,
+                nodeId,
+                state,
+                endpoint,
+                connectionId.ToString("N"),
+                GetConnectionHash(connectionId),
+                GetNodePageHref(connectionId)));
+        }
+
+        return links;
+    }
+
+    private static bool TryGetStatusItemLink(
+        ServiceAdminStatusItem item,
+        [NotNullWhen(true)] out string? href,
+        [NotNullWhen(true)] out string? hash)
+    {
+        href = null;
+        hash = null;
+        if (!IsMasterConnectionItem(item) ||
+            !TryParseConnectionId(item.Value, out var connectionId))
+        {
+            return false;
+        }
+
+        href = GetNodePageHref(connectionId);
+        hash = GetConnectionHash(connectionId);
+        return true;
+    }
+
+    private static bool IsMasterConnectionItem(ServiceAdminStatusItem item)
+    {
+        return string.Equals(item.Name, "Master connection", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryParseConnectionId(string value, out Guid connectionId)
+    {
+        return Guid.TryParseExact(value, "N", out connectionId) ||
+               Guid.TryParse(value, out connectionId);
+    }
+
+    private static string GetConnectionHash(Guid connectionId)
+    {
+        return connectionId.ToString("N")[..8];
+    }
+
+    private static string GetNodePageHref(Guid connectionId)
+    {
+        return $"/nodes/{connectionId:N}";
+    }
+
+    private sealed record RelatedConnectionLink(
+        string Title,
+        string NodeId,
+        string State,
+        string Endpoint,
+        string ConnectionId,
+        string Hash,
+        string Href);
 }

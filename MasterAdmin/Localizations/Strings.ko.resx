@@ -189,6 +189,18 @@
   <data name="NODE_STATUS_RELAY" xml:space="preserve">
     <value>Relay 상태</value>
   </data>
+  <data name="NODE_RELATED_TITLE" xml:space="preserve">
+    <value>연결된 서비스</value>
+  </data>
+  <data name="NODE_RELATED_DESCRIPTION" xml:space="preserve">
+    <value>Master Relay 경로로 바로 열 수 있는 관련 노드입니다.</value>
+  </data>
+  <data name="NODE_RELATED_EMPTY_TITLE" xml:space="preserve">
+    <value>연결된 서비스 없음</value>
+  </data>
+  <data name="NODE_RELATED_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>현재 표시할 Gateway 또는 Dedicated 연결이 없습니다.</value>
+  </data>
   <data name="NODE_STATUS_TITLE" xml:space="preserve">
     <value>서비스 상태</value>
   </data>

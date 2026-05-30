@@ -34,6 +34,7 @@ public static class MasterNodeAuthenticator
         WriteUInt16(payload, hello.ProtocolVersion);
         WriteString(payload, hello.NodeId);
         WriteString(payload, hello.DisplayName);
+        WriteString(payload, hello.MasterConnectionId);
 
         return hmac.ComputeHash(payload.ToArray());
     }

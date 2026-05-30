@@ -628,6 +628,42 @@ namespace MasterAdmin.Localizations {
         }
 
         /// <summary>
+        ///   Related nodes that can be opened through the Master relay path.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_RELATED_DESCRIPTION {
+            get {
+                return ResourceManager.GetString("NODE_RELATED_DESCRIPTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   This service has no related Gateway or Dedicated connection to show.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_RELATED_EMPTY_DESCRIPTION {
+            get {
+                return ResourceManager.GetString("NODE_RELATED_EMPTY_DESCRIPTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   No connected services과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_RELATED_EMPTY_TITLE {
+            get {
+                return ResourceManager.GetString("NODE_RELATED_EMPTY_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Connected Services과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_RELATED_TITLE {
+            get {
+                return ResourceManager.GetString("NODE_RELATED_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   The service did not answer before the request timed out.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string NODE_STATUS_TIMEOUT {
