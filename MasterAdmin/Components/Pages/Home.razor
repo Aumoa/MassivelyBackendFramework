@@ -1,0 +1,158 @@
+@page "/"
+@implements IDisposable
+@inject IMasterOverviewProvider MasterOverview
+
+<PageTitle>@Strings.APP_TITLE</PageTitle>
+
+<section class="dashboard-header">
+    <div>
+        <p class="eyebrow">@Strings.HOME_EYEBROW</p>
+        <h1>@Strings.HOME_TITLE</h1>
+        <p class="summary">@Strings.HOME_SUMMARY</p>
+    </div>
+</section>
+
+<section class="metrics-grid" aria-label="@Strings.HOME_SUMMARY_ARIA">
+    <article class="metric-card">
+        <span class="metric-label">@Strings.METRIC_SOCKET_ENDPOINT</span>
+        <strong>@EndpointText</strong>
+        <span class="metric-detail">@TlsText</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label">@Strings.METRIC_ACTIVE_CONNECTIONS</span>
+        <strong>@Connections.Count</strong>
+        <span class="metric-detail">@Strings.METRIC_ACTIVE_CONNECTIONS_DETAIL</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label">@Strings.METRIC_MASTER_SOCKET</span>
+        <strong>@GetMasterSocketStatusText(OverviewState.ConnectionState)</strong>
+        <span class="metric-detail">@MasterSocketStatusDetail</span>
+    </article>
+</section>
+
+<section class="connection-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>@Strings.CONNECTIONS_TITLE</h2>
+            <p>@Strings.CONNECTIONS_DESCRIPTION</p>
+        </div>
+        <span class="status-pill">@string.Format(Strings.CONNECTIONS_ACTIVE_FORMAT, Connections.Count)</span>
+    </div>
+
+    @if (Connections.Count == 0)
+    {
+        <div class="empty-state">
+            <strong>@Strings.CONNECTIONS_EMPTY_TITLE</strong>
+            <span>@Strings.CONNECTIONS_EMPTY_DESCRIPTION</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>@Strings.CONNECTIONS_TABLE_CONNECTION</th>
+                        <th>@Strings.CONNECTIONS_TABLE_ROLE</th>
+                        <th>@Strings.CONNECTIONS_TABLE_REMOTE_ENDPOINT</th>
+                        <th>@Strings.CONNECTIONS_TABLE_CONNECTED</th>
+                        <th>@Strings.CONNECTIONS_TABLE_LAST_SEEN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var connection in Connections)
+                    {
+                        <tr>
+                            <td><code>@connection.ConnectionId.ToString("N")[..8]</code></td>
+                            <td>@GetNodeKindText(connection.NodeKind)</td>
+                            <td>@connection.RemoteEndPoint</td>
+                            <td>@connection.ConnectedAt.LocalDateTime</td>
+                            <td>@connection.LastSeenAt.LocalDateTime</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private MasterOverviewState OverviewState { get; set; } = new(
+        MasterOverviewConnectionState.Disconnected,
+        new MasterOverviewSnapshot(new MasterSocketEndpoint("unknown", 0, false), [], DateTimeOffset.UtcNow));
+
+    private MasterSocketEndpoint Endpoint => OverviewState.Snapshot.SocketEndpoint;
+
+    private IReadOnlyCollection<MasterConnectionSnapshot> Connections => OverviewState.Snapshot.Connections;
+
+    private string EndpointText => $"{Endpoint.IPAddress}:{Endpoint.Port}";
+
+    private string TlsText => Endpoint.UseTls ? Strings.TLS_ENABLED : Strings.TLS_DISABLED;
+
+    private string MasterSocketStatusDetail
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(OverviewState.LastError))
+            {
+                return string.Format(Strings.MASTER_SOCKET_LAST_ERROR_FORMAT, OverviewState.LastError);
+            }
+
+            if (OverviewState.NextReconnectAt.HasValue)
+            {
+                return string.Format(
+                    Strings.MASTER_SOCKET_RECONNECTING_DETAIL_FORMAT,
+                    OverviewState.NextReconnectAt.Value.LocalDateTime);
+            }
+
+            return OverviewState.ConnectionState == MasterOverviewConnectionState.Connected
+                ? Strings.MASTER_SOCKET_CONNECTED_DETAIL
+                : Strings.MASTER_SOCKET_WAITING_DETAIL;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        OverviewState = MasterOverview.GetState();
+        MasterOverview.StateChanged += OnOverviewStateChanged;
+    }
+
+    private void OnOverviewStateChanged(MasterOverviewState state)
+    {
+        _ = InvokeAsync(() =>
+        {
+            OverviewState = state;
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        MasterOverview.StateChanged -= OnOverviewStateChanged;
+    }
+
+    private static string GetNodeKindText(MasterNodeKind nodeKind)
+    {
+        return nodeKind switch
+        {
+            MasterNodeKind.Gateway => Strings.NODE_KIND_GATEWAY,
+            MasterNodeKind.Dedicated => Strings.NODE_KIND_DEDICATED,
+            MasterNodeKind.MasterAdmin => Strings.NODE_KIND_MASTER_ADMIN,
+            _ => Strings.NODE_KIND_UNKNOWN
+        };
+    }
+
+    private static string GetMasterSocketStatusText(MasterOverviewConnectionState state)
+    {
+        return state switch
+        {
+            MasterOverviewConnectionState.Disabled => Strings.MASTER_SOCKET_STATUS_DISABLED,
+            MasterOverviewConnectionState.Connecting => Strings.MASTER_SOCKET_STATUS_CONNECTING,
+            MasterOverviewConnectionState.Handshaking => Strings.MASTER_SOCKET_STATUS_HANDSHAKING,
+            MasterOverviewConnectionState.Connected => Strings.MASTER_SOCKET_STATUS_CONNECTED,
+            MasterOverviewConnectionState.Reconnecting => Strings.MASTER_SOCKET_STATUS_RECONNECTING,
+            MasterOverviewConnectionState.Stopping => Strings.MASTER_SOCKET_STATUS_STOPPING,
+            _ => Strings.MASTER_SOCKET_STATUS_DISCONNECTED
+        };
+    }
+}

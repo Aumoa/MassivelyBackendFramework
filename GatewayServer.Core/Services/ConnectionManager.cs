@@ -11,7 +11,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PacketCore;
-using PacketCore.Utility;
 
 namespace GatewayServer.Services;
 
@@ -48,19 +47,49 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        m_GracefulCancellation.Cancel();
+        await m_GracefulCancellation.CancelAsync().ConfigureAwait(false);
+        m_Socket.Dispose();
+
         if (m_AcceptTask != null)
         {
-            await m_AcceptTask.ConfigureAwait(false);
+            await WaitForShutdownAsync(m_AcceptTask, cancellationToken).ConfigureAwait(false);
         }
+
+        await DisposeClientsAsync().ConfigureAwait(false);
     }
 
     private async Task StartAcceptAsync(CancellationToken cancellationToken)
     {
-        while (true)
+        while (!cancellationToken.IsCancellationRequested)
         {
-            var clientSocket = await m_Socket.AcceptAsync(cancellationToken).ConfigureAwait(false);
-            StartHandshakeAsync(clientSocket, m_Cert, cancellationToken);
+            Socket? clientSocket = null;
+
+            try
+            {
+                clientSocket = await m_Socket.AcceptAsync(cancellationToken).ConfigureAwait(false);
+                StartHandshakeAsync(clientSocket, m_Cert, cancellationToken);
+                clientSocket = null;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                clientSocket?.Dispose();
+                return;
+            }
+            catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
+            {
+                clientSocket?.Dispose();
+                return;
+            }
+            catch (SocketException) when (cancellationToken.IsCancellationRequested)
+            {
+                clientSocket?.Dispose();
+                return;
+            }
+            catch (Exception e)
+            {
+                clientSocket?.Dispose();
+                logger.LogError(e, "Error occurred while accepting a Gateway client connection.");
+            }
         }
     }
 
@@ -89,13 +118,27 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
                 s = networkStream;
             }
 
-            using (PacketPool.Get(out var p))
+            var handshakeNotify = new GatewayHandshakeNotify("https://accounts.ayla.r-e.kr/authorize");
+            using var handshakeFrame = PacketCodec.Encode(
+                PacketKind.Notify,
+                Pid.GATE_HANDSHAKE_NOTIFY,
+                version: 1,
+                handshakeNotify,
+                GatewayHandshakeNotify.Codec);
+            await PacketFrameWriter.WriteAsync(s, handshakeFrame, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            if (sslStream != null)
             {
-                var handshakeNotify = new GatewayHandshakeNotify
-                {
-                    LoginUri = "https://accounts.ayla.r-e.kr/authorize"
-                };
+                await sslStream.DisposeAsync().ConfigureAwait(false);
             }
+
+            await networkStream.DisposeAsync().ConfigureAwait(false);
+            socket.Dispose();
+
+            return;
         }
         catch (Exception e)
         {
@@ -152,14 +195,20 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
         {
             await foreach (var packet in client.ReadPacketsAsync(cancellationToken))
             {
-                var payloadString = Encoding.UTF8.GetString(packet.Payload);
+                var payloadString = Encoding.UTF8.GetString(packet.Payload.Span);
                 Console.WriteLine(payloadString);
 
-                var response = PacketPool.Get();
                 var responseMessage = $"Response: {payloadString}";
-                using var rentArray = RentUtility.RentFor(responseMessage);
-                response.Initialize(Packet.PROTOCOL_TYPE_ACK, 1, 1, rentArray);
+                using var response = PacketFrame.Create(
+                    PacketKind.Response,
+                    packet.Header.PacketId,
+                    packet.Header.Version,
+                    Encoding.UTF8.GetBytes(responseMessage));
+                await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception e)
         {
@@ -167,7 +216,64 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
         }
         finally
         {
-            await client.DisposeAsync();
+            try
+            {
+                await client.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (Exception e)
+            {
+                logger.LogDebug(e, "Gateway client disposal completed with an error after echo loop.");
+            }
+        }
+    }
+
+    private async Task DisposeClientsAsync()
+    {
+        Client[] clients;
+        lock (m_Clients)
+        {
+            clients = [.. m_Clients];
+        }
+
+        foreach (var client in clients)
+        {
+            try
+            {
+                await client.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (Exception e)
+            {
+                logger.LogDebug(e, "Gateway client disposal completed with an error during shutdown.");
+            }
+        }
+    }
+
+    private static async Task WaitForShutdownAsync(Task task, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
         }
     }
 

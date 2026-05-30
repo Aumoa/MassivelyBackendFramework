@@ -1,10 +1,9 @@
-﻿using System.Net.Sockets;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using PacketCore;
-using PacketCore.Utility;
 
 namespace GatewayServer.Behaviors;
 
@@ -12,21 +11,21 @@ internal class Client(NetworkStream networkStream, Stream stream, ILogger logger
 {
     private readonly NetworkStream m_NetworkStream = networkStream;
     private readonly CancellationTokenSource m_Cancellation = new();
-    private bool m_Completion;
-    private readonly Channel<Packet> m_RequestsChannel = Channel.CreateUnbounded<Packet>();
+    private readonly Channel<PacketFrame> m_RequestsChannel = Channel.CreateUnbounded<PacketFrame>();
     private ExceptionDispatchInfo? m_ExceptionDispatchInfo;
+    private int m_Completion;
 
     public async ValueTask DisposeAsync()
     {
-        if (Interlocked.CompareExchange(ref m_Completion, true, false))
+        if (Interlocked.CompareExchange(ref m_Completion, 1, 0) == 0)
         {
+            await m_Cancellation.CancelAsync().ConfigureAwait(false);
             Aborted?.Invoke();
             Completed?.Invoke();
         }
 
-        await m_NetworkStream.DisposeAsync().ConfigureAwait(false);
         await stream.DisposeAsync().ConfigureAwait(false);
-        m_NetworkStream.Dispose();
+        await m_NetworkStream.DisposeAsync().ConfigureAwait(false);
         GC.SuppressFinalize(this);
         m_ExceptionDispatchInfo?.Throw();
     }
@@ -40,9 +39,10 @@ internal class Client(NetworkStream networkStream, Stream stream, ILogger logger
     {
         if (obj is Client client)
         {
-            return obj.Equals(client.m_NetworkStream);
+            return m_NetworkStream.Equals(client.m_NetworkStream);
         }
-        else if (obj is Socket socket)
+
+        if (obj is Socket socket)
         {
             return m_NetworkStream.Equals(socket);
         }
@@ -50,15 +50,26 @@ internal class Client(NetworkStream networkStream, Stream stream, ILogger logger
         return false;
     }
 
-    public async IAsyncEnumerable<Packet> ReadPacketsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    public async IAsyncEnumerable<PacketFrame> ReadPacketsAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var reader = m_RequestsChannel.Reader;
-        
-        await foreach (var packet in reader.ReadAllAsync(cancellationToken))
+
+        await foreach (var packet in reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {
-            yield return packet;
-            PacketPool.Return(packet);
+            try
+            {
+                yield return packet;
+            }
+            finally
+            {
+                packet.Dispose();
+            }
         }
+    }
+
+    public ValueTask WriteAsync(PacketFrame frame, CancellationToken cancellationToken)
+    {
+        return PacketFrameWriter.WriteAsync(stream, frame, cancellationToken);
     }
 
     public async void Start()
@@ -91,26 +102,33 @@ internal class Client(NetworkStream networkStream, Stream stream, ILogger logger
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            RentedArray<byte> headerArray = default;
-            RentedArray<byte> payloadBuffer = default;
-
             try
             {
-                headerArray = await EnsureReadBytesAsync(Packet.PROTOCOL_HEADER_SIZE_IN_BYTES, cancellationToken);
-                Packet.EnsureClientHeaderValidation(headerArray, out int protocolType, out int protocolId, out int protocolVersion, out int payloadSize);
+                var packet = await PacketFrameReader.ReadAsync(
+                    stream,
+                    PacketReadPolicy.UntrustedClient,
+                    cancellationToken).ConfigureAwait(false);
 
-                if (payloadSize == 0)
+                if (packet == null)
                 {
-                    payloadBuffer = default;
-                }
-                else
-                {
-                    payloadBuffer = await EnsureReadBytesAsync(payloadSize, cancellationToken);
+                    MarkDisconnected();
+                    requestsWriter.Complete();
+                    return;
                 }
 
-                var packet = PacketPool.Get();
-                packet.Initialize(headerArray, payloadBuffer);
-                await requestsWriter.WriteAsync(packet, cancellationToken);
+                bool queued = false;
+                try
+                {
+                    await requestsWriter.WriteAsync(packet, cancellationToken).ConfigureAwait(false);
+                    queued = true;
+                }
+                finally
+                {
+                    if (!queued)
+                    {
+                        packet.Dispose();
+                    }
+                }
             }
             catch (OperationCanceledException)
             {
@@ -124,52 +142,17 @@ internal class Client(NetworkStream networkStream, Stream stream, ILogger logger
                 logger.LogError(e, "Error occurred while reading packet from client.");
                 return;
             }
-            finally
-            {
-                if (headerArray)
-                {
-                    headerArray.Dispose();
-                }
-            }
         }
 
         requestsWriter.Complete();
     }
 
-    private async ValueTask<RentedArray<byte>> EnsureReadBytesAsync(int bytesToRead, CancellationToken cancellationToken)
+    private void MarkDisconnected()
     {
-        var rentArray = RentedArray<byte>.Get(bytesToRead);
-        int writepos = 0;
-
-        try
+        if (Interlocked.CompareExchange(ref m_Completion, 1, 0) == 0)
         {
-            while (cancellationToken.IsCancellationRequested == false && writepos < bytesToRead)
-            {
-                int bytesRead = await stream.ReadAsync(rentArray.AsMemory(writepos), cancellationToken).ConfigureAwait(false);
-                if (bytesRead == 0)
-                {
-                    if (Interlocked.CompareExchange(ref m_Completion, true, false))
-                    {
-                        Disconnected?.Invoke();
-                        Completed?.Invoke();
-                    }
-
-                    throw new OperationCanceledException();
-                }
-
-                writepos += bytesRead;
-            }
-
-            var temp = rentArray;
-            rentArray = default;
-            return temp;
-        }
-        finally
-        {
-            if (rentArray)
-            {
-                rentArray.Dispose();
-            }
+            Disconnected?.Invoke();
+            Completed?.Invoke();
         }
     }
 
