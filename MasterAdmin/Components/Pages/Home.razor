@@ -63,7 +63,18 @@
                     @foreach (var connection in Connections)
                     {
                         <tr>
-                            <td><code>@connection.ConnectionId.ToString("N")[..8]</code></td>
+                            <td>
+                                @if (CanOpenNodePage(connection.NodeKind))
+                                {
+                                    <a class="connection-link" href="@GetNodePageHref(connection)">
+                                        <code>@connection.ConnectionId.ToString("N")[..8]</code>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <code>@connection.ConnectionId.ToString("N")[..8]</code>
+                                }
+                            </td>
                             <td>@GetNodeKindText(connection.NodeKind)</td>
                             <td>@connection.RemoteEndPoint</td>
                             <td>@connection.ConnectedAt.LocalDateTime</td>
@@ -154,5 +165,15 @@
             MasterOverviewConnectionState.Stopping => Strings.MASTER_SOCKET_STATUS_STOPPING,
             _ => Strings.MASTER_SOCKET_STATUS_DISCONNECTED
         };
+    }
+
+    private static bool CanOpenNodePage(MasterNodeKind nodeKind)
+    {
+        return nodeKind is MasterNodeKind.Gateway or MasterNodeKind.Dedicated;
+    }
+
+    private static string GetNodePageHref(MasterConnectionSnapshot connection)
+    {
+        return $"/nodes/{connection.ConnectionId:N}";
     }
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Collections.Concurrent;
 using MasterAdmin.Options;
 using MasterServer.ControlPlane;
 using Microsoft.Extensions.Options;
@@ -16,8 +17,11 @@ public sealed class MasterOverviewSocketClient(
     private readonly MasterConnectionOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly object m_StateSync = new();
+    private readonly SemaphoreSlim m_WriteLock = new(1, 1);
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<ServiceAdminStatusResponse>> m_PendingStatusRequests = [];
     private MasterOverviewState m_State = CreateInitialState(options.Value);
     private Task? m_RunTask;
+    private Stream? m_ActiveStream;
 
     public event Action<MasterOverviewState>? StateChanged;
 
@@ -26,6 +30,49 @@ public sealed class MasterOverviewSocketClient(
         lock (m_StateSync)
         {
             return m_State;
+        }
+    }
+
+    public async Task<ServiceAdminStatusResponse> RequestServiceAdminStatusAsync(
+        string targetConnectionId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(targetConnectionId))
+        {
+            throw new ArgumentException("Target connection id is required.", nameof(targetConnectionId));
+        }
+
+        var stream = m_ActiveStream ?? throw new InvalidOperationException("Master overview socket is not connected.");
+        var request = new ServiceAdminStatusRequest(Guid.NewGuid(), targetConnectionId);
+        var completion = new TaskCompletionSource<ServiceAdminStatusResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!m_PendingStatusRequests.TryAdd(request.RequestId, completion))
+        {
+            throw new InvalidOperationException("A duplicate service admin status request id was generated.");
+        }
+
+        try
+        {
+            using var frame = PacketCodec.Encode(
+                PacketKind.Control,
+                MasterControlPacketIds.ServiceAdminStatusRequest,
+                MasterControlProtocol.SchemaVersion,
+                request,
+                ServiceAdminStatusRequest.Codec);
+            await m_WriteLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                m_WriteLock.Release();
+            }
+
+            return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            m_PendingStatusRequests.TryRemove(request.RequestId, out _);
         }
     }
 
@@ -168,10 +215,14 @@ public sealed class MasterOverviewSocketClient(
                 accepted.NodeId,
                 accepted.ConnectionId);
 
+            m_ActiveStream = activeStream;
             await ReceiveOverviewSnapshotsAsync(activeStream, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
+            m_ActiveStream = null;
+            FailPendingStatusRequests(new IOException("Master overview socket closed."));
+
             if (sslStream != null)
             {
                 await sslStream.DisposeAsync().ConfigureAwait(false);
@@ -264,9 +315,25 @@ public sealed class MasterOverviewSocketClient(
 
             using (frame)
             {
-                MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.OverviewSnapshot);
-                var overview = PacketCodec.Decode(frame, MasterOverviewSnapshot.Codec);
-                PublishState(MasterOverviewConnectionState.Connected, overview);
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.OverviewSnapshot)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.OverviewSnapshot);
+                    var overview = PacketCodec.Decode(frame, MasterOverviewSnapshot.Codec);
+                    PublishState(MasterOverviewConnectionState.Connected, overview);
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.ServiceAdminStatusResponse)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.ServiceAdminStatusResponse);
+                    var response = PacketCodec.Decode(frame, ServiceAdminStatusResponse.Codec);
+                    if (m_PendingStatusRequests.TryRemove(response.RequestId, out var completion))
+                    {
+                        completion.TrySetResult(response);
+                    }
+                }
             }
         }
     }
@@ -344,6 +411,17 @@ public sealed class MasterOverviewSocketClient(
             new MasterSocketEndpoint(options.IPAddress, options.Port, options.UseTls),
             [],
             DateTimeOffset.UtcNow);
+    }
+
+    private void FailPendingStatusRequests(Exception exception)
+    {
+        foreach (var request in m_PendingStatusRequests.ToArray())
+        {
+            if (m_PendingStatusRequests.TryRemove(request.Key, out var completion))
+            {
+                completion.TrySetException(exception);
+            }
+        }
     }
 
     private static async Task WaitForShutdownAsync(Task task, CancellationToken cancellationToken)

@@ -272,7 +272,7 @@ internal class JwtAuthenticationStateProvider(
             var tokenResponse = await tokenRefreshService.TryRefreshTokenAsync();
             if (tokenResponse?.IdToken == null)
             {
-                logger.LogWarning("Token refresh failed, user needs to re-login");
+                logger.LogInformation("Token refresh failed, user needs to re-login");
                 return null;
             }
 
@@ -290,7 +290,7 @@ internal class JwtAuthenticationStateProvider(
             var tokenResponse = await tokenRefreshService.TryRefreshTokenAsync();
             if (tokenResponse?.IdToken == null)
             {
-                logger.LogWarning("Token refresh failed, user needs to re-login");
+                logger.LogInformation("Token refresh failed, user needs to re-login");
                 return null;
             }
 

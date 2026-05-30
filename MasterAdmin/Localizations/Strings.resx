@@ -171,6 +171,84 @@
   <data name="NODE_KIND_MASTER_ADMIN" xml:space="preserve">
     <value>Master Admin</value>
   </data>
+  <data name="NODE_PAGE_TITLE" xml:space="preserve">
+    <value>Node Management</value>
+  </data>
+  <data name="NODE_PAGE_EYEBROW" xml:space="preserve">
+    <value>Master Relay</value>
+  </data>
+  <data name="NODE_PAGE_SUMMARY" xml:space="preserve">
+    <value>Service status is requested through the Master control-plane socket, not by connecting to the service directly.</value>
+  </data>
+  <data name="NODE_BACK_TO_OVERVIEW" xml:space="preserve">
+    <value>Back to overview</value>
+  </data>
+  <data name="NODE_SUMMARY_ARIA" xml:space="preserve">
+    <value>Node summary</value>
+  </data>
+  <data name="NODE_STATUS_RELAY" xml:space="preserve">
+    <value>Relay status</value>
+  </data>
+  <data name="NODE_RELATED_TITLE" xml:space="preserve">
+    <value>Connected Services</value>
+  </data>
+  <data name="NODE_RELATED_DESCRIPTION" xml:space="preserve">
+    <value>Related nodes that can be opened through the Master relay path.</value>
+  </data>
+  <data name="NODE_RELATED_EMPTY_TITLE" xml:space="preserve">
+    <value>No connected services</value>
+  </data>
+  <data name="NODE_RELATED_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>This service has no related Gateway or Dedicated connection to show.</value>
+  </data>
+  <data name="NODE_STATUS_TITLE" xml:space="preserve">
+    <value>Service Status</value>
+  </data>
+  <data name="NODE_STATUS_DESCRIPTION" xml:space="preserve">
+    <value>Current management data returned by the selected service through Master.</value>
+  </data>
+  <data name="NODE_STATUS_ERROR_TITLE" xml:space="preserve">
+    <value>Status unavailable</value>
+  </data>
+  <data name="NODE_STATUS_LOADING_TITLE" xml:space="preserve">
+    <value>Loading status</value>
+  </data>
+  <data name="NODE_STATUS_LOADING_DESCRIPTION" xml:space="preserve">
+    <value>Waiting for the selected service to answer through Master.</value>
+  </data>
+  <data name="NODE_STATUS_EMPTY_TITLE" xml:space="preserve">
+    <value>No status items</value>
+  </data>
+  <data name="NODE_STATUS_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>The service is connected but has not exposed additional management data yet.</value>
+  </data>
+  <data name="NODE_UNKNOWN_CONNECTION" xml:space="preserve">
+    <value>Unknown connection</value>
+  </data>
+  <data name="NODE_STATUS_LOADING" xml:space="preserve">
+    <value>Loading</value>
+  </data>
+  <data name="NODE_STATUS_ERROR" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="NODE_STATUS_CONNECTED" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="NODE_STATUS_UNAVAILABLE" xml:space="preserve">
+    <value>Unavailable</value>
+  </data>
+  <data name="NODE_REFRESH" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="NODE_REFRESHING" xml:space="preserve">
+    <value>Refreshing</value>
+  </data>
+  <data name="NODE_STATUS_INVALID_CONNECTION" xml:space="preserve">
+    <value>Connection id is invalid.</value>
+  </data>
+  <data name="NODE_STATUS_TIMEOUT" xml:space="preserve">
+    <value>The service did not answer before the request timed out.</value>
+  </data>
   <data name="NOTFOUND_TITLE" xml:space="preserve">
     <value>Not Found</value>
   </data>

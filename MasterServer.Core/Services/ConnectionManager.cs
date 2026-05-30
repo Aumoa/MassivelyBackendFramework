@@ -22,6 +22,7 @@ internal sealed class ConnectionManager(
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly ConcurrentDictionary<Guid, MasterConnection> m_Connections = [];
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
+    private readonly ConcurrentDictionary<Guid, Guid> m_AdminStatusRequestRoutes = [];
 
     private Socket? m_Socket;
     private Task? m_AcceptTask;
@@ -172,11 +173,16 @@ internal sealed class ConnectionManager(
                 activeStream = sslStream;
             }
 
+            connection.AttachStream(activeStream);
             await AuthenticateNodeAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
 
             if (connection.NodeKind == MasterNodeKind.MasterAdmin)
             {
                 await PushOverviewUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
+            }
+            else if (connection.NodeKind == MasterNodeKind.Gateway)
+            {
+                await PushDedicatedNodesUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -230,16 +236,51 @@ internal sealed class ConnectionManager(
 
             using (frame)
             {
+                await ProcessTrustedFrameAsync(connection, frame, cancellationToken).ConfigureAwait(false);
                 connection.MarkSeen();
                 NotifyConnectionsChanged();
             }
         }
     }
 
+    private async Task ProcessTrustedFrameAsync(MasterConnection connection, PacketFrame frame, CancellationToken cancellationToken)
+    {
+        if (connection.NodeKind == MasterNodeKind.Dedicated &&
+            frame.Header.Kind == PacketKind.Control &&
+            frame.Header.PacketId == MasterControlPacketIds.DedicatedEndpointAdvertise)
+        {
+            MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.DedicatedEndpointAdvertise);
+            var advertised = PacketCodec.Decode(frame, DedicatedEndpointAdvertise.Codec);
+            connection.UpdateDedicatedGatewayEndpoint(advertised.GatewayEndpoint);
+            logger.LogInformation(
+                "Dedicated node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
+                connection.ConnectionId,
+                connection.NodeId,
+                advertised.GatewayEndpoint.IPAddress,
+                advertised.GatewayEndpoint.Port,
+                advertised.GatewayEndpoint.UseTls);
+            return;
+        }
+
+        if (frame.Header.Kind != PacketKind.Control)
+        {
+            return;
+        }
+
+        if (frame.Header.PacketId == MasterControlPacketIds.ServiceAdminStatusRequest)
+        {
+            await RelayServiceAdminStatusRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (frame.Header.PacketId == MasterControlPacketIds.ServiceAdminStatusResponse)
+        {
+            await RelayServiceAdminStatusResponseAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private async Task PushOverviewUntilClosedAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)
     {
-        var writeLock = new SemaphoreSlim(1, 1);
-
         void OnConnectionsChanged()
         {
             _ = SendOverviewSnapshotSafeAsync();
@@ -249,7 +290,7 @@ internal sealed class ConnectionManager(
         {
             try
             {
-                await WriteOverviewSnapshotAsync(stream, writeLock, cancellationToken).ConfigureAwait(false);
+                await WriteOverviewSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -278,7 +319,7 @@ internal sealed class ConnectionManager(
 
         try
         {
-            await WriteOverviewSnapshotAsync(stream, writeLock, cancellationToken).ConfigureAwait(false);
+            await WriteOverviewSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
             await DrainUntilClosedAsync(connection, stream, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -287,23 +328,181 @@ internal sealed class ConnectionManager(
         }
     }
 
-    private async Task WriteOverviewSnapshotAsync(Stream stream, SemaphoreSlim writeLock, CancellationToken cancellationToken)
+    private async Task WriteOverviewSnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
     {
-        await writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.OverviewSnapshot,
+            CreateOverviewSnapshot(),
+            MasterOverviewSnapshot.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task PushDedicatedNodesUntilClosedAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)
+    {
+        void OnConnectionsChanged()
+        {
+            _ = SendDedicatedNodeSnapshotSafeAsync();
+        }
+
+        async Task SendDedicatedNodeSnapshotSafeAsync()
+        {
+            try
+            {
+                await WriteDedicatedNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception e) when (IsRemoteDisconnect(e))
+            {
+                logger.LogDebug(
+                    e,
+                    "Gateway Dedicated discovery socket write failed because the remote connection closed. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    connection.ConnectionId,
+                    connection.NodeId);
+                connection.Dispose();
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(
+                    e,
+                    "Failed to push Dedicated discovery snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    connection.ConnectionId,
+                    connection.NodeId);
+                connection.Dispose();
+            }
+        }
+
+        ConnectionsChanged += OnConnectionsChanged;
+
         try
         {
-            var overview = CreateOverviewSnapshot();
-            using var frame = PacketCodec.Encode(
-                PacketKind.Control,
-                MasterControlPacketIds.OverviewSnapshot,
-                MasterControlProtocol.SchemaVersion,
-                overview,
-                MasterOverviewSnapshot.Codec);
-            await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+            await WriteDedicatedNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+            await DrainUntilClosedAsync(connection, stream, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            writeLock.Release();
+            ConnectionsChanged -= OnConnectionsChanged;
+        }
+    }
+
+    private async Task WriteDedicatedNodeSnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
+    {
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.DedicatedNodeSnapshot,
+            CreateDedicatedNodeSnapshot(),
+            DedicatedNodeSnapshot.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task RelayServiceAdminStatusRequestAsync(
+        MasterConnection source,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.ServiceAdminStatusRequest);
+        var request = PacketCodec.Decode(frame, ServiceAdminStatusRequest.Codec);
+
+        if (source.NodeKind != MasterNodeKind.MasterAdmin)
+        {
+            logger.LogWarning(
+                "Rejected service admin status request from non-admin node. SourceConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
+                source.ConnectionId,
+                source.NodeKind,
+                source.NodeId);
+            return;
+        }
+
+        if (!Guid.TryParseExact(request.TargetConnectionId, "N", out var targetConnectionId) &&
+            !Guid.TryParse(request.TargetConnectionId, out targetConnectionId))
+        {
+            await WriteServiceAdminFailureAsync(source, request, "Target connection id is invalid.", cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!m_Connections.TryGetValue(targetConnectionId, out var target) ||
+            !target.IsTrusted ||
+            target.NodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated))
+        {
+            await WriteServiceAdminFailureAsync(source, request, "Target node is not connected or cannot provide a management page.", cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        m_AdminStatusRequestRoutes[request.RequestId] = source.ConnectionId;
+        _ = ExpireAdminStatusRouteAsync(request.RequestId, m_Shutdown.Token);
+
+        try
+        {
+            await target.WriteControlAsync(
+                MasterControlPacketIds.ServiceAdminStatusRequest,
+                request,
+                ServiceAdminStatusRequest.Codec,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            m_AdminStatusRequestRoutes.TryRemove(request.RequestId, out _);
+            throw;
+        }
+    }
+
+    private async Task RelayServiceAdminStatusResponseAsync(
+        MasterConnection source,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.ServiceAdminStatusResponse);
+        var response = PacketCodec.Decode(frame, ServiceAdminStatusResponse.Codec);
+
+        if (!m_AdminStatusRequestRoutes.TryRemove(response.RequestId, out var adminConnectionId))
+        {
+            logger.LogDebug(
+                "Dropped service admin status response with no waiting admin request. SourceConnectionId={ConnectionId}, RequestId={RequestId}.",
+                source.ConnectionId,
+                response.RequestId);
+            return;
+        }
+
+        if (!m_Connections.TryGetValue(adminConnectionId, out var adminConnection) ||
+            !adminConnection.IsTrusted ||
+            adminConnection.NodeKind != MasterNodeKind.MasterAdmin)
+        {
+            return;
+        }
+
+        await adminConnection.WriteControlAsync(
+            MasterControlPacketIds.ServiceAdminStatusResponse,
+            response,
+            ServiceAdminStatusResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteServiceAdminFailureAsync(
+        MasterConnection connection,
+        ServiceAdminStatusRequest request,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        var response = ServiceAdminStatusResponse.Failure(
+            request.RequestId,
+            request.TargetConnectionId,
+            errorMessage);
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.ServiceAdminStatusResponse,
+            response,
+            ServiceAdminStatusResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ExpireAdminStatusRouteAsync(Guid requestId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken).ConfigureAwait(false);
+            m_AdminStatusRequestRoutes.TryRemove(requestId, out _);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
     }
 
@@ -312,6 +511,17 @@ internal sealed class ConnectionManager(
         return new MasterOverviewSnapshot(
             GetSocketEndpoint(),
             [.. GetConnectionSnapshots()],
+            DateTimeOffset.UtcNow);
+    }
+
+    private DedicatedNodeSnapshot CreateDedicatedNodeSnapshot()
+    {
+        return new DedicatedNodeSnapshot(
+            [.. m_Connections.Values
+                .Select(static connection => connection.TryCreateDedicatedNodeEndpoint())
+                .Where(static endpoint => endpoint != null)
+                .Select(static endpoint => endpoint!)
+                .OrderBy(static endpoint => endpoint.NodeId, StringComparer.Ordinal)],
             DateTimeOffset.UtcNow);
     }
 
@@ -364,7 +574,7 @@ internal sealed class ConnectionManager(
             await PacketFrameWriter.WriteAsync(stream, acceptedFrame, handshakeTimeout.Token).ConfigureAwait(false);
         }
 
-        connection.MarkAccepted(hello.NodeKind, hello.NodeId);
+        connection.MarkAccepted(hello.NodeKind, hello.NodeId, hello.DisplayName);
         NotifyConnectionsChanged();
         logger.LogInformation(
             "Master node accepted. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
@@ -519,6 +729,8 @@ internal sealed class ConnectionManager(
     {
         private long m_LastSeenAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         private int m_Trusted;
+        private readonly SemaphoreSlim m_WriteLock = new(1, 1);
+        private Stream? m_Stream;
 
         public Guid ConnectionId { get; } = Guid.NewGuid();
 
@@ -528,18 +740,37 @@ internal sealed class ConnectionManager(
 
         public string NodeId { get; private set; } = string.Empty;
 
+        public string DisplayName { get; private set; } = string.Empty;
+
         public string RemoteEndPoint { get; } = socket.RemoteEndPoint?.ToString() ?? "unknown";
 
         public DateTimeOffset ConnectedAt { get; } = DateTimeOffset.UtcNow;
 
         public bool IsTrusted => Volatile.Read(ref m_Trusted) == 1;
 
-        public void MarkAccepted(MasterNodeKind nodeKind, string nodeId)
+        public MasterSocketEndpoint? DedicatedGatewayEndpoint { get; private set; }
+
+        public DateTimeOffset? DedicatedGatewayEndpointAdvertisedAt { get; private set; }
+
+        public void AttachStream(Stream stream)
+        {
+            m_Stream = stream ?? throw new ArgumentNullException(nameof(stream));
+        }
+
+        public void MarkAccepted(MasterNodeKind nodeKind, string nodeId, string displayName)
         {
             NodeKind = nodeKind;
             NodeId = nodeId;
+            DisplayName = displayName;
             MarkSeen();
             Volatile.Write(ref m_Trusted, 1);
+        }
+
+        public void UpdateDedicatedGatewayEndpoint(MasterSocketEndpoint endpoint)
+        {
+            DedicatedGatewayEndpoint = endpoint;
+            DedicatedGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
+            MarkSeen();
         }
 
         public void MarkSeen()
@@ -555,6 +786,51 @@ internal sealed class ConnectionManager(
                 IsTrusted ? NodeKind : MasterNodeKind.Unknown,
                 ConnectedAt,
                 DateTimeOffset.FromUnixTimeMilliseconds(Interlocked.Read(ref m_LastSeenAt)));
+        }
+
+        public DedicatedNodeEndpoint? TryCreateDedicatedNodeEndpoint()
+        {
+            var endpoint = DedicatedGatewayEndpoint;
+            var advertisedAt = DedicatedGatewayEndpointAdvertisedAt;
+            if (!IsTrusted ||
+                NodeKind != MasterNodeKind.Dedicated ||
+                endpoint == null ||
+                !advertisedAt.HasValue)
+            {
+                return null;
+            }
+
+            return new DedicatedNodeEndpoint(
+                NodeId,
+                DisplayName,
+                ConnectionId.ToString("N"),
+                endpoint,
+                advertisedAt.Value);
+        }
+
+        public async Task WriteControlAsync<TPacket>(
+            ushort packetId,
+            TPacket value,
+            IPacketCodec<TPacket> codec,
+            CancellationToken cancellationToken)
+        {
+            var stream = m_Stream ?? throw new InvalidOperationException("Connection stream is not attached.");
+            using var frame = PacketCodec.Encode(
+                PacketKind.Control,
+                packetId,
+                MasterControlProtocol.SchemaVersion,
+                value,
+                codec);
+
+            await m_WriteLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                m_WriteLock.Release();
+            }
         }
 
         public void Dispose()

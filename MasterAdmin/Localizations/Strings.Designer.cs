@@ -473,6 +473,240 @@ namespace MasterAdmin.Localizations {
                 return ResourceManager.GetString("NODE_KIND_MASTER_ADMIN", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Back to overview과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_BACK_TO_OVERVIEW {
+            get {
+                return ResourceManager.GetString("NODE_BACK_TO_OVERVIEW", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Master Relay과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_PAGE_EYEBROW {
+            get {
+                return ResourceManager.GetString("NODE_PAGE_EYEBROW", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Service status is requested through the Master control-plane socket, not by connecting to the service directly.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_PAGE_SUMMARY {
+            get {
+                return ResourceManager.GetString("NODE_PAGE_SUMMARY", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Node Management과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_PAGE_TITLE {
+            get {
+                return ResourceManager.GetString("NODE_PAGE_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Refresh과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_REFRESH {
+            get {
+                return ResourceManager.GetString("NODE_REFRESH", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Refreshing과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_REFRESHING {
+            get {
+                return ResourceManager.GetString("NODE_REFRESHING", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Connected과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_CONNECTED {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_CONNECTED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Current management data returned by the selected service through Master.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_DESCRIPTION {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_DESCRIPTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   No status items과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_EMPTY_TITLE {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_EMPTY_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   The service is connected but has not exposed additional management data yet.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_EMPTY_DESCRIPTION {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_EMPTY_DESCRIPTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Error과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_ERROR {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_ERROR", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Status unavailable과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_ERROR_TITLE {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_ERROR_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Connection id is invalid.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_INVALID_CONNECTION {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_INVALID_CONNECTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Loading과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_LOADING {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_LOADING", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Waiting for the selected service to answer through Master.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_LOADING_DESCRIPTION {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_LOADING_DESCRIPTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Loading status과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_LOADING_TITLE {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_LOADING_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Relay status과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_RELAY {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_RELAY", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Related nodes that can be opened through the Master relay path.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_RELATED_DESCRIPTION {
+            get {
+                return ResourceManager.GetString("NODE_RELATED_DESCRIPTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   This service has no related Gateway or Dedicated connection to show.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_RELATED_EMPTY_DESCRIPTION {
+            get {
+                return ResourceManager.GetString("NODE_RELATED_EMPTY_DESCRIPTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   No connected services과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_RELATED_EMPTY_TITLE {
+            get {
+                return ResourceManager.GetString("NODE_RELATED_EMPTY_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Connected Services과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_RELATED_TITLE {
+            get {
+                return ResourceManager.GetString("NODE_RELATED_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   The service did not answer before the request timed out.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_TIMEOUT {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_TIMEOUT", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Service Status과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_TITLE {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Unavailable과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_STATUS_UNAVAILABLE {
+            get {
+                return ResourceManager.GetString("NODE_STATUS_UNAVAILABLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Node summary과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_SUMMARY_ARIA {
+            get {
+                return ResourceManager.GetString("NODE_SUMMARY_ARIA", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Unknown connection과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_UNKNOWN_CONNECTION {
+            get {
+                return ResourceManager.GetString("NODE_UNKNOWN_CONNECTION", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Unknown과(와) 유사한 지역화된 문자열을 찾습니다.
