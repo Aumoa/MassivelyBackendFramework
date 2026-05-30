@@ -11,12 +11,18 @@ public static class ServiceCollectionExtensions
     {
         s.Configure<ConnectionManagerOptions>(config.GetSection("ConnectionManager"));
         s.Configure<MasterConnectionOptions>(config.GetSection("MasterConnection"));
+        s.Configure<DedicatedConnectionOptions>(config.GetSection("DedicatedConnection"));
 
         s.AddSingleton<IConnectionManager, ConnectionManager>();
         s.AddHostedService(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
+        s.AddSingleton<DedicatedNodeCatalog>();
+        s.AddSingleton<IDedicatedNodeCatalog>(p => p.GetRequiredService<DedicatedNodeCatalog>());
+        s.AddSingleton<IDedicatedNodeCatalogWriter>(p => p.GetRequiredService<DedicatedNodeCatalog>());
         s.AddSingleton<MasterConnectionManager>();
         s.AddSingleton<IMasterConnectionStatusProvider>(p => p.GetRequiredService<MasterConnectionManager>());
         s.AddHostedService(p => p.GetRequiredService<MasterConnectionManager>());
+        s.AddSingleton<DedicatedConnectionManager>();
+        s.AddHostedService(p => p.GetRequiredService<DedicatedConnectionManager>());
 
         return s;
     }

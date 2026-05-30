@@ -178,6 +178,10 @@ internal sealed class ConnectionManager(
             {
                 await PushOverviewUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
             }
+            else if (connection.NodeKind == MasterNodeKind.Gateway)
+            {
+                await PushDedicatedNodesUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
+            }
             else
             {
                 await DrainUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
@@ -230,9 +234,29 @@ internal sealed class ConnectionManager(
 
             using (frame)
             {
+                ProcessTrustedFrame(connection, frame);
                 connection.MarkSeen();
                 NotifyConnectionsChanged();
             }
+        }
+    }
+
+    private void ProcessTrustedFrame(MasterConnection connection, PacketFrame frame)
+    {
+        if (connection.NodeKind == MasterNodeKind.Dedicated &&
+            frame.Header.Kind == PacketKind.Control &&
+            frame.Header.PacketId == MasterControlPacketIds.DedicatedEndpointAdvertise)
+        {
+            MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.DedicatedEndpointAdvertise);
+            var advertised = PacketCodec.Decode(frame, DedicatedEndpointAdvertise.Codec);
+            connection.UpdateDedicatedGatewayEndpoint(advertised.GatewayEndpoint);
+            logger.LogInformation(
+                "Dedicated node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
+                connection.ConnectionId,
+                connection.NodeId,
+                advertised.GatewayEndpoint.IPAddress,
+                advertised.GatewayEndpoint.Port,
+                advertised.GatewayEndpoint.UseTls);
         }
     }
 
@@ -307,11 +331,93 @@ internal sealed class ConnectionManager(
         }
     }
 
+    private async Task PushDedicatedNodesUntilClosedAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)
+    {
+        var writeLock = new SemaphoreSlim(1, 1);
+
+        void OnConnectionsChanged()
+        {
+            _ = SendDedicatedNodeSnapshotSafeAsync();
+        }
+
+        async Task SendDedicatedNodeSnapshotSafeAsync()
+        {
+            try
+            {
+                await WriteDedicatedNodeSnapshotAsync(stream, writeLock, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception e) when (IsRemoteDisconnect(e))
+            {
+                logger.LogDebug(
+                    e,
+                    "Gateway Dedicated discovery socket write failed because the remote connection closed. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    connection.ConnectionId,
+                    connection.NodeId);
+                connection.Dispose();
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(
+                    e,
+                    "Failed to push Dedicated discovery snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    connection.ConnectionId,
+                    connection.NodeId);
+                connection.Dispose();
+            }
+        }
+
+        ConnectionsChanged += OnConnectionsChanged;
+
+        try
+        {
+            await WriteDedicatedNodeSnapshotAsync(stream, writeLock, cancellationToken).ConfigureAwait(false);
+            await DrainUntilClosedAsync(connection, stream, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ConnectionsChanged -= OnConnectionsChanged;
+        }
+    }
+
+    private async Task WriteDedicatedNodeSnapshotAsync(Stream stream, SemaphoreSlim writeLock, CancellationToken cancellationToken)
+    {
+        await writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var snapshot = CreateDedicatedNodeSnapshot();
+            using var frame = PacketCodec.Encode(
+                PacketKind.Control,
+                MasterControlPacketIds.DedicatedNodeSnapshot,
+                MasterControlProtocol.SchemaVersion,
+                snapshot,
+                DedicatedNodeSnapshot.Codec);
+            await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            writeLock.Release();
+        }
+    }
+
     private MasterOverviewSnapshot CreateOverviewSnapshot()
     {
         return new MasterOverviewSnapshot(
             GetSocketEndpoint(),
             [.. GetConnectionSnapshots()],
+            DateTimeOffset.UtcNow);
+    }
+
+    private DedicatedNodeSnapshot CreateDedicatedNodeSnapshot()
+    {
+        return new DedicatedNodeSnapshot(
+            [.. m_Connections.Values
+                .Select(static connection => connection.TryCreateDedicatedNodeEndpoint())
+                .Where(static endpoint => endpoint != null)
+                .Select(static endpoint => endpoint!)
+                .OrderBy(static endpoint => endpoint.NodeId, StringComparer.Ordinal)],
             DateTimeOffset.UtcNow);
     }
 
@@ -364,7 +470,7 @@ internal sealed class ConnectionManager(
             await PacketFrameWriter.WriteAsync(stream, acceptedFrame, handshakeTimeout.Token).ConfigureAwait(false);
         }
 
-        connection.MarkAccepted(hello.NodeKind, hello.NodeId);
+        connection.MarkAccepted(hello.NodeKind, hello.NodeId, hello.DisplayName);
         NotifyConnectionsChanged();
         logger.LogInformation(
             "Master node accepted. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
@@ -528,18 +634,32 @@ internal sealed class ConnectionManager(
 
         public string NodeId { get; private set; } = string.Empty;
 
+        public string DisplayName { get; private set; } = string.Empty;
+
         public string RemoteEndPoint { get; } = socket.RemoteEndPoint?.ToString() ?? "unknown";
 
         public DateTimeOffset ConnectedAt { get; } = DateTimeOffset.UtcNow;
 
         public bool IsTrusted => Volatile.Read(ref m_Trusted) == 1;
 
-        public void MarkAccepted(MasterNodeKind nodeKind, string nodeId)
+        public MasterSocketEndpoint? DedicatedGatewayEndpoint { get; private set; }
+
+        public DateTimeOffset? DedicatedGatewayEndpointAdvertisedAt { get; private set; }
+
+        public void MarkAccepted(MasterNodeKind nodeKind, string nodeId, string displayName)
         {
             NodeKind = nodeKind;
             NodeId = nodeId;
+            DisplayName = displayName;
             MarkSeen();
             Volatile.Write(ref m_Trusted, 1);
+        }
+
+        public void UpdateDedicatedGatewayEndpoint(MasterSocketEndpoint endpoint)
+        {
+            DedicatedGatewayEndpoint = endpoint;
+            DedicatedGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
+            MarkSeen();
         }
 
         public void MarkSeen()
@@ -555,6 +675,26 @@ internal sealed class ConnectionManager(
                 IsTrusted ? NodeKind : MasterNodeKind.Unknown,
                 ConnectedAt,
                 DateTimeOffset.FromUnixTimeMilliseconds(Interlocked.Read(ref m_LastSeenAt)));
+        }
+
+        public DedicatedNodeEndpoint? TryCreateDedicatedNodeEndpoint()
+        {
+            var endpoint = DedicatedGatewayEndpoint;
+            var advertisedAt = DedicatedGatewayEndpointAdvertisedAt;
+            if (!IsTrusted ||
+                NodeKind != MasterNodeKind.Dedicated ||
+                endpoint == null ||
+                !advertisedAt.HasValue)
+            {
+                return null;
+            }
+
+            return new DedicatedNodeEndpoint(
+                NodeId,
+                DisplayName,
+                ConnectionId.ToString("N"),
+                endpoint,
+                advertisedAt.Value);
         }
 
         public void Dispose()
