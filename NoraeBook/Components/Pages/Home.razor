@@ -1,5 +1,7 @@
 @page "/"
 @using System.Security.Claims
+@using Microsoft.AspNetCore.WebUtilities
+@implements IDisposable
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IKaraokeSongRepository SongRepository
 @inject NavigationManager Nav
@@ -165,6 +167,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        Nav.LocationChanged += OnLocationChanged;
+
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         m_OwnerId = GetOwnerId(authState.User);
         if (!string.IsNullOrWhiteSpace(m_OwnerId))
@@ -173,6 +177,7 @@
         }
 
         m_IsLoading = false;
+        SyncFormWithLocation();
     }
 
     private async Task LoadSongsAsync()
@@ -209,6 +214,7 @@
 
         await SongRepository.SaveSongAsync(m_OwnerId, edit);
         HideForm();
+        NavigateToSongList(replace: true);
         await LoadSongsAsync();
     }
 
@@ -223,6 +229,7 @@
         if (m_Form.Id == songId)
         {
             HideForm();
+            NavigateToSongList(replace: true);
         }
 
         await LoadSongsAsync();
@@ -230,11 +237,15 @@
 
     private void ShowNewSongForm()
     {
-        ClearForm();
-        m_IsFormVisible = true;
+        Nav.NavigateTo(GetNewSongUri());
     }
 
     private void EditSong(KaraokeSongEntry song)
+    {
+        Nav.NavigateTo(GetEditSongUri(song.Id));
+    }
+
+    private void LoadSongIntoForm(KaraokeSongEntry song)
     {
         m_ErrorMessage = null;
         m_SelectedDefaultTagIds.Clear();
@@ -265,7 +276,7 @@
 
     private void CancelForm()
     {
-        HideForm();
+        NavigateToSongList(replace: true);
     }
 
     private void HideForm()
@@ -381,6 +392,96 @@
     {
         OidcAuth.NavigateToLogin(Nav, "auth/redirect", "openid");
     }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(() =>
+        {
+            SyncFormWithLocation();
+            StateHasChanged();
+        });
+    }
+
+    private void SyncFormWithLocation()
+    {
+        if (m_IsLoading)
+        {
+            return;
+        }
+
+        var formRoute = GetCurrentFormRoute();
+        if (formRoute.Mode == SongFormRouteMode.New)
+        {
+            ClearForm();
+            m_IsFormVisible = true;
+            return;
+        }
+
+        if (formRoute.Mode == SongFormRouteMode.Edit && formRoute.SongId.HasValue)
+        {
+            var song = m_Songs.FirstOrDefault(entry => entry.Id == formRoute.SongId.Value);
+            if (song is not null)
+            {
+                LoadSongIntoForm(song);
+                return;
+            }
+
+            HideForm();
+            NavigateToSongList(replace: true);
+            return;
+        }
+
+        HideForm();
+    }
+
+    private SongFormRoute GetCurrentFormRoute()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("edit", out var editValues) &&
+            Guid.TryParse(editValues.FirstOrDefault(), out var songId))
+        {
+            return new SongFormRoute(SongFormRouteMode.Edit, songId);
+        }
+
+        if (query.TryGetValue("mode", out var modeValues) &&
+            string.Equals(modeValues.FirstOrDefault(), "new", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SongFormRoute(SongFormRouteMode.New, null);
+        }
+
+        return new SongFormRoute(SongFormRouteMode.List, null);
+    }
+
+    private void NavigateToSongList(bool replace)
+    {
+        Nav.NavigateTo(Nav.BaseUri, replace: replace);
+    }
+
+    private string GetNewSongUri()
+    {
+        return $"{Nav.BaseUri}?mode=new";
+    }
+
+    private string GetEditSongUri(Guid songId)
+    {
+        return $"{Nav.BaseUri}?edit={songId:D}";
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+
+    private enum SongFormRouteMode
+    {
+        List,
+        New,
+        Edit
+    }
+
+    private readonly record struct SongFormRoute(SongFormRouteMode Mode, Guid? SongId);
 
     private sealed class SongFormModel
     {
