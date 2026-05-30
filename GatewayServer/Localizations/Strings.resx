@@ -72,6 +72,57 @@
   <data name="HOME_SUMMARY_ARIA" xml:space="preserve">
     <value>Gateway summary</value>
   </data>
+  <data name="MASTER_STATUS_LABEL" xml:space="preserve">
+    <value>Master connection</value>
+  </data>
+  <data name="MASTER_STATE_DISABLED" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="MASTER_STATE_DISCONNECTED" xml:space="preserve">
+    <value>Disconnected</value>
+  </data>
+  <data name="MASTER_STATE_CONNECTING" xml:space="preserve">
+    <value>Connecting</value>
+  </data>
+  <data name="MASTER_STATE_HANDSHAKING" xml:space="preserve">
+    <value>Handshaking</value>
+  </data>
+  <data name="MASTER_STATE_TRUSTED" xml:space="preserve">
+    <value>Trusted</value>
+  </data>
+  <data name="MASTER_STATE_RECONNECTING" xml:space="preserve">
+    <value>Reconnecting</value>
+  </data>
+  <data name="MASTER_STATE_STOPPING" xml:space="preserve">
+    <value>Stopping</value>
+  </data>
+  <data name="MASTER_STATUS_TRUSTED_DETAIL_FORMAT" xml:space="preserve">
+    <value>Trusted as {0}; Master connection {1}.</value>
+  </data>
+  <data name="MASTER_STATUS_CONNECTING_DETAIL_FORMAT" xml:space="preserve">
+    <value>Opening socket to {0}.</value>
+  </data>
+  <data name="MASTER_STATUS_HANDSHAKING_DETAIL_FORMAT" xml:space="preserve">
+    <value>Handshake step: {0}.</value>
+  </data>
+  <data name="MASTER_STATUS_RECONNECTING_DETAIL_FORMAT" xml:space="preserve">
+    <value>Reconnecting after {0}.</value>
+  </data>
+  <data name="MASTER_STATUS_RECONNECTING_DETAIL" xml:space="preserve">
+    <value>Waiting to reconnect.</value>
+  </data>
+  <data name="MASTER_STATUS_DISABLED_DETAIL" xml:space="preserve">
+    <value>Master connection is disabled.</value>
+  </data>
+  <data name="MASTER_STATUS_STOPPING_DETAIL" xml:space="preserve">
+    <value>Gateway service is stopping.</value>
+  </data>
+  <data name="MASTER_STATUS_DISCONNECTED_DETAIL" xml:space="preserve">
+    <value>Not connected to Master.</value>
+  </data>
+  <data name="MASTER_STATUS_NOTES_FORMAT" xml:space="preserve">
+    <value>Endpoint {0}. {1} Last update: {2}.</value>
+  </data>
   <data name="METRIC_CONTROL_PLANE" xml:space="preserve">
     <value>Control plane</value>
   </data>
@@ -107,6 +158,9 @@
   </data>
   <data name="OPERATIONS_STATUS" xml:space="preserve">
     <value>Configured</value>
+  </data>
+  <data name="OPERATIONS_STATUS_LIVE" xml:space="preserve">
+    <value>Live</value>
   </data>
   <data name="OPERATIONS_TABLE_AREA" xml:space="preserve">
     <value>Area</value>

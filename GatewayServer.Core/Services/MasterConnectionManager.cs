@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using GatewayServer.ControlPlane;
 using GatewayServer.Options;
 using MasterServer.ControlPlane;
 using Microsoft.Extensions.Hosting;
@@ -13,19 +14,32 @@ namespace GatewayServer.Services;
 
 internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
-    ILogger<MasterConnectionManager> logger) : IHostedService
+    ILogger<MasterConnectionManager> logger) : IHostedService, IMasterConnectionStatusProvider
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
+    private readonly object m_StatusSync = new();
+    private MasterConnectionStatus m_Status = CreateInitialStatus(options.Value);
     private Task? m_RunTask;
     private int m_Trusted;
 
     public bool IsTrusted => Volatile.Read(ref m_Trusted) == 1;
 
+    public event Action<MasterConnectionStatus>? StatusChanged;
+
+    public MasterConnectionStatus GetStatus()
+    {
+        lock (m_StatusSync)
+        {
+            return m_Status;
+        }
+    }
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         if (!m_Options.Enabled)
         {
+            PublishStatus(MasterConnectionState.Disabled);
             logger.LogInformation("Gateway Master control-plane connection is disabled.");
             return Task.CompletedTask;
         }
@@ -37,6 +51,7 @@ internal sealed class MasterConnectionManager(
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        PublishStatus(MasterConnectionState.Stopping);
         await m_Shutdown.CancelAsync().ConfigureAwait(false);
 
         if (m_RunTask != null)
@@ -49,9 +64,12 @@ internal sealed class MasterConnectionManager(
     {
         while (!cancellationToken.IsCancellationRequested)
         {
+            string? reconnectReason = null;
+
             try
             {
                 await RunSessionAsync(cancellationToken).ConfigureAwait(false);
+                reconnectReason = "Master connection closed.";
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -59,6 +77,7 @@ internal sealed class MasterConnectionManager(
             }
             catch (TimeoutException e)
             {
+                reconnectReason = e.Message;
                 logger.LogWarning(
                     "Gateway Master handshake timed out: {Message} Endpoint={Address}:{Port}. Verify Master is restarted with NodeAuthChallenge support and matching MasterSocket:NodeAuthSecret.",
                     e.Message,
@@ -67,6 +86,7 @@ internal sealed class MasterConnectionManager(
             }
             catch (EndOfStreamException e)
             {
+                reconnectReason = e.Message;
                 logger.LogWarning(
                     "Gateway Master connection closed before trust was established: {Message} Endpoint={Address}:{Port}.",
                     e.Message,
@@ -75,11 +95,19 @@ internal sealed class MasterConnectionManager(
             }
             catch (Exception e)
             {
+                reconnectReason = e.Message;
                 logger.LogWarning(e, "Gateway Master control-plane session ended before trust was maintained.");
             }
             finally
             {
-                MarkTrusted(false);
+                if (!cancellationToken.IsCancellationRequested)
+                {
+                    var reconnectDelay = TimeSpan.FromMilliseconds(Math.Max(1, m_Options.ReconnectDelayMilliseconds));
+                    PublishStatus(
+                        MasterConnectionState.Reconnecting,
+                        lastError: reconnectReason,
+                        nextReconnectAt: DateTimeOffset.UtcNow.Add(reconnectDelay));
+                }
             }
 
             try
@@ -101,8 +129,13 @@ internal sealed class MasterConnectionManager(
         using var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         socket.NoDelay = true;
 
+        PublishStatus(MasterConnectionState.Connecting);
         await socket.ConnectAsync(new IPEndPoint(address, m_Options.Port), cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Gateway connected to Master socket at {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
+        PublishStatus(
+            MasterConnectionState.Handshaking,
+            handshakeStep: "NodeAuthChallenge",
+            markConnected: true);
 
         await using var networkStream = new NetworkStream(socket, ownsSocket: false);
         SslStream? sslStream = null;
@@ -122,7 +155,10 @@ internal sealed class MasterConnectionManager(
             }
 
             var accepted = await CompleteHandshakeAsync(activeStream, cancellationToken).ConfigureAwait(false);
-            MarkTrusted(true);
+            PublishStatus(
+                MasterConnectionState.Trusted,
+                masterConnectionId: accepted.ConnectionId,
+                markTrusted: true);
             logger.LogInformation(
                 "Gateway Master control-plane session trusted. NodeId={NodeId}, MasterConnectionId={ConnectionId}.",
                 accepted.NodeId,
@@ -148,6 +184,7 @@ internal sealed class MasterConnectionManager(
 
         try
         {
+            PublishStatus(MasterConnectionState.Handshaking, handshakeStep: handshakeStep);
             using var challengeFrame = await ReadRequiredHandshakeFrameAsync(
                 stream,
                 MasterControlPacketIds.NodeAuthChallenge,
@@ -161,6 +198,7 @@ internal sealed class MasterConnectionManager(
                 MasterControlProtocol.SchemaVersion);
 
             handshakeStep = "NodeHello";
+            PublishStatus(MasterConnectionState.Handshaking, handshakeStep: handshakeStep);
             using (var helloFrame = PacketCodec.Encode(
                        PacketKind.Control,
                        MasterControlPacketIds.NodeHello,
@@ -172,6 +210,7 @@ internal sealed class MasterConnectionManager(
             }
 
             handshakeStep = "NodeAuthProof";
+            PublishStatus(MasterConnectionState.Handshaking, handshakeStep: handshakeStep);
             var proof = new NodeAuthProof(
                 hello.NodeId,
                 MasterNodeAuthenticator.ComputeProof(challenge, hello, m_Options.SharedSecret));
@@ -186,6 +225,7 @@ internal sealed class MasterConnectionManager(
             }
 
             handshakeStep = "NodeAccepted";
+            PublishStatus(MasterConnectionState.Handshaking, handshakeStep: handshakeStep);
             using var acceptedFrame = await ReadRequiredHandshakeFrameAsync(
                 stream,
                 MasterControlPacketIds.NodeAccepted,
@@ -267,9 +307,67 @@ internal sealed class MasterConnectionManager(
         }
     }
 
-    private void MarkTrusted(bool trusted)
+    private void PublishStatus(
+        MasterConnectionState state,
+        string? masterConnectionId = null,
+        string? handshakeStep = null,
+        string? lastError = null,
+        DateTimeOffset? nextReconnectAt = null,
+        bool markConnected = false,
+        bool markTrusted = false)
     {
-        Volatile.Write(ref m_Trusted, trusted ? 1 : 0);
+        var now = DateTimeOffset.UtcNow;
+        MasterConnectionStatus status;
+
+        lock (m_StatusSync)
+        {
+            var current = m_Status;
+            var isTrusted = state == MasterConnectionState.Trusted;
+            status = new MasterConnectionStatus(
+                state,
+                m_Options.Enabled,
+                isTrusted,
+                GetEndpoint(m_Options),
+                m_Options.NodeId,
+                m_Options.DisplayName,
+                isTrusted ? masterConnectionId : null,
+                state == MasterConnectionState.Handshaking ? handshakeStep : null,
+                state is MasterConnectionState.Connecting or MasterConnectionState.Handshaking or MasterConnectionState.Trusted
+                    ? null
+                    : lastError,
+                now,
+                markConnected ? now : current.LastConnectedAt,
+                markTrusted ? now : current.LastTrustedAt,
+                state == MasterConnectionState.Reconnecting ? nextReconnectAt : null);
+            m_Status = status;
+        }
+
+        Volatile.Write(ref m_Trusted, status.IsTrusted ? 1 : 0);
+        StatusChanged?.Invoke(status);
+    }
+
+    private static MasterConnectionStatus CreateInitialStatus(MasterConnectionOptions options)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return new MasterConnectionStatus(
+            options.Enabled ? MasterConnectionState.Disconnected : MasterConnectionState.Disabled,
+            options.Enabled,
+            isTrusted: false,
+            GetEndpoint(options),
+            options.NodeId,
+            options.DisplayName,
+            masterConnectionId: null,
+            handshakeStep: null,
+            lastError: null,
+            now,
+            lastConnectedAt: null,
+            lastTrustedAt: null,
+            nextReconnectAt: null);
+    }
+
+    private static string GetEndpoint(MasterConnectionOptions options)
+    {
+        return $"{options.IPAddress}:{options.Port}";
     }
 
     private static async Task WaitForShutdownAsync(Task task, CancellationToken cancellationToken)

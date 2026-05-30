@@ -72,6 +72,57 @@
   <data name="HOME_SUMMARY_ARIA" xml:space="preserve">
     <value>Gateway 요약</value>
   </data>
+  <data name="MASTER_STATUS_LABEL" xml:space="preserve">
+    <value>Master 연결</value>
+  </data>
+  <data name="MASTER_STATE_DISABLED" xml:space="preserve">
+    <value>비활성</value>
+  </data>
+  <data name="MASTER_STATE_DISCONNECTED" xml:space="preserve">
+    <value>연결 끊김</value>
+  </data>
+  <data name="MASTER_STATE_CONNECTING" xml:space="preserve">
+    <value>연결 중</value>
+  </data>
+  <data name="MASTER_STATE_HANDSHAKING" xml:space="preserve">
+    <value>핸드셰이크 중</value>
+  </data>
+  <data name="MASTER_STATE_TRUSTED" xml:space="preserve">
+    <value>신뢰됨</value>
+  </data>
+  <data name="MASTER_STATE_RECONNECTING" xml:space="preserve">
+    <value>재연결 대기</value>
+  </data>
+  <data name="MASTER_STATE_STOPPING" xml:space="preserve">
+    <value>중지 중</value>
+  </data>
+  <data name="MASTER_STATUS_TRUSTED_DETAIL_FORMAT" xml:space="preserve">
+    <value>{0}(으)로 신뢰됨; Master 연결 {1}.</value>
+  </data>
+  <data name="MASTER_STATUS_CONNECTING_DETAIL_FORMAT" xml:space="preserve">
+    <value>{0}(으)로 소켓 연결을 여는 중입니다.</value>
+  </data>
+  <data name="MASTER_STATUS_HANDSHAKING_DETAIL_FORMAT" xml:space="preserve">
+    <value>핸드셰이크 단계: {0}.</value>
+  </data>
+  <data name="MASTER_STATUS_RECONNECTING_DETAIL_FORMAT" xml:space="preserve">
+    <value>{0} 이후 재연결합니다.</value>
+  </data>
+  <data name="MASTER_STATUS_RECONNECTING_DETAIL" xml:space="preserve">
+    <value>재연결을 기다리는 중입니다.</value>
+  </data>
+  <data name="MASTER_STATUS_DISABLED_DETAIL" xml:space="preserve">
+    <value>Master 연결이 비활성화되어 있습니다.</value>
+  </data>
+  <data name="MASTER_STATUS_STOPPING_DETAIL" xml:space="preserve">
+    <value>Gateway 서비스가 중지 중입니다.</value>
+  </data>
+  <data name="MASTER_STATUS_DISCONNECTED_DETAIL" xml:space="preserve">
+    <value>Master에 연결되어 있지 않습니다.</value>
+  </data>
+  <data name="MASTER_STATUS_NOTES_FORMAT" xml:space="preserve">
+    <value>엔드포인트 {0}. {1} 마지막 갱신: {2}.</value>
+  </data>
   <data name="METRIC_CONTROL_PLANE" xml:space="preserve">
     <value>제어 평면</value>
   </data>
@@ -107,6 +158,9 @@
   </data>
   <data name="OPERATIONS_STATUS" xml:space="preserve">
     <value>구성됨</value>
+  </data>
+  <data name="OPERATIONS_STATUS_LIVE" xml:space="preserve">
+    <value>실시간</value>
   </data>
   <data name="OPERATIONS_TABLE_AREA" xml:space="preserve">
     <value>영역</value>

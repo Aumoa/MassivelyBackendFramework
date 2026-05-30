@@ -15,7 +15,9 @@ public static class ServiceCollectionExtensions
 
         s.AddSingleton<IConnectionManager, ConnectionManager>();
         s.AddHostedService(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
-        s.AddHostedService<MasterConnectionManager>();
+        s.AddSingleton<MasterConnectionManager>();
+        s.AddSingleton<IMasterConnectionStatusProvider>(p => p.GetRequiredService<MasterConnectionManager>());
+        s.AddHostedService(p => p.GetRequiredService<MasterConnectionManager>());
 
         return s;
     }

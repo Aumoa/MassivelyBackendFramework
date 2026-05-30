@@ -1,4 +1,6 @@
 @page "/"
+@implements IDisposable
+@inject IMasterConnectionStatusProvider MasterConnectionStatusProvider
 
 <PageTitle>@Strings.APP_TITLE</PageTitle>
 
@@ -11,10 +13,10 @@
 </section>
 
 <section class="metrics-grid" aria-label="@Strings.HOME_SUMMARY_ARIA">
-    <article class="metric-card">
-        <span class="metric-label">@Strings.METRIC_CONTROL_PLANE</span>
-        <strong>@Strings.METRIC_CONTROL_PLANE_VALUE</strong>
-        <span class="metric-detail">@Strings.METRIC_CONTROL_PLANE_DETAIL</span>
+    <article class="metric-card master-status @MasterStatusCssClass">
+        <span class="metric-label">@Strings.MASTER_STATUS_LABEL</span>
+        <strong>@GetMasterStateText(MasterStatus.State)</strong>
+        <span class="metric-detail">@GetMasterStatusDetail()</span>
     </article>
     <article class="metric-card">
         <span class="metric-label">@Strings.METRIC_CLIENT_EDGE</span>
@@ -34,7 +36,7 @@
             <h2>@Strings.OPERATIONS_TITLE</h2>
             <p>@Strings.OPERATIONS_DESCRIPTION</p>
         </div>
-        <span class="status-pill">@Strings.OPERATIONS_STATUS</span>
+        <span class="status-pill">@Strings.OPERATIONS_STATUS_LIVE</span>
     </div>
 
     <div class="table-wrap">
@@ -49,8 +51,8 @@
             <tbody>
                 <tr>
                     <td>@Strings.OPERATIONS_MASTER_AREA</td>
-                    <td>@Strings.OPERATIONS_STATE_CONFIGURED</td>
-                    <td>@Strings.OPERATIONS_MASTER_NOTES</td>
+                    <td>@GetMasterStateText(MasterStatus.State)</td>
+                    <td>@GetMasterOperationNotes()</td>
                 </tr>
                 <tr>
                     <td>@Strings.OPERATIONS_CLIENT_AREA</td>
@@ -66,3 +68,75 @@
         </table>
     </div>
 </section>
+
+@code {
+    private MasterConnectionStatus MasterStatus { get; set; } = null!;
+
+    private string MasterStatusCssClass => MasterStatus.State switch
+    {
+        MasterConnectionState.Trusted => "status-trusted",
+        MasterConnectionState.Connecting or MasterConnectionState.Handshaking => "status-active",
+        MasterConnectionState.Reconnecting => "status-warning",
+        MasterConnectionState.Disabled => "status-muted",
+        _ => "status-down"
+    };
+
+    protected override void OnInitialized()
+    {
+        MasterStatus = MasterConnectionStatusProvider.GetStatus();
+        MasterConnectionStatusProvider.StatusChanged += OnMasterStatusChanged;
+    }
+
+    public void Dispose()
+    {
+        MasterConnectionStatusProvider.StatusChanged -= OnMasterStatusChanged;
+    }
+
+    private void OnMasterStatusChanged(MasterConnectionStatus status)
+    {
+        _ = InvokeAsync(() =>
+        {
+            MasterStatus = status;
+            StateHasChanged();
+        });
+    }
+
+    private static string GetMasterStateText(MasterConnectionState state)
+    {
+        return state switch
+        {
+            MasterConnectionState.Disabled => Strings.MASTER_STATE_DISABLED,
+            MasterConnectionState.Connecting => Strings.MASTER_STATE_CONNECTING,
+            MasterConnectionState.Handshaking => Strings.MASTER_STATE_HANDSHAKING,
+            MasterConnectionState.Trusted => Strings.MASTER_STATE_TRUSTED,
+            MasterConnectionState.Reconnecting => Strings.MASTER_STATE_RECONNECTING,
+            MasterConnectionState.Stopping => Strings.MASTER_STATE_STOPPING,
+            _ => Strings.MASTER_STATE_DISCONNECTED
+        };
+    }
+
+    private string GetMasterStatusDetail()
+    {
+        return MasterStatus.State switch
+        {
+            MasterConnectionState.Trusted => string.Format(Strings.MASTER_STATUS_TRUSTED_DETAIL_FORMAT, MasterStatus.NodeId, MasterStatus.MasterConnectionId),
+            MasterConnectionState.Connecting => string.Format(Strings.MASTER_STATUS_CONNECTING_DETAIL_FORMAT, MasterStatus.Endpoint),
+            MasterConnectionState.Handshaking => string.Format(Strings.MASTER_STATUS_HANDSHAKING_DETAIL_FORMAT, MasterStatus.HandshakeStep ?? "PacketCore"),
+            MasterConnectionState.Reconnecting => MasterStatus.NextReconnectAt.HasValue
+                ? string.Format(Strings.MASTER_STATUS_RECONNECTING_DETAIL_FORMAT, MasterStatus.NextReconnectAt.Value.LocalDateTime)
+                : Strings.MASTER_STATUS_RECONNECTING_DETAIL,
+            MasterConnectionState.Disabled => Strings.MASTER_STATUS_DISABLED_DETAIL,
+            MasterConnectionState.Stopping => Strings.MASTER_STATUS_STOPPING_DETAIL,
+            _ => Strings.MASTER_STATUS_DISCONNECTED_DETAIL
+        };
+    }
+
+    private string GetMasterOperationNotes()
+    {
+        return string.Format(
+            Strings.MASTER_STATUS_NOTES_FORMAT,
+            MasterStatus.Endpoint,
+            GetMasterStatusDetail(),
+            MasterStatus.LastChangedAt.LocalDateTime);
+    }
+}
