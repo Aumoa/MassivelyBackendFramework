@@ -40,91 +40,91 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="APP_TITLE" xml:space="preserve">
-    <value>MasterServer</value>
+    <value>Master Admin</value>
   </data>
   <data name="TOPBAR_SECTION_BACKEND" xml:space="preserve">
     <value>Backend</value>
   </data>
   <data name="ACCESS_DENIED_TITLE" xml:space="preserve">
-    <value>Access denied</value>
+    <value>접근 거부</value>
   </data>
   <data name="ACCESS_DENIED_DESCRIPTION" xml:space="preserve">
-    <value>This management page requires the admin role.</value>
+    <value>이 관리 페이지에는 admin 역할이 필요합니다.</value>
   </data>
   <data name="NAV_TOGGLE_TITLE" xml:space="preserve">
-    <value>Navigation menu</value>
+    <value>탐색 메뉴</value>
   </data>
   <data name="NAV_OVERVIEW" xml:space="preserve">
-    <value>Overview</value>
+    <value>개요</value>
   </data>
   <data name="HOME_EYEBROW" xml:space="preserve">
-    <value>MasterServer</value>
+    <value>Master Admin</value>
   </data>
   <data name="HOME_TITLE" xml:space="preserve">
-    <value>Control Plane</value>
+    <value>제어 평면</value>
   </data>
   <data name="HOME_SUMMARY" xml:space="preserve">
-    <value>Gateway and Dedicated nodes connect here for control-plane state. Packet relay and game data stay outside Master.</value>
+    <value>Gateway와 Dedicated 노드는 제어 평면 상태를 위해 이곳에 연결됩니다. 패킷 릴레이와 게임 데이터는 Master 밖에 유지됩니다.</value>
   </data>
   <data name="HOME_SUMMARY_ARIA" xml:space="preserve">
-    <value>Master summary</value>
+    <value>Master 요약</value>
   </data>
   <data name="METRIC_SOCKET_ENDPOINT" xml:space="preserve">
-    <value>Socket endpoint</value>
+    <value>소켓 엔드포인트</value>
   </data>
   <data name="METRIC_ACTIVE_CONNECTIONS" xml:space="preserve">
-    <value>Active connections</value>
+    <value>활성 연결</value>
   </data>
   <data name="METRIC_ACTIVE_CONNECTIONS_DETAIL" xml:space="preserve">
-    <value>Gateway/Dedicated role handshake pending</value>
+    <value>Gateway/Dedicated 역할 핸드셰이크 대기 중</value>
   </data>
   <data name="METRIC_CONTROL_MODE" xml:space="preserve">
-    <value>Control mode</value>
+    <value>제어 모드</value>
   </data>
   <data name="METRIC_CONTROL_MODE_VALUE" xml:space="preserve">
-    <value>Single Master</value>
+    <value>단일 Master</value>
   </data>
   <data name="METRIC_CONTROL_MODE_DETAIL" xml:space="preserve">
-    <value>Ready for lease and ownership extensions</value>
+    <value>리스와 소유권 확장을 붙일 수 있는 상태</value>
   </data>
   <data name="TLS_ENABLED" xml:space="preserve">
-    <value>TLS enabled</value>
+    <value>TLS 사용</value>
   </data>
   <data name="TLS_DISABLED" xml:space="preserve">
-    <value>TLS disabled</value>
+    <value>TLS 미사용</value>
   </data>
   <data name="CONNECTIONS_TITLE" xml:space="preserve">
-    <value>Node Connections</value>
+    <value>노드 연결</value>
   </data>
   <data name="CONNECTIONS_DESCRIPTION" xml:space="preserve">
-    <value>Current socket peers observed by the Master hosted service.</value>
+    <value>Master hosted service가 관찰한 현재 소켓 피어입니다.</value>
   </data>
   <data name="CONNECTIONS_ACTIVE_FORMAT" xml:space="preserve">
-    <value>{0} active</value>
+    <value>{0}개 활성</value>
   </data>
   <data name="CONNECTIONS_EMPTY_TITLE" xml:space="preserve">
-    <value>No node connections</value>
+    <value>연결된 노드 없음</value>
   </data>
   <data name="CONNECTIONS_EMPTY_DESCRIPTION" xml:space="preserve">
-    <value>Gateway and Dedicated registration can be added on top of this socket surface.</value>
+    <value>Gateway와 Dedicated 등록은 이 소켓 표면 위에 추가할 수 있습니다.</value>
   </data>
   <data name="CONNECTIONS_TABLE_CONNECTION" xml:space="preserve">
-    <value>Connection</value>
+    <value>연결</value>
   </data>
   <data name="CONNECTIONS_TABLE_ROLE" xml:space="preserve">
-    <value>Role</value>
+    <value>역할</value>
   </data>
   <data name="CONNECTIONS_TABLE_REMOTE_ENDPOINT" xml:space="preserve">
-    <value>Remote endpoint</value>
+    <value>원격 엔드포인트</value>
   </data>
   <data name="CONNECTIONS_TABLE_CONNECTED" xml:space="preserve">
-    <value>Connected</value>
+    <value>연결 시각</value>
   </data>
   <data name="CONNECTIONS_TABLE_LAST_SEEN" xml:space="preserve">
-    <value>Last seen</value>
+    <value>마지막 확인</value>
   </data>
   <data name="NODE_KIND_UNKNOWN" xml:space="preserve">
-    <value>Unknown</value>
+    <value>알 수 없음</value>
   </data>
   <data name="NODE_KIND_GATEWAY" xml:space="preserve">
     <value>Gateway</value>
@@ -133,27 +133,27 @@
     <value>Dedicated</value>
   </data>
   <data name="NOTFOUND_TITLE" xml:space="preserve">
-    <value>Not Found</value>
+    <value>페이지 없음</value>
   </data>
   <data name="NOTFOUND_DESCRIPTION" xml:space="preserve">
-    <value>The requested MasterServer page does not exist.</value>
+    <value>요청한 Master Admin 페이지가 없습니다.</value>
   </data>
   <data name="ERROR_PAGE_TITLE" xml:space="preserve">
-    <value>Error</value>
+    <value>오류</value>
   </data>
   <data name="ERROR_PAGE_MESSAGE" xml:space="preserve">
-    <value>An error occurred while processing your request.</value>
+    <value>요청을 처리하는 동안 오류가 발생했습니다.</value>
   </data>
   <data name="ERROR_REQUEST_ID" xml:space="preserve">
-    <value>Request ID</value>
+    <value>요청 ID</value>
   </data>
   <data name="ERROR_DEVELOPMENT_MODE_TITLE" xml:space="preserve">
-    <value>Development Mode</value>
+    <value>개발 모드</value>
   </data>
   <data name="ERROR_DEVELOPMENT_MODE_DESCRIPTION" xml:space="preserve">
-    <value>Swapping to Development environment will display more detailed information about the error that occurred.</value>
+    <value>Development 환경으로 전환하면 발생한 오류의 자세한 정보를 표시합니다.</value>
   </data>
   <data name="ERROR_DEVELOPMENT_MODE_WARNING" xml:space="preserve">
-    <value>The Development environment should not be enabled for deployed applications.</value>
+    <value>배포된 애플리케이션에서는 Development 환경을 활성화하지 않아야 합니다.</value>
   </data>
 </root>

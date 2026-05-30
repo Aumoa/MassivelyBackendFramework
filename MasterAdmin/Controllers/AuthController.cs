@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using OpenIDConnect;
 
-namespace MasterServer.Controllers;
+namespace MasterAdmin.Controllers;
 
 [Route("auth")]
 public sealed class AuthController(IAuthenticationStateProvider auth, ILogger<AuthController> logger) : ControllerBase

@@ -1,6 +1,6 @@
 @page "/"
-@implements IDisposable
-@inject IConnectionManager ConnectionManager
+@implements IAsyncDisposable
+@inject MasterOverviewClient MasterOverview
 
 <PageTitle>@Strings.APP_TITLE</PageTitle>
 
@@ -77,6 +77,9 @@
 </section>
 
 @code {
+    private readonly CancellationTokenSource m_DisposeCancellation = new();
+    private Task? m_RefreshLoop;
+
     private MasterSocketEndpoint Endpoint { get; set; } = new("unknown", 0, false);
 
     private IReadOnlyCollection<MasterConnectionSnapshot> Connections { get; set; } = [];
@@ -85,30 +88,54 @@
 
     private string TlsText => Endpoint.UseTls ? Strings.TLS_ENABLED : Strings.TLS_DISABLED;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        Endpoint = ConnectionManager.GetSocketEndpoint();
-        RefreshConnections();
-        ConnectionManager.ConnectionsChanged += OnConnectionsChanged;
+        await RefreshOverviewAsync(m_DisposeCancellation.Token);
+        m_RefreshLoop = RefreshLoopAsync(m_DisposeCancellation.Token);
     }
 
-    private void OnConnectionsChanged()
+    private async Task RefreshLoopAsync(CancellationToken cancellationToken)
     {
-        _ = InvokeAsync(() =>
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+
+        while (await timer.WaitForNextTickAsync(cancellationToken))
         {
-            RefreshConnections();
-            StateHasChanged();
-        });
+            await InvokeAsync(async () =>
+            {
+                await RefreshOverviewAsync(cancellationToken);
+                StateHasChanged();
+            });
+        }
     }
 
-    private void RefreshConnections()
+    private async ValueTask RefreshOverviewAsync(CancellationToken cancellationToken)
     {
-        Connections = ConnectionManager.GetConnectionSnapshots();
+        var overview = await MasterOverview.GetOverviewAsync(cancellationToken);
+        if (overview == null)
+        {
+            return;
+        }
+
+        Endpoint = overview.SocketEndpoint;
+        Connections = overview.Connections;
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        ConnectionManager.ConnectionsChanged -= OnConnectionsChanged;
+        await m_DisposeCancellation.CancelAsync();
+
+        if (m_RefreshLoop != null)
+        {
+            try
+            {
+                await m_RefreshLoop;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        m_DisposeCancellation.Dispose();
     }
 
     private static string GetNodeKindText(MasterNodeKind nodeKind)

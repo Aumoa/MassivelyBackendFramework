@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 
-namespace MasterServer.Authorization;
+namespace MasterAdmin.Authorization;
 
 internal static class MasterAuthorizationPolicies
 {
