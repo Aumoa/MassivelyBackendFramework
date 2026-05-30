@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using NoraeBook.Components;
+using NoraeBook.Services;
 using OpenIDConnect.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +19,7 @@ ConfigureDataProtection(builder);
 builder.Services.AddAuthorizationCore();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenIDConnect(builder.Configuration);
+builder.Services.AddSingleton<IKaraokeSongRepository, InMemoryKaraokeSongRepository>();
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {

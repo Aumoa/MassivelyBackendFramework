@@ -1,4 +1,9 @@
 @page "/"
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IKaraokeSongRepository SongRepository
+@inject NavigationManager Nav
+@inject OpenIDConnect.IAuthenticationStateProvider OidcAuth
 
 <PageTitle>@Strings.APP_TITLE</PageTitle>
 
@@ -8,28 +13,370 @@
     <p class="summary">@Strings.HOME_SUMMARY</p>
 </section>
 
-<section class="workspace-grid" aria-label="@Strings.HOME_WORKSPACE_ARIA">
-    <article class="panel">
-        <div class="panel-heading">
-            <div>
-                <h2>@Strings.HOME_QUEUE_TITLE</h2>
-                <p>@Strings.HOME_QUEUE_DESCRIPTION</p>
-            </div>
-            <span class="status-pill">@Strings.STATUS_PLANNED</span>
-        </div>
+<AuthorizeView>
+    <Authorized>
+        <section class="workspace-grid" aria-label="@Strings.HOME_WORKSPACE_ARIA">
+            <article class="panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>@Strings.HOME_QUEUE_TITLE</h2>
+                        <p>@Strings.HOME_QUEUE_DESCRIPTION</p>
+                    </div>
+                    <span class="status-pill">@SongCountText</span>
+                </div>
 
-        <div class="empty-state">
-            <strong>@Strings.HOME_EMPTY_TITLE</strong>
-            <span>@Strings.HOME_EMPTY_DESCRIPTION</span>
-        </div>
-    </article>
+                <form class="song-form" @onsubmit="SaveSongAsync" @onsubmit:preventDefault="true">
+                    @if (!string.IsNullOrWhiteSpace(m_ErrorMessage))
+                    {
+                        <p class="form-error">@m_ErrorMessage</p>
+                    }
 
-    <aside class="panel side-panel">
-        <h2>@Strings.HOME_NEXT_TITLE</h2>
-        <ul class="roadmap">
-            <li>@Strings.HOME_NEXT_AUTH</li>
-            <li>@Strings.HOME_NEXT_PLAYLISTS</li>
-            <li>@Strings.HOME_NEXT_STORAGE</li>
-        </ul>
-    </aside>
-</section>
+                    <div class="form-grid">
+                        <label class="field">
+                            <span>@Strings.SONG_NUMBER_LABEL</span>
+                            <input class="form-input" type="number" min="1" step="1" @bind="m_Form.SongNumber" />
+                        </label>
+                        <label class="field">
+                            <span>@Strings.SONG_ARTIST_LABEL</span>
+                            <input class="form-input" type="text" maxlength="120" @bind="m_Form.Artist" />
+                        </label>
+                        <label class="field">
+                            <span>@Strings.SONG_TITLE_LABEL</span>
+                            <input class="form-input" type="text" maxlength="160" @bind="m_Form.Title" />
+                        </label>
+                    </div>
+
+                    <fieldset class="tag-fieldset">
+                        <legend>@Strings.SONG_TAGS_LABEL</legend>
+                        <div class="tag-options">
+                            @foreach (var tagId in DefaultTagIds)
+                            {
+                                <button type="button"
+                                        class="@GetTagButtonClass(tagId)"
+                                        aria-pressed="@m_SelectedDefaultTagIds.Contains(tagId)"
+                                        @onclick="() => ToggleDefaultTag(tagId)">
+                                    @GetDefaultTagLabel(tagId)
+                                </button>
+                            }
+                        </div>
+                    </fieldset>
+
+                    <label class="field">
+                        <span>@Strings.SONG_CUSTOM_TAGS_LABEL</span>
+                        <input class="form-input" type="text" maxlength="160" placeholder="@Strings.SONG_CUSTOM_TAGS_PLACEHOLDER" @bind="m_Form.CustomTags" />
+                    </label>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">@SaveButtonText</button>
+                        @if (m_Form.Id.HasValue)
+                        {
+                            <button type="button" class="btn-secondary" @onclick="ResetForm">@Strings.SONG_CANCEL_EDIT_BUTTON</button>
+                        }
+                    </div>
+                </form>
+
+                @if (m_IsLoading)
+                {
+                    <div class="empty-state">
+                        <strong>@Strings.SONG_LOADING_TITLE</strong>
+                        <span>@Strings.SONG_LOADING_DESCRIPTION</span>
+                    </div>
+                }
+                else if (m_Songs.Count == 0)
+                {
+                    <div class="empty-state">
+                        <strong>@Strings.HOME_EMPTY_TITLE</strong>
+                        <span>@Strings.HOME_EMPTY_DESCRIPTION</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>@Strings.SONG_TABLE_NUMBER</th>
+                                    <th>@Strings.SONG_TABLE_ARTIST</th>
+                                    <th>@Strings.SONG_TABLE_TITLE</th>
+                                    <th>@Strings.SONG_TABLE_TAGS</th>
+                                    <th>@Strings.SONG_TABLE_ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var song in m_Songs)
+                                {
+                                    <tr @key="song.Id">
+                                        <td><span class="song-number">@song.SongNumber</span></td>
+                                        <td>@song.Artist</td>
+                                        <td>@song.Title</td>
+                                        <td>
+                                            <div class="tag-list">
+                                                @foreach (var tag in song.Tags)
+                                                {
+                                                    <span class="tag-chip">@GetTagDisplayText(tag)</span>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="row-actions">
+                                                <button type="button" class="btn-row" @onclick="() => EditSong(song)">@Strings.SONG_EDIT_BUTTON</button>
+                                                <button type="button" class="btn-row danger" @onclick="() => DeleteSongAsync(song.Id)">@Strings.SONG_DELETE_BUTTON</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </article>
+
+            <aside class="panel side-panel">
+                <h2>@Strings.HOME_NEXT_TITLE</h2>
+                <ul class="roadmap">
+                    <li>@Strings.HOME_NEXT_AUTH</li>
+                    <li>@Strings.HOME_NEXT_PLAYLISTS</li>
+                    <li>@Strings.HOME_NEXT_STORAGE</li>
+                </ul>
+            </aside>
+        </section>
+    </Authorized>
+    <NotAuthorized>
+        <section class="panel auth-panel">
+            <h2>@Strings.AUTH_REQUIRED_TITLE</h2>
+            <p>@Strings.AUTH_REQUIRED_DESCRIPTION</p>
+            <button type="button" class="btn-primary" @onclick="StartLogin">@Strings.AUTH_LOGIN</button>
+        </section>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private static readonly string[] DefaultTagIds = ["male", "female", "mixed"];
+    private static readonly char[] CustomTagSeparators = [',', ';', '\n', '\r'];
+    private readonly HashSet<string> m_SelectedDefaultTagIds = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<KaraokeSongEntry> m_Songs = [];
+    private SongFormModel m_Form = new();
+    private string? m_OwnerId;
+    private string? m_ErrorMessage;
+    private bool m_IsLoading = true;
+
+    private string SongCountText => string.Format(Strings.SONG_COUNT_FORMAT, m_Songs.Count);
+
+    private string SaveButtonText => m_Form.Id.HasValue
+        ? Strings.SONG_UPDATE_BUTTON
+        : Strings.SONG_SAVE_BUTTON;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        m_OwnerId = GetOwnerId(authState.User);
+        if (!string.IsNullOrWhiteSpace(m_OwnerId))
+        {
+            await LoadSongsAsync();
+        }
+
+        m_IsLoading = false;
+    }
+
+    private async Task LoadSongsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(m_OwnerId))
+        {
+            m_Songs = [];
+            return;
+        }
+
+        m_Songs = await SongRepository.GetSongsAsync(m_OwnerId);
+    }
+
+    private async Task SaveSongAsync()
+    {
+        if (string.IsNullOrWhiteSpace(m_OwnerId))
+        {
+            m_ErrorMessage = Strings.SONG_VALIDATION_AUTH_REQUIRED;
+            return;
+        }
+
+        m_ErrorMessage = ValidateForm();
+        if (!string.IsNullOrWhiteSpace(m_ErrorMessage))
+        {
+            return;
+        }
+
+        var edit = new KaraokeSongEdit(
+            m_Form.Id,
+            m_Form.SongNumber!.Value,
+            m_Form.Artist.Trim(),
+            m_Form.Title.Trim(),
+            BuildTagList());
+
+        await SongRepository.SaveSongAsync(m_OwnerId, edit);
+        ResetForm();
+        await LoadSongsAsync();
+    }
+
+    private async Task DeleteSongAsync(Guid songId)
+    {
+        if (string.IsNullOrWhiteSpace(m_OwnerId))
+        {
+            return;
+        }
+
+        await SongRepository.DeleteSongAsync(m_OwnerId, songId);
+        if (m_Form.Id == songId)
+        {
+            ResetForm();
+        }
+
+        await LoadSongsAsync();
+    }
+
+    private void EditSong(KaraokeSongEntry song)
+    {
+        m_ErrorMessage = null;
+        m_SelectedDefaultTagIds.Clear();
+        var customTags = new List<string>();
+
+        foreach (var tag in song.Tags)
+        {
+            if (IsDefaultTag(tag))
+            {
+                m_SelectedDefaultTagIds.Add(tag);
+            }
+            else
+            {
+                customTags.Add(tag);
+            }
+        }
+
+        m_Form = new SongFormModel
+        {
+            Id = song.Id,
+            SongNumber = song.SongNumber,
+            Artist = song.Artist,
+            Title = song.Title,
+            CustomTags = string.Join(", ", customTags)
+        };
+    }
+
+    private void ResetForm()
+    {
+        m_ErrorMessage = null;
+        m_SelectedDefaultTagIds.Clear();
+        m_Form = new SongFormModel();
+    }
+
+    private void ToggleDefaultTag(string tagId)
+    {
+        if (!m_SelectedDefaultTagIds.Add(tagId))
+        {
+            m_SelectedDefaultTagIds.Remove(tagId);
+        }
+    }
+
+    private IReadOnlyCollection<string> BuildTagList()
+    {
+        var tags = new List<string>(m_SelectedDefaultTagIds);
+        foreach (var customTag in m_Form.CustomTags.Split(CustomTagSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var defaultTagId = TryGetDefaultTagId(customTag);
+            tags.Add(defaultTagId ?? customTag);
+        }
+
+        return tags
+            .Where(static tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private string? ValidateForm()
+    {
+        if (m_Form.SongNumber is null or <= 0)
+        {
+            return Strings.SONG_VALIDATION_NUMBER;
+        }
+
+        if (string.IsNullOrWhiteSpace(m_Form.Artist))
+        {
+            return Strings.SONG_VALIDATION_ARTIST;
+        }
+
+        if (string.IsNullOrWhiteSpace(m_Form.Title))
+        {
+            return Strings.SONG_VALIDATION_TITLE;
+        }
+
+        return null;
+    }
+
+    private string GetTagButtonClass(string tagId)
+    {
+        return m_SelectedDefaultTagIds.Contains(tagId)
+            ? "tag-option selected"
+            : "tag-option";
+    }
+
+    private string GetDefaultTagLabel(string tagId)
+    {
+        return tagId switch
+        {
+            "male" => Strings.SONG_TAG_MALE,
+            "female" => Strings.SONG_TAG_FEMALE,
+            "mixed" => Strings.SONG_TAG_MIXED,
+            _ => tagId
+        };
+    }
+
+    private string GetTagDisplayText(string tag)
+    {
+        return IsDefaultTag(tag) ? GetDefaultTagLabel(tag) : tag;
+    }
+
+    private string? TryGetDefaultTagId(string tag)
+    {
+        foreach (var tagId in DefaultTagIds)
+        {
+            if (string.Equals(tag, tagId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(tag, GetDefaultTagLabel(tagId), StringComparison.CurrentCultureIgnoreCase))
+            {
+                return tagId;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsDefaultTag(string tag)
+    {
+        return DefaultTagIds.Contains(tag, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string? GetOwnerId(ClaimsPrincipal user)
+    {
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            return null;
+        }
+
+        return user.FindFirst("sub")?.Value
+            ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    }
+
+    private void StartLogin()
+    {
+        OidcAuth.NavigateToLogin(Nav, "auth/redirect", "openid");
+    }
+
+    private sealed class SongFormModel
+    {
+        public Guid? Id { get; set; }
+
+        public int? SongNumber { get; set; }
+
+        public string Artist { get; set; } = string.Empty;
+
+        public string Title { get; set; } = string.Empty;
+
+        public string CustomTags { get; set; } = string.Empty;
+    }
+}

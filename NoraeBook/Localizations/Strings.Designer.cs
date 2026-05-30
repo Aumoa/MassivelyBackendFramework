@@ -46,6 +46,10 @@ namespace NoraeBook.Localizations
 
         internal static string AUTH_LOGOUT => ResourceManager.GetString("AUTH_LOGOUT", resourceCulture)!;
 
+        internal static string AUTH_REQUIRED_DESCRIPTION => ResourceManager.GetString("AUTH_REQUIRED_DESCRIPTION", resourceCulture)!;
+
+        internal static string AUTH_REQUIRED_TITLE => ResourceManager.GetString("AUTH_REQUIRED_TITLE", resourceCulture)!;
+
         internal static string ERROR_PAGE_MESSAGE => ResourceManager.GetString("ERROR_PAGE_MESSAGE", resourceCulture)!;
 
         internal static string ERROR_PAGE_TITLE => ResourceManager.GetString("ERROR_PAGE_TITLE", resourceCulture)!;
@@ -83,6 +87,58 @@ namespace NoraeBook.Localizations
         internal static string NOTFOUND_DESCRIPTION => ResourceManager.GetString("NOTFOUND_DESCRIPTION", resourceCulture)!;
 
         internal static string NOTFOUND_TITLE => ResourceManager.GetString("NOTFOUND_TITLE", resourceCulture)!;
+
+        internal static string SONG_ARTIST_LABEL => ResourceManager.GetString("SONG_ARTIST_LABEL", resourceCulture)!;
+
+        internal static string SONG_CANCEL_EDIT_BUTTON => ResourceManager.GetString("SONG_CANCEL_EDIT_BUTTON", resourceCulture)!;
+
+        internal static string SONG_COUNT_FORMAT => ResourceManager.GetString("SONG_COUNT_FORMAT", resourceCulture)!;
+
+        internal static string SONG_CUSTOM_TAGS_LABEL => ResourceManager.GetString("SONG_CUSTOM_TAGS_LABEL", resourceCulture)!;
+
+        internal static string SONG_CUSTOM_TAGS_PLACEHOLDER => ResourceManager.GetString("SONG_CUSTOM_TAGS_PLACEHOLDER", resourceCulture)!;
+
+        internal static string SONG_DELETE_BUTTON => ResourceManager.GetString("SONG_DELETE_BUTTON", resourceCulture)!;
+
+        internal static string SONG_EDIT_BUTTON => ResourceManager.GetString("SONG_EDIT_BUTTON", resourceCulture)!;
+
+        internal static string SONG_LOADING_DESCRIPTION => ResourceManager.GetString("SONG_LOADING_DESCRIPTION", resourceCulture)!;
+
+        internal static string SONG_LOADING_TITLE => ResourceManager.GetString("SONG_LOADING_TITLE", resourceCulture)!;
+
+        internal static string SONG_NUMBER_LABEL => ResourceManager.GetString("SONG_NUMBER_LABEL", resourceCulture)!;
+
+        internal static string SONG_SAVE_BUTTON => ResourceManager.GetString("SONG_SAVE_BUTTON", resourceCulture)!;
+
+        internal static string SONG_TABLE_ACTIONS => ResourceManager.GetString("SONG_TABLE_ACTIONS", resourceCulture)!;
+
+        internal static string SONG_TABLE_ARTIST => ResourceManager.GetString("SONG_TABLE_ARTIST", resourceCulture)!;
+
+        internal static string SONG_TABLE_NUMBER => ResourceManager.GetString("SONG_TABLE_NUMBER", resourceCulture)!;
+
+        internal static string SONG_TABLE_TAGS => ResourceManager.GetString("SONG_TABLE_TAGS", resourceCulture)!;
+
+        internal static string SONG_TABLE_TITLE => ResourceManager.GetString("SONG_TABLE_TITLE", resourceCulture)!;
+
+        internal static string SONG_TAG_FEMALE => ResourceManager.GetString("SONG_TAG_FEMALE", resourceCulture)!;
+
+        internal static string SONG_TAG_MALE => ResourceManager.GetString("SONG_TAG_MALE", resourceCulture)!;
+
+        internal static string SONG_TAG_MIXED => ResourceManager.GetString("SONG_TAG_MIXED", resourceCulture)!;
+
+        internal static string SONG_TAGS_LABEL => ResourceManager.GetString("SONG_TAGS_LABEL", resourceCulture)!;
+
+        internal static string SONG_TITLE_LABEL => ResourceManager.GetString("SONG_TITLE_LABEL", resourceCulture)!;
+
+        internal static string SONG_UPDATE_BUTTON => ResourceManager.GetString("SONG_UPDATE_BUTTON", resourceCulture)!;
+
+        internal static string SONG_VALIDATION_ARTIST => ResourceManager.GetString("SONG_VALIDATION_ARTIST", resourceCulture)!;
+
+        internal static string SONG_VALIDATION_AUTH_REQUIRED => ResourceManager.GetString("SONG_VALIDATION_AUTH_REQUIRED", resourceCulture)!;
+
+        internal static string SONG_VALIDATION_NUMBER => ResourceManager.GetString("SONG_VALIDATION_NUMBER", resourceCulture)!;
+
+        internal static string SONG_VALIDATION_TITLE => ResourceManager.GetString("SONG_VALIDATION_TITLE", resourceCulture)!;
 
         internal static string STATUS_PLANNED => ResourceManager.GetString("STATUS_PLANNED", resourceCulture)!;
     }
