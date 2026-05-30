@@ -101,12 +101,11 @@ internal sealed class MasterConnectionManager(
 
     private async Task RunSessionAsync(CancellationToken cancellationToken)
     {
-        var address = IPAddress.Parse(m_Options.IPAddress);
-        using var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        socket.NoDelay = true;
-
         SetStatus("Connecting");
-        await socket.ConnectAsync(new IPEndPoint(address, m_Options.Port), cancellationToken).ConfigureAwait(false);
+        using var socket = await MasterEndpointResolver.ConnectTcpAsync(
+            m_Options.IPAddress,
+            m_Options.Port,
+            cancellationToken).ConfigureAwait(false);
         SetStatus("Handshaking", markConnected: true);
         logger.LogInformation("Dedicated connected to Master socket at {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
 

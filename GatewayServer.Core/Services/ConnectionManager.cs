@@ -7,6 +7,7 @@ using System.Text;
 using GatewayServer.Behaviors;
 using GatewayServer.Options;
 using GatewayServer.Protocols;
+using MasterServer.ControlPlane;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -16,9 +17,9 @@ namespace GatewayServer.Services;
 
 internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILogger<ConnectionManager> logger, IHostEnvironment env) : IHostedService, IConnectionManager
 {
-    private readonly Socket m_Socket = new(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
     private readonly CancellationTokenSource m_GracefulCancellation = new();
 
+    private Socket? m_Socket;
     private Task? m_AcceptTask;
     private X509Certificate2? m_Cert;
     private readonly HashSet<Client> m_Clients = [];
@@ -33,14 +34,18 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
             }
         }
 
+        var listenAddress = await MasterEndpointResolver.ResolveBindAddressAsync(
+            options.Value.IPAddress,
+            cancellationToken).ConfigureAwait(false);
+        m_Socket = new Socket(listenAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        if (listenAddress.Equals(IPAddress.IPv6Any))
+        {
+            m_Socket.DualMode = true;
+        }
+
         m_Socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
         m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-
-        var ep = new IPEndPoint(
-            IPAddress.Parse(options.Value.IPAddress),
-            options.Value.Port
-            );
-        m_Socket.Bind(ep);
+        m_Socket.Bind(new IPEndPoint(listenAddress, options.Value.Port));
         m_Socket.Listen();
         m_AcceptTask = StartAcceptAsync(m_GracefulCancellation.Token);
     }
@@ -48,7 +53,7 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         await m_GracefulCancellation.CancelAsync().ConfigureAwait(false);
-        m_Socket.Dispose();
+        m_Socket?.Dispose();
 
         if (m_AcceptTask != null)
         {
@@ -66,7 +71,7 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
 
             try
             {
-                clientSocket = await m_Socket.AcceptAsync(cancellationToken).ConfigureAwait(false);
+                clientSocket = await m_Socket!.AcceptAsync(cancellationToken).ConfigureAwait(false);
                 StartHandshakeAsync(clientSocket, m_Cert, cancellationToken);
                 clientSocket = null;
             }

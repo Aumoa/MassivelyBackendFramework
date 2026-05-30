@@ -179,11 +179,10 @@ internal sealed class DedicatedConnectionManager(
     private async Task RunSessionAsync(DedicatedNodeEndpoint node, CancellationToken cancellationToken)
     {
         var endpoint = node.GatewayEndpoint;
-        var address = IPAddress.Parse(endpoint.IPAddress);
-        using var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        socket.NoDelay = true;
-
-        await socket.ConnectAsync(new IPEndPoint(address, endpoint.Port), cancellationToken).ConfigureAwait(false);
+        using var socket = await MasterEndpointResolver.ConnectTcpAsync(
+            endpoint.IPAddress,
+            endpoint.Port,
+            cancellationToken).ConfigureAwait(false);
         m_PeerStates[node.MasterConnectionId] = "Connected";
         logger.LogInformation(
             "Gateway connected to Dedicated node. DedicatedNodeId={NodeId}, Endpoint={Address}:{Port}.",
