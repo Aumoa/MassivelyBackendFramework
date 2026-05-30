@@ -49,6 +49,30 @@ h1 {
     box-shadow: var(--app-shadow-sm);
 }
 
+.master-status {
+    border-left: 4px solid var(--app-border-strong);
+}
+
+.master-status.status-trusted {
+    border-left-color: var(--app-success);
+}
+
+.master-status.status-active {
+    border-left-color: var(--app-accent);
+}
+
+.master-status.status-warning {
+    border-left-color: #d97706;
+}
+
+.master-status.status-down {
+    border-left-color: var(--app-danger);
+}
+
+.master-status.status-muted {
+    border-left-color: var(--app-text-muted);
+}
+
 .metric-label,
 .metric-detail {
     color: var(--app-text-muted);
