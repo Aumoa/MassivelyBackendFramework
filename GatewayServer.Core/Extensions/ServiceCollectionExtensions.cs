@@ -9,7 +9,6 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddGatewayServer(this IServiceCollection s, IConfiguration config)
     {
-        s.Configure<MySqlOptions>(config.GetRequiredSection("MySql"));
         s.Configure<ConnectionManagerOptions>(config.GetSection("ConnectionManager"));
         s.Configure<MasterConnectionOptions>(config.GetSection("MasterConnection"));
 
