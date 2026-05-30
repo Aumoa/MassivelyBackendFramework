@@ -57,6 +57,22 @@ internal sealed class MasterConnectionManager(
             {
                 return;
             }
+            catch (TimeoutException e)
+            {
+                logger.LogWarning(
+                    "Gateway Master handshake timed out: {Message} Endpoint={Address}:{Port}. Verify Master is restarted with NodeAuthChallenge support and matching MasterSocket:NodeAuthSecret.",
+                    e.Message,
+                    m_Options.IPAddress,
+                    m_Options.Port);
+            }
+            catch (EndOfStreamException e)
+            {
+                logger.LogWarning(
+                    "Gateway Master connection closed before trust was established: {Message} Endpoint={Address}:{Port}.",
+                    e.Message,
+                    m_Options.IPAddress,
+                    m_Options.Port);
+            }
             catch (Exception e)
             {
                 logger.LogWarning(e, "Gateway Master control-plane session ended before trust was maintained.");
@@ -128,53 +144,67 @@ internal sealed class MasterConnectionManager(
         using var handshakeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         handshakeTimeout.CancelAfter(TimeSpan.FromMilliseconds(Math.Max(1, m_Options.HandshakeTimeoutMilliseconds)));
 
-        using var challengeFrame = await ReadRequiredHandshakeFrameAsync(
-            stream,
-            MasterControlPacketIds.NodeAuthChallenge,
-            handshakeTimeout.Token).ConfigureAwait(false);
-        var challenge = PacketCodec.Decode(challengeFrame, NodeAuthChallenge.Codec);
+        var handshakeStep = "NodeAuthChallenge";
 
-        var hello = new NodeHello(
-            MasterNodeKind.Gateway,
-            m_Options.NodeId,
-            m_Options.DisplayName,
-            MasterControlProtocol.SchemaVersion);
-
-        using (var helloFrame = PacketCodec.Encode(
-                   PacketKind.Control,
-                   MasterControlPacketIds.NodeHello,
-                   MasterControlProtocol.SchemaVersion,
-                   hello,
-                   NodeHello.Codec))
+        try
         {
-            await PacketFrameWriter.WriteAsync(stream, helloFrame, handshakeTimeout.Token).ConfigureAwait(false);
-        }
+            using var challengeFrame = await ReadRequiredHandshakeFrameAsync(
+                stream,
+                MasterControlPacketIds.NodeAuthChallenge,
+                handshakeTimeout.Token).ConfigureAwait(false);
+            var challenge = PacketCodec.Decode(challengeFrame, NodeAuthChallenge.Codec);
 
-        var proof = new NodeAuthProof(
-            hello.NodeId,
-            MasterNodeAuthenticator.ComputeProof(challenge, hello, m_Options.SharedSecret));
-        using (var proofFrame = PacketCodec.Encode(
-                   PacketKind.Control,
-                   MasterControlPacketIds.NodeAuthProof,
-                   MasterControlProtocol.SchemaVersion,
-                   proof,
-                   NodeAuthProof.Codec))
+            var hello = new NodeHello(
+                MasterNodeKind.Gateway,
+                m_Options.NodeId,
+                m_Options.DisplayName,
+                MasterControlProtocol.SchemaVersion);
+
+            handshakeStep = "NodeHello";
+            using (var helloFrame = PacketCodec.Encode(
+                       PacketKind.Control,
+                       MasterControlPacketIds.NodeHello,
+                       MasterControlProtocol.SchemaVersion,
+                       hello,
+                       NodeHello.Codec))
+            {
+                await PacketFrameWriter.WriteAsync(stream, helloFrame, handshakeTimeout.Token).ConfigureAwait(false);
+            }
+
+            handshakeStep = "NodeAuthProof";
+            var proof = new NodeAuthProof(
+                hello.NodeId,
+                MasterNodeAuthenticator.ComputeProof(challenge, hello, m_Options.SharedSecret));
+            using (var proofFrame = PacketCodec.Encode(
+                       PacketKind.Control,
+                       MasterControlPacketIds.NodeAuthProof,
+                       MasterControlProtocol.SchemaVersion,
+                       proof,
+                       NodeAuthProof.Codec))
+            {
+                await PacketFrameWriter.WriteAsync(stream, proofFrame, handshakeTimeout.Token).ConfigureAwait(false);
+            }
+
+            handshakeStep = "NodeAccepted";
+            using var acceptedFrame = await ReadRequiredHandshakeFrameAsync(
+                stream,
+                MasterControlPacketIds.NodeAccepted,
+                handshakeTimeout.Token).ConfigureAwait(false);
+            var accepted = PacketCodec.Decode(acceptedFrame, NodeAccepted.Codec);
+
+            if (!string.Equals(accepted.NodeId, hello.NodeId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Master accepted a different node id than the Gateway requested.");
+            }
+
+            return accepted;
+        }
+        catch (OperationCanceledException e) when (!cancellationToken.IsCancellationRequested && handshakeTimeout.IsCancellationRequested)
         {
-            await PacketFrameWriter.WriteAsync(stream, proofFrame, handshakeTimeout.Token).ConfigureAwait(false);
+            throw new TimeoutException(
+                $"Timed out during {handshakeStep} after {Math.Max(1, m_Options.HandshakeTimeoutMilliseconds)} ms.",
+                e);
         }
-
-        using var acceptedFrame = await ReadRequiredHandshakeFrameAsync(
-            stream,
-            MasterControlPacketIds.NodeAccepted,
-            handshakeTimeout.Token).ConfigureAwait(false);
-        var accepted = PacketCodec.Decode(acceptedFrame, NodeAccepted.Codec);
-
-        if (!string.Equals(accepted.NodeId, hello.NodeId, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException("Master accepted a different node id than the Gateway requested.");
-        }
-
-        return accepted;
     }
 
     private static async Task<PacketFrame> ReadRequiredHandshakeFrameAsync(
