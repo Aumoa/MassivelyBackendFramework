@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\OpenIDConnect.Core\OpenIDConnect.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Update="Localizations\Strings.Designer.cs">
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>

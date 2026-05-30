@@ -42,6 +42,10 @@ namespace NoraeBook.Localizations
 
         internal static string APP_TITLE => ResourceManager.GetString("APP_TITLE", resourceCulture)!;
 
+        internal static string AUTH_LOGIN => ResourceManager.GetString("AUTH_LOGIN", resourceCulture)!;
+
+        internal static string AUTH_LOGOUT => ResourceManager.GetString("AUTH_LOGOUT", resourceCulture)!;
+
         internal static string ERROR_PAGE_MESSAGE => ResourceManager.GetString("ERROR_PAGE_MESSAGE", resourceCulture)!;
 
         internal static string ERROR_PAGE_TITLE => ResourceManager.GetString("ERROR_PAGE_TITLE", resourceCulture)!;

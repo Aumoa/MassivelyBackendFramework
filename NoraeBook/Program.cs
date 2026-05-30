@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using NoraeBook.Components;
+using OpenIDConnect.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 ValidateProductionAllowedHosts(builder);
@@ -14,6 +15,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
 ConfigureDataProtection(builder);
+builder.Services.AddAuthorizationCore();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddOpenIDConnect(builder.Configuration);
 
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
