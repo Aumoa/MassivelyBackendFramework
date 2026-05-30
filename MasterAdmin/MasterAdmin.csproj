@@ -11,6 +11,7 @@
     <ProjectReference Include="..\BlazorSharedComponent\BlazorSharedComponent.csproj" />
     <ProjectReference Include="..\MasterServer.Abstractions\MasterServer.Abstractions.csproj" />
     <ProjectReference Include="..\OpenIDConnect.Core\OpenIDConnect.Core.csproj" />
+    <ProjectReference Include="..\PacketCore\PacketCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

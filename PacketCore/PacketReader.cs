@@ -49,6 +49,22 @@ public ref struct PacketReader
         return value;
     }
 
+    public long ReadInt64()
+    {
+        EnsureAvailable(8);
+        long value = BinaryPrimitives.ReadInt64BigEndian(m_Buffer.Slice(m_Position, 8));
+        m_Position += 8;
+        return value;
+    }
+
+    public Guid ReadGuid()
+    {
+        EnsureAvailable(16);
+        var value = new Guid(m_Buffer.Slice(m_Position, 16));
+        m_Position += 16;
+        return value;
+    }
+
     public string ReadString()
     {
         int byteCount = ReadInt32();

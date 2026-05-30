@@ -56,6 +56,24 @@ public ref struct PacketWriter
         m_Position += 4;
     }
 
+    public void WriteInt64(long value)
+    {
+        EnsureAvailable(8);
+        BinaryPrimitives.WriteInt64BigEndian(m_Buffer.Slice(m_Position, 8), value);
+        m_Position += 8;
+    }
+
+    public void WriteGuid(Guid value)
+    {
+        EnsureAvailable(16);
+        if (!value.TryWriteBytes(m_Buffer.Slice(m_Position, 16)))
+        {
+            throw new PacketFormatException(PacketValidationError.PayloadTooSmall);
+        }
+
+        m_Position += 16;
+    }
+
     public void WriteString(string value)
     {
         if (value == null)

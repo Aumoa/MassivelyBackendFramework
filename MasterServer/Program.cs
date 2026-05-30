@@ -1,19 +1,17 @@
 using MasterServer.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+});
 
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
-builder.Services.AddControllers();
 builder.Services.AddMasterServer(builder.Configuration);
 
-var app = builder.Build();
-
-app.UseRouting();
-
-app.MapControllers();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
-
-app.Run();
+await builder.Build().RunAsync();

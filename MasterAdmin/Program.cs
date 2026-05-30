@@ -4,7 +4,6 @@ using MasterAdmin.Options;
 using MasterAdmin.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.Extensions.Options;
 using OpenIDConnect.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,13 +16,10 @@ builder.Services.AddControllers();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
-builder.Services.Configure<MasterApiOptions>(builder.Configuration.GetRequiredSection("MasterApi"));
-builder.Services.AddHttpClient<MasterOverviewClient>((provider, client) =>
-{
-    var options = provider.GetRequiredService<IOptions<MasterApiOptions>>().Value;
-    client.BaseAddress = new Uri(options.BaseAddress.TrimEnd('/') + "/");
-    client.Timeout = TimeSpan.FromMilliseconds(Math.Max(1, options.TimeoutMilliseconds));
-});
+builder.Services.Configure<MasterConnectionOptions>(builder.Configuration.GetRequiredSection("MasterConnection"));
+builder.Services.AddSingleton<MasterOverviewSocketClient>();
+builder.Services.AddSingleton<IMasterOverviewProvider>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
+builder.Services.AddHostedService(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 
 var dataProtection = builder.Configuration.GetSection("DataProtection");
 var keyPath = dataProtection.GetValue<string>("KeyPath");

@@ -87,6 +87,42 @@
   <data name="METRIC_CONTROL_MODE_DETAIL" xml:space="preserve">
     <value>Ready for lease and ownership extensions</value>
   </data>
+  <data name="METRIC_MASTER_SOCKET" xml:space="preserve">
+    <value>Master socket</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_CONNECTED" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_CONNECTING" xml:space="preserve">
+    <value>Connecting</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_HANDSHAKING" xml:space="preserve">
+    <value>Handshaking</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_RECONNECTING" xml:space="preserve">
+    <value>Reconnecting</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_DISABLED" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_DISCONNECTED" xml:space="preserve">
+    <value>Disconnected</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_STOPPING" xml:space="preserve">
+    <value>Stopping</value>
+  </data>
+  <data name="MASTER_SOCKET_CONNECTED_DETAIL" xml:space="preserve">
+    <value>Receiving live snapshots over the shared packet socket</value>
+  </data>
+  <data name="MASTER_SOCKET_WAITING_DETAIL" xml:space="preserve">
+    <value>Waiting for Master socket state</value>
+  </data>
+  <data name="MASTER_SOCKET_RECONNECTING_DETAIL_FORMAT" xml:space="preserve">
+    <value>Next reconnect at {0}</value>
+  </data>
+  <data name="MASTER_SOCKET_LAST_ERROR_FORMAT" xml:space="preserve">
+    <value>Last socket event: {0}</value>
+  </data>
   <data name="TLS_ENABLED" xml:space="preserve">
     <value>TLS enabled</value>
   </data>
@@ -131,6 +167,9 @@
   </data>
   <data name="NODE_KIND_DEDICATED" xml:space="preserve">
     <value>Dedicated</value>
+  </data>
+  <data name="NODE_KIND_MASTER_ADMIN" xml:space="preserve">
+    <value>Master Admin</value>
   </data>
   <data name="NOTFOUND_TITLE" xml:space="preserve">
     <value>Not Found</value>

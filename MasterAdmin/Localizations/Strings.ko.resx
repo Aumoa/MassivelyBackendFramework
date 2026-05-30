@@ -87,6 +87,42 @@
   <data name="METRIC_CONTROL_MODE_DETAIL" xml:space="preserve">
     <value>리스와 소유권 확장을 붙일 수 있는 상태</value>
   </data>
+  <data name="METRIC_MASTER_SOCKET" xml:space="preserve">
+    <value>Master 소켓</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_CONNECTED" xml:space="preserve">
+    <value>연결됨</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_CONNECTING" xml:space="preserve">
+    <value>연결 중</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_HANDSHAKING" xml:space="preserve">
+    <value>핸드셰이크 중</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_RECONNECTING" xml:space="preserve">
+    <value>재연결 대기</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_DISABLED" xml:space="preserve">
+    <value>비활성</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_DISCONNECTED" xml:space="preserve">
+    <value>연결 끊김</value>
+  </data>
+  <data name="MASTER_SOCKET_STATUS_STOPPING" xml:space="preserve">
+    <value>종료 중</value>
+  </data>
+  <data name="MASTER_SOCKET_CONNECTED_DETAIL" xml:space="preserve">
+    <value>공유 패킷 소켓으로 실시간 스냅샷 수신 중</value>
+  </data>
+  <data name="MASTER_SOCKET_WAITING_DETAIL" xml:space="preserve">
+    <value>Master 소켓 상태 대기 중</value>
+  </data>
+  <data name="MASTER_SOCKET_RECONNECTING_DETAIL_FORMAT" xml:space="preserve">
+    <value>다음 재연결: {0}</value>
+  </data>
+  <data name="MASTER_SOCKET_LAST_ERROR_FORMAT" xml:space="preserve">
+    <value>마지막 소켓 이벤트: {0}</value>
+  </data>
   <data name="TLS_ENABLED" xml:space="preserve">
     <value>TLS 사용</value>
   </data>
@@ -131,6 +167,9 @@
   </data>
   <data name="NODE_KIND_DEDICATED" xml:space="preserve">
     <value>Dedicated</value>
+  </data>
+  <data name="NODE_KIND_MASTER_ADMIN" xml:space="preserve">
+    <value>Master Admin</value>
   </data>
   <data name="NOTFOUND_TITLE" xml:space="preserve">
     <value>페이지 없음</value>

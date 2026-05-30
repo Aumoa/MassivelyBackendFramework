@@ -311,6 +311,114 @@ namespace MasterAdmin.Localizations {
                 return ResourceManager.GetString("METRIC_CONTROL_MODE_VALUE", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Master socket과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string METRIC_MASTER_SOCKET {
+            get {
+                return ResourceManager.GetString("METRIC_MASTER_SOCKET", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Receiving live snapshots over the shared packet socket과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_CONNECTED_DETAIL {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_CONNECTED_DETAIL", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Last socket event: {0}과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_LAST_ERROR_FORMAT {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_LAST_ERROR_FORMAT", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Next reconnect at {0}과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_RECONNECTING_DETAIL_FORMAT {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_RECONNECTING_DETAIL_FORMAT", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Connected과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_STATUS_CONNECTED {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_STATUS_CONNECTED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Connecting과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_STATUS_CONNECTING {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_STATUS_CONNECTING", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Disabled과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_STATUS_DISABLED {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_STATUS_DISABLED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Disconnected과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_STATUS_DISCONNECTED {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_STATUS_DISCONNECTED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Handshaking과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_STATUS_HANDSHAKING {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_STATUS_HANDSHAKING", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Reconnecting과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_STATUS_RECONNECTING {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_STATUS_RECONNECTING", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Stopping과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_STATUS_STOPPING {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_STATUS_STOPPING", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Waiting for Master socket state과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MASTER_SOCKET_WAITING_DETAIL {
+            get {
+                return ResourceManager.GetString("MASTER_SOCKET_WAITING_DETAIL", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Socket endpoint과(와) 유사한 지역화된 문자열을 찾습니다.
@@ -354,6 +462,15 @@ namespace MasterAdmin.Localizations {
         internal static string NODE_KIND_GATEWAY {
             get {
                 return ResourceManager.GetString("NODE_KIND_GATEWAY", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Master Admin과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NODE_KIND_MASTER_ADMIN {
+            get {
+                return ResourceManager.GetString("NODE_KIND_MASTER_ADMIN", resourceCulture);
             }
         }
         

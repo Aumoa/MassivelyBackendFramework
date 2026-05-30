@@ -1,6 +1,6 @@
 @page "/"
-@implements IAsyncDisposable
-@inject MasterOverviewClient MasterOverview
+@implements IDisposable
+@inject IMasterOverviewProvider MasterOverview
 
 <PageTitle>@Strings.APP_TITLE</PageTitle>
 
@@ -24,9 +24,9 @@
         <span class="metric-detail">@Strings.METRIC_ACTIVE_CONNECTIONS_DETAIL</span>
     </article>
     <article class="metric-card">
-        <span class="metric-label">@Strings.METRIC_CONTROL_MODE</span>
-        <strong>@Strings.METRIC_CONTROL_MODE_VALUE</strong>
-        <span class="metric-detail">@Strings.METRIC_CONTROL_MODE_DETAIL</span>
+        <span class="metric-label">@Strings.METRIC_MASTER_SOCKET</span>
+        <strong>@GetMasterSocketStatusText(OverviewState.ConnectionState)</strong>
+        <span class="metric-detail">@MasterSocketStatusDetail</span>
     </article>
 </section>
 
@@ -77,65 +77,58 @@
 </section>
 
 @code {
-    private readonly CancellationTokenSource m_DisposeCancellation = new();
-    private Task? m_RefreshLoop;
+    private MasterOverviewState OverviewState { get; set; } = new(
+        MasterOverviewConnectionState.Disconnected,
+        new MasterOverviewSnapshot(new MasterSocketEndpoint("unknown", 0, false), [], DateTimeOffset.UtcNow));
 
-    private MasterSocketEndpoint Endpoint { get; set; } = new("unknown", 0, false);
+    private MasterSocketEndpoint Endpoint => OverviewState.Snapshot.SocketEndpoint;
 
-    private IReadOnlyCollection<MasterConnectionSnapshot> Connections { get; set; } = [];
+    private IReadOnlyCollection<MasterConnectionSnapshot> Connections => OverviewState.Snapshot.Connections;
 
     private string EndpointText => $"{Endpoint.IPAddress}:{Endpoint.Port}";
 
     private string TlsText => Endpoint.UseTls ? Strings.TLS_ENABLED : Strings.TLS_DISABLED;
 
-    protected override async Task OnInitializedAsync()
+    private string MasterSocketStatusDetail
     {
-        await RefreshOverviewAsync(m_DisposeCancellation.Token);
-        m_RefreshLoop = RefreshLoopAsync(m_DisposeCancellation.Token);
-    }
-
-    private async Task RefreshLoopAsync(CancellationToken cancellationToken)
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
-
-        while (await timer.WaitForNextTickAsync(cancellationToken))
+        get
         {
-            await InvokeAsync(async () =>
+            if (!string.IsNullOrWhiteSpace(OverviewState.LastError))
             {
-                await RefreshOverviewAsync(cancellationToken);
-                StateHasChanged();
-            });
-        }
-    }
-
-    private async ValueTask RefreshOverviewAsync(CancellationToken cancellationToken)
-    {
-        var overview = await MasterOverview.GetOverviewAsync(cancellationToken);
-        if (overview == null)
-        {
-            return;
-        }
-
-        Endpoint = overview.SocketEndpoint;
-        Connections = overview.Connections;
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await m_DisposeCancellation.CancelAsync();
-
-        if (m_RefreshLoop != null)
-        {
-            try
-            {
-                await m_RefreshLoop;
+                return string.Format(Strings.MASTER_SOCKET_LAST_ERROR_FORMAT, OverviewState.LastError);
             }
-            catch (OperationCanceledException)
-            {
-            }
-        }
 
-        m_DisposeCancellation.Dispose();
+            if (OverviewState.NextReconnectAt.HasValue)
+            {
+                return string.Format(
+                    Strings.MASTER_SOCKET_RECONNECTING_DETAIL_FORMAT,
+                    OverviewState.NextReconnectAt.Value.LocalDateTime);
+            }
+
+            return OverviewState.ConnectionState == MasterOverviewConnectionState.Connected
+                ? Strings.MASTER_SOCKET_CONNECTED_DETAIL
+                : Strings.MASTER_SOCKET_WAITING_DETAIL;
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        OverviewState = MasterOverview.GetState();
+        MasterOverview.StateChanged += OnOverviewStateChanged;
+    }
+
+    private void OnOverviewStateChanged(MasterOverviewState state)
+    {
+        _ = InvokeAsync(() =>
+        {
+            OverviewState = state;
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        MasterOverview.StateChanged -= OnOverviewStateChanged;
     }
 
     private static string GetNodeKindText(MasterNodeKind nodeKind)
@@ -144,7 +137,22 @@
         {
             MasterNodeKind.Gateway => Strings.NODE_KIND_GATEWAY,
             MasterNodeKind.Dedicated => Strings.NODE_KIND_DEDICATED,
+            MasterNodeKind.MasterAdmin => Strings.NODE_KIND_MASTER_ADMIN,
             _ => Strings.NODE_KIND_UNKNOWN
+        };
+    }
+
+    private static string GetMasterSocketStatusText(MasterOverviewConnectionState state)
+    {
+        return state switch
+        {
+            MasterOverviewConnectionState.Disabled => Strings.MASTER_SOCKET_STATUS_DISABLED,
+            MasterOverviewConnectionState.Connecting => Strings.MASTER_SOCKET_STATUS_CONNECTING,
+            MasterOverviewConnectionState.Handshaking => Strings.MASTER_SOCKET_STATUS_HANDSHAKING,
+            MasterOverviewConnectionState.Connected => Strings.MASTER_SOCKET_STATUS_CONNECTED,
+            MasterOverviewConnectionState.Reconnecting => Strings.MASTER_SOCKET_STATUS_RECONNECTING,
+            MasterOverviewConnectionState.Stopping => Strings.MASTER_SOCKET_STATUS_STOPPING,
+            _ => Strings.MASTER_SOCKET_STATUS_DISCONNECTED
         };
     }
 }

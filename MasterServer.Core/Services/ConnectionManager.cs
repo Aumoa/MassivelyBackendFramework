@@ -173,7 +173,16 @@ internal sealed class ConnectionManager(
             }
 
             await AuthenticateNodeAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
-            await DrainUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
+
+            if (connection.NodeKind == MasterNodeKind.MasterAdmin)
+            {
+                await PushOverviewUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await DrainUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
+            }
+
             LogNodeDisconnected(connection);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -225,6 +234,85 @@ internal sealed class ConnectionManager(
                 NotifyConnectionsChanged();
             }
         }
+    }
+
+    private async Task PushOverviewUntilClosedAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)
+    {
+        var writeLock = new SemaphoreSlim(1, 1);
+
+        void OnConnectionsChanged()
+        {
+            _ = SendOverviewSnapshotSafeAsync();
+        }
+
+        async Task SendOverviewSnapshotSafeAsync()
+        {
+            try
+            {
+                await WriteOverviewSnapshotAsync(stream, writeLock, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+            }
+            catch (Exception e) when (IsRemoteDisconnect(e))
+            {
+                logger.LogDebug(
+                    e,
+                    "MasterAdmin overview socket write failed because the remote connection closed. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    connection.ConnectionId,
+                    connection.NodeId);
+                connection.Dispose();
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(
+                    e,
+                    "Failed to push Master overview snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    connection.ConnectionId,
+                    connection.NodeId);
+                connection.Dispose();
+            }
+        }
+
+        ConnectionsChanged += OnConnectionsChanged;
+
+        try
+        {
+            await WriteOverviewSnapshotAsync(stream, writeLock, cancellationToken).ConfigureAwait(false);
+            await DrainUntilClosedAsync(connection, stream, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ConnectionsChanged -= OnConnectionsChanged;
+        }
+    }
+
+    private async Task WriteOverviewSnapshotAsync(Stream stream, SemaphoreSlim writeLock, CancellationToken cancellationToken)
+    {
+        await writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var overview = CreateOverviewSnapshot();
+            using var frame = PacketCodec.Encode(
+                PacketKind.Control,
+                MasterControlPacketIds.OverviewSnapshot,
+                MasterControlProtocol.SchemaVersion,
+                overview,
+                MasterOverviewSnapshot.Codec);
+            await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            writeLock.Release();
+        }
+    }
+
+    private MasterOverviewSnapshot CreateOverviewSnapshot()
+    {
+        return new MasterOverviewSnapshot(
+            GetSocketEndpoint(),
+            [.. GetConnectionSnapshots()],
+            DateTimeOffset.UtcNow);
     }
 
     private async Task AuthenticateNodeAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)

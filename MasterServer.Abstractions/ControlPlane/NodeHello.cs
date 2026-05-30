@@ -7,7 +7,7 @@ public sealed class NodeHello
 {
     public NodeHello(MasterNodeKind nodeKind, string nodeId, string displayName, ushort protocolVersion)
     {
-        if (nodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated))
+        if (nodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.MasterAdmin))
         {
             throw new ArgumentOutOfRangeException(nameof(nodeKind));
         }
