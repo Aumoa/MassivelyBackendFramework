@@ -1,5 +1,6 @@
 # Visual Studio
 .vs
+*.csproj.user
 *.slnLaunch.user
 **/obj/
 **/bin/
