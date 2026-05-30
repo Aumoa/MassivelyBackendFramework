@@ -19,6 +19,14 @@
 - Gateway and Dedicated should be able to cache routing and ownership information from Master for a bounded time or hold it through a lease model.
 - Model channel ownership explicitly, such as `ChannelId -> Owner Dedicated`, so Gateway can route clients to the correct Dedicated server.
 
+## Trust Boundary And Packet Validation
+
+- Gateway is the external security boundary. Client-facing Gateway sockets should use TLS/SSL, perform authentication and authorization, apply rate limiting or other DoS controls, and reject malformed or incompatible packets before forwarding them inward.
+- Master and Dedicated are internal services. They rely on platform isolation such as private networking, firewalls, security groups, or Kubernetes network policies to prevent direct external access.
+- Master and Dedicated may trust packets that arrive from authenticated internal nodes and skip expensive hostile-input checks in hot paths, but they must keep cheap protocol sanity checks such as packet header, kind, id, version, payload length, and schema compatibility.
+- Gateway owns basic packet compatibility validation, including version and payload size policy. Dedicated owns game-rule validation and final authoritative state changes.
+- Do not use Master as a data-plane relay for player gameplay packets. Master should observe and coordinate service state, ownership, and routing metadata only.
+
 ## Gateway Batching
 
 - Gateway normally forwards packets immediately.
