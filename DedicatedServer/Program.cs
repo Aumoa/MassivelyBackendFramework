@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using DedicatedServer.Extensions;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
     ContentRootPath = AppContext.BaseDirectory
@@ -12,6 +14,9 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
+builder.WebHost.UseUrls(builder.Configuration.GetValue<string>("HealthEndpoint:Url") ?? "http://0.0.0.0:11803");
 builder.Services.AddDedicatedServer(builder.Configuration);
 
-await builder.Build().RunAsync();
+var app = builder.Build();
+app.MapGet("/healthz", static () => "OK");
+await app.RunAsync();
