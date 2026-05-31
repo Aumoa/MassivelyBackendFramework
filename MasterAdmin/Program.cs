@@ -5,6 +5,7 @@ using MasterAdmin.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using OpenIDConnect.Extensions;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,14 +22,16 @@ builder.Services.AddSingleton<MasterOverviewSocketClient>();
 builder.Services.AddSingleton<IMasterOverviewProvider>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 builder.Services.AddHostedService(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 
-var dataProtection = builder.Configuration.GetSection("DataProtection");
-var keyPath = dataProtection.GetValue<string>("KeyPath");
-if (!string.IsNullOrWhiteSpace(keyPath))
+var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");
+var redisConnectionString = dataProtection.GetValue<string>("RedisConnectionString");
+if (string.IsNullOrWhiteSpace(redisConnectionString))
 {
-    builder.Services.AddDataProtection()
-        .PersistKeysToFileSystem(new DirectoryInfo(keyPath))
-        .SetApplicationName("MasterAdmin");
+    throw new InvalidOperationException("DataProtection:RedisConnectionString is not configured.");
 }
+
+builder.Services.AddDataProtection()
+    .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
+    .SetApplicationName("MasterAdmin");
 
 builder.Services.AddAuthorizationCore(options =>
 {
