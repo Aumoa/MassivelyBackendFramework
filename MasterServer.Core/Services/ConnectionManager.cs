@@ -54,7 +54,9 @@ internal sealed class ConnectionManager(
             m_Cert = await LoadCertificateAsync(m_Options, cancellationToken).ConfigureAwait(false);
         }
 
-        var listenAddress = IPAddress.Parse(m_Options.IPAddress);
+        var listenAddress = await MasterEndpointResolver.ResolveBindAddressAsync(
+            m_Options.IPAddress,
+            cancellationToken).ConfigureAwait(false);
         m_Socket = new Socket(listenAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
         if (listenAddress.Equals(IPAddress.IPv6Any))

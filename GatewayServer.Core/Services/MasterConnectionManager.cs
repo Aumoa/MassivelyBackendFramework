@@ -128,12 +128,11 @@ internal sealed class MasterConnectionManager(
 
     private async Task RunSessionAsync(CancellationToken cancellationToken)
     {
-        var address = IPAddress.Parse(m_Options.IPAddress);
-        using var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        socket.NoDelay = true;
-
         PublishStatus(MasterConnectionState.Connecting);
-        await socket.ConnectAsync(new IPEndPoint(address, m_Options.Port), cancellationToken).ConfigureAwait(false);
+        using var socket = await MasterEndpointResolver.ConnectTcpAsync(
+            m_Options.IPAddress,
+            m_Options.Port,
+            cancellationToken).ConfigureAwait(false);
         logger.LogInformation("Gateway connected to Master socket at {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
         PublishStatus(
             MasterConnectionState.Handshaking,

@@ -184,12 +184,11 @@ public sealed class MasterOverviewSocketClient(
 
     private async Task RunSessionAsync(CancellationToken cancellationToken)
     {
-        var address = IPAddress.Parse(m_Options.IPAddress);
-        using var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        socket.NoDelay = true;
-
         PublishState(MasterOverviewConnectionState.Connecting);
-        await socket.ConnectAsync(new IPEndPoint(address, m_Options.Port), cancellationToken).ConfigureAwait(false);
+        using var socket = await MasterEndpointResolver.ConnectTcpAsync(
+            m_Options.IPAddress,
+            m_Options.Port,
+            cancellationToken).ConfigureAwait(false);
         logger.LogInformation("MasterAdmin connected to Master overview socket at {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
 
         await using var networkStream = new NetworkStream(socket, ownsSocket: false);
