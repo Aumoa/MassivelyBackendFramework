@@ -1,5 +1,6 @@
 @page "/"
 @using System.Security.Claims
+@using System.Text
 @using Microsoft.AspNetCore.WebUtilities
 @implements IDisposable
 @inject AuthenticationStateProvider AuthStateProvider
@@ -243,6 +244,9 @@
 </AuthorizeView>
 
 @code {
+    private const string FilterGroupQueryKey = "fg";
+    private const char FilterGroupModeSeparator = ':';
+    private const char FilterGroupTagSeparator = ',';
     private static readonly IReadOnlyList<string> DefaultTagIds = KaraokeSongTags.DefaultTagIds;
     private static readonly char[] CustomTagSeparators = [',', ';', '\n', '\r'];
     private readonly HashSet<string> m_SelectedDefaultTagIds = new(StringComparer.OrdinalIgnoreCase);
@@ -308,6 +312,7 @@
         }
 
         m_IsLoading = false;
+        SyncFiltersWithLocation();
         SyncFormWithLocation();
     }
 
@@ -459,29 +464,35 @@
         {
             filterGroup.SelectedTags.Clear();
             filterGroup.Mode = TagFilterMode.And;
+            NavigateToCurrentFilterUri(replace: true);
             return;
         }
 
         m_FilterGroups.Remove(filterGroup);
+        NavigateToCurrentFilterUri(replace: true);
     }
 
-    private static void SetFilterGroupMode(TagFilterGroup filterGroup, TagFilterMode mode)
+    private void SetFilterGroupMode(TagFilterGroup filterGroup, TagFilterMode mode)
     {
         filterGroup.Mode = mode;
+        NavigateToCurrentFilterUri(replace: true);
     }
 
-    private static void ToggleFilterTag(TagFilterGroup filterGroup, string tag)
+    private void ToggleFilterTag(TagFilterGroup filterGroup, string tag)
     {
         if (!filterGroup.SelectedTags.Add(tag))
         {
             filterGroup.SelectedTags.Remove(tag);
         }
+
+        NavigateToCurrentFilterUri(replace: true);
     }
 
     private void ClearTagFilters()
     {
         m_FilterGroups.Clear();
         m_FilterGroups.Add(new TagFilterGroup());
+        NavigateToCurrentFilterUri(replace: true);
     }
 
     private void PruneSelectedFilterTags()
@@ -669,9 +680,31 @@
     {
         _ = InvokeAsync(() =>
         {
+            SyncFiltersWithLocation();
             SyncFormWithLocation();
             StateHasChanged();
         });
+    }
+
+    private void SyncFiltersWithLocation()
+    {
+        if (m_IsLoading)
+        {
+            return;
+        }
+
+        var filterGroups = GetCurrentFilterGroups();
+        m_FilterGroups.Clear();
+        if (filterGroups.Count == 0)
+        {
+            m_FilterGroups.Add(new TagFilterGroup());
+        }
+        else
+        {
+            m_FilterGroups.AddRange(filterGroups);
+        }
+
+        PruneSelectedFilterTags();
     }
 
     private void SyncFormWithLocation()
@@ -706,6 +739,57 @@
         HideForm();
     }
 
+    private IReadOnlyList<TagFilterGroup> GetCurrentFilterGroups()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (!query.TryGetValue(FilterGroupQueryKey, out var filterValues))
+        {
+            return [];
+        }
+
+        return filterValues
+            .Select(TryParseFilterGroup)
+            .Where(static group => group is { SelectedTags.Count: > 0 })
+            .Select(static group => group!)
+            .ToArray();
+    }
+
+    private static TagFilterGroup? TryParseFilterGroup(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var separatorIndex = value.IndexOf(FilterGroupModeSeparator);
+        if (separatorIndex <= 0 || separatorIndex == value.Length - 1)
+        {
+            return null;
+        }
+
+        if (!TryParseFilterMode(value[..separatorIndex], out var mode))
+        {
+            return null;
+        }
+
+        var filterGroup = new TagFilterGroup
+        {
+            Mode = mode
+        };
+
+        foreach (var encodedTag in value[(separatorIndex + 1)..].Split(FilterGroupTagSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var tag = TryDecodeFilterTag(encodedTag);
+            if (!string.IsNullOrWhiteSpace(tag))
+            {
+                filterGroup.SelectedTags.Add(tag);
+            }
+        }
+
+        return filterGroup;
+    }
+
     private SongFormRoute GetCurrentFormRoute()
     {
         var uri = Nav.ToAbsoluteUri(Nav.Uri);
@@ -726,19 +810,99 @@
         return new SongFormRoute(SongFormRouteMode.List, null);
     }
 
+    private static bool TryParseFilterMode(string value, out TagFilterMode mode)
+    {
+        if (string.Equals(value, "and", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = TagFilterMode.And;
+            return true;
+        }
+
+        if (string.Equals(value, "or", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = TagFilterMode.Or;
+            return true;
+        }
+
+        mode = TagFilterMode.And;
+        return false;
+    }
+
+    private void NavigateToCurrentFilterUri(bool replace)
+    {
+        Nav.NavigateTo(BuildHomeUri(GetCurrentFormRoute()), replace: replace);
+    }
+
+    private string GetSongListUri()
+    {
+        return BuildHomeUri(new SongFormRoute(SongFormRouteMode.List, null));
+    }
+
+    private string BuildHomeUri(SongFormRoute formRoute)
+    {
+        var queryString = new List<KeyValuePair<string, string?>>();
+        if (formRoute.Mode == SongFormRouteMode.New)
+        {
+            queryString.Add(new KeyValuePair<string, string?>("mode", "new"));
+        }
+        else if (formRoute.Mode == SongFormRouteMode.Edit && formRoute.SongId.HasValue)
+        {
+            queryString.Add(new KeyValuePair<string, string?>("edit", formRoute.SongId.Value.ToString("D")));
+        }
+
+        foreach (var filterGroup in ActiveFilterGroups)
+        {
+            queryString.Add(new KeyValuePair<string, string?>(FilterGroupQueryKey, SerializeFilterGroup(filterGroup)));
+        }
+
+        return queryString.Count == 0
+            ? Nav.BaseUri
+            : QueryHelpers.AddQueryString(Nav.BaseUri, queryString);
+    }
+
+    private static string SerializeFilterGroup(TagFilterGroup filterGroup)
+    {
+        var modeText = filterGroup.Mode == TagFilterMode.Or ? "or" : "and";
+        var encodedTags = filterGroup.SelectedTags
+            .OrderBy(static tag => tag, StringComparer.OrdinalIgnoreCase)
+            .Select(EncodeFilterTag);
+        return $"{modeText}{FilterGroupModeSeparator}{string.Join(FilterGroupTagSeparator, encodedTags)}";
+    }
+
+    private static string EncodeFilterTag(string tag)
+    {
+        return WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(tag));
+    }
+
+    private static string? TryDecodeFilterTag(string encodedTag)
+    {
+        try
+        {
+            return Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(encodedTag));
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
     private void NavigateToSongList(bool replace)
     {
-        Nav.NavigateTo(Nav.BaseUri, replace: replace);
+        Nav.NavigateTo(GetSongListUri(), replace: replace);
     }
 
     private string GetNewSongUri()
     {
-        return $"{Nav.BaseUri}?mode=new";
+        return BuildHomeUri(new SongFormRoute(SongFormRouteMode.New, null));
     }
 
     private string GetEditSongUri(Guid songId)
     {
-        return $"{Nav.BaseUri}?edit={songId:D}";
+        return BuildHomeUri(new SongFormRoute(SongFormRouteMode.Edit, songId));
     }
 
     public void Dispose()
