@@ -34,6 +34,8 @@
 
                 @if (m_IsFormVisible)
                 {
+                    var savedTagPresets = SavedTagPresets;
+
                     <form class="song-form" @onsubmit="SaveSongAsync" @onsubmit:preventDefault="true">
                         @if (!string.IsNullOrWhiteSpace(m_ErrorMessage))
                         {
@@ -68,6 +70,24 @@
                                     </button>
                                 }
                             </div>
+                            @if (savedTagPresets.Count > 0)
+                            {
+                                <div class="saved-tag-presets">
+                                    <span class="tag-preset-heading">@Strings.SONG_SAVED_TAG_PRESETS_LABEL</span>
+                                    <div class="tag-options">
+                                        @foreach (var preset in savedTagPresets)
+                                        {
+                                            <button type="button"
+                                                    class="@GetSavedPresetTagButtonClass(preset.Tag)"
+                                                    aria-pressed="@m_SelectedSavedPresetTags.Contains(preset.Tag)"
+                                                    @onclick="() => ToggleSavedPresetTag(preset.Tag)">
+                                                <span>@GetTagDisplayText(preset.Tag)</span>
+                                                <span class="tag-option-count">@preset.UsageCount</span>
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
                         </fieldset>
 
                         <label class="field">
@@ -226,6 +246,7 @@
     private static readonly IReadOnlyList<string> DefaultTagIds = KaraokeSongTags.DefaultTagIds;
     private static readonly char[] CustomTagSeparators = [',', ';', '\n', '\r'];
     private readonly HashSet<string> m_SelectedDefaultTagIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> m_SelectedSavedPresetTags = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<TagFilterGroup> m_FilterGroups = [new()];
     private IReadOnlyList<KaraokeSongEntry> m_Songs = [];
     private SongFormModel m_Form = new();
@@ -239,6 +260,15 @@
         .Where(static tag => !string.IsNullOrWhiteSpace(tag))
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .OrderBy(GetTagDisplayText, StringComparer.CurrentCultureIgnoreCase)
+        .ToArray();
+
+    private IReadOnlyList<SavedTagPreset> SavedTagPresets => m_Songs
+        .SelectMany(static song => song.Tags)
+        .Where(static tag => IsSavedPresetTag(tag))
+        .GroupBy(static tag => tag, StringComparer.OrdinalIgnoreCase)
+        .Select(static group => new SavedTagPreset(group.First(), group.Count()))
+        .OrderByDescending(static preset => preset.UsageCount)
+        .ThenBy(preset => GetTagDisplayText(preset.Tag), StringComparer.CurrentCultureIgnoreCase)
         .ToArray();
 
     private bool HasActiveFilters => m_FilterGroups.Any(static group => group.SelectedTags.Count > 0);
@@ -291,6 +321,7 @@
 
         m_Songs = await SongRepository.GetSongsAsync(m_OwnerId);
         PruneSelectedFilterTags();
+        PruneSelectedSavedPresetTags();
     }
 
     private async Task SaveSongAsync()
@@ -351,6 +382,7 @@
     {
         m_ErrorMessage = null;
         m_SelectedDefaultTagIds.Clear();
+        m_SelectedSavedPresetTags.Clear();
         m_IsFormVisible = true;
         var customTags = new List<string>();
 
@@ -367,7 +399,7 @@
             }
             else
             {
-                customTags.Add(tag);
+                m_SelectedSavedPresetTags.Add(tag);
             }
         }
 
@@ -396,6 +428,7 @@
     {
         m_ErrorMessage = null;
         m_SelectedDefaultTagIds.Clear();
+        m_SelectedSavedPresetTags.Clear();
         m_Form = new SongFormModel();
     }
 
@@ -404,6 +437,14 @@
         if (!m_SelectedDefaultTagIds.Add(tagId))
         {
             m_SelectedDefaultTagIds.Remove(tagId);
+        }
+    }
+
+    private void ToggleSavedPresetTag(string tag)
+    {
+        if (!m_SelectedSavedPresetTags.Add(tag))
+        {
+            m_SelectedSavedPresetTags.Remove(tag);
         }
     }
 
@@ -452,6 +493,14 @@
         }
     }
 
+    private void PruneSelectedSavedPresetTags()
+    {
+        var savedPresetTags = SavedTagPresets
+            .Select(static preset => preset.Tag)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        m_SelectedSavedPresetTags.RemoveWhere(tag => !savedPresetTags.Contains(tag));
+    }
+
     private static bool SongMatchesSelectedFilters(
         KaraokeSongEntry song,
         IReadOnlyList<TagFilterGroup> activeFilterGroups)
@@ -472,6 +521,7 @@
     private IReadOnlyCollection<string> BuildTagList()
     {
         var tags = new List<string>(m_SelectedDefaultTagIds);
+        tags.AddRange(m_SelectedSavedPresetTags);
         foreach (var customTag in m_Form.CustomTags.Split(CustomTagSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             AddNormalizedInputTag(tags, customTag);
@@ -524,6 +574,13 @@
         return m_SelectedDefaultTagIds.Contains(tagId)
             ? "tag-option selected"
             : "tag-option";
+    }
+
+    private string GetSavedPresetTagButtonClass(string tag)
+    {
+        return m_SelectedSavedPresetTags.Contains(tag)
+            ? "tag-option tag-option-with-count selected"
+            : "tag-option tag-option-with-count";
     }
 
     private string GetFilterTagButtonClass(TagFilterGroup filterGroup, string tag)
@@ -583,6 +640,13 @@
     private static bool IsDefaultTag(string tag)
     {
         return KaraokeSongTags.IsDefaultTag(tag);
+    }
+
+    private static bool IsSavedPresetTag(string tag)
+    {
+        return !string.IsNullOrWhiteSpace(tag) &&
+            !KaraokeSongTags.IsDefaultTag(tag) &&
+            !KaraokeSongTags.IsMixedTag(tag);
     }
 
     private static string? GetOwnerId(ClaimsPrincipal user)
@@ -690,6 +754,8 @@
     }
 
     private readonly record struct SongFormRoute(SongFormRouteMode Mode, Guid? SongId);
+
+    private readonly record struct SavedTagPreset(string Tag, int UsageCount);
 
     private enum TagFilterMode
     {

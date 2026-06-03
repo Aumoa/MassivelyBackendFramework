@@ -122,6 +122,8 @@ namespace NoraeBook.Localizations
 
         internal static string SONG_NUMBER_LABEL => ResourceManager.GetString("SONG_NUMBER_LABEL", resourceCulture)!;
 
+        internal static string SONG_SAVED_TAG_PRESETS_LABEL => ResourceManager.GetString("SONG_SAVED_TAG_PRESETS_LABEL", resourceCulture)!;
+
         internal static string SONG_SAVE_BUTTON => ResourceManager.GetString("SONG_SAVE_BUTTON", resourceCulture)!;
 
         internal static string SONG_TABLE_ACTIONS => ResourceManager.GetString("SONG_TABLE_ACTIONS", resourceCulture)!;

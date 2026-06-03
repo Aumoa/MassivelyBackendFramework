@@ -96,6 +96,9 @@
   <data name="SONG_CUSTOM_TAGS_PLACEHOLDER" xml:space="preserve">
     <value>발라드, 듀엣, 고음</value>
   </data>
+  <data name="SONG_SAVED_TAG_PRESETS_LABEL" xml:space="preserve">
+    <value>저장된 태그 프리셋</value>
+  </data>
   <data name="SONG_SAVE_BUTTON" xml:space="preserve">
     <value>곡 추가</value>
   </data>

@@ -401,6 +401,19 @@ h2 {
     font-weight: 700;
 }
 
+.saved-tag-presets {
+    display: grid;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--app-border);
+}
+
+.tag-preset-heading {
+    color: var(--app-text-muted);
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
 .tag-options,
 .tag-list,
 .row-actions,
@@ -430,9 +443,33 @@ h2 {
     cursor: pointer;
 }
 
+.tag-option-with-count {
+    gap: 6px;
+}
+
+.tag-option-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    padding: 0 0.32rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--app-surface) 70%, transparent);
+    color: var(--app-text-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
 .tag-option.selected {
     border-color: color-mix(in srgb, var(--app-accent) 64%, var(--app-border));
     background: var(--app-accent-soft);
+    color: var(--app-accent);
+}
+
+.tag-option.selected .tag-option-count {
+    background: color-mix(in srgb, var(--app-accent) 12%, var(--app-surface));
     color: var(--app-accent);
 }
 

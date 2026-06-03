@@ -96,6 +96,9 @@
   <data name="SONG_CUSTOM_TAGS_PLACEHOLDER" xml:space="preserve">
     <value>Ballad, duet, high note</value>
   </data>
+  <data name="SONG_SAVED_TAG_PRESETS_LABEL" xml:space="preserve">
+    <value>Saved tag presets</value>
+  </data>
   <data name="SONG_SAVE_BUTTON" xml:space="preserve">
     <value>Add song</value>
   </data>
