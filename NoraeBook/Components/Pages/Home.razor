@@ -104,22 +104,59 @@
                     @if (availableFilterTags.Count > 0)
                     {
                         <section class="filter-strip" aria-label="@Strings.SONG_FILTER_ARIA">
-                            <div class="filter-heading">
+                            <div class="filter-toolbar">
                                 <span>@Strings.SONG_FILTER_TITLE</span>
-                                @if (m_SelectedFilterTags.Count > 0)
-                                {
-                                    <button type="button" class="btn-row" @onclick="ClearTagFilters">@Strings.SONG_FILTER_CLEAR</button>
-                                }
+                                <div class="filter-toolbar-actions">
+                                    <button type="button" class="btn-row" @onclick="AddFilterGroup">@Strings.SONG_FILTER_ADD_GROUP</button>
+                                    @if (HasActiveFilters)
+                                    {
+                                        <button type="button" class="btn-row" @onclick="ClearTagFilters">@Strings.SONG_FILTER_CLEAR</button>
+                                    }
+                                </div>
                             </div>
-                            <div class="tag-options">
-                                @foreach (var tag in availableFilterTags)
+
+                            <div class="filter-groups">
+                                @for (var groupIndex = 0; groupIndex < m_FilterGroups.Count; groupIndex++)
                                 {
-                                    <button type="button"
-                                            class="@GetFilterTagButtonClass(tag)"
-                                            aria-pressed="@m_SelectedFilterTags.Contains(tag)"
-                                            @onclick="() => ToggleFilterTag(tag)">
-                                        @GetTagDisplayText(tag)
-                                    </button>
+                                    var filterGroup = m_FilterGroups[groupIndex];
+
+                                    <div class="filter-group" @key="filterGroup.Id">
+                                        <div class="filter-group-header">
+                                            <span class="filter-group-title">@string.Format(Strings.SONG_FILTER_GROUP_TITLE_FORMAT, groupIndex + 1)</span>
+                                            <div class="filter-group-actions">
+                                                <div class="filter-mode-toggle" aria-label="@Strings.SONG_FILTER_MODE_ARIA">
+                                                    <button type="button"
+                                                            class="@GetFilterModeButtonClass(filterGroup, TagFilterMode.And)"
+                                                            aria-pressed="@(filterGroup.Mode == TagFilterMode.And)"
+                                                            @onclick="() => SetFilterGroupMode(filterGroup, TagFilterMode.And)">
+                                                        @Strings.SONG_FILTER_MODE_AND
+                                                    </button>
+                                                    <button type="button"
+                                                            class="@GetFilterModeButtonClass(filterGroup, TagFilterMode.Or)"
+                                                            aria-pressed="@(filterGroup.Mode == TagFilterMode.Or)"
+                                                            @onclick="() => SetFilterGroupMode(filterGroup, TagFilterMode.Or)">
+                                                        @Strings.SONG_FILTER_MODE_OR
+                                                    </button>
+                                                </div>
+
+                                                @if (m_FilterGroups.Count > 1)
+                                                {
+                                                    <button type="button" class="btn-row" @onclick="() => RemoveFilterGroup(filterGroup)">@Strings.SONG_FILTER_GROUP_REMOVE</button>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="tag-options">
+                                            @foreach (var tag in availableFilterTags)
+                                            {
+                                                <button type="button"
+                                                        class="@GetFilterTagButtonClass(filterGroup, tag)"
+                                                        aria-pressed="@filterGroup.SelectedTags.Contains(tag)"
+                                                        @onclick="() => ToggleFilterTag(filterGroup, tag)">
+                                                    @GetTagDisplayText(tag)
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
                                 }
                             </div>
                         </section>
@@ -189,7 +226,7 @@
     private static readonly string[] DefaultTagIds = ["male", "female", "mixed"];
     private static readonly char[] CustomTagSeparators = [',', ';', '\n', '\r'];
     private readonly HashSet<string> m_SelectedDefaultTagIds = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> m_SelectedFilterTags = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<TagFilterGroup> m_FilterGroups = [new()];
     private IReadOnlyList<KaraokeSongEntry> m_Songs = [];
     private SongFormModel m_Form = new();
     private string? m_OwnerId;
@@ -204,11 +241,24 @@
         .OrderBy(GetTagDisplayText, StringComparer.CurrentCultureIgnoreCase)
         .ToArray();
 
-    private IReadOnlyList<KaraokeSongEntry> DisplayedSongs => m_SelectedFilterTags.Count == 0
-        ? m_Songs
-        : m_Songs.Where(SongMatchesSelectedTags).ToArray();
+    private bool HasActiveFilters => m_FilterGroups.Any(static group => group.SelectedTags.Count > 0);
 
-    private string SongCountText => m_SelectedFilterTags.Count == 0
+    private IReadOnlyList<TagFilterGroup> ActiveFilterGroups => m_FilterGroups
+        .Where(static group => group.SelectedTags.Count > 0)
+        .ToArray();
+
+    private IReadOnlyList<KaraokeSongEntry> DisplayedSongs
+    {
+        get
+        {
+            var activeFilterGroups = ActiveFilterGroups;
+            return activeFilterGroups.Count == 0
+                ? m_Songs
+                : m_Songs.Where(song => SongMatchesSelectedFilters(song, activeFilterGroups)).ToArray();
+        }
+    }
+
+    private string SongCountText => !HasActiveFilters
         ? string.Format(Strings.SONG_COUNT_FORMAT, m_Songs.Count)
         : string.Format(Strings.SONG_FILTERED_COUNT_FORMAT, DisplayedSongs.Count, m_Songs.Count);
 
@@ -352,28 +402,66 @@
         }
     }
 
-    private void ToggleFilterTag(string tag)
+    private void AddFilterGroup()
     {
-        if (!m_SelectedFilterTags.Add(tag))
+        m_FilterGroups.Add(new TagFilterGroup());
+    }
+
+    private void RemoveFilterGroup(TagFilterGroup filterGroup)
+    {
+        if (m_FilterGroups.Count <= 1)
         {
-            m_SelectedFilterTags.Remove(tag);
+            filterGroup.SelectedTags.Clear();
+            filterGroup.Mode = TagFilterMode.And;
+            return;
+        }
+
+        m_FilterGroups.Remove(filterGroup);
+    }
+
+    private static void SetFilterGroupMode(TagFilterGroup filterGroup, TagFilterMode mode)
+    {
+        filterGroup.Mode = mode;
+    }
+
+    private static void ToggleFilterTag(TagFilterGroup filterGroup, string tag)
+    {
+        if (!filterGroup.SelectedTags.Add(tag))
+        {
+            filterGroup.SelectedTags.Remove(tag);
         }
     }
 
     private void ClearTagFilters()
     {
-        m_SelectedFilterTags.Clear();
+        m_FilterGroups.Clear();
+        m_FilterGroups.Add(new TagFilterGroup());
     }
 
     private void PruneSelectedFilterTags()
     {
         var availableTags = AvailableFilterTags.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        m_SelectedFilterTags.RemoveWhere(tag => !availableTags.Contains(tag));
+        foreach (var filterGroup in m_FilterGroups)
+        {
+            filterGroup.SelectedTags.RemoveWhere(tag => !availableTags.Contains(tag));
+        }
     }
 
-    private bool SongMatchesSelectedTags(KaraokeSongEntry song)
+    private static bool SongMatchesSelectedFilters(
+        KaraokeSongEntry song,
+        IReadOnlyList<TagFilterGroup> activeFilterGroups)
     {
-        return m_SelectedFilterTags.All(filterTag => song.Tags.Contains(filterTag, StringComparer.OrdinalIgnoreCase));
+        return activeFilterGroups.All(filterGroup => SongMatchesFilterGroup(song, filterGroup));
+    }
+
+    private static bool SongMatchesFilterGroup(KaraokeSongEntry song, TagFilterGroup filterGroup)
+    {
+        return filterGroup.Mode switch
+        {
+            TagFilterMode.And => filterGroup.SelectedTags.All(tag => song.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase)),
+            TagFilterMode.Or => filterGroup.SelectedTags.Any(tag => song.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase)),
+            _ => false
+        };
     }
 
     private IReadOnlyCollection<string> BuildTagList()
@@ -418,11 +506,18 @@
             : "tag-option";
     }
 
-    private string GetFilterTagButtonClass(string tag)
+    private string GetFilterTagButtonClass(TagFilterGroup filterGroup, string tag)
     {
-        return m_SelectedFilterTags.Contains(tag)
+        return filterGroup.SelectedTags.Contains(tag)
             ? "tag-option selected"
             : "tag-option";
+    }
+
+    private static string GetFilterModeButtonClass(TagFilterGroup filterGroup, TagFilterMode mode)
+    {
+        return filterGroup.Mode == mode
+            ? "filter-mode-button selected"
+            : "filter-mode-button";
     }
 
     private string GetDefaultTagLabel(string tagId)
@@ -565,6 +660,21 @@
     }
 
     private readonly record struct SongFormRoute(SongFormRouteMode Mode, Guid? SongId);
+
+    private enum TagFilterMode
+    {
+        And,
+        Or
+    }
+
+    private sealed class TagFilterGroup
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+
+        public TagFilterMode Mode { get; set; }
+
+        public HashSet<string> SelectedTags { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
 
     private sealed class SongFormModel
     {

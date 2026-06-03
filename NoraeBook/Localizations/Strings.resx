@@ -138,8 +138,26 @@
   <data name="SONG_FILTER_TITLE" xml:space="preserve">
     <value>Filter by tag</value>
   </data>
+  <data name="SONG_FILTER_ADD_GROUP" xml:space="preserve">
+    <value>Add group</value>
+  </data>
   <data name="SONG_FILTER_CLEAR" xml:space="preserve">
     <value>Clear</value>
+  </data>
+  <data name="SONG_FILTER_GROUP_TITLE_FORMAT" xml:space="preserve">
+    <value>Group {0}</value>
+  </data>
+  <data name="SONG_FILTER_GROUP_REMOVE" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="SONG_FILTER_MODE_ARIA" xml:space="preserve">
+    <value>Filter group match mode</value>
+  </data>
+  <data name="SONG_FILTER_MODE_AND" xml:space="preserve">
+    <value>AND</value>
+  </data>
+  <data name="SONG_FILTER_MODE_OR" xml:space="preserve">
+    <value>OR</value>
   </data>
   <data name="SONG_FILTERED_COUNT_FORMAT" xml:space="preserve">
     <value>{0} of {1} songs</value>

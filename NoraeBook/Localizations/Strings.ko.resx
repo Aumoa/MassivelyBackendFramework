@@ -138,8 +138,26 @@
   <data name="SONG_FILTER_TITLE" xml:space="preserve">
     <value>태그로 보기</value>
   </data>
+  <data name="SONG_FILTER_ADD_GROUP" xml:space="preserve">
+    <value>그룹 추가</value>
+  </data>
   <data name="SONG_FILTER_CLEAR" xml:space="preserve">
     <value>초기화</value>
+  </data>
+  <data name="SONG_FILTER_GROUP_TITLE_FORMAT" xml:space="preserve">
+    <value>그룹 {0}</value>
+  </data>
+  <data name="SONG_FILTER_GROUP_REMOVE" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="SONG_FILTER_MODE_ARIA" xml:space="preserve">
+    <value>필터 그룹 일치 방식</value>
+  </data>
+  <data name="SONG_FILTER_MODE_AND" xml:space="preserve">
+    <value>AND</value>
+  </data>
+  <data name="SONG_FILTER_MODE_OR" xml:space="preserve">
+    <value>OR</value>
   </data>
   <data name="SONG_FILTERED_COUNT_FORMAT" xml:space="preserve">
     <value>{0}/{1}곡</value>

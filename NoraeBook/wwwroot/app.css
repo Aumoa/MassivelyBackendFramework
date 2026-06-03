@@ -271,20 +271,87 @@ h2 {
 
 .filter-strip {
     display: grid;
-    gap: 10px;
+    gap: 14px;
     padding: 14px 22px;
     border-bottom: 1px solid var(--app-border);
     background: color-mix(in srgb, var(--app-surface-muted) 34%, var(--app-surface));
 }
 
-.filter-heading {
+.filter-toolbar,
+.filter-toolbar-actions,
+.filter-group-header,
+.filter-group-actions,
+.filter-mode-toggle {
     display: flex;
     gap: 12px;
     align-items: center;
+}
+
+.filter-toolbar,
+.filter-group-header {
+    flex-wrap: wrap;
     justify-content: space-between;
+}
+
+.filter-toolbar {
     color: var(--app-text-muted);
     font-size: 0.84rem;
     font-weight: 800;
+}
+
+.filter-toolbar-actions,
+.filter-group-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.filter-groups {
+    display: grid;
+    gap: 14px;
+}
+
+.filter-group {
+    display: grid;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--app-border);
+}
+
+.filter-group:first-child {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.filter-group-title {
+    color: var(--app-text);
+    font-size: 0.86rem;
+    font-weight: 800;
+}
+
+.filter-mode-toggle {
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface);
+}
+
+.filter-mode-button {
+    min-height: 28px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-text-muted);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.filter-mode-button.selected {
+    background: var(--app-accent-soft);
+    color: var(--app-accent);
 }
 
 .form-grid {

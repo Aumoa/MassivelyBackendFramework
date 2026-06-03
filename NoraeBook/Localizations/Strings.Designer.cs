@@ -90,6 +90,8 @@ namespace NoraeBook.Localizations
 
         internal static string SONG_DELETE_BUTTON => ResourceManager.GetString("SONG_DELETE_BUTTON", resourceCulture)!;
 
+        internal static string SONG_FILTER_ADD_GROUP => ResourceManager.GetString("SONG_FILTER_ADD_GROUP", resourceCulture)!;
+
         internal static string SONG_FILTER_ARIA => ResourceManager.GetString("SONG_FILTER_ARIA", resourceCulture)!;
 
         internal static string SONG_FILTER_CLEAR => ResourceManager.GetString("SONG_FILTER_CLEAR", resourceCulture)!;
@@ -97,6 +99,16 @@ namespace NoraeBook.Localizations
         internal static string SONG_FILTER_EMPTY_DESCRIPTION => ResourceManager.GetString("SONG_FILTER_EMPTY_DESCRIPTION", resourceCulture)!;
 
         internal static string SONG_FILTER_EMPTY_TITLE => ResourceManager.GetString("SONG_FILTER_EMPTY_TITLE", resourceCulture)!;
+
+        internal static string SONG_FILTER_GROUP_REMOVE => ResourceManager.GetString("SONG_FILTER_GROUP_REMOVE", resourceCulture)!;
+
+        internal static string SONG_FILTER_GROUP_TITLE_FORMAT => ResourceManager.GetString("SONG_FILTER_GROUP_TITLE_FORMAT", resourceCulture)!;
+
+        internal static string SONG_FILTER_MODE_AND => ResourceManager.GetString("SONG_FILTER_MODE_AND", resourceCulture)!;
+
+        internal static string SONG_FILTER_MODE_ARIA => ResourceManager.GetString("SONG_FILTER_MODE_ARIA", resourceCulture)!;
+
+        internal static string SONG_FILTER_MODE_OR => ResourceManager.GetString("SONG_FILTER_MODE_OR", resourceCulture)!;
 
         internal static string SONG_FILTER_TITLE => ResourceManager.GetString("SONG_FILTER_TITLE", resourceCulture)!;
 
