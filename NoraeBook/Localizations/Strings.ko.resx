@@ -132,6 +132,24 @@
   <data name="SONG_DELETE_BUTTON" xml:space="preserve">
     <value>삭제</value>
   </data>
+  <data name="SONG_FILTER_ARIA" xml:space="preserve">
+    <value>노래 태그 필터</value>
+  </data>
+  <data name="SONG_FILTER_TITLE" xml:space="preserve">
+    <value>태그로 보기</value>
+  </data>
+  <data name="SONG_FILTER_CLEAR" xml:space="preserve">
+    <value>초기화</value>
+  </data>
+  <data name="SONG_FILTERED_COUNT_FORMAT" xml:space="preserve">
+    <value>{0}/{1}곡</value>
+  </data>
+  <data name="SONG_FILTER_EMPTY_TITLE" xml:space="preserve">
+    <value>선택한 태그와 일치하는 노래가 없습니다</value>
+  </data>
+  <data name="SONG_FILTER_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>선택한 태그를 줄이면 더 많은 노래를 볼 수 있습니다.</value>
+  </data>
   <data name="SONG_TAG_MALE" xml:space="preserve">
     <value>남자</value>
   </data>

@@ -98,6 +98,42 @@
                 }
                 else
                 {
+                    var availableFilterTags = AvailableFilterTags;
+                    var displayedSongs = DisplayedSongs;
+
+                    @if (availableFilterTags.Count > 0)
+                    {
+                        <section class="filter-strip" aria-label="@Strings.SONG_FILTER_ARIA">
+                            <div class="filter-heading">
+                                <span>@Strings.SONG_FILTER_TITLE</span>
+                                @if (m_SelectedFilterTags.Count > 0)
+                                {
+                                    <button type="button" class="btn-row" @onclick="ClearTagFilters">@Strings.SONG_FILTER_CLEAR</button>
+                                }
+                            </div>
+                            <div class="tag-options">
+                                @foreach (var tag in availableFilterTags)
+                                {
+                                    <button type="button"
+                                            class="@GetFilterTagButtonClass(tag)"
+                                            aria-pressed="@m_SelectedFilterTags.Contains(tag)"
+                                            @onclick="() => ToggleFilterTag(tag)">
+                                        @GetTagDisplayText(tag)
+                                    </button>
+                                }
+                            </div>
+                        </section>
+                    }
+
+                    @if (displayedSongs.Count == 0)
+                    {
+                        <div class="empty-state">
+                            <strong>@Strings.SONG_FILTER_EMPTY_TITLE</strong>
+                            <span>@Strings.SONG_FILTER_EMPTY_DESCRIPTION</span>
+                        </div>
+                    }
+                    else
+                    {
                     <div class="table-wrap">
                         <table>
                             <thead>
@@ -110,7 +146,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var song in m_Songs)
+                                @foreach (var song in displayedSongs)
                                 {
                                     <tr @key="song.Id">
                                         <td><span class="song-number">@song.SongNumber</span></td>
@@ -135,6 +171,7 @@
                             </tbody>
                         </table>
                     </div>
+                    }
                 }
             </article>
         </section>
@@ -152,6 +189,7 @@
     private static readonly string[] DefaultTagIds = ["male", "female", "mixed"];
     private static readonly char[] CustomTagSeparators = [',', ';', '\n', '\r'];
     private readonly HashSet<string> m_SelectedDefaultTagIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> m_SelectedFilterTags = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<KaraokeSongEntry> m_Songs = [];
     private SongFormModel m_Form = new();
     private string? m_OwnerId;
@@ -159,7 +197,20 @@
     private bool m_IsLoading = true;
     private bool m_IsFormVisible;
 
-    private string SongCountText => string.Format(Strings.SONG_COUNT_FORMAT, m_Songs.Count);
+    private IReadOnlyList<string> AvailableFilterTags => m_Songs
+        .SelectMany(static song => song.Tags)
+        .Where(static tag => !string.IsNullOrWhiteSpace(tag))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(GetTagDisplayText, StringComparer.CurrentCultureIgnoreCase)
+        .ToArray();
+
+    private IReadOnlyList<KaraokeSongEntry> DisplayedSongs => m_SelectedFilterTags.Count == 0
+        ? m_Songs
+        : m_Songs.Where(SongMatchesSelectedTags).ToArray();
+
+    private string SongCountText => m_SelectedFilterTags.Count == 0
+        ? string.Format(Strings.SONG_COUNT_FORMAT, m_Songs.Count)
+        : string.Format(Strings.SONG_FILTERED_COUNT_FORMAT, DisplayedSongs.Count, m_Songs.Count);
 
     private string SaveButtonText => m_Form.Id.HasValue
         ? Strings.SONG_UPDATE_BUTTON
@@ -189,6 +240,7 @@
         }
 
         m_Songs = await SongRepository.GetSongsAsync(m_OwnerId);
+        PruneSelectedFilterTags();
     }
 
     private async Task SaveSongAsync()
@@ -300,6 +352,30 @@
         }
     }
 
+    private void ToggleFilterTag(string tag)
+    {
+        if (!m_SelectedFilterTags.Add(tag))
+        {
+            m_SelectedFilterTags.Remove(tag);
+        }
+    }
+
+    private void ClearTagFilters()
+    {
+        m_SelectedFilterTags.Clear();
+    }
+
+    private void PruneSelectedFilterTags()
+    {
+        var availableTags = AvailableFilterTags.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        m_SelectedFilterTags.RemoveWhere(tag => !availableTags.Contains(tag));
+    }
+
+    private bool SongMatchesSelectedTags(KaraokeSongEntry song)
+    {
+        return m_SelectedFilterTags.All(filterTag => song.Tags.Contains(filterTag, StringComparer.OrdinalIgnoreCase));
+    }
+
     private IReadOnlyCollection<string> BuildTagList()
     {
         var tags = new List<string>(m_SelectedDefaultTagIds);
@@ -338,6 +414,13 @@
     private string GetTagButtonClass(string tagId)
     {
         return m_SelectedDefaultTagIds.Contains(tagId)
+            ? "tag-option selected"
+            : "tag-option";
+    }
+
+    private string GetFilterTagButtonClass(string tag)
+    {
+        return m_SelectedFilterTags.Contains(tag)
             ? "tag-option selected"
             : "tag-option";
     }

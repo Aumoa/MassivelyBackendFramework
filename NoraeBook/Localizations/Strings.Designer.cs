@@ -90,6 +90,18 @@ namespace NoraeBook.Localizations
 
         internal static string SONG_DELETE_BUTTON => ResourceManager.GetString("SONG_DELETE_BUTTON", resourceCulture)!;
 
+        internal static string SONG_FILTER_ARIA => ResourceManager.GetString("SONG_FILTER_ARIA", resourceCulture)!;
+
+        internal static string SONG_FILTER_CLEAR => ResourceManager.GetString("SONG_FILTER_CLEAR", resourceCulture)!;
+
+        internal static string SONG_FILTER_EMPTY_DESCRIPTION => ResourceManager.GetString("SONG_FILTER_EMPTY_DESCRIPTION", resourceCulture)!;
+
+        internal static string SONG_FILTER_EMPTY_TITLE => ResourceManager.GetString("SONG_FILTER_EMPTY_TITLE", resourceCulture)!;
+
+        internal static string SONG_FILTER_TITLE => ResourceManager.GetString("SONG_FILTER_TITLE", resourceCulture)!;
+
+        internal static string SONG_FILTERED_COUNT_FORMAT => ResourceManager.GetString("SONG_FILTERED_COUNT_FORMAT", resourceCulture)!;
+
         internal static string SONG_EDIT_BUTTON => ResourceManager.GetString("SONG_EDIT_BUTTON", resourceCulture)!;
 
         internal static string SONG_LOADING_DESCRIPTION => ResourceManager.GetString("SONG_LOADING_DESCRIPTION", resourceCulture)!;

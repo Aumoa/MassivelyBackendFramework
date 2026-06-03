@@ -132,6 +132,24 @@
   <data name="SONG_DELETE_BUTTON" xml:space="preserve">
     <value>Delete</value>
   </data>
+  <data name="SONG_FILTER_ARIA" xml:space="preserve">
+    <value>Song tag filters</value>
+  </data>
+  <data name="SONG_FILTER_TITLE" xml:space="preserve">
+    <value>Filter by tag</value>
+  </data>
+  <data name="SONG_FILTER_CLEAR" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="SONG_FILTERED_COUNT_FORMAT" xml:space="preserve">
+    <value>{0} of {1} songs</value>
+  </data>
+  <data name="SONG_FILTER_EMPTY_TITLE" xml:space="preserve">
+    <value>No songs match these tags</value>
+  </data>
+  <data name="SONG_FILTER_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>Clear a selected tag to widen the list.</value>
+  </data>
   <data name="SONG_TAG_MALE" xml:space="preserve">
     <value>Male</value>
   </data>
