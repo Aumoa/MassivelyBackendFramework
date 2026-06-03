@@ -7,6 +7,14 @@
 - For high-performance socket server work, including Master, Gateway, Dedicated, channel execution, game networking, packet routing, and MMORPG server logic, also follow `SOCKETAGENTS.md`.
 - If a task touches both domains, follow both files and prefer the stricter runtime, safety, or performance rule where they conflict.
 
+## Solution Folder Policy
+
+- When adding or moving projects in the solution, place them in the solution folder that matches their runtime boundary and primary responsibility.
+- Use `Frontend` for web servers or any server that directly accepts external connections.
+- Use `Backend` for servers that communicate only with internal services.
+- Use `Services` for projects that define service components, contracts, abstractions, controllers, core logic, SQL, or other service-owned building blocks.
+- Use `Utility` for projects that simply provide reusable functionality to many services without owning a service domain.
+
 ## Git Commit Policy
 
 - When implementing a requested feature, split the work into meaningful feature-sized commits.

@@ -7,9 +7,11 @@
 
 # ASP.NET
 appsettings.*.json
+**/.data-protection-keys/
 
 # Claude Code
 .claude/*.local.json
 
 # Codex
 .codex-build/
+**/devserver.*.log

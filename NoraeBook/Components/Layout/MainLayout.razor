@@ -1,0 +1,37 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject OpenIDConnect.IAuthenticationStateProvider OidcAuth
+
+<div class="app-shell">
+    <header class="topbar">
+        <a class="brand" href="" aria-label="@Strings.APP_TITLE">
+            <span class="brand-mark" aria-hidden="true">N</span>
+            <span>@Strings.APP_TITLE</span>
+        </a>
+        <AuthorizeView>
+            <Authorized>
+                <a class="auth-action" href="auth/logout">@Strings.AUTH_LOGOUT</a>
+            </Authorized>
+            <NotAuthorized>
+                <button type="button" class="auth-action" @onclick="OnLoginClick">@Strings.AUTH_LOGIN</button>
+            </NotAuthorized>
+        </AuthorizeView>
+    </header>
+
+    <main class="content">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    @Strings.ERROR_UNHANDLED
+    <a href="" class="reload">@Strings.ERROR_RELOAD</a>
+    <a class="dismiss">x</a>
+</div>
+
+@code {
+    private void OnLoginClick()
+    {
+        OidcAuth.NavigateToLogin(Nav, "auth/redirect", "openid");
+    }
+}

@@ -1,0 +1,951 @@
+@page "/"
+@using System.Security.Claims
+@using System.Text
+@using Microsoft.AspNetCore.WebUtilities
+@implements IDisposable
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IKaraokeSongRepository SongRepository
+@inject NavigationManager Nav
+@inject OpenIDConnect.IAuthenticationStateProvider OidcAuth
+
+<PageTitle>@Strings.APP_TITLE</PageTitle>
+
+<section class="page-header">
+    <p class="eyebrow">@Strings.HOME_EYEBROW</p>
+    <h1>@Strings.HOME_TITLE</h1>
+</section>
+
+<AuthorizeView>
+    <Authorized>
+        <section class="editor-shell" aria-label="@Strings.HOME_WORKSPACE_ARIA">
+            <article class="panel">
+                <div class="panel-heading">
+                    <div>
+                        <h2>@Strings.HOME_QUEUE_TITLE</h2>
+                        <p>@Strings.HOME_QUEUE_DESCRIPTION</p>
+                    </div>
+                    <div class="panel-heading-actions">
+                        <span class="status-pill">@SongCountText</span>
+                        @if (!m_IsFormVisible)
+                        {
+                            <button type="button" class="btn-primary" @onclick="ShowNewSongForm">@Strings.SONG_SAVE_BUTTON</button>
+                        }
+                    </div>
+                </div>
+
+                @if (m_IsFormVisible)
+                {
+                    var savedTagPresets = SavedTagPresets;
+
+                    <form class="song-form" @onsubmit="SaveSongAsync" @onsubmit:preventDefault="true">
+                        @if (!string.IsNullOrWhiteSpace(m_ErrorMessage))
+                        {
+                            <p class="form-error">@m_ErrorMessage</p>
+                        }
+
+                        <div class="form-grid">
+                            <label class="field">
+                                <span>@Strings.SONG_NUMBER_LABEL</span>
+                                <input class="form-input" type="number" min="1" step="1" @bind="m_Form.SongNumber" />
+                            </label>
+                            <label class="field">
+                                <span>@Strings.SONG_ARTIST_LABEL</span>
+                                <input class="form-input" type="text" maxlength="120" @bind="m_Form.Artist" />
+                            </label>
+                            <label class="field">
+                                <span>@Strings.SONG_TITLE_LABEL</span>
+                                <input class="form-input" type="text" maxlength="160" @bind="m_Form.Title" />
+                            </label>
+                        </div>
+
+                        <fieldset class="tag-fieldset">
+                            <legend>@Strings.SONG_TAGS_LABEL</legend>
+                            <div class="tag-options">
+                                @foreach (var tagId in DefaultTagIds)
+                                {
+                                    <button type="button"
+                                            class="@GetTagButtonClass(tagId)"
+                                            aria-pressed="@m_SelectedDefaultTagIds.Contains(tagId)"
+                                            @onclick="() => ToggleDefaultTag(tagId)">
+                                        @GetDefaultTagLabel(tagId)
+                                    </button>
+                                }
+                            </div>
+                            @if (savedTagPresets.Count > 0)
+                            {
+                                <div class="saved-tag-presets">
+                                    <span class="tag-preset-heading">@Strings.SONG_SAVED_TAG_PRESETS_LABEL</span>
+                                    <div class="tag-options">
+                                        @foreach (var preset in savedTagPresets)
+                                        {
+                                            <button type="button"
+                                                    class="@GetSavedPresetTagButtonClass(preset.Tag)"
+                                                    aria-pressed="@m_SelectedSavedPresetTags.Contains(preset.Tag)"
+                                                    @onclick="() => ToggleSavedPresetTag(preset.Tag)">
+                                                <span>@GetTagDisplayText(preset.Tag)</span>
+                                                <span class="tag-option-count">@preset.UsageCount</span>
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </fieldset>
+
+                        <label class="field">
+                            <span>@Strings.SONG_CUSTOM_TAGS_LABEL</span>
+                            <input class="form-input" type="text" maxlength="160" placeholder="@Strings.SONG_CUSTOM_TAGS_PLACEHOLDER" @bind="m_Form.CustomTags" />
+                        </label>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">@SaveButtonText</button>
+                            <button type="button" class="btn-secondary" @onclick="CancelForm">@Strings.SONG_CANCEL_BUTTON</button>
+                        </div>
+                    </form>
+                }
+
+                @if (m_IsLoading)
+                {
+                    <div class="empty-state">
+                        <strong>@Strings.SONG_LOADING_TITLE</strong>
+                        <span>@Strings.SONG_LOADING_DESCRIPTION</span>
+                    </div>
+                }
+                else if (m_Songs.Count == 0)
+                {
+                    <div class="empty-state">
+                        <strong>@Strings.HOME_EMPTY_TITLE</strong>
+                        <span>@Strings.HOME_EMPTY_DESCRIPTION</span>
+                    </div>
+                }
+                else
+                {
+                    var availableFilterTags = AvailableFilterTags;
+                    var displayedSongs = DisplayedSongs;
+
+                    @if (availableFilterTags.Count > 0)
+                    {
+                        <section class="filter-strip" aria-label="@Strings.SONG_FILTER_ARIA">
+                            <div class="filter-toolbar">
+                                <span>@Strings.SONG_FILTER_TITLE</span>
+                                <div class="filter-toolbar-actions">
+                                    <button type="button" class="btn-row" @onclick="AddFilterGroup">@Strings.SONG_FILTER_ADD_GROUP</button>
+                                    @if (HasActiveFilters)
+                                    {
+                                        <button type="button" class="btn-row" @onclick="ClearTagFilters">@Strings.SONG_FILTER_CLEAR</button>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="filter-groups">
+                                @for (var groupIndex = 0; groupIndex < m_FilterGroups.Count; groupIndex++)
+                                {
+                                    var filterGroup = m_FilterGroups[groupIndex];
+
+                                    <div class="filter-group" @key="filterGroup.Id">
+                                        <div class="filter-group-header">
+                                            <span class="filter-group-title">@string.Format(Strings.SONG_FILTER_GROUP_TITLE_FORMAT, groupIndex + 1)</span>
+                                            <div class="filter-group-actions">
+                                                <div class="filter-mode-toggle" aria-label="@Strings.SONG_FILTER_MODE_ARIA">
+                                                    <button type="button"
+                                                            class="@GetFilterModeButtonClass(filterGroup, TagFilterMode.And)"
+                                                            aria-pressed="@(filterGroup.Mode == TagFilterMode.And)"
+                                                            @onclick="() => SetFilterGroupMode(filterGroup, TagFilterMode.And)">
+                                                        @Strings.SONG_FILTER_MODE_AND
+                                                    </button>
+                                                    <button type="button"
+                                                            class="@GetFilterModeButtonClass(filterGroup, TagFilterMode.Or)"
+                                                            aria-pressed="@(filterGroup.Mode == TagFilterMode.Or)"
+                                                            @onclick="() => SetFilterGroupMode(filterGroup, TagFilterMode.Or)">
+                                                        @Strings.SONG_FILTER_MODE_OR
+                                                    </button>
+                                                </div>
+
+                                                @if (m_FilterGroups.Count > 1)
+                                                {
+                                                    <button type="button" class="btn-row" @onclick="() => RemoveFilterGroup(filterGroup)">@Strings.SONG_FILTER_GROUP_REMOVE</button>
+                                                }
+                                            </div>
+                                        </div>
+                                        <div class="tag-options">
+                                            @foreach (var tag in availableFilterTags)
+                                            {
+                                                <button type="button"
+                                                        class="@GetFilterTagButtonClass(filterGroup, tag)"
+                                                        aria-pressed="@filterGroup.SelectedTags.Contains(tag)"
+                                                        @onclick="() => ToggleFilterTag(filterGroup, tag)">
+                                                    @GetTagDisplayText(tag)
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </section>
+                    }
+
+                    @if (displayedSongs.Count == 0)
+                    {
+                        <div class="empty-state">
+                            <strong>@Strings.SONG_FILTER_EMPTY_TITLE</strong>
+                            <span>@Strings.SONG_FILTER_EMPTY_DESCRIPTION</span>
+                        </div>
+                    }
+                    else
+                    {
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>@Strings.SONG_TABLE_NUMBER</th>
+                                    <th>@Strings.SONG_TABLE_ARTIST</th>
+                                    <th>@Strings.SONG_TABLE_TITLE</th>
+                                    <th>@Strings.SONG_TABLE_TAGS</th>
+                                    <th>@Strings.SONG_TABLE_ACTIONS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var song in displayedSongs)
+                                {
+                                    <tr @key="song.Id">
+                                        <td><span class="song-number">@song.SongNumber</span></td>
+                                        <td>@song.Artist</td>
+                                        <td>@song.Title</td>
+                                        <td>
+                                            <div class="tag-list">
+                                                @foreach (var tag in song.Tags)
+                                                {
+                                                    <span class="tag-chip">@GetTagDisplayText(tag)</span>
+                                                }
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="row-actions">
+                                                <button type="button" class="btn-row" @onclick="() => EditSong(song)">@Strings.SONG_EDIT_BUTTON</button>
+                                                <button type="button" class="btn-row danger" @onclick="() => DeleteSongAsync(song.Id)">@Strings.SONG_DELETE_BUTTON</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    }
+                }
+            </article>
+        </section>
+    </Authorized>
+    <NotAuthorized>
+        <section class="panel auth-panel">
+            <h2>@Strings.AUTH_REQUIRED_TITLE</h2>
+            <p>@Strings.AUTH_REQUIRED_DESCRIPTION</p>
+            <button type="button" class="btn-primary" @onclick="StartLogin">@Strings.AUTH_LOGIN</button>
+        </section>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private const string FilterGroupQueryKey = "fg";
+    private const char FilterGroupModeSeparator = ':';
+    private const char FilterGroupTagSeparator = ',';
+    private static readonly IReadOnlyList<string> DefaultTagIds = KaraokeSongTags.DefaultTagIds;
+    private static readonly char[] CustomTagSeparators = [',', ';', '\n', '\r'];
+    private readonly HashSet<string> m_SelectedDefaultTagIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> m_SelectedSavedPresetTags = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<TagFilterGroup> m_FilterGroups = [new()];
+    private IReadOnlyList<KaraokeSongEntry> m_Songs = [];
+    private SongFormModel m_Form = new();
+    private string? m_OwnerId;
+    private string? m_ErrorMessage;
+    private bool m_IsLoading = true;
+    private bool m_IsFormVisible;
+
+    private IReadOnlyList<string> AvailableFilterTags => m_Songs
+        .SelectMany(static song => song.Tags)
+        .Where(static tag => !string.IsNullOrWhiteSpace(tag))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(GetTagDisplayText, StringComparer.CurrentCultureIgnoreCase)
+        .ToArray();
+
+    private IReadOnlyList<SavedTagPreset> SavedTagPresets => m_Songs
+        .SelectMany(static song => song.Tags)
+        .Where(static tag => IsSavedPresetTag(tag))
+        .GroupBy(static tag => tag, StringComparer.OrdinalIgnoreCase)
+        .Select(static group => new SavedTagPreset(group.First(), group.Count()))
+        .OrderByDescending(static preset => preset.UsageCount)
+        .ThenBy(preset => GetTagDisplayText(preset.Tag), StringComparer.CurrentCultureIgnoreCase)
+        .ToArray();
+
+    private bool HasActiveFilters => m_FilterGroups.Any(static group => group.SelectedTags.Count > 0);
+
+    private IReadOnlyList<TagFilterGroup> ActiveFilterGroups => m_FilterGroups
+        .Where(static group => group.SelectedTags.Count > 0)
+        .ToArray();
+
+    private IReadOnlyList<KaraokeSongEntry> DisplayedSongs
+    {
+        get
+        {
+            var activeFilterGroups = ActiveFilterGroups;
+            return activeFilterGroups.Count == 0
+                ? m_Songs
+                : m_Songs.Where(song => SongMatchesSelectedFilters(song, activeFilterGroups)).ToArray();
+        }
+    }
+
+    private string SongCountText => !HasActiveFilters
+        ? string.Format(Strings.SONG_COUNT_FORMAT, m_Songs.Count)
+        : string.Format(Strings.SONG_FILTERED_COUNT_FORMAT, DisplayedSongs.Count, m_Songs.Count);
+
+    private string SaveButtonText => m_Form.Id.HasValue
+        ? Strings.SONG_UPDATE_BUTTON
+        : Strings.SONG_SAVE_BUTTON;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Nav.LocationChanged += OnLocationChanged;
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        m_OwnerId = GetOwnerId(authState.User);
+        if (!string.IsNullOrWhiteSpace(m_OwnerId))
+        {
+            await LoadSongsAsync();
+        }
+
+        m_IsLoading = false;
+        SyncFiltersWithLocation();
+        SyncFormWithLocation();
+    }
+
+    private async Task LoadSongsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(m_OwnerId))
+        {
+            m_Songs = [];
+            return;
+        }
+
+        m_Songs = await SongRepository.GetSongsAsync(m_OwnerId);
+        PruneSelectedFilterTags();
+        PruneSelectedSavedPresetTags();
+    }
+
+    private async Task SaveSongAsync()
+    {
+        if (string.IsNullOrWhiteSpace(m_OwnerId))
+        {
+            m_ErrorMessage = Strings.SONG_VALIDATION_AUTH_REQUIRED;
+            return;
+        }
+
+        m_ErrorMessage = ValidateForm();
+        if (!string.IsNullOrWhiteSpace(m_ErrorMessage))
+        {
+            return;
+        }
+
+        var edit = new KaraokeSongEdit(
+            m_Form.Id,
+            m_Form.SongNumber!.Value,
+            m_Form.Artist.Trim(),
+            m_Form.Title.Trim(),
+            BuildTagList());
+
+        await SongRepository.SaveSongAsync(m_OwnerId, edit);
+        HideForm();
+        NavigateToSongList(replace: true);
+        await LoadSongsAsync();
+    }
+
+    private async Task DeleteSongAsync(Guid songId)
+    {
+        if (string.IsNullOrWhiteSpace(m_OwnerId))
+        {
+            return;
+        }
+
+        await SongRepository.DeleteSongAsync(m_OwnerId, songId);
+        if (m_Form.Id == songId)
+        {
+            HideForm();
+            NavigateToSongList(replace: true);
+        }
+
+        await LoadSongsAsync();
+    }
+
+    private void ShowNewSongForm()
+    {
+        Nav.NavigateTo(GetNewSongUri());
+    }
+
+    private void EditSong(KaraokeSongEntry song)
+    {
+        Nav.NavigateTo(GetEditSongUri(song.Id));
+    }
+
+    private void LoadSongIntoForm(KaraokeSongEntry song)
+    {
+        m_ErrorMessage = null;
+        m_SelectedDefaultTagIds.Clear();
+        m_SelectedSavedPresetTags.Clear();
+        m_IsFormVisible = true;
+        var customTags = new List<string>();
+
+        foreach (var tag in song.Tags)
+        {
+            if (IsDefaultTag(tag))
+            {
+                m_SelectedDefaultTagIds.Add(tag);
+            }
+            else if (KaraokeSongTags.IsMixedTag(tag))
+            {
+                m_SelectedDefaultTagIds.Add(KaraokeSongTags.Male);
+                m_SelectedDefaultTagIds.Add(KaraokeSongTags.Female);
+            }
+            else
+            {
+                m_SelectedSavedPresetTags.Add(tag);
+            }
+        }
+
+        m_Form = new SongFormModel
+        {
+            Id = song.Id,
+            SongNumber = song.SongNumber,
+            Artist = song.Artist,
+            Title = song.Title,
+            CustomTags = string.Join(", ", customTags)
+        };
+    }
+
+    private void CancelForm()
+    {
+        NavigateToSongList(replace: true);
+    }
+
+    private void HideForm()
+    {
+        ClearForm();
+        m_IsFormVisible = false;
+    }
+
+    private void ClearForm()
+    {
+        m_ErrorMessage = null;
+        m_SelectedDefaultTagIds.Clear();
+        m_SelectedSavedPresetTags.Clear();
+        m_Form = new SongFormModel();
+    }
+
+    private void ToggleDefaultTag(string tagId)
+    {
+        if (!m_SelectedDefaultTagIds.Add(tagId))
+        {
+            m_SelectedDefaultTagIds.Remove(tagId);
+        }
+    }
+
+    private void ToggleSavedPresetTag(string tag)
+    {
+        if (!m_SelectedSavedPresetTags.Add(tag))
+        {
+            m_SelectedSavedPresetTags.Remove(tag);
+        }
+    }
+
+    private void AddFilterGroup()
+    {
+        m_FilterGroups.Add(new TagFilterGroup());
+    }
+
+    private void RemoveFilterGroup(TagFilterGroup filterGroup)
+    {
+        if (m_FilterGroups.Count <= 1)
+        {
+            filterGroup.SelectedTags.Clear();
+            filterGroup.Mode = TagFilterMode.And;
+            NavigateToCurrentFilterUri(replace: true);
+            return;
+        }
+
+        m_FilterGroups.Remove(filterGroup);
+        NavigateToCurrentFilterUri(replace: true);
+    }
+
+    private void SetFilterGroupMode(TagFilterGroup filterGroup, TagFilterMode mode)
+    {
+        filterGroup.Mode = mode;
+        NavigateToCurrentFilterUri(replace: true);
+    }
+
+    private void ToggleFilterTag(TagFilterGroup filterGroup, string tag)
+    {
+        if (!filterGroup.SelectedTags.Add(tag))
+        {
+            filterGroup.SelectedTags.Remove(tag);
+        }
+
+        NavigateToCurrentFilterUri(replace: true);
+    }
+
+    private void ClearTagFilters()
+    {
+        m_FilterGroups.Clear();
+        m_FilterGroups.Add(new TagFilterGroup());
+        NavigateToCurrentFilterUri(replace: true);
+    }
+
+    private void PruneSelectedFilterTags()
+    {
+        var availableTags = AvailableFilterTags.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var filterGroup in m_FilterGroups)
+        {
+            filterGroup.SelectedTags.RemoveWhere(tag => !availableTags.Contains(tag));
+        }
+    }
+
+    private void PruneSelectedSavedPresetTags()
+    {
+        var savedPresetTags = SavedTagPresets
+            .Select(static preset => preset.Tag)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        m_SelectedSavedPresetTags.RemoveWhere(tag => !savedPresetTags.Contains(tag));
+    }
+
+    private static bool SongMatchesSelectedFilters(
+        KaraokeSongEntry song,
+        IReadOnlyList<TagFilterGroup> activeFilterGroups)
+    {
+        return activeFilterGroups.All(filterGroup => SongMatchesFilterGroup(song, filterGroup));
+    }
+
+    private static bool SongMatchesFilterGroup(KaraokeSongEntry song, TagFilterGroup filterGroup)
+    {
+        return filterGroup.Mode switch
+        {
+            TagFilterMode.And => filterGroup.SelectedTags.All(tag => song.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase)),
+            TagFilterMode.Or => filterGroup.SelectedTags.Any(tag => song.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase)),
+            _ => false
+        };
+    }
+
+    private IReadOnlyCollection<string> BuildTagList()
+    {
+        var tags = new List<string>(m_SelectedDefaultTagIds);
+        tags.AddRange(m_SelectedSavedPresetTags);
+        foreach (var customTag in m_Form.CustomTags.Split(CustomTagSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            AddNormalizedInputTag(tags, customTag);
+        }
+
+        return KaraokeSongTags.NormalizeForStorage(tags);
+    }
+
+    private void AddNormalizedInputTag(ICollection<string> tags, string inputTag)
+    {
+        var defaultTagId = TryGetDefaultTagId(inputTag);
+        if (defaultTagId is not null)
+        {
+            tags.Add(defaultTagId);
+            return;
+        }
+
+        if (IsMixedTagInput(inputTag))
+        {
+            tags.Add(KaraokeSongTags.Male);
+            tags.Add(KaraokeSongTags.Female);
+            return;
+        }
+
+        tags.Add(inputTag);
+    }
+
+    private string? ValidateForm()
+    {
+        if (m_Form.SongNumber is null or <= 0)
+        {
+            return Strings.SONG_VALIDATION_NUMBER;
+        }
+
+        if (string.IsNullOrWhiteSpace(m_Form.Artist))
+        {
+            return Strings.SONG_VALIDATION_ARTIST;
+        }
+
+        if (string.IsNullOrWhiteSpace(m_Form.Title))
+        {
+            return Strings.SONG_VALIDATION_TITLE;
+        }
+
+        return null;
+    }
+
+    private string GetTagButtonClass(string tagId)
+    {
+        return m_SelectedDefaultTagIds.Contains(tagId)
+            ? "tag-option selected"
+            : "tag-option";
+    }
+
+    private string GetSavedPresetTagButtonClass(string tag)
+    {
+        return m_SelectedSavedPresetTags.Contains(tag)
+            ? "tag-option tag-option-with-count selected"
+            : "tag-option tag-option-with-count";
+    }
+
+    private string GetFilterTagButtonClass(TagFilterGroup filterGroup, string tag)
+    {
+        return filterGroup.SelectedTags.Contains(tag)
+            ? "tag-option selected"
+            : "tag-option";
+    }
+
+    private static string GetFilterModeButtonClass(TagFilterGroup filterGroup, TagFilterMode mode)
+    {
+        return filterGroup.Mode == mode
+            ? "filter-mode-button selected"
+            : "filter-mode-button";
+    }
+
+    private string GetDefaultTagLabel(string tagId)
+    {
+        return tagId switch
+        {
+            KaraokeSongTags.Male => Strings.SONG_TAG_MALE,
+            KaraokeSongTags.Female => Strings.SONG_TAG_FEMALE,
+            _ => tagId
+        };
+    }
+
+    private string GetTagDisplayText(string tag)
+    {
+        if (KaraokeSongTags.IsMixedTag(tag))
+        {
+            return $"{Strings.SONG_TAG_MALE}, {Strings.SONG_TAG_FEMALE}";
+        }
+
+        return IsDefaultTag(tag) ? GetDefaultTagLabel(tag) : tag;
+    }
+
+    private string? TryGetDefaultTagId(string tag)
+    {
+        foreach (var tagId in DefaultTagIds)
+        {
+            if (string.Equals(tag, tagId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(tag, GetDefaultTagLabel(tagId), StringComparison.CurrentCultureIgnoreCase))
+            {
+                return tagId;
+            }
+        }
+
+        return null;
+    }
+
+    private bool IsMixedTagInput(string tag)
+    {
+        return KaraokeSongTags.IsMixedTag(tag) ||
+            string.Equals(tag, Strings.SONG_TAG_MIXED, StringComparison.CurrentCultureIgnoreCase);
+    }
+
+    private static bool IsDefaultTag(string tag)
+    {
+        return KaraokeSongTags.IsDefaultTag(tag);
+    }
+
+    private static bool IsSavedPresetTag(string tag)
+    {
+        return !string.IsNullOrWhiteSpace(tag) &&
+            !KaraokeSongTags.IsDefaultTag(tag) &&
+            !KaraokeSongTags.IsMixedTag(tag);
+    }
+
+    private static string? GetOwnerId(ClaimsPrincipal user)
+    {
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            return null;
+        }
+
+        return user.FindFirst("sub")?.Value
+            ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    }
+
+    private void StartLogin()
+    {
+        OidcAuth.NavigateToLogin(Nav, "auth/redirect", "openid");
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(() =>
+        {
+            SyncFiltersWithLocation();
+            SyncFormWithLocation();
+            StateHasChanged();
+        });
+    }
+
+    private void SyncFiltersWithLocation()
+    {
+        if (m_IsLoading)
+        {
+            return;
+        }
+
+        var filterGroups = GetCurrentFilterGroups();
+        m_FilterGroups.Clear();
+        if (filterGroups.Count == 0)
+        {
+            m_FilterGroups.Add(new TagFilterGroup());
+        }
+        else
+        {
+            m_FilterGroups.AddRange(filterGroups);
+        }
+
+        PruneSelectedFilterTags();
+    }
+
+    private void SyncFormWithLocation()
+    {
+        if (m_IsLoading)
+        {
+            return;
+        }
+
+        var formRoute = GetCurrentFormRoute();
+        if (formRoute.Mode == SongFormRouteMode.New)
+        {
+            ClearForm();
+            m_IsFormVisible = true;
+            return;
+        }
+
+        if (formRoute.Mode == SongFormRouteMode.Edit && formRoute.SongId.HasValue)
+        {
+            var song = m_Songs.FirstOrDefault(entry => entry.Id == formRoute.SongId.Value);
+            if (song is not null)
+            {
+                LoadSongIntoForm(song);
+                return;
+            }
+
+            HideForm();
+            NavigateToSongList(replace: true);
+            return;
+        }
+
+        HideForm();
+    }
+
+    private IReadOnlyList<TagFilterGroup> GetCurrentFilterGroups()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (!query.TryGetValue(FilterGroupQueryKey, out var filterValues))
+        {
+            return [];
+        }
+
+        return filterValues
+            .Select(TryParseFilterGroup)
+            .Where(static group => group is { SelectedTags.Count: > 0 })
+            .Select(static group => group!)
+            .ToArray();
+    }
+
+    private static TagFilterGroup? TryParseFilterGroup(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var separatorIndex = value.IndexOf(FilterGroupModeSeparator);
+        if (separatorIndex <= 0 || separatorIndex == value.Length - 1)
+        {
+            return null;
+        }
+
+        if (!TryParseFilterMode(value[..separatorIndex], out var mode))
+        {
+            return null;
+        }
+
+        var filterGroup = new TagFilterGroup
+        {
+            Mode = mode
+        };
+
+        foreach (var encodedTag in value[(separatorIndex + 1)..].Split(FilterGroupTagSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var tag = TryDecodeFilterTag(encodedTag);
+            if (!string.IsNullOrWhiteSpace(tag))
+            {
+                filterGroup.SelectedTags.Add(tag);
+            }
+        }
+
+        return filterGroup;
+    }
+
+    private SongFormRoute GetCurrentFormRoute()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("edit", out var editValues) &&
+            Guid.TryParse(editValues.FirstOrDefault(), out var songId))
+        {
+            return new SongFormRoute(SongFormRouteMode.Edit, songId);
+        }
+
+        if (query.TryGetValue("mode", out var modeValues) &&
+            string.Equals(modeValues.FirstOrDefault(), "new", StringComparison.OrdinalIgnoreCase))
+        {
+            return new SongFormRoute(SongFormRouteMode.New, null);
+        }
+
+        return new SongFormRoute(SongFormRouteMode.List, null);
+    }
+
+    private static bool TryParseFilterMode(string value, out TagFilterMode mode)
+    {
+        if (string.Equals(value, "and", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = TagFilterMode.And;
+            return true;
+        }
+
+        if (string.Equals(value, "or", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = TagFilterMode.Or;
+            return true;
+        }
+
+        mode = TagFilterMode.And;
+        return false;
+    }
+
+    private void NavigateToCurrentFilterUri(bool replace)
+    {
+        Nav.NavigateTo(BuildHomeUri(GetCurrentFormRoute()), replace: replace);
+    }
+
+    private string GetSongListUri()
+    {
+        return BuildHomeUri(new SongFormRoute(SongFormRouteMode.List, null));
+    }
+
+    private string BuildHomeUri(SongFormRoute formRoute)
+    {
+        var queryString = new List<KeyValuePair<string, string?>>();
+        if (formRoute.Mode == SongFormRouteMode.New)
+        {
+            queryString.Add(new KeyValuePair<string, string?>("mode", "new"));
+        }
+        else if (formRoute.Mode == SongFormRouteMode.Edit && formRoute.SongId.HasValue)
+        {
+            queryString.Add(new KeyValuePair<string, string?>("edit", formRoute.SongId.Value.ToString("D")));
+        }
+
+        foreach (var filterGroup in ActiveFilterGroups)
+        {
+            queryString.Add(new KeyValuePair<string, string?>(FilterGroupQueryKey, SerializeFilterGroup(filterGroup)));
+        }
+
+        return queryString.Count == 0
+            ? Nav.BaseUri
+            : QueryHelpers.AddQueryString(Nav.BaseUri, queryString);
+    }
+
+    private static string SerializeFilterGroup(TagFilterGroup filterGroup)
+    {
+        var modeText = filterGroup.Mode == TagFilterMode.Or ? "or" : "and";
+        var encodedTags = filterGroup.SelectedTags
+            .OrderBy(static tag => tag, StringComparer.OrdinalIgnoreCase)
+            .Select(EncodeFilterTag);
+        return $"{modeText}{FilterGroupModeSeparator}{string.Join(FilterGroupTagSeparator, encodedTags)}";
+    }
+
+    private static string EncodeFilterTag(string tag)
+    {
+        return WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(tag));
+    }
+
+    private static string? TryDecodeFilterTag(string encodedTag)
+    {
+        try
+        {
+            return Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(encodedTag));
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private void NavigateToSongList(bool replace)
+    {
+        Nav.NavigateTo(GetSongListUri(), replace: replace);
+    }
+
+    private string GetNewSongUri()
+    {
+        return BuildHomeUri(new SongFormRoute(SongFormRouteMode.New, null));
+    }
+
+    private string GetEditSongUri(Guid songId)
+    {
+        return BuildHomeUri(new SongFormRoute(SongFormRouteMode.Edit, songId));
+    }
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+
+    private enum SongFormRouteMode
+    {
+        List,
+        New,
+        Edit
+    }
+
+    private readonly record struct SongFormRoute(SongFormRouteMode Mode, Guid? SongId);
+
+    private readonly record struct SavedTagPreset(string Tag, int UsageCount);
+
+    private enum TagFilterMode
+    {
+        And,
+        Or
+    }
+
+    private sealed class TagFilterGroup
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+
+        public TagFilterMode Mode { get; set; }
+
+        public HashSet<string> SelectedTags { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private sealed class SongFormModel
+    {
+        public Guid? Id { get; set; }
+
+        public int? SongNumber { get; set; }
+
+        public string Artist { get; set; } = string.Empty;
+
+        public string Title { get; set; } = string.Empty;
+
+        public string CustomTags { get; set; } = string.Empty;
+    }
+}
