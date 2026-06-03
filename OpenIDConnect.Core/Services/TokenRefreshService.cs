@@ -13,7 +13,8 @@ internal class TokenRefreshService(
     IOptions<OIDCOptions> oidcOptions,
     ILogger<TokenRefreshService> logger,
     HttpClient httpClient,
-    OidcTokenValidator tokenValidator)
+    OidcTokenValidator tokenValidator,
+    OidcTokenCookieManager cookieManager)
 {
     public async Task<TokenResponse?> TryRefreshTokenAsync(CancellationToken cancellationToken = default)
     {
@@ -24,7 +25,7 @@ internal class TokenRefreshService(
             return null;
         }
 
-        var refreshToken = httpContext.Request.Cookies["refresh_token"];
+        var refreshToken = cookieManager.ReadRefreshToken(httpContext);
         if (string.IsNullOrEmpty(refreshToken))
         {
             logger.LogInformation("No refresh token found");
@@ -60,7 +61,7 @@ internal class TokenRefreshService(
                 }
 
                 // Refresh token invalid, delete cookies
-                ClearTokenCookies(httpContext);
+                cookieManager.ClearTokenCookies(httpContext);
                 return null;
             }
 
@@ -80,7 +81,7 @@ internal class TokenRefreshService(
                 catch (SecurityTokenException ex)
                 {
                     logger.LogWarning(ex, "Refreshed id_token validation failed");
-                    ClearTokenCookies(httpContext);
+                    cookieManager.ClearTokenCookies(httpContext);
                     return null;
                 }
             }
@@ -88,26 +89,18 @@ internal class TokenRefreshService(
             // Update cookies with new tokens for subsequent requests
             if (!string.IsNullOrEmpty(tokenResponse.IdToken))
             {
-                httpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.Strict,
-                    Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn)
-                });
+                cookieManager.AppendIdToken(
+                    httpContext,
+                    tokenResponse.IdToken,
+                    DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn));
             }
 
             if (!string.IsNullOrEmpty(tokenResponse.RefreshToken))
             {
-                httpContext.Response.Cookies.Append("refresh_token", tokenResponse.RefreshToken, new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.Strict,
-                    Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn)
-                });
+                cookieManager.AppendRefreshToken(
+                    httpContext,
+                    tokenResponse.RefreshToken,
+                    DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn));
             }
 
             logger.LogTrace("Token refreshed successfully");
@@ -118,19 +111,6 @@ internal class TokenRefreshService(
             logger.LogError(ex, "Error refreshing token");
             return null;
         }
-    }
-
-    private static void ClearTokenCookies(HttpContext httpContext)
-    {
-        var cookieOptions = new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/"
-        };
-        httpContext.Response.Cookies.Delete("id_token", cookieOptions);
-        httpContext.Response.Cookies.Delete("refresh_token", cookieOptions);
     }
 
     private static bool IsExpectedRefreshTokenRejection(string errorContent)

@@ -29,21 +29,7 @@ public sealed class AuthController(IAuthenticationStateProvider auth, ILogger<Au
     [HttpGet("logout")]
     public IActionResult Logout()
     {
-        DeleteTokenCookie("id_token");
-        DeleteTokenCookie("refresh_token");
-        auth.Clear();
-
+        auth.ClearTokenCookies(HttpContext);
         return Redirect("/");
-    }
-
-    private void DeleteTokenCookie(string name)
-    {
-        HttpContext.Response.Cookies.Delete(name, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/"
-        });
     }
 }

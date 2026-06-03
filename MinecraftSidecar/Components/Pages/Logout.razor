@@ -1,6 +1,7 @@
 ﻿@page "/auth/logout"
 @inject IHttpContextAccessor HttpContextAccessor
 @inject NavigationManager Nav
+@inject OpenIDConnect.IAuthenticationStateProvider Auth
 
 @code {
     protected override Task OnParametersSetAsync()
@@ -11,8 +12,7 @@
             throw new InvalidOperationException();
         }
 
-        httpContext.Response.Cookies.Delete("id_token");
-        httpContext.Response.Cookies.Delete("refresh_token");
+        Auth.ClearTokenCookies(httpContext);
 
         return Task.CompletedTask;
     }

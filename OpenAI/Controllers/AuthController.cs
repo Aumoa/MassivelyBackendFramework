@@ -4,14 +4,13 @@ using OpenIDConnect;
 namespace OpenAI.Controllers;
 
 [Route("auth")]
-public class AuthController : ControllerBase
+public class AuthController(IAuthenticationStateProvider auth) : ControllerBase
 {
     [HttpGet("logout")]
-    public ValueTask<IActionResult> LogoutAsync(CancellationToken cancellationToken)
+    public IActionResult Logout()
     {
-        HttpContext.Response.Cookies.Delete("id_token");
-        HttpContext.Response.Cookies.Delete("refresh_token");
-        return ValueTask.FromResult<IActionResult>(Redirect("/"));
+        auth.ClearTokenCookies(HttpContext);
+        return Redirect("/");
     }
 
     [HttpGet("redirect")]

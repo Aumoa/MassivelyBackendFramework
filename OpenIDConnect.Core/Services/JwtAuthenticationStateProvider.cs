@@ -24,6 +24,7 @@ internal class JwtAuthenticationStateProvider(
     TokenRefreshService tokenRefreshService,
     HttpClient http,
     OidcTokenValidator tokenValidator,
+    OidcTokenCookieManager cookieManager,
     IDataProtectionProvider dataProtectionProvider) : AuthenticationStateProvider, IAuthenticationStateProvider
 {
     private const int PkceStateLifetimeMinutes = 10;
@@ -51,7 +52,7 @@ internal class JwtAuthenticationStateProvider(
             return new AuthenticationState(m_CurrentUser);
         }
 
-        var jwtToken = httpContext.Request.Cookies["id_token"];
+        var jwtToken = cookieManager.ReadIdToken(httpContext);
         if (string.IsNullOrEmpty(jwtToken))
         {
             var authHeader = httpContext.Request.Headers.Authorization.ToString();
@@ -64,7 +65,7 @@ internal class JwtAuthenticationStateProvider(
         // If id_token is missing but refresh_token exists, attempt refresh
         if (string.IsNullOrWhiteSpace(jwtToken))
         {
-            var refreshToken = httpContext.Request.Cookies["refresh_token"];
+            var refreshToken = cookieManager.ReadRefreshToken(httpContext);
             if (!string.IsNullOrEmpty(refreshToken))
             {
                 var tokenResponse = await tokenRefreshService.TryRefreshTokenAsync();
@@ -194,26 +195,18 @@ internal class JwtAuthenticationStateProvider(
                     return;
                 }
 
-                httpContext.Response.Cookies.Append("id_token", tokenResponse.IdToken, new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.Strict,
-                    Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn)
-                });
+                cookieManager.AppendIdToken(
+                    httpContext,
+                    tokenResponse.IdToken,
+                    DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn));
             }
 
             if (tokenResponse.RefreshToken != null)
             {
-                httpContext.Response.Cookies.Append("refresh_token", tokenResponse.RefreshToken, new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.Strict,
-                    Path = "/",
-                    Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn)
-                });
+                cookieManager.AppendRefreshToken(
+                    httpContext,
+                    tokenResponse.RefreshToken,
+                    DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn));
             }
 
             m_LastSuccessfullyCode = code;
@@ -231,8 +224,14 @@ internal class JwtAuthenticationStateProvider(
 
     public void Clear()
     {
-        m_CurrentUser = null;
-        NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
+        m_CurrentUser = new ClaimsPrincipal(new ClaimsIdentity());
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(m_CurrentUser)));
+    }
+
+    public void ClearTokenCookies(HttpContext httpContext)
+    {
+        cookieManager.ClearTokenCookies(httpContext);
+        Clear();
     }
 
     public void NavigateToLogin(NavigationManager navigation, string redirectRelativeUri, string scope)

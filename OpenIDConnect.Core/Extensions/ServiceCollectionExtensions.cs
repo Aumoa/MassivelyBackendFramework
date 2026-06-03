@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
 
         s.AddHttpClient(OidcTokenValidator.HttpClientName);
         s.AddSingleton<OidcTokenValidator>();
+        s.AddSingleton<OidcTokenCookieManager>();
         s.AddHttpClient<TokenRefreshService>();
         s.AddHttpClient<JwtAuthenticationStateProvider>();
         s.AddScoped<TokenRefreshService>();

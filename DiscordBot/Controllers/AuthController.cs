@@ -27,8 +27,7 @@ public class AuthController(IAuthenticationStateProvider auth, ILogger<AuthContr
     [HttpGet("logout")]
     public IActionResult Logout()
     {
-        HttpContext.Response.Cookies.Delete("id_token");
-        HttpContext.Response.Cookies.Delete("refresh_token");
+        auth.ClearTokenCookies(HttpContext);
         return Redirect("/");
     }
 }

@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components;
 
+using Microsoft.AspNetCore.Http;
+
 namespace OpenIDConnect;
 
 public interface IAuthenticationStateProvider
@@ -9,6 +11,8 @@ public interface IAuthenticationStateProvider
     ValueTask AcceptAsync(string code, string redirectUri, string? state, CancellationToken cancellationToken = default);
 
     void Clear();
+
+    void ClearTokenCookies(HttpContext httpContext);
 
     void NavigateToLogin(NavigationManager navigation, string redirectRelativeUri, string scope);
 }
