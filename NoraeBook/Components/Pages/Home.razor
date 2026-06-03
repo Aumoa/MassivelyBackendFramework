@@ -223,7 +223,7 @@
 </AuthorizeView>
 
 @code {
-    private static readonly string[] DefaultTagIds = ["male", "female", "mixed"];
+    private static readonly IReadOnlyList<string> DefaultTagIds = KaraokeSongTags.DefaultTagIds;
     private static readonly char[] CustomTagSeparators = [',', ';', '\n', '\r'];
     private readonly HashSet<string> m_SelectedDefaultTagIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<TagFilterGroup> m_FilterGroups = [new()];
@@ -360,6 +360,11 @@
             {
                 m_SelectedDefaultTagIds.Add(tag);
             }
+            else if (KaraokeSongTags.IsMixedTag(tag))
+            {
+                m_SelectedDefaultTagIds.Add(KaraokeSongTags.Male);
+                m_SelectedDefaultTagIds.Add(KaraokeSongTags.Female);
+            }
             else
             {
                 customTags.Add(tag);
@@ -469,14 +474,29 @@
         var tags = new List<string>(m_SelectedDefaultTagIds);
         foreach (var customTag in m_Form.CustomTags.Split(CustomTagSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            var defaultTagId = TryGetDefaultTagId(customTag);
-            tags.Add(defaultTagId ?? customTag);
+            AddNormalizedInputTag(tags, customTag);
         }
 
-        return tags
-            .Where(static tag => !string.IsNullOrWhiteSpace(tag))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+        return KaraokeSongTags.NormalizeForStorage(tags);
+    }
+
+    private void AddNormalizedInputTag(ICollection<string> tags, string inputTag)
+    {
+        var defaultTagId = TryGetDefaultTagId(inputTag);
+        if (defaultTagId is not null)
+        {
+            tags.Add(defaultTagId);
+            return;
+        }
+
+        if (IsMixedTagInput(inputTag))
+        {
+            tags.Add(KaraokeSongTags.Male);
+            tags.Add(KaraokeSongTags.Female);
+            return;
+        }
+
+        tags.Add(inputTag);
     }
 
     private string? ValidateForm()
@@ -524,15 +544,19 @@
     {
         return tagId switch
         {
-            "male" => Strings.SONG_TAG_MALE,
-            "female" => Strings.SONG_TAG_FEMALE,
-            "mixed" => Strings.SONG_TAG_MIXED,
+            KaraokeSongTags.Male => Strings.SONG_TAG_MALE,
+            KaraokeSongTags.Female => Strings.SONG_TAG_FEMALE,
             _ => tagId
         };
     }
 
     private string GetTagDisplayText(string tag)
     {
+        if (KaraokeSongTags.IsMixedTag(tag))
+        {
+            return $"{Strings.SONG_TAG_MALE}, {Strings.SONG_TAG_FEMALE}";
+        }
+
         return IsDefaultTag(tag) ? GetDefaultTagLabel(tag) : tag;
     }
 
@@ -550,9 +574,15 @@
         return null;
     }
 
+    private bool IsMixedTagInput(string tag)
+    {
+        return KaraokeSongTags.IsMixedTag(tag) ||
+            string.Equals(tag, Strings.SONG_TAG_MIXED, StringComparison.CurrentCultureIgnoreCase);
+    }
+
     private static bool IsDefaultTag(string tag)
     {
-        return DefaultTagIds.Contains(tag, StringComparer.OrdinalIgnoreCase);
+        return KaraokeSongTags.IsDefaultTag(tag);
     }
 
     private static string? GetOwnerId(ClaimsPrincipal user)

@@ -49,7 +49,7 @@ ORDER BY `tag` ASC";
             .GroupBy(static tag => tag.SongId)
             .ToDictionary(
                 static group => group.Key,
-                static group => (IReadOnlyList<string>)[.. group.Select(static tag => tag.Tag)]);
+                static group => KaraokeSongTags.NormalizeForStorage(group.Select(static tag => tag.Tag)));
 
         return songRows
             .Select(song => song.ToEntry(tagsBySongId.GetValueOrDefault(song.Id, [])))
@@ -69,7 +69,7 @@ ORDER BY `tag` ASC";
         }
 
         var songId = edit.Id ?? Guid.NewGuid();
-        var normalizedTags = NormalizeTags(edit.Tags);
+        var normalizedTags = KaraokeSongTags.NormalizeForStorage(edit.Tags);
         var nowUtc = DateTime.UtcNow;
 
         await using var connection = GetConnection();
@@ -232,17 +232,8 @@ WHERE `song_id` = @songId
 ORDER BY `tag` ASC";
 
         var tagCommand = new CommandDefinition(tagSql, new { songId = songId.ToString() }, cancellationToken: cancellationToken);
-        var tags = (await connection.QueryAsync<string>(tagCommand)).ToArray();
+        var tags = KaraokeSongTags.NormalizeForStorage(await connection.QueryAsync<string>(tagCommand));
         return song.ToEntry(tags);
-    }
-
-    private static IReadOnlyList<string> NormalizeTags(IReadOnlyCollection<string> tags)
-    {
-        return tags
-            .Select(static tag => tag.Trim())
-            .Where(static tag => !string.IsNullOrWhiteSpace(tag))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
     }
 
     private sealed class SongRow
