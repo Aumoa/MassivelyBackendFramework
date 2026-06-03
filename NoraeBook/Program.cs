@@ -8,6 +8,7 @@ using NoraeBook.Services;
 using NoraeBook.SQL.Migration;
 using OpenIDConnect.Extensions;
 using SQLMigration;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 ValidateProductionAllowedHosts(builder);
@@ -86,23 +87,15 @@ static void ValidateProductionAllowedHosts(WebApplicationBuilder builder)
 
 static void ConfigureDataProtection(WebApplicationBuilder builder)
 {
-    var keyPath = builder.Configuration.GetValue<string>("DataProtection:KeyPath");
-    if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(keyPath))
+    var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");
+    var redisConnectionString = dataProtection.GetValue<string>("RedisConnectionString");
+    if (string.IsNullOrWhiteSpace(redisConnectionString))
     {
-        keyPath = ".data-protection-keys";
+        throw new InvalidOperationException("DataProtection:RedisConnectionString is not configured.");
     }
-
-    if (string.IsNullOrWhiteSpace(keyPath))
-    {
-        return;
-    }
-
-    var resolvedKeyPath = Path.IsPathFullyQualified(keyPath)
-        ? keyPath
-        : Path.Combine(builder.Environment.ContentRootPath, keyPath);
 
     builder.Services.AddDataProtection()
-        .PersistKeysToFileSystem(new DirectoryInfo(resolvedKeyPath))
+        .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
         .SetApplicationName("NoraeBook");
 }
 
