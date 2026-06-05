@@ -7,13 +7,15 @@
 - For high-performance socket server work, including Master, Gateway, Dedicated, channel execution, game networking, packet routing, and MMORPG server logic, also follow `SOCKETAGENTS.md`.
 - If a task touches both domains, follow both files and prefer the stricter runtime, safety, or performance rule where they conflict.
 
-## Solution Folder Policy
+## Skill Extraction Policy
 
-- When adding or moving projects in the solution, place them in the solution folder that matches their runtime boundary and primary responsibility.
-- Use `Frontend` for web servers or any server that directly accepts external connections.
-- Use `Backend` for servers that communicate only with internal services.
-- Use `Services` for projects that define service components, contracts, abstractions, controllers, core logic, SQL, or other service-owned building blocks.
-- Use `Utility` for projects that simply provide reusable functionality to many services without owning a service domain.
+- When new or updated instructions would work better as a reusable skill, separate and store them as a skill instead of expanding `AGENTS.md` indefinitely.
+- Only extract instructions into a skill when the skill has a clear trigger, reusable workflow, or meaningful context-saving benefit.
+- When extracting instructions into a skill, tell the user that the instructions were separated and where they were stored.
+
+## Project Classification Skill
+
+- When adding, moving, or classifying projects in the solution, read and follow `.codex/skills/classify-solution-project/SKILL.md`.
 
 ## Git Commit Policy
 
