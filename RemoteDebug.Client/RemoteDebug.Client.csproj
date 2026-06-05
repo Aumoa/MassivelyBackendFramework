@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>RemoteDebug</RootNamespace>
+    <LangVersion>10.0</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PacketCore\PacketCore.csproj" />
+    <ProjectReference Include="..\RemoteDebugServer.Abstractions\RemoteDebugServer.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>
