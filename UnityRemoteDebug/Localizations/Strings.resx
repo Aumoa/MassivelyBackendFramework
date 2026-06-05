@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="APP_TITLE" xml:space="preserve">
+    <value>Unity RemoteDebug</value>
+  </data>
+  <data name="TOPBAR_SECTION_MANAGEMENT" xml:space="preserve">
+    <value>Remote debugging management</value>
+  </data>
+  <data name="ACCESS_DENIED_TITLE" xml:space="preserve">
+    <value>Access denied</value>
+  </data>
+  <data name="ACCESS_DENIED_DESCRIPTION" xml:space="preserve">
+    <value>This management page requires the staff or admin group.</value>
+  </data>
+  <data name="NAV_TOGGLE_TITLE" xml:space="preserve">
+    <value>Navigation menu</value>
+  </data>
+  <data name="NAV_OVERVIEW" xml:space="preserve">
+    <value>Overview</value>
+  </data>
+  <data name="HOME_EYEBROW" xml:space="preserve">
+    <value>Unity RemoteDebug</value>
+  </data>
+  <data name="HOME_TITLE" xml:space="preserve">
+    <value>Remote Debug Console</value>
+  </data>
+  <data name="HOME_SUMMARY" xml:space="preserve">
+    <value>SSO-gated frontend shell for Unity remote debugging tools. Backend integration is intentionally left as a later step.</value>
+  </data>
+  <data name="HOME_SUMMARY_ARIA" xml:space="preserve">
+    <value>Unity RemoteDebug summary</value>
+  </data>
+  <data name="METRIC_AUTHORITY" xml:space="preserve">
+    <value>SSO authority</value>
+  </data>
+  <data name="METRIC_AUTHORITY_VALUE" xml:space="preserve">
+    <value>accounts.ayla.r-e.kr</value>
+  </data>
+  <data name="METRIC_AUTHORITY_DETAIL" xml:space="preserve">
+    <value>Uses OIDC authorization code flow with PKCE.</value>
+  </data>
+  <data name="METRIC_ACCESS" xml:space="preserve">
+    <value>Required access</value>
+  </data>
+  <data name="METRIC_ACCESS_VALUE" xml:space="preserve">
+    <value>staff or admin</value>
+  </data>
+  <data name="METRIC_ACCESS_DETAIL" xml:space="preserve">
+    <value>Resolved from the requested groups scope.</value>
+  </data>
+  <data name="METRIC_BACKEND" xml:space="preserve">
+    <value>Backend status</value>
+  </data>
+  <data name="METRIC_BACKEND_VALUE" xml:space="preserve">
+    <value>Draft</value>
+  </data>
+  <data name="METRIC_BACKEND_DETAIL" xml:space="preserve">
+    <value>Remote session APIs are not connected yet.</value>
+  </data>
+  <data name="PANEL_TITLE" xml:space="preserve">
+    <value>Management workspace</value>
+  </data>
+  <data name="PANEL_DESCRIPTION" xml:space="preserve">
+    <value>This page is ready to host Unity player sessions, device routing, and runtime diagnostics.</value>
+  </data>
+  <data name="PANEL_STATUS_LABEL" xml:space="preserve">
+    <value>Current surface</value>
+  </data>
+  <data name="PANEL_STATUS_VALUE" xml:space="preserve">
+    <value>Frontend draft</value>
+  </data>
+  <data name="PANEL_STATUS_DETAIL" xml:space="preserve">
+    <value>The navigation, authorization shell, and theme-aware layout are in place.</value>
+  </data>
+  <data name="PANEL_SCOPE_LABEL" xml:space="preserve">
+    <value>Requested scope</value>
+  </data>
+  <data name="PANEL_SCOPE_VALUE" xml:space="preserve">
+    <value>openid profile email groups</value>
+  </data>
+  <data name="PANEL_SCOPE_DETAIL" xml:space="preserve">
+    <value>The groups claim must include staff or admin to reveal the management area.</value>
+  </data>
+  <data name="PANEL_NEXT_TITLE" xml:space="preserve">
+    <value>Next integration points</value>
+  </data>
+  <data name="PANEL_NEXT_ITEM_SESSION" xml:space="preserve">
+    <value>Attach live Unity editor or player sessions.</value>
+  </data>
+  <data name="PANEL_NEXT_ITEM_DEVICE" xml:space="preserve">
+    <value>Route authorized operators to a selected client.</value>
+  </data>
+  <data name="PANEL_NEXT_ITEM_LOGS" xml:space="preserve">
+    <value>Stream logs, commands, and diagnostic events.</value>
+  </data>
+  <data name="NOTFOUND_TITLE" xml:space="preserve">
+    <value>Not Found</value>
+  </data>
+  <data name="NOTFOUND_DESCRIPTION" xml:space="preserve">
+    <value>The requested Unity RemoteDebug page does not exist.</value>
+  </data>
+  <data name="ERROR_PAGE_TITLE" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="ERROR_PAGE_MESSAGE" xml:space="preserve">
+    <value>An error occurred while processing your request.</value>
+  </data>
+  <data name="ERROR_REQUEST_ID" xml:space="preserve">
+    <value>Request ID</value>
+  </data>
+  <data name="ERROR_DEVELOPMENT_MODE_TITLE" xml:space="preserve">
+    <value>Development Mode</value>
+  </data>
+  <data name="ERROR_DEVELOPMENT_MODE_DESCRIPTION" xml:space="preserve">
+    <value>Swapping to Development environment will display more detailed information about the error that occurred.</value>
+  </data>
+  <data name="ERROR_DEVELOPMENT_MODE_WARNING" xml:space="preserve">
+    <value>The Development environment should not be enabled for deployed applications.</value>
+  </data>
+</root>
