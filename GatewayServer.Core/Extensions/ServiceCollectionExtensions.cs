@@ -18,6 +18,9 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<DedicatedNodeCatalog>();
         s.AddSingleton<IDedicatedNodeCatalog>(p => p.GetRequiredService<DedicatedNodeCatalog>());
         s.AddSingleton<IDedicatedNodeCatalogWriter>(p => p.GetRequiredService<DedicatedNodeCatalog>());
+        s.AddSingleton<BackendNodeCatalog>();
+        s.AddSingleton<IBackendNodeCatalog>(p => p.GetRequiredService<BackendNodeCatalog>());
+        s.AddSingleton<IBackendNodeCatalogWriter>(p => p.GetRequiredService<BackendNodeCatalog>());
         s.AddSingleton<MasterConnectionManager>();
         s.AddSingleton<IMasterConnectionStatusProvider>(p => p.GetRequiredService<MasterConnectionManager>());
         s.AddHostedService(p => p.GetRequiredService<MasterConnectionManager>());

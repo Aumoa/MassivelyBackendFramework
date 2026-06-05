@@ -11,4 +11,6 @@ public static class MasterControlPacketIds
     public const ushort DedicatedNodeSnapshot = 106;
     public const ushort ServiceAdminStatusRequest = 107;
     public const ushort ServiceAdminStatusResponse = 108;
+    public const ushort BackendEndpointAdvertise = 109;
+    public const ushort BackendNodeSnapshot = 110;
 }

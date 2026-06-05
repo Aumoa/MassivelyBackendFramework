@@ -184,7 +184,7 @@ internal sealed class ConnectionManager(
             }
             else if (connection.NodeKind == MasterNodeKind.Gateway)
             {
-                await PushDedicatedNodesUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
+                await PushGatewayDiscoveryUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
             }
             else
             {
@@ -257,6 +257,24 @@ internal sealed class ConnectionManager(
             logger.LogInformation(
                 "Dedicated node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
                 connection.ConnectionId,
+                connection.NodeId,
+                advertised.GatewayEndpoint.IPAddress,
+                advertised.GatewayEndpoint.Port,
+                advertised.GatewayEndpoint.UseTls);
+            return;
+        }
+
+        if (BackendNodeEndpoint.IsBackendNodeKind(connection.NodeKind) &&
+            frame.Header.Kind == PacketKind.Control &&
+            frame.Header.PacketId == MasterControlPacketIds.BackendEndpointAdvertise)
+        {
+            MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendEndpointAdvertise);
+            var advertised = PacketCodec.Decode(frame, BackendEndpointAdvertise.Codec);
+            connection.UpdateBackendGatewayEndpoint(advertised.GatewayEndpoint);
+            logger.LogInformation(
+                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
+                connection.ConnectionId,
+                connection.NodeKind,
                 connection.NodeId,
                 advertised.GatewayEndpoint.IPAddress,
                 advertised.GatewayEndpoint.Port,
@@ -339,18 +357,18 @@ internal sealed class ConnectionManager(
             cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task PushDedicatedNodesUntilClosedAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)
+    private async Task PushGatewayDiscoveryUntilClosedAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)
     {
         void OnConnectionsChanged()
         {
-            _ = SendDedicatedNodeSnapshotSafeAsync();
+            _ = SendGatewayDiscoverySnapshotsSafeAsync();
         }
 
-        async Task SendDedicatedNodeSnapshotSafeAsync()
+        async Task SendGatewayDiscoverySnapshotsSafeAsync()
         {
             try
             {
-                await WriteDedicatedNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+                await WriteGatewayDiscoverySnapshotsAsync(connection, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -359,7 +377,7 @@ internal sealed class ConnectionManager(
             {
                 logger.LogDebug(
                     e,
-                    "Gateway Dedicated discovery socket write failed because the remote connection closed. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    "Gateway discovery socket write failed because the remote connection closed. ConnectionId={ConnectionId}, NodeId={NodeId}.",
                     connection.ConnectionId,
                     connection.NodeId);
                 connection.Dispose();
@@ -368,7 +386,7 @@ internal sealed class ConnectionManager(
             {
                 logger.LogWarning(
                     e,
-                    "Failed to push Dedicated discovery snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    "Failed to push Gateway discovery snapshots. ConnectionId={ConnectionId}, NodeId={NodeId}.",
                     connection.ConnectionId,
                     connection.NodeId);
                 connection.Dispose();
@@ -379,7 +397,7 @@ internal sealed class ConnectionManager(
 
         try
         {
-            await WriteDedicatedNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+            await WriteGatewayDiscoverySnapshotsAsync(connection, cancellationToken).ConfigureAwait(false);
             await DrainUntilClosedAsync(connection, stream, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -388,12 +406,27 @@ internal sealed class ConnectionManager(
         }
     }
 
+    private async Task WriteGatewayDiscoverySnapshotsAsync(MasterConnection connection, CancellationToken cancellationToken)
+    {
+        await WriteDedicatedNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+        await WriteBackendNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task WriteDedicatedNodeSnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
     {
         await connection.WriteControlAsync(
             MasterControlPacketIds.DedicatedNodeSnapshot,
             CreateDedicatedNodeSnapshot(),
             DedicatedNodeSnapshot.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteBackendNodeSnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
+    {
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.BackendNodeSnapshot,
+            CreateBackendNodeSnapshot(),
+            BackendNodeSnapshot.Codec,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -424,7 +457,7 @@ internal sealed class ConnectionManager(
 
         if (!m_Connections.TryGetValue(targetConnectionId, out var target) ||
             !target.IsTrusted ||
-            target.NodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated))
+            target.NodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.RemoteDebug))
         {
             await WriteServiceAdminFailureAsync(source, request, "Target node is not connected or cannot provide a management page.", cancellationToken).ConfigureAwait(false);
             return;
@@ -524,6 +557,18 @@ internal sealed class ConnectionManager(
                 .Where(static endpoint => endpoint != null)
                 .Select(static endpoint => endpoint!)
                 .OrderBy(static endpoint => endpoint.NodeId, StringComparer.Ordinal)],
+            DateTimeOffset.UtcNow);
+    }
+
+    private BackendNodeSnapshot CreateBackendNodeSnapshot()
+    {
+        return new BackendNodeSnapshot(
+            [.. m_Connections.Values
+                .Select(static connection => connection.TryCreateBackendNodeEndpoint())
+                .Where(static endpoint => endpoint != null)
+                .Select(static endpoint => endpoint!)
+                .OrderBy(static endpoint => endpoint.NodeKind)
+                .ThenBy(static endpoint => endpoint.NodeId, StringComparer.Ordinal)],
             DateTimeOffset.UtcNow);
     }
 
@@ -754,6 +799,10 @@ internal sealed class ConnectionManager(
 
         public DateTimeOffset? DedicatedGatewayEndpointAdvertisedAt { get; private set; }
 
+        public MasterSocketEndpoint? BackendGatewayEndpoint { get; private set; }
+
+        public DateTimeOffset? BackendGatewayEndpointAdvertisedAt { get; private set; }
+
         public void AttachStream(Stream stream)
         {
             m_Stream = stream ?? throw new ArgumentNullException(nameof(stream));
@@ -770,8 +819,21 @@ internal sealed class ConnectionManager(
 
         public void UpdateDedicatedGatewayEndpoint(MasterSocketEndpoint endpoint)
         {
+            var advertisedAt = DateTimeOffset.UtcNow;
             DedicatedGatewayEndpoint = endpoint;
-            DedicatedGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
+            DedicatedGatewayEndpointAdvertisedAt = advertisedAt;
+            UpdateBackendGatewayEndpoint(endpoint, advertisedAt);
+        }
+
+        public void UpdateBackendGatewayEndpoint(MasterSocketEndpoint endpoint)
+        {
+            UpdateBackendGatewayEndpoint(endpoint, DateTimeOffset.UtcNow);
+        }
+
+        private void UpdateBackendGatewayEndpoint(MasterSocketEndpoint endpoint, DateTimeOffset advertisedAt)
+        {
+            BackendGatewayEndpoint = endpoint;
+            BackendGatewayEndpointAdvertisedAt = advertisedAt;
             MarkSeen();
         }
 
@@ -803,6 +865,27 @@ internal sealed class ConnectionManager(
             }
 
             return new DedicatedNodeEndpoint(
+                NodeId,
+                DisplayName,
+                ConnectionId.ToString("N"),
+                endpoint,
+                advertisedAt.Value);
+        }
+
+        public BackendNodeEndpoint? TryCreateBackendNodeEndpoint()
+        {
+            var endpoint = BackendGatewayEndpoint;
+            var advertisedAt = BackendGatewayEndpointAdvertisedAt;
+            if (!IsTrusted ||
+                !BackendNodeEndpoint.IsBackendNodeKind(NodeKind) ||
+                endpoint == null ||
+                !advertisedAt.HasValue)
+            {
+                return null;
+            }
+
+            return new BackendNodeEndpoint(
+                NodeKind,
                 NodeId,
                 DisplayName,
                 ConnectionId.ToString("N"),
