@@ -1,5 +1,5 @@
 @page "/"
-@attribute [Authorize]
+@attribute [Authorize(Policy = RemoteDebugAuthorizationPolicies.Management)]
 
 <PageTitle>@Strings.APP_TITLE</PageTitle>
 

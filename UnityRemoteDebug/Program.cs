@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using OpenIDConnect.Extensions;
+using StackExchange.Redis;
 using UnityRemoteDebug.Authorization;
 using UnityRemoteDebug.Components;
 
@@ -15,11 +16,16 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddLocalization(options => options.ResourcesPath = "Localizations");
 
-var dataProtectionApplicationName = builder.Configuration.GetValue<string>("DataProtection:ApplicationName");
+var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");
+var redisConnectionString = dataProtection.GetValue<string>("RedisConnectionString");
+if (string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    throw new InvalidOperationException("DataProtection:RedisConnectionString is not configured.");
+}
+
 builder.Services.AddDataProtection()
-    .SetApplicationName(string.IsNullOrWhiteSpace(dataProtectionApplicationName)
-        ? "UnityRemoteDebug"
-        : dataProtectionApplicationName);
+    .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
+    .SetApplicationName("UnityRemoteDebug");
 
 builder.Services.AddAuthorizationCore(options =>
 {
