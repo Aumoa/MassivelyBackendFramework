@@ -31,10 +31,7 @@ public sealed class RemoteDebugClientOptions
 
     public string UnityVersion { get; set; } = string.Empty;
 
-    public RemoteDebugCapabilities Capabilities { get; set; } =
-        RemoteDebugCapabilities.LogStreaming |
-        RemoteDebugCapabilities.FileTransfer |
-        RemoteDebugCapabilities.RemoteControl;
+    public RemoteDebugCapabilities Capabilities { get; set; } = RemoteDebugCapabilities.LogStreaming;
 
     public string SharedSecret { get; set; } = string.Empty;
 

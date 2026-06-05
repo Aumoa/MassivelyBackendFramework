@@ -457,7 +457,7 @@ internal sealed class ConnectionManager(
 
         if (!m_Connections.TryGetValue(targetConnectionId, out var target) ||
             !target.IsTrusted ||
-            target.NodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.RemoteDebug))
+            target.NodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated))
         {
             await WriteServiceAdminFailureAsync(source, request, "Target node is not connected or cannot provide a management page.", cancellationToken).ConfigureAwait(false);
             return;
@@ -819,21 +819,15 @@ internal sealed class ConnectionManager(
 
         public void UpdateDedicatedGatewayEndpoint(MasterSocketEndpoint endpoint)
         {
-            var advertisedAt = DateTimeOffset.UtcNow;
             DedicatedGatewayEndpoint = endpoint;
-            DedicatedGatewayEndpointAdvertisedAt = advertisedAt;
-            UpdateBackendGatewayEndpoint(endpoint, advertisedAt);
+            DedicatedGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
+            MarkSeen();
         }
 
         public void UpdateBackendGatewayEndpoint(MasterSocketEndpoint endpoint)
         {
-            UpdateBackendGatewayEndpoint(endpoint, DateTimeOffset.UtcNow);
-        }
-
-        private void UpdateBackendGatewayEndpoint(MasterSocketEndpoint endpoint, DateTimeOffset advertisedAt)
-        {
             BackendGatewayEndpoint = endpoint;
-            BackendGatewayEndpointAdvertisedAt = advertisedAt;
+            BackendGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
             MarkSeen();
         }
 

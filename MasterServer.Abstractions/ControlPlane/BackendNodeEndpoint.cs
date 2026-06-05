@@ -54,6 +54,6 @@ public sealed class BackendNodeEndpoint
 
     public static bool IsBackendNodeKind(MasterNodeKind nodeKind)
     {
-        return nodeKind is MasterNodeKind.Dedicated or MasterNodeKind.RemoteDebug;
+        return nodeKind is MasterNodeKind.RemoteDebug;
     }
 }

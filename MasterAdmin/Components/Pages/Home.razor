@@ -170,7 +170,7 @@
 
     private static bool CanOpenNodePage(MasterNodeKind nodeKind)
     {
-        return nodeKind is MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.RemoteDebug;
+        return nodeKind is MasterNodeKind.Gateway or MasterNodeKind.Dedicated;
     }
 
     private static string GetNodePageHref(MasterConnectionSnapshot connection)
