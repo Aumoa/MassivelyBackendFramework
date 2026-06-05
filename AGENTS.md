@@ -17,6 +17,15 @@
 
 - When adding, moving, or classifying projects in the solution, read and follow `.codex/skills/classify-solution-project/SKILL.md`.
 
+## Coding Style Policy
+
+- Follow Microsoft's standard C# coding conventions by default.
+- Keep repository-specific deviations from the standard documented only under `Coding Style Exceptions`.
+
+## Coding Style Exceptions
+
+- Prefix private C# member fields with `m_`.
+
 ## Git Commit Policy
 
 - When implementing a requested feature, split the work into meaningful feature-sized commits.
