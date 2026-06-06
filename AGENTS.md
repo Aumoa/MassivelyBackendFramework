@@ -33,6 +33,14 @@
 - Flag risky defaults where client SDKs request powerful capabilities by default, especially remote control, file transfer, admin operations, payment, session, group, authorization, or data export capabilities.
 - Do not treat client-provided roles, scopes, groups, permissions, or capability declarations as authoritative without server-side verification.
 
+## Online Change Approval Policy
+
+- Always get final user approval before operations that publish, push, deploy, release, upload, create or update remote pull requests, or otherwise change online state in a way that can affect other users.
+- If final approval cannot be requested or received, do not perform the online operation.
+- When an online operation is blocked by missing approval, re-check the written code and local changes as thoroughly as practical to identify real issues before reporting back.
+- Use GitHub-related tooling such as `gh` proactively for validation when available, especially read-only checks for pull request state, CI results, branch metadata, and review context.
+- GitHub or `gh` operations that change remote state still require final user approval.
+
 ## Git Commit Policy
 
 - When implementing a requested feature, split the work into meaningful feature-sized commits.
