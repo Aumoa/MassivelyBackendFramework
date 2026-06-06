@@ -1,7 +1,10 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using OpenIDConnect.Extensions;
 using StackExchange.Redis;
+using UnityRemoteDebug.Authentication;
 using UnityRemoteDebug.Authorization;
 using UnityRemoteDebug.Components;
 
@@ -27,14 +30,12 @@ builder.Services.AddDataProtection()
     .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
     .SetApplicationName("UnityRemoteDebug");
 
-builder.Services.AddAuthorizationCore(options =>
-{
-    options.AddPolicy(RemoteDebugAuthorizationPolicies.Management, policy =>
-    {
-        policy.RequireAuthenticatedUser();
-        policy.RequireAssertion(context => RemoteDebugAuthorizationPolicies.HasManagementGroup(context.User));
-    });
-});
+builder.Services.AddAuthentication(RemoteDebugAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, RemoteDebugAuthenticationHandler>(
+        RemoteDebugAuthenticationHandler.SchemeName,
+        options => { });
+builder.Services.AddAuthorization(ConfigureAuthorization);
+builder.Services.AddAuthorizationCore(ConfigureAuthorization);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenIDConnect(builder.Configuration);
 
@@ -62,6 +63,8 @@ app.UseRequestLocalization();
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapControllers();
@@ -70,3 +73,12 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+static void ConfigureAuthorization(AuthorizationOptions options)
+{
+    options.AddPolicy(RemoteDebugAuthorizationPolicies.Management, policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireAssertion(context => RemoteDebugAuthorizationPolicies.HasManagementGroup(context.User));
+    });
+}
