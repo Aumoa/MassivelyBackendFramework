@@ -35,11 +35,14 @@
 
 ## Online Change Approval Policy
 
-- Always get final user approval before operations that publish, push, deploy, release, upload, create or update remote pull requests, or otherwise change online state in a way that can affect other users.
-- If final approval cannot be requested or received, do not perform the online operation.
+- Treat `dev`, `master`, `main`, release branches, production branches, and any branch or environment used by other users as protected shared targets.
+- Always get final user approval before operations that publish, push, deploy, release, upload, create or update remote pull requests, or otherwise change online state on protected shared targets or production-like environments.
+- If final approval cannot be requested or received for a protected shared target, do not perform the online operation.
+- Branches that are clearly isolated work branches, such as `codex/*`, may use a more flexible approval model for pushing, draft pull request updates, and other collaboration or validation tasks when doing so is useful for the requested work.
+- Even on work branches, avoid destructive remote operations, production-impacting changes, or changes that can affect other users without explicit user approval.
 - When an online operation is blocked by missing approval, re-check the written code and local changes as thoroughly as practical to identify real issues before reporting back.
 - Use GitHub-related tooling such as `gh` proactively for validation when available, especially read-only checks for pull request state, CI results, branch metadata, and review context.
-- GitHub or `gh` operations that change remote state still require final user approval.
+- GitHub or `gh` operations that change protected shared targets or production-like online state still require final user approval.
 
 ## Git Commit Policy
 
