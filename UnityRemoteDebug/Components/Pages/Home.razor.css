@@ -37,8 +37,7 @@ h1 {
 }
 
 .metric-card,
-.workspace-panel,
-.info-block {
+.workspace-panel {
     border: 1px solid var(--app-border);
     border-radius: 8px;
     background: var(--app-surface);
@@ -60,8 +59,7 @@ h1 {
     font-size: 0.86rem;
 }
 
-.metric-card strong,
-.info-block strong {
+.metric-card strong {
     margin: 0.65rem 0;
     font-size: 1.25rem;
     line-height: 1.2;
@@ -95,6 +93,12 @@ h1 {
     font-size: 0.9rem;
 }
 
+.panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .status-pill {
     flex: 0 0 auto;
     padding: 0.3rem 0.6rem;
@@ -105,45 +109,84 @@ h1 {
     font-size: 0.82rem;
 }
 
-.panel-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.9rem;
-    padding: 1rem;
+.icon-button {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 6px;
+    color: var(--app-text-muted);
+    background: var(--app-surface);
+    cursor: pointer;
 }
 
-.info-block {
+.icon-button:hover:not(:disabled) {
+    color: var(--app-accent);
+    border-color: var(--app-accent);
+}
+
+.icon-button:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.empty-state {
     display: flex;
-    min-height: 9rem;
     flex-direction: column;
-    padding: 1rem;
-}
-
-.info-block p {
-    margin: 0;
+    gap: 0.35rem;
+    padding: 2rem 1rem;
     color: var(--app-text-muted);
 }
 
-.next-block {
-    padding: 0 1rem 1rem;
+.empty-state strong {
+    color: var(--app-text);
 }
 
-.next-block h3 {
-    margin: 0 0 0.65rem;
-    font-size: 0.96rem;
+.table-wrap {
+    overflow-x: auto;
 }
 
-.next-block ul {
-    display: grid;
-    gap: 0.45rem;
-    margin: 0;
-    padding-left: 1.2rem;
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+th,
+td {
+    padding: 0.78rem 1rem;
+    border-bottom: 1px solid var(--app-border);
+    text-align: left;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+th {
     color: var(--app-text-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+td strong,
+td code {
+    display: block;
+}
+
+td code {
+    color: var(--app-text-muted);
+    font-size: 0.78rem;
+}
+
+tr:last-child td {
+    border-bottom: 0;
 }
 
 @media (max-width: 860px) {
-    .metrics-grid,
-    .panel-grid {
+    .metrics-grid {
         grid-template-columns: 1fr;
     }
 
@@ -151,6 +194,10 @@ h1 {
     .panel-heading {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .panel-actions {
+        justify-content: space-between;
     }
 
     .status-pill {

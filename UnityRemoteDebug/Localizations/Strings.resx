@@ -88,13 +88,52 @@
     <value>Resolved from the requested groups scope.</value>
   </data>
   <data name="METRIC_BACKEND" xml:space="preserve">
-    <value>Backend status</value>
+    <value>Connected clients</value>
   </data>
   <data name="METRIC_BACKEND_VALUE" xml:space="preserve">
     <value>Draft</value>
   </data>
   <data name="METRIC_BACKEND_DETAIL" xml:space="preserve">
-    <value>Remote session APIs are not connected yet.</value>
+    <value>Live sessions tracked by the WebSocket registry.</value>
+  </data>
+  <data name="CLIENTS_TITLE" xml:space="preserve">
+    <value>Connected Unity Clients</value>
+  </data>
+  <data name="CLIENTS_DESCRIPTION" xml:space="preserve">
+    <value>Unity clients currently holding an active RemoteDebug WebSocket session.</value>
+  </data>
+  <data name="CLIENTS_CONNECTED_FORMAT" xml:space="preserve">
+    <value>{0} connected</value>
+  </data>
+  <data name="CLIENTS_REFRESH" xml:space="preserve">
+    <value>Refresh connected clients</value>
+  </data>
+  <data name="CLIENTS_EMPTY_TITLE" xml:space="preserve">
+    <value>No clients connected</value>
+  </data>
+  <data name="CLIENTS_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>Connected Unity clients will appear here.</value>
+  </data>
+  <data name="CLIENTS_TABLE_CLIENT" xml:space="preserve">
+    <value>Client</value>
+  </data>
+  <data name="CLIENTS_TABLE_PROJECT" xml:space="preserve">
+    <value>Project</value>
+  </data>
+  <data name="CLIENTS_TABLE_PLATFORM" xml:space="preserve">
+    <value>Platform</value>
+  </data>
+  <data name="CLIENTS_TABLE_UNITY" xml:space="preserve">
+    <value>Unity</value>
+  </data>
+  <data name="CLIENTS_TABLE_REMOTE" xml:space="preserve">
+    <value>Remote</value>
+  </data>
+  <data name="CLIENTS_TABLE_CONNECTED" xml:space="preserve">
+    <value>Connected</value>
+  </data>
+  <data name="CLIENTS_TABLE_LAST_SEEN" xml:space="preserve">
+    <value>Last seen</value>
   </data>
   <data name="PANEL_TITLE" xml:space="preserve">
     <value>Management workspace</value>

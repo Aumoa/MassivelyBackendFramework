@@ -7,6 +7,8 @@ using StackExchange.Redis;
 using UnityRemoteDebug.Authentication;
 using UnityRemoteDebug.Authorization;
 using UnityRemoteDebug.Components;
+using UnityRemoteDebug.Options;
+using UnityRemoteDebug.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +20,8 @@ builder.Services.AddControllers();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddLocalization(options => options.ResourcesPath = "Localizations");
+builder.Services.Configure<RemoteDebugClientConnectionOptions>(builder.Configuration.GetSection("ClientConnection"));
+builder.Services.AddSingleton<RemoteDebugClientRegistry>();
 
 var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");
 var redisConnectionString = dataProtection.GetValue<string>("RedisConnectionString");
@@ -62,6 +66,7 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 app.UseRequestLocalization();
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+app.UseWebSockets();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();

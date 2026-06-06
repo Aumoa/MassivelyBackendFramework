@@ -1,5 +1,7 @@
 @page "/"
 @attribute [Authorize(Policy = RemoteDebugAuthorizationPolicies.Management)]
+@implements IDisposable
+@inject RemoteDebugClientRegistry ClientRegistry
 
 <PageTitle>@Strings.APP_TITLE</PageTitle>
 
@@ -24,7 +26,7 @@
     </article>
     <article class="metric-card">
         <span class="metric-label">@Strings.METRIC_BACKEND</span>
-        <strong>@Strings.METRIC_BACKEND_VALUE</strong>
+        <strong>@m_Clients.Count</strong>
         <span class="metric-detail">@Strings.METRIC_BACKEND_DETAIL</span>
     </article>
 </section>
@@ -32,31 +34,101 @@
 <section class="workspace-panel">
     <div class="panel-heading">
         <div>
-            <h2>@Strings.PANEL_TITLE</h2>
-            <p>@Strings.PANEL_DESCRIPTION</p>
+            <h2>@Strings.CLIENTS_TITLE</h2>
+            <p>@Strings.CLIENTS_DESCRIPTION</p>
         </div>
-        <span class="status-pill">@Strings.PANEL_STATUS_VALUE</span>
+        <div class="panel-actions">
+            <span class="status-pill">@string.Format(Strings.CLIENTS_CONNECTED_FORMAT, m_Clients.Count)</span>
+            <button class="icon-button" type="button" title="@Strings.CLIENTS_REFRESH" @onclick="RefreshClientsAsync" disabled="@m_IsRefreshing">
+                <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+            </button>
+        </div>
     </div>
 
-    <div class="panel-grid">
-        <article class="info-block">
-            <span class="info-label">@Strings.PANEL_STATUS_LABEL</span>
-            <strong>@Strings.PANEL_STATUS_VALUE</strong>
-            <p>@Strings.PANEL_STATUS_DETAIL</p>
-        </article>
-        <article class="info-block">
-            <span class="info-label">@Strings.PANEL_SCOPE_LABEL</span>
-            <strong>@Strings.PANEL_SCOPE_VALUE</strong>
-            <p>@Strings.PANEL_SCOPE_DETAIL</p>
-        </article>
-    </div>
-
-    <div class="next-block">
-        <h3>@Strings.PANEL_NEXT_TITLE</h3>
-        <ul>
-            <li>@Strings.PANEL_NEXT_ITEM_SESSION</li>
-            <li>@Strings.PANEL_NEXT_ITEM_DEVICE</li>
-            <li>@Strings.PANEL_NEXT_ITEM_LOGS</li>
-        </ul>
-    </div>
+    @if (m_Clients.Count == 0)
+    {
+        <div class="empty-state">
+            <strong>@Strings.CLIENTS_EMPTY_TITLE</strong>
+            <span>@Strings.CLIENTS_EMPTY_DESCRIPTION</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>@Strings.CLIENTS_TABLE_CLIENT</th>
+                        <th>@Strings.CLIENTS_TABLE_PROJECT</th>
+                        <th>@Strings.CLIENTS_TABLE_PLATFORM</th>
+                        <th>@Strings.CLIENTS_TABLE_UNITY</th>
+                        <th>@Strings.CLIENTS_TABLE_REMOTE</th>
+                        <th>@Strings.CLIENTS_TABLE_CONNECTED</th>
+                        <th>@Strings.CLIENTS_TABLE_LAST_SEEN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var client in m_Clients)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@client.DisplayName</strong>
+                                <code>@client.ClientId.ToString("N")[..8]</code>
+                            </td>
+                            <td>@client.ProjectName</td>
+                            <td>@client.Platform</td>
+                            <td>@client.UnityVersion</td>
+                            <td>@client.RemoteEndPoint</td>
+                            <td>@FormatDateTime(client.ConnectedAt)</td>
+                            <td>@FormatDateTime(client.LastSeenAt)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 </section>
+
+@code {
+    private IReadOnlyList<RemoteDebugClientSnapshot> m_Clients = [];
+    private bool m_IsRefreshing;
+
+    protected override void OnInitialized()
+    {
+        RefreshClients();
+        ClientRegistry.Changed += OnClientRegistryChanged;
+    }
+
+    public void Dispose()
+    {
+        ClientRegistry.Changed -= OnClientRegistryChanged;
+        GC.SuppressFinalize(this);
+    }
+
+    private async Task RefreshClientsAsync()
+    {
+        m_IsRefreshing = true;
+        await Task.Yield();
+        RefreshClients();
+        m_IsRefreshing = false;
+    }
+
+    private void RefreshClients()
+    {
+        m_Clients = ClientRegistry.GetClients();
+    }
+
+    private void OnClientRegistryChanged()
+    {
+        _ = InvokeAsync(() =>
+        {
+            RefreshClients();
+            StateHasChanged();
+        });
+    }
+
+    private static string FormatDateTime(DateTimeOffset value)
+    {
+        return value.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
+    }
+}
