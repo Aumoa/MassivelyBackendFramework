@@ -1,0 +1,21 @@
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                <NotAuthorized Context="authenticationState">
+                    @if (authenticationState.User.Identity?.IsAuthenticated == true)
+                    {
+                        <LayoutView Layout="typeof(Layout.MainLayout)">
+                            <BlazorSharedComponent.ErrorView ErrorTextBody="@Strings.ACCESS_DENIED_TITLE" ErrorText="@Strings.ACCESS_DENIED_DESCRIPTION" />
+                        </LayoutView>
+                    }
+                    else
+                    {
+                        <RedirectToLogin />
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+    </Router>
+</CascadingAuthenticationState>
