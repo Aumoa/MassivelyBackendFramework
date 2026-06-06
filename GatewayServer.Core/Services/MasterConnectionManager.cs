@@ -15,6 +15,7 @@ namespace GatewayServer.Services;
 internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
     IDedicatedNodeCatalogWriter dedicatedNodeCatalog,
+    IBackendNodeCatalogWriter backendNodeCatalog,
     IDedicatedConnectionStatusProvider dedicatedConnectionStatusProvider,
     IGatewayMasterConnectionIdentitySink gatewayMasterConnectionIdentitySink,
     ILogger<MasterConnectionManager> logger) : IHostedService, IMasterConnectionStatusProvider
@@ -299,6 +300,19 @@ internal sealed class MasterConnectionManager(
                     var snapshot = PacketCodec.Decode(frame, DedicatedNodeSnapshot.Codec);
                     dedicatedNodeCatalog.Publish(snapshot);
                     logger.LogInformation("Gateway received Dedicated discovery snapshot. DedicatedCount={Count}.", snapshot.Nodes.Length);
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.BackendNodeSnapshot)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendNodeSnapshot);
+                    var snapshot = PacketCodec.Decode(frame, BackendNodeSnapshot.Codec);
+                    backendNodeCatalog.Publish(snapshot);
+                    logger.LogInformation(
+                        "Gateway received backend discovery snapshot. BackendCount={Count}, RemoteDebugCount={RemoteDebugCount}.",
+                        snapshot.Nodes.Length,
+                        snapshot.Nodes.Count(static node => node.NodeKind == MasterNodeKind.RemoteDebug));
                     continue;
                 }
 

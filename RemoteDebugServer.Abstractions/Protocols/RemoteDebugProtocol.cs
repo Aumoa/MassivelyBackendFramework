@@ -1,11 +1,11 @@
 using System;
 using PacketCore;
 
-namespace MasterServer.ControlPlane;
+namespace RemoteDebugServer.Protocols;
 
-public static class MasterControlProtocol
+public static class RemoteDebugProtocol
 {
-    public const ushort SchemaVersion = 3;
+    public const ushort SchemaVersion = 1;
     public const int AuthNonceLength = 32;
     public const int MaxHandshakePayloadLength = 16 * 1024;
 
@@ -14,9 +14,7 @@ public static class MasterControlProtocol
         MaxHandshakePayloadLength,
         rejectUnknownFlags: true);
 
-    public static readonly PacketReadPolicy TrustedControlPlanePolicy = PacketReadPolicy.TrustedServer;
-
-    public static void ValidateControlFrame(PacketFrame frame, ushort expectedPacketId)
+    public static void ValidateHandshakeFrame(PacketFrame frame, ushort expectedPacketId)
     {
         if (frame == null)
         {
@@ -30,7 +28,7 @@ public static class MasterControlProtocol
             header.Version != SchemaVersion)
         {
             throw new InvalidOperationException(
-                $"Unexpected Master control packet. Expected id {expectedPacketId}, received kind {header.Kind}, id {header.PacketId}, version {header.Version}.");
+                $"Unexpected RemoteDebug handshake packet. Expected id {expectedPacketId}, received kind {header.Kind}, id {header.PacketId}, version {header.Version}.");
         }
     }
 }

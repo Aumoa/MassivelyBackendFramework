@@ -12,7 +12,7 @@ public sealed class NodeHello
         ushort protocolVersion,
         string masterConnectionId = "")
     {
-        if (nodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.MasterAdmin))
+        if (nodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.MasterAdmin or MasterNodeKind.RemoteDebug))
         {
             throw new ArgumentOutOfRangeException(nameof(nodeKind));
         }
