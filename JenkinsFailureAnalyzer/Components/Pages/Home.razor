@@ -1,0 +1,143 @@
+@page "/"
+@attribute [Authorize(Policy = JenkinsFailureAnalyzerAuthorizationPolicies.Management)]
+@inject JenkinsFailureAnalyzer.Services.IFailureAnalysisStore AnalysisStore
+
+<PageTitle>@Strings.AppTitle</PageTitle>
+
+<section class="dashboard">
+    <section class="list-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="eyebrow">@Strings.AppTitle</p>
+                <h2>@Strings.RecentAnalyses</h2>
+            </div>
+            <button class="text-button" type="button" @onclick="LoadAsync">
+                @Strings.Refresh
+            </button>
+        </div>
+
+        @if (m_IsLoading)
+        {
+            <p class="muted">@Strings.Refresh</p>
+        }
+        else if (m_Records.Count == 0)
+        {
+            <div class="empty-inline">
+                <strong>@Strings.EmptyTitle</strong>
+                <span>@Strings.EmptyDescription</span>
+            </div>
+        }
+        else
+        {
+            <div class="analysis-list">
+                @foreach (var record in m_Records)
+                {
+                    <button class="analysis-row" type="button" @onclick="() => SelectRecordAsync(record.Id)">
+                        <span>
+                            <strong>@record.JobName</strong>
+                            <small>@Strings.Build @record.BuildNumber</small>
+                        </span>
+                        <time>@FormatDate(record.ReceivedAt)</time>
+                    </button>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="detail-panel">
+        @if (m_SelectedRecord is null)
+        {
+            <div class="empty-state compact">
+                <h2>@Strings.AnalysisResult</h2>
+                <p>@Strings.SelectAnalysis</p>
+            </div>
+        }
+        else
+        {
+            <div class="record-header">
+                <div>
+                    <p class="eyebrow">@Strings.AnalysisResult</p>
+                    <h2>@(m_SelectedRecord.Submission.JobName ?? Strings.Unknown)</h2>
+                </div>
+                <span>@FormatDate(m_SelectedRecord.ReceivedAt)</span>
+            </div>
+
+            <dl class="metadata-grid">
+                <div>
+                    <dt>@Strings.Build</dt>
+                    <dd>@(m_SelectedRecord.Submission.BuildNumber ?? Strings.Unknown)</dd>
+                </div>
+                <div>
+                    <dt>@Strings.FailedStage</dt>
+                    <dd>@(m_SelectedRecord.Submission.FailedStage ?? Strings.Unknown)</dd>
+                </div>
+                <div>
+                    <dt>@Strings.Commit</dt>
+                    <dd>@(m_SelectedRecord.Submission.Commit ?? Strings.Unknown)</dd>
+                </div>
+                <div>
+                    <dt>@Strings.RemoteAddress</dt>
+                    <dd>@(m_SelectedRecord.RemoteAddress ?? Strings.Unknown)</dd>
+                </div>
+            </dl>
+
+            <section class="detail-section">
+                <h3>@Strings.Summary</h3>
+                <p>@m_SelectedRecord.Analysis.Summary</p>
+            </section>
+
+            <section class="detail-section">
+                <h3>@Strings.LikelyCauses</h3>
+                <ul>
+                    @foreach (var cause in m_SelectedRecord.Analysis.LikelyCauses)
+                    {
+                        <li>@cause</li>
+                    }
+                </ul>
+            </section>
+
+            <section class="detail-section">
+                <h3>@Strings.SuggestedActions</h3>
+                <ul>
+                    @foreach (var action in m_SelectedRecord.Analysis.SuggestedActions)
+                    {
+                        <li>@action</li>
+                    }
+                </ul>
+            </section>
+
+            <section class="detail-section">
+                <h3>@Strings.CapturedContent</h3>
+                <pre>@m_SelectedRecord.Submission.Content</pre>
+            </section>
+        }
+    </section>
+</section>
+
+@code {
+    private IReadOnlyList<JenkinsFailureAnalyzer.Services.FailureAnalysisRecordSummary> m_Records = [];
+    private JenkinsFailureAnalyzer.Services.FailureAnalysisRecord? m_SelectedRecord;
+    private bool m_IsLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        m_IsLoading = true;
+        m_Records = await AnalysisStore.ListAsync(CancellationToken.None);
+        m_IsLoading = false;
+    }
+
+    private async Task SelectRecordAsync(string id)
+    {
+        m_SelectedRecord = await AnalysisStore.GetAsync(id, CancellationToken.None);
+    }
+
+    private static string FormatDate(DateTimeOffset value)
+    {
+        return value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+    }
+}

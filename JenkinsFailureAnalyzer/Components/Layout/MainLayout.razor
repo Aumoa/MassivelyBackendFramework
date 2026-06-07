@@ -1,0 +1,21 @@
+@inherits LayoutComponentBase
+
+<div class="shell">
+    <header class="topbar">
+        <div>
+            <p class="eyebrow">Jenkins</p>
+            <h1>@Strings.AppTitle</h1>
+        </div>
+        <a class="text-button" href="/auth/logout">@Strings.Logout</a>
+    </header>
+
+    <main>
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    @Strings.ErrorTitle
+    <a href="." class="reload">@Strings.Reload</a>
+    <span class="dismiss">x</span>
+</div>
