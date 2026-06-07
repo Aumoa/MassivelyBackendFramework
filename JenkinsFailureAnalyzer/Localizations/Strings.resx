@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="AccessDeniedDescription" xml:space="preserve">
+    <value>Your account is authenticated, but it does not have the staff or admin group required to view this service.</value>
+  </data>
+  <data name="AccessDeniedEyebrow" xml:space="preserve">
+    <value>Authorization</value>
+  </data>
+  <data name="AccessDeniedTitle" xml:space="preserve">
+    <value>Access denied</value>
+  </data>
+  <data name="AnalysisResult" xml:space="preserve">
+    <value>Analysis result</value>
+  </data>
+  <data name="AppTitle" xml:space="preserve">
+    <value>Jenkins Failure Analyzer</value>
+  </data>
+  <data name="Build" xml:space="preserve">
+    <value>Build</value>
+  </data>
+  <data name="CapturedContent" xml:space="preserve">
+    <value>Captured content</value>
+  </data>
+  <data name="Commit" xml:space="preserve">
+    <value>Commit</value>
+  </data>
+  <data name="EmptyDescription" xml:space="preserve">
+    <value>Send a failed Jenkins job from the CLI to create the first analysis record.</value>
+  </data>
+  <data name="EmptyTitle" xml:space="preserve">
+    <value>No analysis records yet</value>
+  </data>
+  <data name="ErrorTitle" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="FailedStage" xml:space="preserve">
+    <value>Failed stage</value>
+  </data>
+  <data name="Job" xml:space="preserve">
+    <value>Job</value>
+  </data>
+  <data name="LikelyCauses" xml:space="preserve">
+    <value>Likely causes</value>
+  </data>
+  <data name="Logout" xml:space="preserve">
+    <value>Logout</value>
+  </data>
+  <data name="NotFoundDescription" xml:space="preserve">
+    <value>The requested page could not be found.</value>
+  </data>
+  <data name="NotFoundTitle" xml:space="preserve">
+    <value>Not found</value>
+  </data>
+  <data name="RecentAnalyses" xml:space="preserve">
+    <value>Recent analyses</value>
+  </data>
+  <data name="Received" xml:space="preserve">
+    <value>Received</value>
+  </data>
+  <data name="Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Reload" xml:space="preserve">
+    <value>Reload</value>
+  </data>
+  <data name="RemoteAddress" xml:space="preserve">
+    <value>Remote address</value>
+  </data>
+  <data name="SelectAnalysis" xml:space="preserve">
+    <value>Select an analysis record to view the stored log and generated response.</value>
+  </data>
+  <data name="SuggestedActions" xml:space="preserve">
+    <value>Suggested actions</value>
+  </data>
+  <data name="Summary" xml:space="preserve">
+    <value>Summary</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+</root>

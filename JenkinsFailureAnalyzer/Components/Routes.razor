@@ -1,0 +1,25 @@
+<CascadingAuthenticationState>
+    <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                <NotAuthorized Context="authenticationState">
+                    @if (authenticationState.User.Identity?.IsAuthenticated == true)
+                    {
+                        <LayoutView Layout="typeof(Layout.MainLayout)">
+                            <section class="empty-state">
+                                <p class="eyebrow">@Strings.AccessDeniedEyebrow</p>
+                                <h1>@Strings.AccessDeniedTitle</h1>
+                                <p>@Strings.AccessDeniedDescription</p>
+                            </section>
+                        </LayoutView>
+                    }
+                    else
+                    {
+                        <RedirectToLogin />
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+    </Router>
+</CascadingAuthenticationState>

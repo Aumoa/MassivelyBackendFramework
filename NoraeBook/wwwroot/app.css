@@ -607,4 +607,110 @@ tbody tr:hover {
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+
+    .table-wrap {
+        overflow: visible;
+    }
+
+    .table-wrap table,
+    .table-wrap tbody,
+    .table-wrap tr,
+    .table-wrap td {
+        display: block;
+    }
+
+    .table-wrap thead {
+        display: none;
+    }
+
+    .table-wrap tbody {
+        display: grid;
+        gap: 10px;
+    }
+
+    .table-wrap tbody tr {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-areas:
+            "number title"
+            "number artist"
+            "tags tags"
+            "actions actions";
+        gap: 4px 12px;
+        padding: 12px;
+        border: 1px solid var(--app-border);
+        border-radius: 8px;
+        background: var(--app-surface);
+        box-shadow: var(--app-shadow-sm);
+    }
+
+    .table-wrap tbody tr:hover {
+        background: var(--app-surface);
+    }
+
+    .table-wrap td {
+        min-width: 0;
+        padding: 0;
+        border-bottom: 0;
+    }
+
+    .table-wrap td:nth-child(1) {
+        grid-area: number;
+        align-self: start;
+    }
+
+    .table-wrap td:nth-child(2) {
+        grid-area: artist;
+        color: var(--app-text-muted);
+        font-size: 0.86rem;
+    }
+
+    .table-wrap td:nth-child(3) {
+        grid-area: title;
+        font-size: 0.98rem;
+        font-weight: 800;
+        line-height: 1.35;
+    }
+
+    .table-wrap td:nth-child(4) {
+        grid-area: tags;
+        padding-top: 8px;
+    }
+
+    .table-wrap td:nth-child(5) {
+        grid-area: actions;
+        padding-top: 8px;
+    }
+
+    .song-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 58px;
+        min-height: 40px;
+        padding: 0 8px;
+        border: 1px solid var(--app-border);
+        border-radius: 8px;
+        background: var(--app-surface-muted);
+        color: var(--app-accent);
+        font-size: 0.9rem;
+    }
+
+    .table-wrap td:nth-child(4) .tag-list {
+        flex-wrap: nowrap;
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        scrollbar-width: thin;
+    }
+
+    .table-wrap td:nth-child(4) .tag-chip {
+        flex: 0 0 auto;
+    }
+
+    .table-wrap td:nth-child(5) .row-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
 }
