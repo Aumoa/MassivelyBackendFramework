@@ -17,6 +17,34 @@
 
 - When adding, moving, or classifying projects in the solution, read and follow `.codex/skills/classify-solution-project/SKILL.md`.
 
+## Coding Style Policy
+
+- Follow Microsoft's standard C# coding conventions by default.
+- Keep repository-specific deviations from the standard documented only under `Coding Style Exceptions`.
+
+## Coding Style Exceptions
+
+- Prefix private C# member fields with `m_`.
+
+## Pull Request Review Policy
+
+- When reviewing pull requests, prioritize issues that could let a client gain, request, or exercise privileges beyond what the server explicitly authorizes.
+- Treat client-to-server capability negotiation as security-sensitive. Clients may request capabilities, but the server must make the final authorization decision with least privilege and default-deny behavior.
+- Flag risky defaults where client SDKs request powerful capabilities by default, especially remote control, file transfer, admin operations, payment, session, group, authorization, or data export capabilities.
+- Do not treat client-provided roles, scopes, groups, permissions, or capability declarations as authoritative without server-side verification.
+
+## Online Change Approval Policy
+
+- Treat `dev`, `master`, `main`, release branches, production branches, and any branch or environment used by other users as protected shared targets.
+- Always get final user approval before operations that publish, push, deploy, release, upload, create or update remote pull requests, or otherwise change online state on protected shared targets or production-like environments.
+- If final approval cannot be requested or received for a protected shared target, do not perform the online operation.
+- Branches that are clearly isolated work branches, such as `codex/*`, may use a more flexible approval model for pushing, draft pull request updates, and other collaboration or validation tasks when doing so is useful for the requested work.
+- When choosing credentials for GitHub commit-adjacent or online operations such as push, pull request creation or updates, branch publication, or remote validation, read and follow `.codex/skills/github-app-credential-policy/SKILL.md`.
+- Even on work branches, avoid destructive remote operations, production-impacting changes, or changes that can affect other users without explicit user approval.
+- When an online operation is blocked by missing approval, re-check the written code and local changes as thoroughly as practical to identify real issues before reporting back.
+- Use GitHub-related tooling such as `gh` proactively for validation when available, especially read-only checks for pull request state, CI results, branch metadata, and review context.
+- GitHub or `gh` operations that change protected shared targets or production-like online state still require final user approval.
+
 ## Git Commit Policy
 
 - When implementing a requested feature, split the work into meaningful feature-sized commits.
@@ -29,6 +57,7 @@
 - Do not commit user-made unrelated changes.
 - If the working tree already contains unrelated changes, isolate only Codex-made changes in the commit.
 - If a clean feature-sized commit is not possible, stop and explain why.
+- For commits intended to participate in a GitHub App-authenticated isolated work-branch workflow, follow `.codex/skills/github-app-credential-policy/SKILL.md` before creating the commit identity.
 
 ## Commit Message Format
 

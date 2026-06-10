@@ -23,7 +23,7 @@ public sealed class ServiceAdminStatusResponse
             throw new ArgumentOutOfRangeException(nameof(requestId));
         }
 
-        if (nodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.MasterAdmin or MasterNodeKind.Unknown))
+        if (nodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.MasterAdmin or MasterNodeKind.RemoteDebug or MasterNodeKind.Unknown))
         {
             throw new ArgumentOutOfRangeException(nameof(nodeKind));
         }
