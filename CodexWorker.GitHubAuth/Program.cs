@@ -48,13 +48,13 @@ app.Use(async (context, next) =>
 {
     if (!IsLoopback(context.Connection.RemoteIpAddress))
     {
-        await Results.Forbid().ExecuteAsync(context);
+        await Results.StatusCode(StatusCodes.Status403Forbidden).ExecuteAsync(context);
         return;
     }
 
     if (context.Request.Headers.ContainsKey("Origin"))
     {
-        await Results.Forbid().ExecuteAsync(context);
+        await Results.StatusCode(StatusCodes.Status403Forbidden).ExecuteAsync(context);
         return;
     }
 
@@ -65,7 +65,7 @@ app.MapGet("/healthz", static () => Results.Ok(new { status = "ok" }));
 
 app.MapPost(
     "/v1/github/installation-token",
-    async Task<Results<Ok<BrokerTokenResponse>, BadRequest<ProblemResponse>, UnauthorizedHttpResult, ForbidHttpResult, ProblemHttpResult>> (
+    async Task<Results<Ok<BrokerTokenResponse>, BadRequest<ProblemResponse>, UnauthorizedHttpResult, StatusCodeHttpResult, ProblemHttpResult>> (
         TokenBrokerRequest request,
         HttpContext context,
         IOptions<CodexWorkerGitHubAuthOptions> options,
@@ -94,12 +94,12 @@ app.MapPost(
         var policy = TokenPolicy.Resolve(options.Value, repositoryName, request.Purpose);
         if (policy is null)
         {
-            return TypedResults.Forbid();
+            return TypedResults.StatusCode(StatusCodes.Status403Forbidden);
         }
 
         if (!policy.Purpose.AllowsBranch(request.Branch))
         {
-            return TypedResults.Forbid();
+            return TypedResults.StatusCode(StatusCodes.Status403Forbidden);
         }
 
         try
