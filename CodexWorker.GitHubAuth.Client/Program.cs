@@ -19,29 +19,53 @@ if (command.ShowHelp)
 
 try
 {
-    if (string.Equals(command.Command, "askpass", StringComparison.OrdinalIgnoreCase)
-        && IsUsernamePrompt(command.Prompt))
+    if (command.Format is OutputFormat.GitAskPass && IsUsernamePrompt(command.Prompt))
     {
         Console.WriteLine("x-access-token");
         return 0;
     }
 
-    var token = await RequestTokenAsync(command, CancellationToken.None);
-
     switch (command.Format)
     {
         case OutputFormat.Token:
+        {
+            var token = await RequestTokenAsync(command, CancellationToken.None);
             Console.WriteLine(token.Token);
             break;
+        }
         case OutputFormat.Json:
+        {
+            var token = await RequestTokenAsync(command, CancellationToken.None);
             Console.WriteLine(JsonSerializer.Serialize(token, JsonSerialization.Options));
             break;
+        }
         case OutputFormat.GitAskPass:
+        {
+            var token = await RequestTokenAsync(command, CancellationToken.None);
             Console.WriteLine(IsUsernamePrompt(command.Prompt) ? "x-access-token" : token.Token);
             break;
+        }
         case OutputFormat.GhEnv:
+        {
+            var token = await RequestTokenAsync(command, CancellationToken.None);
             Console.WriteLine("GH_TOKEN=" + token.Token);
             break;
+        }
+        case OutputFormat.IdentityJson:
+        {
+            var identity = await RequestIdentityAsync(command, CancellationToken.None);
+            Console.WriteLine(JsonSerializer.Serialize(identity, JsonSerialization.Options));
+            break;
+        }
+        case OutputFormat.GitEnv:
+        {
+            var identity = await RequestIdentityAsync(command, CancellationToken.None);
+            Console.WriteLine("GIT_AUTHOR_NAME=" + identity.GitUserName);
+            Console.WriteLine("GIT_AUTHOR_EMAIL=" + identity.GitUserEmail);
+            Console.WriteLine("GIT_COMMITTER_NAME=" + identity.GitUserName);
+            Console.WriteLine("GIT_COMMITTER_EMAIL=" + identity.GitUserEmail);
+            break;
+        }
         default:
             throw new InvalidOperationException("Unsupported output format.");
     }
@@ -66,8 +90,8 @@ static async Task<BrokerTokenResponse> RequestTokenAsync(
     using var request = new HttpRequestMessage(HttpMethod.Post, "v1/github/installation-token");
     request.Headers.Authorization = new("Bearer", command.Secret);
     request.Content = JsonContent.Create(new TokenBrokerRequest(
-        command.Repository,
-        command.Purpose,
+        command.Repository!,
+        command.Purpose!,
         command.Branch));
 
     using var response = await httpClient.SendAsync(request, cancellationToken);
@@ -86,6 +110,38 @@ static async Task<BrokerTokenResponse> RequestTokenAsync(
     }
 
     return token;
+}
+
+static async Task<BrokerAppIdentityResponse> RequestIdentityAsync(
+    ClientCommand command,
+    CancellationToken cancellationToken)
+{
+    using var httpClient = new HttpClient
+    {
+        BaseAddress = new Uri(command.BrokerUrl.TrimEnd('/') + "/")
+    };
+
+    using var request = new HttpRequestMessage(HttpMethod.Get, "v1/github/app-identity");
+    request.Headers.Authorization = new("Bearer", command.Secret);
+
+    using var response = await httpClient.SendAsync(request, cancellationToken);
+    var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+    if (!response.IsSuccessStatusCode)
+    {
+        throw new InvalidOperationException(
+            $"Broker returned {(int)response.StatusCode} {response.ReasonPhrase}. {Trim(responseBody)}");
+    }
+
+    var identity = JsonSerializer.Deserialize<BrokerAppIdentityResponse>(responseBody, JsonSerialization.Options);
+    if (identity is null
+        || string.IsNullOrWhiteSpace(identity.GitUserName)
+        || string.IsNullOrWhiteSpace(identity.GitUserEmail))
+    {
+        throw new InvalidOperationException("Broker response did not include a git identity.");
+    }
+
+    return identity;
 }
 
 static bool IsUsernamePrompt(string? prompt)
@@ -113,6 +169,8 @@ static void PrintUsage()
           CodexWorker.GitHubAuth.Client json --repo OWNER/REPO --purpose PURPOSE [--branch BRANCH]
           CodexWorker.GitHubAuth.Client gh-env --repo OWNER/REPO --purpose PURPOSE [--branch BRANCH]
           CodexWorker.GitHubAuth.Client askpass --repo OWNER/REPO --purpose PURPOSE [--branch BRANCH] [git prompt]
+          CodexWorker.GitHubAuth.Client identity
+          CodexWorker.GitHubAuth.Client git-env
 
         Options:
           --broker-url URL       Defaults to CODEX_WORKER_GITHUB_AUTH_URL or http://127.0.0.1:5657
@@ -136,12 +194,20 @@ sealed record BrokerTokenResponse(
     [property: JsonPropertyName("purpose")] string Purpose,
     [property: JsonPropertyName("permissions")] IReadOnlyDictionary<string, string> Permissions);
 
+sealed record BrokerAppIdentityResponse(
+    [property: JsonPropertyName("appSlug")] string AppSlug,
+    [property: JsonPropertyName("appName")] string AppName,
+    [property: JsonPropertyName("botLogin")] string BotLogin,
+    [property: JsonPropertyName("botUserId")] long BotUserId,
+    [property: JsonPropertyName("gitUserName")] string GitUserName,
+    [property: JsonPropertyName("gitUserEmail")] string GitUserEmail);
+
 sealed record ClientCommand(
     string Command,
     string BrokerUrl,
     string Secret,
-    string Repository,
-    string Purpose,
+    string? Repository,
+    string? Purpose,
     string? Branch,
     OutputFormat Format,
     string? Prompt,
@@ -152,7 +218,9 @@ enum OutputFormat
     Token,
     Json,
     GitAskPass,
-    GhEnv
+    GhEnv,
+    IdentityJson,
+    GitEnv
 }
 
 sealed record ParseResult(bool IsSuccess, ClientCommand Value, string? Error)
@@ -209,6 +277,8 @@ static class CommandLine
             "json" => OutputFormat.Json,
             "askpass" => OutputFormat.GitAskPass,
             "gh-env" => OutputFormat.GhEnv,
+            "identity" => OutputFormat.IdentityJson,
+            "git-env" => OutputFormat.GitEnv,
             _ => (OutputFormat?)null
         };
 
@@ -261,12 +331,12 @@ static class CommandLine
                 return ParseResult.Failure("Broker shared secret is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(repository))
+            if (RequiresRepository(format.Value) && string.IsNullOrWhiteSpace(repository))
             {
                 return ParseResult.Failure("--repo is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(purpose))
+            if (RequiresRepository(format.Value) && string.IsNullOrWhiteSpace(purpose))
             {
                 return ParseResult.Failure("--purpose is required.");
             }
@@ -298,6 +368,14 @@ static class CommandLine
         return string.IsNullOrWhiteSpace(path)
             ? null
             : File.ReadAllText(path).Trim();
+    }
+
+    private static bool RequiresRepository(OutputFormat format)
+    {
+        return format is OutputFormat.Token
+            or OutputFormat.Json
+            or OutputFormat.GitAskPass
+            or OutputFormat.GhEnv;
     }
 }
 

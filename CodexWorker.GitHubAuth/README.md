@@ -122,6 +122,19 @@ docker run --rm `
 
 ## Client examples
 
+Resolve the GitHub App bot identity without printing any token:
+
+```powershell
+dotnet run --project CodexWorker.GitHubAuth.Client -- identity --secret-file C:\Users\liberty\.secrets\codex-worker-aumoa-broker.secret
+```
+
+Use that identity for an App-authenticated work-branch commit:
+
+```powershell
+$identity = dotnet run --project CodexWorker.GitHubAuth.Client -- identity --secret-file C:\Users\liberty\.secrets\codex-worker-aumoa-broker.secret | ConvertFrom-Json
+git -c user.name="$($identity.gitUserName)" -c user.email="$($identity.gitUserEmail)" commit -m "Codex: Example"
+```
+
 ```powershell
 dotnet run --project CodexWorker.GitHubAuth.Client -- token --repo Aumoa/MassivelyBackendFramework --purpose push-codex-branch --branch codex/example --secret-file C:\Users\liberty\.secrets\codex-worker-aumoa-broker.secret
 ```

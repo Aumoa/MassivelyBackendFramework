@@ -67,6 +67,49 @@ app.Use(async (context, next) =>
 
 app.MapGet("/healthz", static () => Results.Ok(new { status = "ok" }));
 
+app.MapGet(
+    "/v1/github/app-identity",
+    async Task<Results<Ok<BrokerAppIdentityResponse>, UnauthorizedHttpResult, ProblemHttpResult>> (
+        HttpContext context,
+        SharedSecretProvider sharedSecretProvider,
+        GitHubAppTokenService tokenService,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken) =>
+    {
+        var logger = loggerFactory.CreateLogger("AppIdentity");
+
+        if (!IsAuthorized(context.Request, sharedSecretProvider.GetSharedSecret()))
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        try
+        {
+            var identity = await tokenService.GetAppIdentityAsync(cancellationToken);
+
+            logger.LogInformation(
+                "Resolved GitHub App identity for {BotLogin}.",
+                identity.BotLogin);
+
+            return TypedResults.Ok(new BrokerAppIdentityResponse(
+                identity.AppSlug,
+                identity.AppName,
+                identity.BotLogin,
+                identity.BotUserId,
+                identity.GitUserName,
+                identity.GitUserEmail));
+        }
+        catch (GitHubTokenException exception)
+        {
+            logger.LogWarning(exception, "GitHub App identity request failed.");
+
+            return TypedResults.Problem(
+                title: "GitHub App identity request failed.",
+                detail: exception.Message,
+                statusCode: StatusCodes.Status502BadGateway);
+        }
+    });
+
 app.MapPost(
     "/v1/github/installation-token",
     async Task<Results<Ok<BrokerTokenResponse>, BadRequest<ProblemResponse>, UnauthorizedHttpResult, StatusCodeHttpResult, ProblemHttpResult>> (
@@ -310,6 +353,14 @@ sealed record BrokerTokenResponse(
     [property: JsonPropertyName("purpose")] string Purpose,
     [property: JsonPropertyName("permissions")] IReadOnlyDictionary<string, string> Permissions);
 
+sealed record BrokerAppIdentityResponse(
+    [property: JsonPropertyName("appSlug")] string AppSlug,
+    [property: JsonPropertyName("appName")] string AppName,
+    [property: JsonPropertyName("botLogin")] string BotLogin,
+    [property: JsonPropertyName("botUserId")] long BotUserId,
+    [property: JsonPropertyName("gitUserName")] string GitUserName,
+    [property: JsonPropertyName("gitUserEmail")] string GitUserEmail);
+
 sealed record ProblemResponse(
     [property: JsonPropertyName("code")] string Code,
     [property: JsonPropertyName("message")] string Message);
@@ -387,6 +438,44 @@ sealed class GitHubAppTokenService(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    public async Task<GitHubAppIdentity> GetAppIdentityAsync(CancellationToken cancellationToken)
+    {
+        var configuredOptions = options.Value;
+        var jwt = await CreateJwtAsync(configuredOptions, cancellationToken);
+        using var appRequest = CreateGitHubRequest(
+            configuredOptions,
+            HttpMethod.Get,
+            "/app",
+            jwt);
+
+        using var appResponse = await SendGitHubAsync(appRequest, cancellationToken);
+        var appResponseBody = await appResponse.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!appResponse.IsSuccessStatusCode)
+        {
+            throw new GitHubTokenException(
+                $"GitHub returned {(int)appResponse.StatusCode} {appResponse.ReasonPhrase} for app identity. {TrimResponse(appResponseBody)}");
+        }
+
+        var app = JsonSerializer.Deserialize<GitHubAppResponse>(appResponseBody, s_jsonOptions);
+        if (app is null || string.IsNullOrWhiteSpace(app.Slug))
+        {
+            throw new GitHubTokenException("GitHub returned an app response without a slug.");
+        }
+
+        var botLogin = app.Slug + "[bot]";
+        var botUser = await GetGitHubUserAsync(configuredOptions, botLogin, cancellationToken);
+        var gitUserEmail = $"{botUser.Id}+{botUser.Login}@users.noreply.github.com";
+
+        return new GitHubAppIdentity(
+            app.Slug,
+            app.Name,
+            botUser.Login,
+            botUser.Id,
+            botUser.Login,
+            gitUserEmail);
+    }
+
     public async Task<GitHubInstallationToken> CreateInstallationTokenAsync(
         RepositoryName repositoryName,
         AllowedRepositoryOptions repository,
@@ -395,14 +484,11 @@ sealed class GitHubAppTokenService(
     {
         var configuredOptions = options.Value;
         var jwt = await CreateJwtAsync(configuredOptions, cancellationToken);
-        using var request = new HttpRequestMessage(
+        using var request = CreateGitHubRequest(
+            configuredOptions,
             HttpMethod.Post,
-            BuildUri(configuredOptions.GitHubApiBaseUrl, $"/app/installations/{configuredOptions.InstallationId}/access_tokens"));
-
-        request.Headers.Accept.ParseAdd("application/vnd.github+json");
-        request.Headers.Authorization = new("Bearer", jwt);
-        request.Headers.UserAgent.ParseAdd("CodexWorker-GitHubAuth/1.0");
-        request.Headers.Add("X-GitHub-Api-Version", configuredOptions.GitHubApiVersion);
+            $"/app/installations/{configuredOptions.InstallationId}/access_tokens",
+            jwt);
 
         var body = new GitHubInstallationTokenRequest(
             repository.RepositoryId is null ? [repositoryName.Name] : null,
@@ -411,7 +497,7 @@ sealed class GitHubAppTokenService(
 
         request.Content = JsonContent.Create(body, options: s_jsonOptions);
 
-        using var response = await httpClient.SendAsync(request, cancellationToken);
+        using var response = await SendGitHubAsync(request, cancellationToken);
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)
@@ -427,6 +513,70 @@ sealed class GitHubAppTokenService(
         }
 
         return new GitHubInstallationToken(tokenResponse.Token, tokenResponse.ExpiresAt);
+    }
+
+    private async Task<GitHubUserResponse> GetGitHubUserAsync(
+        CodexWorkerGitHubAuthOptions options,
+        string login,
+        CancellationToken cancellationToken)
+    {
+        using var request = CreateGitHubRequest(
+            options,
+            HttpMethod.Get,
+            "/users/" + Uri.EscapeDataString(login),
+            bearerToken: null);
+
+        using var response = await SendGitHubAsync(request, cancellationToken);
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new GitHubTokenException(
+                $"GitHub returned {(int)response.StatusCode} {response.ReasonPhrase} for bot user '{login}'. {TrimResponse(responseBody)}");
+        }
+
+        var user = JsonSerializer.Deserialize<GitHubUserResponse>(responseBody, s_jsonOptions);
+        if (user is null || user.Id <= 0 || string.IsNullOrWhiteSpace(user.Login))
+        {
+            throw new GitHubTokenException($"GitHub returned an invalid user response for bot user '{login}'.");
+        }
+
+        return user;
+    }
+
+    private static HttpRequestMessage CreateGitHubRequest(
+        CodexWorkerGitHubAuthOptions options,
+        HttpMethod method,
+        string path,
+        string? bearerToken)
+    {
+        var request = new HttpRequestMessage(method, BuildUri(options.GitHubApiBaseUrl, path));
+        request.Headers.Accept.ParseAdd("application/vnd.github+json");
+        request.Headers.UserAgent.ParseAdd("CodexWorker-GitHubAuth/1.0");
+        request.Headers.Add("X-GitHub-Api-Version", options.GitHubApiVersion);
+
+        if (!string.IsNullOrWhiteSpace(bearerToken))
+        {
+            request.Headers.Authorization = new("Bearer", bearerToken);
+        }
+
+        return request;
+    }
+
+    private async Task<HttpResponseMessage> SendGitHubAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await httpClient.SendAsync(request, cancellationToken);
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new GitHubTokenException(
+                $"GitHub API request failed. {exception.Message}",
+                exception);
+        }
     }
 
     private static Uri BuildUri(string baseUrl, string path)
@@ -496,9 +646,36 @@ sealed class GitHubAppTokenService(
     }
 }
 
-sealed class GitHubTokenException(string message) : Exception(message);
+sealed class GitHubTokenException : Exception
+{
+    public GitHubTokenException(string message)
+        : base(message)
+    {
+    }
+
+    public GitHubTokenException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
 
 sealed record GitHubInstallationToken(string Token, DateTimeOffset ExpiresAt);
+
+sealed record GitHubAppIdentity(
+    string AppSlug,
+    string AppName,
+    string BotLogin,
+    long BotUserId,
+    string GitUserName,
+    string GitUserEmail);
+
+sealed record GitHubAppResponse(
+    [property: JsonPropertyName("slug")] string Slug,
+    [property: JsonPropertyName("name")] string Name);
+
+sealed record GitHubUserResponse(
+    [property: JsonPropertyName("login")] string Login,
+    [property: JsonPropertyName("id")] long Id);
 
 sealed record GitHubInstallationTokenRequest(
     [property: JsonPropertyName("repositories")] IReadOnlyList<string>? Repositories,

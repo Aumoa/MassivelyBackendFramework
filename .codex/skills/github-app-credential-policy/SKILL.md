@@ -34,6 +34,13 @@ Local `git commit` does not require GitHub credentials. Apply this policy when a
 - Pass the branch name when requesting a token for branch-scoped purposes, and expect non-allowed branches to fail closed.
 - Never print, persist, commit, or place installation tokens in git remotes, repository files, shell history snippets, logs, or PR text.
 
+## App Commit Identity
+
+- For new commits on isolated work branches that will use the GitHub App for the related remote workflow, prefer the broker-provided App identity for the commit author and committer.
+- Resolve identity with `CodexWorker.GitHubAuth.Client identity` and the broker secret file. Use the returned `gitUserName` and `gitUserEmail` with per-command git config, for example `git -c user.name=... -c user.email=... commit ...`.
+- Do not rewrite existing commits solely to change author identity unless the user asks for that rewrite.
+- If the broker identity endpoint is unavailable, keep the normal local git identity rather than inventing a bot email.
+
 ## Approval Rules
 
 - This credential policy does not replace the repository's Online Change Approval Policy.

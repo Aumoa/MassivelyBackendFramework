@@ -57,6 +57,7 @@
 - Do not commit user-made unrelated changes.
 - If the working tree already contains unrelated changes, isolate only Codex-made changes in the commit.
 - If a clean feature-sized commit is not possible, stop and explain why.
+- For commits intended to participate in a GitHub App-authenticated isolated work-branch workflow, follow `.codex/skills/github-app-credential-policy/SKILL.md` before creating the commit identity.
 
 ## Commit Message Format
 
