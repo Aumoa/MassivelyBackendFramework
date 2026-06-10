@@ -58,6 +58,68 @@ dotnet run --project CodexWorker.GitHubAuth -- --config C:\Users\liberty\.secret
 The broker rejects non-loopback requests and browser `Origin` requests. It also requires
 the shared secret through `Authorization: Bearer ...` or `X-Codex-Worker-Secret`.
 
+## Docker configuration
+
+When running in a Linux container, use container paths in the config file. Windows paths
+such as `C:\Users\...` do not exist inside the container after mounting the secret
+directory.
+
+```json
+{
+  "CodexWorkerGitHubAuth": {
+    "ListenUrl": "http://0.0.0.0:5657",
+    "AllowNonLoopbackListenUrl": true,
+    "AllowNonLoopbackClientAddress": true,
+    "AppId": "123456",
+    "InstallationId": 12345678,
+    "PrivateKeyPath": "/run/secrets/codex-worker-aumoa.pem",
+    "SharedSecretPath": "/run/secrets/codex-worker-aumoa-broker.secret",
+    "AllowedRepositories": [
+      {
+        "Name": "Aumoa/MassivelyBackendFramework",
+        "Purposes": {
+          "push-codex-branch": {
+            "RequireBranch": true,
+            "BranchPrefixes": [ "codex/" ],
+            "Permissions": {
+              "contents": "write"
+            }
+          },
+          "create-pr": {
+            "RequireBranch": true,
+            "BranchPrefixes": [ "codex/" ],
+            "Permissions": {
+              "pull_requests": "write"
+            }
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+Only use `AllowNonLoopbackListenUrl` and `AllowNonLoopbackClientAddress` with a Docker
+publish binding that exposes the broker on host loopback only:
+
+```powershell
+docker run --rm `
+  --name codex-worker-github-auth `
+  -p 127.0.0.1:5657:5657 `
+  -v C:\Users\liberty\.secrets:/run/secrets:ro `
+  codex-worker-github-auth
+```
+
+To confirm the mount shape:
+
+```powershell
+docker run --rm `
+  --entrypoint /bin/sh `
+  -v C:\Users\liberty\.secrets:/run/secrets:ro `
+  codex-worker-github-auth `
+  -c "ls -la /run/secrets"
+```
+
 ## Client examples
 
 ```powershell

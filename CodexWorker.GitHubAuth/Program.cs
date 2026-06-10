@@ -46,7 +46,11 @@ ValidateStartupOptions(app.Services.GetRequiredService<IOptions<CodexWorkerGitHu
 
 app.Use(async (context, next) =>
 {
-    if (!IsLoopback(context.Connection.RemoteIpAddress))
+    var runtimeOptions = context.RequestServices
+        .GetRequiredService<IOptions<CodexWorkerGitHubAuthOptions>>()
+        .Value;
+
+    if (!runtimeOptions.AllowNonLoopbackClientAddress && !IsLoopback(context.Connection.RemoteIpAddress))
     {
         await Results.StatusCode(StatusCodes.Status403Forbidden).ExecuteAsync(context);
         return;
@@ -211,9 +215,9 @@ static void ValidateStartupOptions(CodexWorkerGitHubAuthOptions options)
         errors.Add($"{optionsSectionName}:AppId or {optionsSectionName}:Issuer is required.");
     }
 
-    if (!UsesLoopbackListenUrl(options.ListenUrl))
+    if (!options.AllowNonLoopbackListenUrl && !UsesLoopbackListenUrl(options.ListenUrl))
     {
-        errors.Add($"{optionsSectionName}:ListenUrl must bind only to localhost, 127.0.0.1, or ::1.");
+        errors.Add($"{optionsSectionName}:ListenUrl must bind only to localhost, 127.0.0.1, or ::1 unless {optionsSectionName}:AllowNonLoopbackListenUrl is true.");
     }
 
     if (options.InstallationId <= 0)
@@ -313,6 +317,10 @@ sealed record ProblemResponse(
 sealed class CodexWorkerGitHubAuthOptions
 {
     public string ListenUrl { get; set; } = "http://127.0.0.1:5657";
+
+    public bool AllowNonLoopbackListenUrl { get; set; }
+
+    public bool AllowNonLoopbackClientAddress { get; set; }
 
     public string GitHubApiBaseUrl { get; set; } = "https://api.github.com";
 
