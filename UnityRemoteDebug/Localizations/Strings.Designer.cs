@@ -91,7 +91,13 @@ internal class Strings
 
     internal static string METRIC_ACCESS => GetString(nameof(METRIC_ACCESS));
 
+    internal static string METRIC_ACCESS_ADMIN_VALUE => GetString(nameof(METRIC_ACCESS_ADMIN_VALUE));
+
     internal static string METRIC_ACCESS_DETAIL => GetString(nameof(METRIC_ACCESS_DETAIL));
+
+    internal static string METRIC_ACCESS_STAFF_VALUE => GetString(nameof(METRIC_ACCESS_STAFF_VALUE));
+
+    internal static string METRIC_ACCESS_UNKNOWN_VALUE => GetString(nameof(METRIC_ACCESS_UNKNOWN_VALUE));
 
     internal static string METRIC_ACCESS_VALUE => GetString(nameof(METRIC_ACCESS_VALUE));
 

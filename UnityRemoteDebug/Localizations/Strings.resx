@@ -79,13 +79,22 @@
     <value>Uses OIDC authorization code flow with PKCE.</value>
   </data>
   <data name="METRIC_ACCESS" xml:space="preserve">
-    <value>Required access</value>
+    <value>Current access</value>
   </data>
   <data name="METRIC_ACCESS_VALUE" xml:space="preserve">
     <value>staff or admin</value>
   </data>
+  <data name="METRIC_ACCESS_ADMIN_VALUE" xml:space="preserve">
+    <value>Administrator</value>
+  </data>
+  <data name="METRIC_ACCESS_STAFF_VALUE" xml:space="preserve">
+    <value>Staff</value>
+  </data>
+  <data name="METRIC_ACCESS_UNKNOWN_VALUE" xml:space="preserve">
+    <value>Signed in</value>
+  </data>
   <data name="METRIC_ACCESS_DETAIL" xml:space="preserve">
-    <value>Resolved from the requested groups scope.</value>
+    <value>Resolved from the signed-in account's groups claim.</value>
   </data>
   <data name="METRIC_BACKEND" xml:space="preserve">
     <value>Connected clients</value>

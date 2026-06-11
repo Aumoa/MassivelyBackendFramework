@@ -7,13 +7,30 @@ internal static class RemoteDebugAuthorizationPolicies
 {
     public const string Management = "UnityRemoteDebugManagement";
     public const string GroupsClaim = "groups";
+    private const string StaffGroup = "staff";
+    private const string AdminGroup = "admin";
 
-    private static readonly string[] ManagementGroups = ["staff", "admin"];
+    private static readonly string[] ManagementGroups = [StaffGroup, AdminGroup];
 
     public static bool HasManagementGroup(ClaimsPrincipal user)
     {
+        return ManagementGroups.Any(group => HasGroup(user, group));
+    }
+
+    public static bool HasStaffGroup(ClaimsPrincipal user)
+    {
+        return HasGroup(user, StaffGroup);
+    }
+
+    public static bool HasAdminGroup(ClaimsPrincipal user)
+    {
+        return HasGroup(user, AdminGroup);
+    }
+
+    private static bool HasGroup(ClaimsPrincipal user, string group)
+    {
         return user.FindAll(GroupsClaim)
-            .Any(static claim => ManagementGroups.Any(group => ContainsGroup(claim.Value, group)));
+            .Any(claim => ContainsGroup(claim.Value, group));
     }
 
     private static bool ContainsGroup(string value, string group)

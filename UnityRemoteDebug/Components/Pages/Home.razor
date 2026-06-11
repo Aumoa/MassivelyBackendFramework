@@ -1,6 +1,7 @@
 @page "/"
 @attribute [Authorize(Policy = RemoteDebugAuthorizationPolicies.Management)]
 @implements IDisposable
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject RemoteDebugClientRegistry ClientRegistry
 
 <PageTitle>@Strings.APP_TITLE</PageTitle>
@@ -21,7 +22,7 @@
     </article>
     <article class="metric-card">
         <span class="metric-label">@Strings.METRIC_ACCESS</span>
-        <strong>@Strings.METRIC_ACCESS_VALUE</strong>
+        <strong>@m_AccessValue</strong>
         <span class="metric-detail">@Strings.METRIC_ACCESS_DETAIL</span>
     </article>
     <article class="metric-card">
@@ -91,10 +92,14 @@
 
 @code {
     private IReadOnlyList<RemoteDebugClientSnapshot> m_Clients = [];
+    private string m_AccessValue = Strings.METRIC_ACCESS_UNKNOWN_VALUE;
     private bool m_IsRefreshing;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        m_AccessValue = ResolveAccessValue(authenticationState.User);
+
         RefreshClients();
         ClientRegistry.Changed += OnClientRegistryChanged;
     }
@@ -130,5 +135,20 @@
     private static string FormatDateTime(DateTimeOffset value)
     {
         return value.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
+    }
+
+    private static string ResolveAccessValue(System.Security.Claims.ClaimsPrincipal user)
+    {
+        if (RemoteDebugAuthorizationPolicies.HasAdminGroup(user))
+        {
+            return Strings.METRIC_ACCESS_ADMIN_VALUE;
+        }
+
+        if (RemoteDebugAuthorizationPolicies.HasStaffGroup(user))
+        {
+            return Strings.METRIC_ACCESS_STAFF_VALUE;
+        }
+
+        return Strings.METRIC_ACCESS_UNKNOWN_VALUE;
     }
 }
