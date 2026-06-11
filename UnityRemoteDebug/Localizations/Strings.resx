@@ -103,13 +103,13 @@
     <value>Draft</value>
   </data>
   <data name="METRIC_BACKEND_DETAIL" xml:space="preserve">
-    <value>Live sessions tracked by the WebSocket registry.</value>
+    <value>Gateway TCP integration is pending.</value>
   </data>
   <data name="CLIENTS_TITLE" xml:space="preserve">
     <value>Connected Unity Clients</value>
   </data>
   <data name="CLIENTS_DESCRIPTION" xml:space="preserve">
-    <value>Unity clients currently holding an active RemoteDebug WebSocket session.</value>
+    <value>Unity clients will appear here after the frontend connects through the Gateway TCP path.</value>
   </data>
   <data name="CLIENTS_CONNECTED_FORMAT" xml:space="preserve">
     <value>{0} connected</value>
@@ -121,7 +121,7 @@
     <value>No clients connected</value>
   </data>
   <data name="CLIENTS_EMPTY_DESCRIPTION" xml:space="preserve">
-    <value>Connected Unity clients will appear here.</value>
+    <value>Gateway-backed RemoteDebug client discovery will appear here in a later integration step.</value>
   </data>
   <data name="CLIENTS_TABLE_CLIENT" xml:space="preserve">
     <value>Client</value>

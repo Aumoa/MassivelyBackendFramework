@@ -103,13 +103,13 @@
     <value>초안</value>
   </data>
   <data name="METRIC_BACKEND_DETAIL" xml:space="preserve">
-    <value>WebSocket registry에서 추적 중인 실시간 세션입니다.</value>
+    <value>Gateway TCP 연동은 이후 단계에서 진행합니다.</value>
   </data>
   <data name="CLIENTS_TITLE" xml:space="preserve">
     <value>연결된 Unity 클라이언트</value>
   </data>
   <data name="CLIENTS_DESCRIPTION" xml:space="preserve">
-    <value>현재 RemoteDebug WebSocket 세션을 유지 중인 Unity 클라이언트입니다.</value>
+    <value>프론트엔드가 Gateway TCP 경로로 연결된 이후 Unity 클라이언트가 여기에 표시됩니다.</value>
   </data>
   <data name="CLIENTS_CONNECTED_FORMAT" xml:space="preserve">
     <value>{0}개 연결됨</value>
@@ -121,7 +121,7 @@
     <value>연결된 클라이언트 없음</value>
   </data>
   <data name="CLIENTS_EMPTY_DESCRIPTION" xml:space="preserve">
-    <value>Unity 클라이언트가 연결되면 여기에 표시됩니다.</value>
+    <value>Gateway 기반 RemoteDebug 클라이언트 탐색은 이후 연동 단계에서 표시됩니다.</value>
   </data>
   <data name="CLIENTS_TABLE_CLIENT" xml:space="preserve">
     <value>클라이언트</value>

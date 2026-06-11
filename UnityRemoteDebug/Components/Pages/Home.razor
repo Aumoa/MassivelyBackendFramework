@@ -1,6 +1,5 @@
 @page "/"
 @attribute [Authorize(Policy = RemoteDebugAuthorizationPolicies.Management)]
-@implements IDisposable
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject RemoteDebugClientRegistry ClientRegistry
 
@@ -101,13 +100,6 @@
         m_AccessValue = ResolveAccessValue(authenticationState.User);
 
         RefreshClients();
-        ClientRegistry.Changed += OnClientRegistryChanged;
-    }
-
-    public void Dispose()
-    {
-        ClientRegistry.Changed -= OnClientRegistryChanged;
-        GC.SuppressFinalize(this);
     }
 
     private async Task RefreshClientsAsync()
@@ -121,15 +113,6 @@
     private void RefreshClients()
     {
         m_Clients = ClientRegistry.GetClients();
-    }
-
-    private void OnClientRegistryChanged()
-    {
-        _ = InvokeAsync(() =>
-        {
-            RefreshClients();
-            StateHasChanged();
-        });
     }
 
     private static string FormatDateTime(DateTimeOffset value)
