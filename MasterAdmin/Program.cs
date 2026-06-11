@@ -17,7 +17,9 @@ builder.Services.AddControllers();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
+builder.Services.Configure<MySqlOptions>(builder.Configuration.GetRequiredSection("MySql"));
 builder.Services.Configure<MasterConnectionOptions>(builder.Configuration.GetRequiredSection("MasterConnection"));
+builder.Services.AddTransient<IServiceConnectionCredentials, MySqlServiceConnectionCredentials>();
 builder.Services.AddSingleton<MasterOverviewSocketClient>();
 builder.Services.AddSingleton<IMasterOverviewProvider>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 builder.Services.AddHostedService(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());

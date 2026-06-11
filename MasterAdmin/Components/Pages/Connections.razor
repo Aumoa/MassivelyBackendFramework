@@ -1,0 +1,302 @@
+@page "/connections"
+@attribute [Authorize(Policy = MasterAuthorizationPolicies.Admin)]
+@inject IServiceConnectionCredentials Credentials
+@inject IStringLocalizer<MasterAdmin.Localizations.Strings> L
+
+<PageTitle>@T("CONNECTION_CREDENTIALS_TITLE")</PageTitle>
+
+<section class="connections-header">
+    <div>
+        <p class="eyebrow">@T("CONNECTION_CREDENTIALS_EYEBROW")</p>
+        <h1>@T("CONNECTION_CREDENTIALS_TITLE")</h1>
+        <p class="summary">@T("CONNECTION_CREDENTIALS_SUMMARY")</p>
+    </div>
+</section>
+
+<section class="connection-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>@FormTitle</h2>
+            <p>@T("CONNECTION_CREDENTIALS_FORM_DESCRIPTION")</p>
+        </div>
+        <button type="button" class="refresh-button" @onclick="ResetForm">
+            @T("CONNECTION_CREDENTIALS_NEW")
+        </button>
+    </div>
+
+    <EditForm Model="Form" OnValidSubmit="SaveAsync" FormName="service-connection-credential">
+        <DataAnnotationsValidator />
+        <div class="credential-form">
+            <label>
+                <span>@T("CONNECTION_CREDENTIALS_NODE_KIND")</span>
+                <InputSelect @bind-Value="Form.NodeKind">
+                    @foreach (var kind in SupportedNodeKinds)
+                    {
+                        <option value="@kind">@GetNodeKindText(kind)</option>
+                    }
+                </InputSelect>
+            </label>
+            <label>
+                <span>@T("CONNECTION_CREDENTIALS_NODE_ID")</span>
+                <InputText @bind-Value="Form.NodeId" />
+            </label>
+            <label>
+                <span>@T("CONNECTION_CREDENTIALS_DISPLAY_NAME")</span>
+                <InputText @bind-Value="Form.DisplayName" />
+            </label>
+            <label class="toggle-row">
+                <InputCheckbox @bind-Value="Form.Enabled" />
+                <span>@T("CONNECTION_CREDENTIALS_ENABLED")</span>
+            </label>
+            <button type="submit" class="refresh-button" disabled="@IsBusy">
+                @SaveButtonText
+            </button>
+        </div>
+        <ValidationSummary />
+    </EditForm>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(NewSecret))
+{
+    <section class="secret-panel" aria-live="polite">
+        <div>
+            <strong>@T("CONNECTION_CREDENTIALS_SECRET_CREATED")</strong>
+            <span>@T("CONNECTION_CREDENTIALS_SECRET_DESCRIPTION")</span>
+        </div>
+        <code>@NewSecret</code>
+    </section>
+}
+
+<section class="connection-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>@T("CONNECTION_CREDENTIALS_LIST_TITLE")</h2>
+            <p>@T("CONNECTION_CREDENTIALS_LIST_DESCRIPTION")</p>
+        </div>
+        <button type="button" class="refresh-button" @onclick="LoadAsync" disabled="@IsBusy">
+            @Strings.NODE_REFRESH
+        </button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="empty-state">
+            <strong>@Strings.NODE_STATUS_ERROR_TITLE</strong>
+            <span>@ErrorMessage</span>
+        </div>
+    }
+    else if (Items.Length == 0)
+    {
+        <div class="empty-state">
+            <strong>@T("CONNECTION_CREDENTIALS_EMPTY_TITLE")</strong>
+            <span>@T("CONNECTION_CREDENTIALS_EMPTY_DESCRIPTION")</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>@T("CONNECTION_CREDENTIALS_NODE_KIND")</th>
+                        <th>@T("CONNECTION_CREDENTIALS_NODE_ID")</th>
+                        <th>@T("CONNECTION_CREDENTIALS_DISPLAY_NAME")</th>
+                        <th>@T("CONNECTION_CREDENTIALS_STATUS")</th>
+                        <th>@T("CONNECTION_CREDENTIALS_UPDATED")</th>
+                        <th>@T("CONNECTION_CREDENTIALS_ACTIONS")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Items)
+                    {
+                        <tr>
+                            <td>@GetNodeKindText(item.NodeKind)</td>
+                            <td><code>@item.NodeId</code></td>
+                            <td>@item.DisplayName</td>
+                            <td>@(item.Enabled ? T("CONNECTION_CREDENTIALS_ENABLED") : T("CONNECTION_CREDENTIALS_DISABLED"))</td>
+                            <td>@item.UpdatedAt</td>
+                            <td>
+                                <div class="action-row">
+                                    <button type="button" class="table-button" @onclick="() => Edit(item)" disabled="@IsBusy">
+                                        @T("CONNECTION_CREDENTIALS_EDIT")
+                                    </button>
+                                    <button type="button" class="table-button" @onclick="() => RotateAsync(item.Id)" disabled="@IsBusy">
+                                        @T("CONNECTION_CREDENTIALS_ROTATE")
+                                    </button>
+                                    <button type="button" class="table-button danger" @onclick="() => RemoveAsync(item.Id)" disabled="@IsBusy">
+                                        @T("CONNECTION_CREDENTIALS_REMOVE")
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private static readonly MasterNodeKind[] SupportedNodeKinds =
+    [
+        MasterNodeKind.Gateway,
+        MasterNodeKind.Dedicated,
+        MasterNodeKind.MasterAdmin,
+        MasterNodeKind.RemoteDebug
+    ];
+
+    private ServiceConnectionCredentialInfo[] Items { get; set; } = [];
+
+    private CredentialFormModel Form { get; set; } = new();
+
+    private long? EditingId { get; set; }
+
+    private string? NewSecret { get; set; }
+
+    private string? ErrorMessage { get; set; }
+
+    private bool IsBusy { get; set; }
+
+    private string FormTitle => EditingId.HasValue
+        ? T("CONNECTION_CREDENTIALS_EDIT_TITLE")
+        : T("CONNECTION_CREDENTIALS_CREATE_TITLE");
+
+    private string SaveButtonText => IsBusy
+        ? T("CONNECTION_CREDENTIALS_SAVING")
+        : EditingId.HasValue
+            ? T("CONNECTION_CREDENTIALS_SAVE")
+            : T("CONNECTION_CREDENTIALS_CREATE");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        await RunBusyAsync(async () =>
+        {
+            Items = await Credentials.GetCredentialsAsync();
+        });
+    }
+
+    private async Task SaveAsync()
+    {
+        await RunBusyAsync(async () =>
+        {
+            var input = new ServiceConnectionCredentialInput(
+                Form.NodeKind,
+                Form.NodeId.Trim(),
+                Form.DisplayName.Trim(),
+                Form.Enabled);
+
+            if (EditingId.HasValue)
+            {
+                await Credentials.UpdateCredentialAsync(EditingId.Value, input);
+            }
+            else
+            {
+                var created = await Credentials.CreateCredentialAsync(input);
+                NewSecret = created.SharedSecret;
+            }
+
+            ResetForm();
+            Items = await Credentials.GetCredentialsAsync();
+        });
+    }
+
+    private async Task RotateAsync(long id)
+    {
+        await RunBusyAsync(async () =>
+        {
+            NewSecret = await Credentials.RotateSecretAsync(id);
+            Items = await Credentials.GetCredentialsAsync();
+        });
+    }
+
+    private async Task RemoveAsync(long id)
+    {
+        await RunBusyAsync(async () =>
+        {
+            await Credentials.RemoveCredentialAsync(id);
+            Items = await Credentials.GetCredentialsAsync();
+            if (EditingId == id)
+            {
+                ResetForm();
+            }
+        });
+    }
+
+    private void Edit(ServiceConnectionCredentialInfo item)
+    {
+        EditingId = item.Id;
+        NewSecret = null;
+        Form = new CredentialFormModel
+        {
+            NodeKind = item.NodeKind,
+            NodeId = item.NodeId,
+            DisplayName = item.DisplayName,
+            Enabled = item.Enabled
+        };
+    }
+
+    private void ResetForm()
+    {
+        EditingId = null;
+        Form = new CredentialFormModel();
+    }
+
+    private async Task RunBusyAsync(Func<Task> action)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            ErrorMessage = null;
+            await action();
+        }
+        catch (Exception e)
+        {
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private static string GetNodeKindText(MasterNodeKind nodeKind)
+    {
+        return nodeKind switch
+        {
+            MasterNodeKind.Gateway => Strings.NODE_KIND_GATEWAY,
+            MasterNodeKind.Dedicated => Strings.NODE_KIND_DEDICATED,
+            MasterNodeKind.MasterAdmin => Strings.NODE_KIND_MASTER_ADMIN,
+            MasterNodeKind.RemoteDebug => "RemoteDebug",
+            _ => Strings.NODE_KIND_UNKNOWN
+        };
+    }
+
+    private string T(string key)
+    {
+        return L[key].Value;
+    }
+
+    private sealed class CredentialFormModel
+    {
+        [Required]
+        public MasterNodeKind NodeKind { get; set; } = MasterNodeKind.Gateway;
+
+        [Required]
+        public string NodeId { get; set; } = string.Empty;
+
+        [Required]
+        public string DisplayName { get; set; } = string.Empty;
+
+        public bool Enabled { get; set; } = true;
+    }
+}

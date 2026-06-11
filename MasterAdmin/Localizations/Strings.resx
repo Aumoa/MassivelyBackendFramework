@@ -273,4 +273,88 @@
   <data name="ERROR_DEVELOPMENT_MODE_WARNING" xml:space="preserve">
     <value>The Development environment should not be enabled for deployed applications.</value>
   </data>
+  <data name="NAV_CONNECTIONS" xml:space="preserve">
+    <value>Connections</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_EYEBROW" xml:space="preserve">
+    <value>Credentials</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_TITLE" xml:space="preserve">
+    <value>Service Connection Credentials</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_SUMMARY" xml:space="preserve">
+    <value>Manage internal node credentials used by Master, Gateway, and backend services.</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_FORM_DESCRIPTION" xml:space="preserve">
+    <value>Create or edit a node credential. Secrets are shown only when created or rotated.</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_NEW" xml:space="preserve">
+    <value>New</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_CREATE_TITLE" xml:space="preserve">
+    <value>Create credential</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_EDIT_TITLE" xml:space="preserve">
+    <value>Edit credential</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_NODE_KIND" xml:space="preserve">
+    <value>Node Kind</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_NODE_ID" xml:space="preserve">
+    <value>Node ID</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_DISPLAY_NAME" xml:space="preserve">
+    <value>Display Name</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_ENABLED" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_DISABLED" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_CREATE" xml:space="preserve">
+    <value>Create</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_SAVING" xml:space="preserve">
+    <value>Saving</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_SECRET_CREATED" xml:space="preserve">
+    <value>Secret ready</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_SECRET_DESCRIPTION" xml:space="preserve">
+    <value>Store this value now. It will not be shown again after leaving this page.</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_LIST_TITLE" xml:space="preserve">
+    <value>Credential List</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_LIST_DESCRIPTION" xml:space="preserve">
+    <value>Active and disabled node credentials registered for the Master control plane.</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_EMPTY_TITLE" xml:space="preserve">
+    <value>No credentials</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>Create a credential before switching services from appsettings secrets to managed credentials.</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_STATUS" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_UPDATED" xml:space="preserve">
+    <value>Updated</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_ACTIONS" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_EDIT" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_ROTATE" xml:space="preserve">
+    <value>Rotate</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_REMOVE" xml:space="preserve">
+    <value>Remove</value>
+  </data>
 </root>
