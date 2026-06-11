@@ -19,6 +19,7 @@ Keep the real configuration outside this repository, for example:
     "InstallationId": 12345678,
     "PrivateKeyPath": "C:\\Users\\liberty\\.secrets\\codex-worker-aumoa.pem",
     "SharedSecretPath": "C:\\Users\\liberty\\.secrets\\codex-worker-aumoa-broker.secret",
+    "AppIdentityCachePath": "C:\\Users\\liberty\\.secrets\\codex-worker-aumoa-app-identity.json",
     "AllowedRepositories": [
       {
         "Name": "Aumoa/MassivelyBackendFramework",
@@ -58,6 +59,26 @@ dotnet run --project CodexWorker.GitHubAuth -- --config C:\Users\liberty\.secret
 The broker rejects non-loopback requests and browser `Origin` requests. It also requires
 the shared secret through `Authorization: Bearer ...` or `X-Codex-Worker-Secret`.
 
+### App identity cache
+
+Set `AppIdentityCachePath` to avoid repeated GitHub API calls when resolving the bot
+commit identity. The broker reads this JSON file first and only calls GitHub when the
+file is missing or invalid. If GitHub lookup succeeds and the path is writable, the
+broker writes the cache file automatically.
+
+Example cache file:
+
+```json
+{
+  "appSlug": "codex-worker-aumoa",
+  "appName": "codex-worker-aumoa",
+  "botLogin": "codex-worker-aumoa[bot]",
+  "botUserId": 292147838,
+  "gitUserName": "codex-worker-aumoa[bot]",
+  "gitUserEmail": "292147838+codex-worker-aumoa[bot]@users.noreply.github.com"
+}
+```
+
 ## Docker configuration
 
 When running in a Linux container, use container paths in the config file. Windows paths
@@ -74,6 +95,7 @@ directory.
     "InstallationId": 12345678,
     "PrivateKeyPath": "/run/secrets/codex-worker-aumoa.pem",
     "SharedSecretPath": "/run/secrets/codex-worker-aumoa-broker.secret",
+    "AppIdentityCachePath": "/run/secrets/codex-worker-aumoa-app-identity.json",
     "AllowedRepositories": [
       {
         "Name": "Aumoa/MassivelyBackendFramework",

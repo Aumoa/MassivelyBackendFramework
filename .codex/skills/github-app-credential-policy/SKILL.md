@@ -37,7 +37,9 @@ Local `git commit` does not require GitHub credentials. Apply this policy when a
 ## App Commit Identity
 
 - For new commits on isolated work branches that will use the GitHub App for the related remote workflow, prefer the broker-provided App identity for the commit author and committer.
-- Resolve identity with `CodexWorker.GitHubAuth.Client identity` and the broker secret file. Use the returned `gitUserName` and `gitUserEmail` with per-command git config, for example `git -c user.name=... -c user.email=... commit ...`.
+- Resolve identity with `CodexWorker.GitHubAuth.Client identity` and the broker secret file. The broker should be configured with an `AppIdentityCachePath`; use the cached identity first and let the broker call GitHub only when the cache is missing or invalid.
+- The expected local cache path for `codex-worker-aumoa` is `C:\Users\liberty\.secrets\codex-worker-aumoa-app-identity.json`; Docker deployments should mount the same file and configure `/run/secrets/codex-worker-aumoa-app-identity.json`.
+- Use the returned `gitUserName` and `gitUserEmail` with per-command git config, for example `git -c user.name=... -c user.email=... commit ...`.
 - Do not rewrite existing commits solely to change author identity unless the user asks for that rewrite.
 - If the broker identity endpoint is unavailable, keep the normal local git identity rather than inventing a bot email.
 
