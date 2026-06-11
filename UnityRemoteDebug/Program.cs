@@ -22,6 +22,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddLocalization(options => options.ResourcesPath = "Localizations");
 builder.Services.Configure<RemoteDebugClientConnectionOptions>(builder.Configuration.GetSection("ClientConnection"));
 builder.Services.AddSingleton<RemoteDebugClientRegistry>();
+builder.Services.AddSingleton<RemoteDebugClientChallengeStore>();
 
 var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");
 var redisConnectionString = dataProtection.GetValue<string>("RedisConnectionString");

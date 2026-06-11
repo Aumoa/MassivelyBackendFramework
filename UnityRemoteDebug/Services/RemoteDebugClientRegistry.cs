@@ -6,12 +6,17 @@ namespace UnityRemoteDebug.Services;
 public sealed class RemoteDebugClientRegistry
 {
     private readonly ConcurrentDictionary<Guid, RemoteDebugClientSession> m_Clients = [];
+    private readonly object m_Sync = new();
 
     public event Action? Changed;
 
-    internal RemoteDebugClientSession Connect(RemoteDebugClientRegistration registration)
+    internal bool TryConnect(
+        RemoteDebugClientRegistration registration,
+        int maxClients,
+        int maxClientsPerRemoteEndPoint,
+        out RemoteDebugClientSession session)
     {
-        var client = new RemoteDebugClientSession(
+        session = new RemoteDebugClientSession(
             Guid.NewGuid(),
             Normalize(registration.DisplayName, "Unity Client"),
             Normalize(registration.ProjectName, "Unknown Project"),
@@ -19,9 +24,26 @@ public sealed class RemoteDebugClientRegistry
             Normalize(registration.Platform, "Unknown"),
             Normalize(registration.RemoteEndPoint, "Unknown"));
 
-        m_Clients[client.ClientId] = client;
+        lock (m_Sync)
+        {
+            if (m_Clients.Count >= maxClients)
+            {
+                return false;
+            }
+
+            var remoteEndPoint = session.RemoteEndPoint;
+            var remoteEndPointCount = m_Clients.Values.Count(
+                client => string.Equals(client.RemoteEndPoint, remoteEndPoint, StringComparison.Ordinal));
+            if (remoteEndPointCount >= maxClientsPerRemoteEndPoint)
+            {
+                return false;
+            }
+
+            m_Clients[session.ClientId] = session;
+        }
+
         OnChanged();
-        return client;
+        return true;
     }
 
     public IReadOnlyList<RemoteDebugClientSnapshot> GetClients()
@@ -31,12 +53,14 @@ public sealed class RemoteDebugClientRegistry
             .OrderByDescending(static client => client.ConnectedAt)];
     }
 
-    internal void Touch(Guid clientId)
+    internal void Touch(Guid clientId, TimeSpan notificationInterval)
     {
         if (m_Clients.TryGetValue(clientId, out var client))
         {
-            client.Touch();
-            OnChanged();
+            if (client.Touch(notificationInterval))
+            {
+                OnChanged();
+            }
         }
     }
 
@@ -82,6 +106,7 @@ internal sealed class RemoteDebugClientSession(
 {
     private readonly object m_Sync = new();
     private DateTimeOffset m_LastSeenAt = DateTimeOffset.UtcNow;
+    private DateTimeOffset m_LastNotifiedAt = DateTimeOffset.UtcNow;
 
     public Guid ClientId { get; } = clientId;
 
@@ -97,11 +122,19 @@ internal sealed class RemoteDebugClientSession(
 
     public DateTimeOffset ConnectedAt { get; } = DateTimeOffset.UtcNow;
 
-    public void Touch()
+    public bool Touch(TimeSpan notificationInterval)
     {
         lock (m_Sync)
         {
-            m_LastSeenAt = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.UtcNow;
+            m_LastSeenAt = now;
+            if (now - m_LastNotifiedAt < notificationInterval)
+            {
+                return false;
+            }
+
+            m_LastNotifiedAt = now;
+            return true;
         }
     }
 

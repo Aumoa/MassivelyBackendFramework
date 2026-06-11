@@ -1,4 +1,6 @@
 using System.Buffers;
+using System.Buffers.Binary;
+using System.IO;
 using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -16,10 +18,14 @@ namespace UnityRemoteDebug.Controllers;
 [Route("api/clients")]
 public sealed class RemoteDebugClientsController(
     RemoteDebugClientRegistry clientRegistry,
+    RemoteDebugClientChallengeStore challengeStore,
     IOptions<RemoteDebugClientConnectionOptions> options,
     ILogger<RemoteDebugClientsController> logger) : ControllerBase
 {
-    private const string SharedSecretHeader = "X-UnityRemoteDebug-Secret";
+    private const string ChallengeIdHeader = "X-UnityRemoteDebug-Challenge-Id";
+    private const string ProofHeader = "X-UnityRemoteDebug-Proof";
+    private const string ProofAlgorithm = "HMAC-SHA256/Base64Url";
+    private const int ProofLength = 32;
     private const int ReceiveBufferSize = 4096;
 
     [HttpGet]
@@ -29,16 +35,40 @@ public sealed class RemoteDebugClientsController(
         return new RemoteDebugClientListResponse(clientRegistry.GetClients(), DateTimeOffset.UtcNow);
     }
 
-    [HttpGet("connect")]
-    public async Task<IActionResult> ConnectAsync(CancellationToken cancellationToken)
+    [HttpGet("challenge")]
+    public IActionResult CreateChallenge()
     {
-        var expectedSecret = options.Value.SharedSecret;
-        if (string.IsNullOrWhiteSpace(expectedSecret))
+        if (string.IsNullOrWhiteSpace(options.Value.SharedSecret))
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable, "Unity RemoteDebug client connections are not configured.");
         }
 
-        if (!TryAuthorizeClient(expectedSecret))
+        var challenge = challengeStore.Create(options.Value.ChallengeLifetime);
+        return Ok(new RemoteDebugClientChallengeResponse(
+            challenge.ChallengeId,
+            Base64UrlEncode(challenge.Nonce),
+            challenge.ExpiresAt,
+            ProofAlgorithm));
+    }
+
+    [HttpGet("connect")]
+    public async Task<IActionResult> ConnectAsync(CancellationToken cancellationToken)
+    {
+        var connectionOptions = options.Value;
+        var sharedSecret = connectionOptions.SharedSecret;
+        if (string.IsNullOrWhiteSpace(sharedSecret))
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, "Unity RemoteDebug client connections are not configured.");
+        }
+
+        var registration = new RemoteDebugClientRegistration(
+            GetQueryValue("name"),
+            GetQueryValue("project"),
+            GetQueryValue("unityVersion"),
+            GetQueryValue("platform"),
+            HttpContext.Connection.RemoteIpAddress?.ToString());
+
+        if (!TryAuthorizeClient(sharedSecret, registration))
         {
             return Unauthorized();
         }
@@ -48,18 +78,26 @@ public sealed class RemoteDebugClientsController(
             return BadRequest("Unity RemoteDebug clients must connect with WebSocket.");
         }
 
+        if (!clientRegistry.TryConnect(
+                registration,
+                connectionOptions.EffectiveMaxConcurrentClients,
+                connectionOptions.EffectiveMaxConcurrentClientsPerRemoteEndPoint,
+                out var session))
+        {
+            return StatusCode(StatusCodes.Status429TooManyRequests, "Unity RemoteDebug client connection limit reached.");
+        }
+
         using var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-        var session = clientRegistry.Connect(new RemoteDebugClientRegistration(
-            Request.Query["name"],
-            Request.Query["project"],
-            Request.Query["unityVersion"],
-            Request.Query["platform"],
-            HttpContext.Connection.RemoteIpAddress?.ToString()));
 
         logger.LogInformation("Unity RemoteDebug client connected. ClientId={ClientId}, DisplayName={DisplayName}.", session.ClientId, session.DisplayName);
         try
         {
-            await ReceiveUntilClosedAsync(socket, session.ClientId, cancellationToken);
+            await ReceiveUntilClosedAsync(
+                socket,
+                session.ClientId,
+                connectionOptions.IdleTimeout,
+                connectionOptions.LastSeenNotificationInterval,
+                cancellationToken);
         }
         finally
         {
@@ -70,15 +108,33 @@ public sealed class RemoteDebugClientsController(
         return new EmptyResult();
     }
 
-    private async Task ReceiveUntilClosedAsync(WebSocket socket, Guid clientId, CancellationToken cancellationToken)
+    private async Task ReceiveUntilClosedAsync(
+        WebSocket socket,
+        Guid clientId,
+        TimeSpan idleTimeout,
+        TimeSpan notificationInterval,
+        CancellationToken cancellationToken)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(ReceiveBufferSize);
         try
         {
             while (socket.State == WebSocketState.Open)
             {
-                var result = await socket.ReceiveAsync(buffer.AsMemory(0, ReceiveBufferSize), cancellationToken);
-                clientRegistry.Touch(clientId);
+                using var receiveTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                receiveTimeout.CancelAfter(idleTimeout);
+
+                ValueWebSocketReceiveResult result;
+                try
+                {
+                    result = await socket.ReceiveAsync(buffer.AsMemory(0, ReceiveBufferSize), receiveTimeout.Token);
+                }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                {
+                    await socket.CloseAsync(WebSocketCloseStatus.PolicyViolation, "Idle timeout", CancellationToken.None);
+                    return;
+                }
+
+                clientRegistry.Touch(clientId, notificationInterval);
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
                     await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed by client", cancellationToken);
@@ -99,22 +155,88 @@ public sealed class RemoteDebugClientsController(
         }
     }
 
-    private bool TryAuthorizeClient(string expectedSecret)
+    private bool TryAuthorizeClient(string sharedSecret, RemoteDebugClientRegistration registration)
     {
-        if (Request.Headers.TryGetValue(SharedSecretHeader, out var headerSecret) &&
-            SecretEquals(headerSecret.ToString(), expectedSecret))
+        if (!Request.Headers.TryGetValue(ChallengeIdHeader, out var challengeId) ||
+            !Request.Headers.TryGetValue(ProofHeader, out var proofHeader))
         {
-            return true;
+            return false;
         }
 
-        return false;
+        if (!challengeStore.TryConsume(challengeId.ToString(), out var challenge) ||
+            !TryBase64UrlDecode(proofHeader.ToString(), out var providedProof) ||
+            providedProof.Length != ProofLength)
+        {
+            return false;
+        }
+
+        var expectedProof = ComputeProof(challenge, registration, sharedSecret);
+        return CryptographicOperations.FixedTimeEquals(providedProof, expectedProof);
     }
 
-    private static bool SecretEquals(string providedSecret, string expectedSecret)
+    private string GetQueryValue(string key)
     {
-        var providedBytes = Encoding.UTF8.GetBytes(providedSecret);
-        var expectedBytes = Encoding.UTF8.GetBytes(expectedSecret);
-        return providedBytes.Length == expectedBytes.Length &&
-               CryptographicOperations.FixedTimeEquals(providedBytes, expectedBytes);
+        return Request.Query[key].ToString();
+    }
+
+    private static byte[] ComputeProof(
+        RemoteDebugClientChallenge challenge,
+        RemoteDebugClientRegistration registration,
+        string sharedSecret)
+    {
+        var key = Encoding.UTF8.GetBytes(sharedSecret);
+        using var hmac = new HMACSHA256(key);
+        using var payload = new MemoryStream();
+
+        WriteString(payload, challenge.ChallengeId);
+        WriteBytes(payload, challenge.Nonce);
+        WriteString(payload, registration.DisplayName ?? string.Empty);
+        WriteString(payload, registration.ProjectName ?? string.Empty);
+        WriteString(payload, registration.UnityVersion ?? string.Empty);
+        WriteString(payload, registration.Platform ?? string.Empty);
+
+        return hmac.ComputeHash(payload.ToArray());
+    }
+
+    private static void WriteString(Stream stream, string value)
+    {
+        WriteBytes(stream, Encoding.UTF8.GetBytes(value));
+    }
+
+    private static void WriteBytes(Stream stream, byte[] value)
+    {
+        Span<byte> length = stackalloc byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32BigEndian(length, value.Length);
+        stream.Write(length);
+        stream.Write(value);
+    }
+
+    private static string Base64UrlEncode(ReadOnlySpan<byte> bytes)
+    {
+        return Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
+    private static bool TryBase64UrlDecode(string value, out byte[] bytes)
+    {
+        bytes = [];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        try
+        {
+            var padded = value.Replace('-', '+').Replace('_', '/');
+            padded = padded.PadRight(padded.Length + (4 - padded.Length % 4) % 4, '=');
+            bytes = Convert.FromBase64String(padded);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 }
