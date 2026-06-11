@@ -7,7 +7,7 @@ description: Choose credentials for GitHub commit-adjacent and online operations
 
 ## Trigger
 
-Use this skill before choosing credentials for GitHub operations, including push, remote branch publication, pull request creation or updates, PR comments, remote validation, or other online state changes.
+Use this skill before choosing credentials for GitHub operations, including push, remote branch publication, pull request creation or updates, remote validation, or other online state changes.
 
 Local `git commit` does not require GitHub credentials. Apply this policy when a commit is about to be pushed, associated with a pull request, or otherwise used in a remote GitHub workflow.
 
@@ -18,6 +18,8 @@ Local `git commit` does not require GitHub credentials. Apply this policy when a
 
 ## Credential Selection
 
+- Pull request reviews, review comments, and PR conversation comments that are part of a review must use the current ordinary GitHub user account. Do not use the GitHub App, bot identity, or installation token for review feedback.
+- If current-user GitHub credentials are unavailable for PR review feedback, do not post remotely. Return the review findings to the user so they can submit them from the current account.
 - For protected root branches, require ordinary user credentials. If the user provides ordinary user credentials and final approval, use those credentials for the operation.
 - Do not use the GitHub App to push directly to protected root branches or to bypass branch protection, review, CI, release, or production safeguards.
 - For isolated work branches, prefer the GitHub App when it is available and can satisfy the needed operation.
