@@ -79,22 +79,70 @@
     <value>PKCE를 사용하는 OIDC authorization code flow를 사용합니다.</value>
   </data>
   <data name="METRIC_ACCESS" xml:space="preserve">
-    <value>필요 권한</value>
+    <value>현재 권한</value>
   </data>
   <data name="METRIC_ACCESS_VALUE" xml:space="preserve">
     <value>staff 또는 admin</value>
   </data>
+  <data name="METRIC_ACCESS_ADMIN_VALUE" xml:space="preserve">
+    <value>관리자</value>
+  </data>
+  <data name="METRIC_ACCESS_STAFF_VALUE" xml:space="preserve">
+    <value>스태프</value>
+  </data>
+  <data name="METRIC_ACCESS_UNKNOWN_VALUE" xml:space="preserve">
+    <value>로그인됨</value>
+  </data>
   <data name="METRIC_ACCESS_DETAIL" xml:space="preserve">
-    <value>요청한 groups scope에서 판정합니다.</value>
+    <value>현재 로그인한 계정의 groups 클레임 기준입니다.</value>
   </data>
   <data name="METRIC_BACKEND" xml:space="preserve">
-    <value>백엔드 상태</value>
+    <value>연결 클라이언트</value>
   </data>
   <data name="METRIC_BACKEND_VALUE" xml:space="preserve">
     <value>초안</value>
   </data>
   <data name="METRIC_BACKEND_DETAIL" xml:space="preserve">
-    <value>원격 세션 API는 아직 연결하지 않았습니다.</value>
+    <value>Gateway TCP 연동은 이후 단계에서 진행합니다.</value>
+  </data>
+  <data name="CLIENTS_TITLE" xml:space="preserve">
+    <value>연결된 Unity 클라이언트</value>
+  </data>
+  <data name="CLIENTS_DESCRIPTION" xml:space="preserve">
+    <value>프론트엔드가 Gateway TCP 경로로 연결된 이후 Unity 클라이언트가 여기에 표시됩니다.</value>
+  </data>
+  <data name="CLIENTS_CONNECTED_FORMAT" xml:space="preserve">
+    <value>{0}개 연결됨</value>
+  </data>
+  <data name="CLIENTS_REFRESH" xml:space="preserve">
+    <value>연결 클라이언트 새로고침</value>
+  </data>
+  <data name="CLIENTS_EMPTY_TITLE" xml:space="preserve">
+    <value>연결된 클라이언트 없음</value>
+  </data>
+  <data name="CLIENTS_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>Gateway 기반 RemoteDebug 클라이언트 탐색은 이후 연동 단계에서 표시됩니다.</value>
+  </data>
+  <data name="CLIENTS_TABLE_CLIENT" xml:space="preserve">
+    <value>클라이언트</value>
+  </data>
+  <data name="CLIENTS_TABLE_PROJECT" xml:space="preserve">
+    <value>프로젝트</value>
+  </data>
+  <data name="CLIENTS_TABLE_PLATFORM" xml:space="preserve">
+    <value>플랫폼</value>
+  </data>
+  <data name="CLIENTS_TABLE_UNITY" xml:space="preserve">
+    <value>Unity</value>
+  </data>
+  <data name="CLIENTS_TABLE_REMOTE" xml:space="preserve">
+    <value>원격 주소</value>
+  </data>
+  <data name="CLIENTS_TABLE_CONNECTED" xml:space="preserve">
+    <value>연결 시각</value>
+  </data>
+  <data name="CLIENTS_TABLE_LAST_SEEN" xml:space="preserve">
+    <value>마지막 확인</value>
   </data>
   <data name="PANEL_TITLE" xml:space="preserve">
     <value>관리 작업 영역</value>

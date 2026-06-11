@@ -43,6 +43,32 @@ internal class Strings
 
     internal static string APP_TITLE => GetString(nameof(APP_TITLE));
 
+    internal static string CLIENTS_CONNECTED_FORMAT => GetString(nameof(CLIENTS_CONNECTED_FORMAT));
+
+    internal static string CLIENTS_DESCRIPTION => GetString(nameof(CLIENTS_DESCRIPTION));
+
+    internal static string CLIENTS_EMPTY_DESCRIPTION => GetString(nameof(CLIENTS_EMPTY_DESCRIPTION));
+
+    internal static string CLIENTS_EMPTY_TITLE => GetString(nameof(CLIENTS_EMPTY_TITLE));
+
+    internal static string CLIENTS_REFRESH => GetString(nameof(CLIENTS_REFRESH));
+
+    internal static string CLIENTS_TABLE_CLIENT => GetString(nameof(CLIENTS_TABLE_CLIENT));
+
+    internal static string CLIENTS_TABLE_CONNECTED => GetString(nameof(CLIENTS_TABLE_CONNECTED));
+
+    internal static string CLIENTS_TABLE_LAST_SEEN => GetString(nameof(CLIENTS_TABLE_LAST_SEEN));
+
+    internal static string CLIENTS_TABLE_PLATFORM => GetString(nameof(CLIENTS_TABLE_PLATFORM));
+
+    internal static string CLIENTS_TABLE_PROJECT => GetString(nameof(CLIENTS_TABLE_PROJECT));
+
+    internal static string CLIENTS_TABLE_REMOTE => GetString(nameof(CLIENTS_TABLE_REMOTE));
+
+    internal static string CLIENTS_TABLE_UNITY => GetString(nameof(CLIENTS_TABLE_UNITY));
+
+    internal static string CLIENTS_TITLE => GetString(nameof(CLIENTS_TITLE));
+
     internal static string ERROR_DEVELOPMENT_MODE_DESCRIPTION => GetString(nameof(ERROR_DEVELOPMENT_MODE_DESCRIPTION));
 
     internal static string ERROR_DEVELOPMENT_MODE_TITLE => GetString(nameof(ERROR_DEVELOPMENT_MODE_TITLE));
@@ -65,7 +91,13 @@ internal class Strings
 
     internal static string METRIC_ACCESS => GetString(nameof(METRIC_ACCESS));
 
+    internal static string METRIC_ACCESS_ADMIN_VALUE => GetString(nameof(METRIC_ACCESS_ADMIN_VALUE));
+
     internal static string METRIC_ACCESS_DETAIL => GetString(nameof(METRIC_ACCESS_DETAIL));
+
+    internal static string METRIC_ACCESS_STAFF_VALUE => GetString(nameof(METRIC_ACCESS_STAFF_VALUE));
+
+    internal static string METRIC_ACCESS_UNKNOWN_VALUE => GetString(nameof(METRIC_ACCESS_UNKNOWN_VALUE));
 
     internal static string METRIC_ACCESS_VALUE => GetString(nameof(METRIC_ACCESS_VALUE));
 

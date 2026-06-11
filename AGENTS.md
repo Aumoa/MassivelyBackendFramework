@@ -28,8 +28,9 @@
 
 ## Pull Request Review Policy
 
-- Submit pull request reviews and review comments only with the current ordinary GitHub user account, not with GitHub App, bot, or integration credentials.
-- If current-user GitHub credentials are unavailable, do not post the review remotely. Report the review findings to the user instead.
+- Use the current ordinary GitHub user account when submitting pull request review feedback that evaluates code, opens new review findings, approves, or requests changes.
+- Do not use GitHub App, bot, or integration credentials for review feedback that should appear as the current user's reviewer judgment. If suitable current-user credentials are unavailable, report the review findings to the user instead of posting them remotely.
+- GitHub App or bot credentials may be used for author-side PR activity, such as replying to existing review feedback, explaining pushed commits, updating PR descriptions, reporting validation results, or asking for re-review after the user requests that workflow.
 - When reviewing pull requests, prioritize issues that could let a client gain, request, or exercise privileges beyond what the server explicitly authorizes.
 - Treat client-to-server capability negotiation as security-sensitive. Clients may request capabilities, but the server must make the final authorization decision with least privilege and default-deny behavior.
 - Flag risky defaults where client SDKs request powerful capabilities by default, especially remote control, file transfer, admin operations, payment, session, group, authorization, or data export capabilities.

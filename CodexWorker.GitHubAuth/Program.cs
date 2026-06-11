@@ -377,6 +377,8 @@ sealed class CodexWorkerGitHubAuthOptions
 
     public string GitHubApiVersion { get; set; } = "2026-03-10";
 
+    public string? AppIdentityCachePath { get; set; }
+
     public string? AppId { get; set; }
 
     public string? Issuer { get; set; }
@@ -431,7 +433,8 @@ sealed class SharedSecretProvider(IOptions<CodexWorkerGitHubAuthOptions> options
 
 sealed class GitHubAppTokenService(
     HttpClient httpClient,
-    IOptions<CodexWorkerGitHubAuthOptions> options)
+    IOptions<CodexWorkerGitHubAuthOptions> options,
+    ILogger<GitHubAppTokenService> logger)
 {
     private static readonly JsonSerializerOptions s_jsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -441,6 +444,12 @@ sealed class GitHubAppTokenService(
     public async Task<GitHubAppIdentity> GetAppIdentityAsync(CancellationToken cancellationToken)
     {
         var configuredOptions = options.Value;
+        var cachedIdentity = await TryReadCachedAppIdentityAsync(configuredOptions, cancellationToken);
+        if (cachedIdentity is not null)
+        {
+            return cachedIdentity;
+        }
+
         var jwt = await CreateJwtAsync(configuredOptions, cancellationToken);
         using var appRequest = CreateGitHubRequest(
             configuredOptions,
@@ -467,13 +476,16 @@ sealed class GitHubAppTokenService(
         var botUser = await GetGitHubUserAsync(configuredOptions, botLogin, cancellationToken);
         var gitUserEmail = $"{botUser.Id}+{botUser.Login}@users.noreply.github.com";
 
-        return new GitHubAppIdentity(
+        var identity = new GitHubAppIdentity(
             app.Slug,
             app.Name,
             botUser.Login,
             botUser.Id,
             botUser.Login,
             gitUserEmail);
+
+        await TryWriteCachedAppIdentityAsync(configuredOptions, identity, cancellationToken);
+        return identity;
     }
 
     public async Task<GitHubInstallationToken> CreateInstallationTokenAsync(
@@ -542,6 +554,85 @@ sealed class GitHubAppTokenService(
         }
 
         return user;
+    }
+
+    private async Task<GitHubAppIdentity?> TryReadCachedAppIdentityAsync(
+        CodexWorkerGitHubAuthOptions options,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.AppIdentityCachePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (!File.Exists(options.AppIdentityCachePath))
+            {
+                return null;
+            }
+
+            await using var stream = File.OpenRead(options.AppIdentityCachePath);
+            var identity = await JsonSerializer.DeserializeAsync<GitHubAppIdentity>(
+                stream,
+                s_jsonOptions,
+                cancellationToken);
+
+            if (IsValidAppIdentity(identity))
+            {
+                logger.LogInformation("Loaded GitHub App identity from cache {CachePath}.", options.AppIdentityCachePath);
+                return identity;
+            }
+
+            logger.LogWarning("Ignoring invalid GitHub App identity cache at {CachePath}.", options.AppIdentityCachePath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            logger.LogWarning(exception, "Failed to read GitHub App identity cache at {CachePath}.", options.AppIdentityCachePath);
+        }
+
+        return null;
+    }
+
+    private async Task TryWriteCachedAppIdentityAsync(
+        CodexWorkerGitHubAuthOptions options,
+        GitHubAppIdentity identity,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(options.AppIdentityCachePath))
+        {
+            return;
+        }
+
+        try
+        {
+            var directory = Path.GetDirectoryName(options.AppIdentityCachePath);
+            if (!string.IsNullOrWhiteSpace(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            await using var stream = File.Create(options.AppIdentityCachePath);
+            await JsonSerializer.SerializeAsync(stream, identity, s_jsonOptions, cancellationToken);
+            await stream.FlushAsync(cancellationToken);
+
+            logger.LogInformation("Cached GitHub App identity at {CachePath}.", options.AppIdentityCachePath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(exception, "Failed to write GitHub App identity cache at {CachePath}.", options.AppIdentityCachePath);
+        }
+    }
+
+    private static bool IsValidAppIdentity(GitHubAppIdentity? identity)
+    {
+        return identity is not null
+            && !string.IsNullOrWhiteSpace(identity.AppSlug)
+            && !string.IsNullOrWhiteSpace(identity.AppName)
+            && !string.IsNullOrWhiteSpace(identity.BotLogin)
+            && identity.BotUserId > 0
+            && !string.IsNullOrWhiteSpace(identity.GitUserName)
+            && !string.IsNullOrWhiteSpace(identity.GitUserEmail);
     }
 
     private static HttpRequestMessage CreateGitHubRequest(

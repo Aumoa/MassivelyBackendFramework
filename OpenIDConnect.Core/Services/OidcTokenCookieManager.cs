@@ -76,7 +76,7 @@ internal sealed class OidcTokenCookieManager(IOptions<OIDCOptions> options)
         {
             HttpOnly = true,
             Secure = true,
-            SameSite = SameSiteMode.Strict,
+            SameSite = SameSiteMode.Lax,
             Path = "/",
             Expires = expires
         };
@@ -88,7 +88,7 @@ internal sealed class OidcTokenCookieManager(IOptions<OIDCOptions> options)
         {
             HttpOnly = true,
             Secure = true,
-            SameSite = SameSiteMode.Strict,
+            SameSite = SameSiteMode.Lax,
             Path = "/"
         };
     }
