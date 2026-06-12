@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<IBackendNodeCatalogWriter>(p => p.GetRequiredService<BackendNodeCatalog>());
         s.AddSingleton<MasterConnectionManager>();
         s.AddSingleton<IMasterConnectionStatusProvider>(p => p.GetRequiredService<MasterConnectionManager>());
+        s.AddSingleton<IDirectConnectCodeIssuer>(p => p.GetRequiredService<MasterConnectionManager>());
         s.AddHostedService(p => p.GetRequiredService<MasterConnectionManager>());
         s.AddSingleton<DedicatedConnectionManager>();
         s.AddSingleton<IDedicatedConnectionStatusProvider>(p => p.GetRequiredService<DedicatedConnectionManager>());

@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGatewayConnectionStatusProvider>(static provider => provider.GetRequiredService<GatewayConnectionManager>());
         services.AddHostedService(static provider => provider.GetRequiredService<GatewayConnectionManager>());
         services.AddSingleton<MasterConnectionManager>();
+        services.AddSingleton<IDirectConnectCodeValidator>(static provider => provider.GetRequiredService<MasterConnectionManager>());
         services.AddHostedService(static provider => provider.GetRequiredService<MasterConnectionManager>());
 
         return services;

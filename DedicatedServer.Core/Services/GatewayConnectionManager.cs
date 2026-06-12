@@ -23,6 +23,7 @@ internal interface IGatewayConnectionStatusProvider
 internal sealed class GatewayConnectionManager(
     IOptions<GatewayListenerOptions> options,
     IDedicatedWorldRuntime worldRuntime,
+    IDirectConnectCodeValidator directConnectCodeValidator,
     ILogger<GatewayConnectionManager> logger) : IHostedService, IGatewayConnectionStatusProvider
 {
     private readonly GatewayListenerOptions m_Options = options.Value;
@@ -38,8 +39,6 @@ internal sealed class GatewayConnectionManager(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        EnsureConfigured();
-
         if (m_Options.UseTls)
         {
             m_Cert = await LoadCertificateAsync(m_Options, cancellationToken).ConfigureAwait(false);
@@ -245,14 +244,25 @@ internal sealed class GatewayConnectionManager(
             m_GatewayMasterConnectionIds[connectionId] = hello.MasterConnectionId;
         }
 
-        using var proofFrame = await ReadRequiredHandshakeFrameAsync(
-            stream,
-            MasterControlPacketIds.NodeAuthProof,
-            handshakeTimeout.Token).ConfigureAwait(false);
-        var proof = PacketCodec.Decode(proofFrame, NodeAuthProof.Codec);
-        if (!MasterNodeAuthenticator.VerifyProof(challenge, hello, proof, m_Options.SharedSecret))
+        if (string.IsNullOrWhiteSpace(hello.MasterConnectionId))
         {
-            throw new UnauthorizedAccessException($"Gateway authentication proof was rejected for node '{hello.NodeId}'.");
+            throw new UnauthorizedAccessException("Gateway Master connection id is required for direct connection approval.");
+        }
+
+        using var codeFrame = await ReadRequiredHandshakeFrameAsync(
+            stream,
+            MasterControlPacketIds.DirectConnectCode,
+            handshakeTimeout.Token).ConfigureAwait(false);
+        var directConnectCode = PacketCodec.Decode(codeFrame, DirectConnectCode.Codec);
+        var validation = await directConnectCodeValidator.ValidateDirectConnectCodeAsync(
+            directConnectCode.Code,
+            hello.NodeId,
+            hello.MasterConnectionId,
+            handshakeTimeout.Token).ConfigureAwait(false);
+        if (!string.Equals(validation.GatewayNodeId, hello.NodeId, StringComparison.Ordinal) ||
+            !string.Equals(validation.GatewayMasterConnectionId, hello.MasterConnectionId, StringComparison.Ordinal))
+        {
+            throw new UnauthorizedAccessException("Direct connect code validation returned a different Gateway identity.");
         }
 
         var accepted = new NodeAccepted(hello.NodeId, connectionId.ToString("N"));
@@ -334,14 +344,6 @@ internal sealed class GatewayConnectionManager(
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(nonce);
         return new NodeAuthChallenge(Guid.NewGuid().ToString("N"), nonce);
-    }
-
-    private void EnsureConfigured()
-    {
-        if (string.IsNullOrWhiteSpace(m_Options.SharedSecret))
-        {
-            throw new InvalidOperationException("GatewayListener:SharedSecret must be configured before accepting Gateway connections.");
-        }
     }
 
     public ServiceAdminStatusItem[] GetStatusItems()

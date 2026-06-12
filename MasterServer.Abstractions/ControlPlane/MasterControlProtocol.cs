@@ -5,7 +5,7 @@ namespace MasterServer.ControlPlane;
 
 public static class MasterControlProtocol
 {
-    public const ushort SchemaVersion = 4;
+    public const ushort SchemaVersion = 5;
     public const int AuthNonceLength = 32;
     public const int MaxHandshakePayloadLength = 16 * 1024;
 

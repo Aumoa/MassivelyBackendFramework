@@ -18,6 +18,7 @@ internal sealed class ConnectionManager(
     IOptions<MasterSocketOptions> options,
     IOptions<ServiceConnectionCredentialOptions> serviceCredentialOptions,
     INodeAuthSecretProvider nodeAuthSecretProvider,
+    IDirectConnectCodeStore directConnectCodeStore,
     ILogger<ConnectionManager> logger) : IHostedService, IConnectionManager
 {
     private readonly MasterSocketOptions m_Options = options.Value;
@@ -378,6 +379,18 @@ internal sealed class ConnectionManager(
         if (frame.Header.PacketId == MasterControlPacketIds.ServiceAdminStatusResponse)
         {
             await RelayServiceAdminStatusResponseAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (frame.Header.PacketId == MasterControlPacketIds.DirectConnectCodeRequest)
+        {
+            await HandleDirectConnectCodeRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (frame.Header.PacketId == MasterControlPacketIds.DirectConnectCodeValidationRequest)
+        {
+            await HandleDirectConnectCodeValidationRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -611,6 +624,142 @@ internal sealed class ConnectionManager(
             cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task HandleDirectConnectCodeRequestAsync(
+        MasterConnection source,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.DirectConnectCodeRequest);
+        var request = PacketCodec.Decode(frame, DirectConnectCodeRequest.Codec);
+
+        if (source.NodeKind != MasterNodeKind.Gateway)
+        {
+            await WriteDirectConnectCodeFailureAsync(
+                source,
+                request.RequestId,
+                "Only Gateway nodes can request direct connect codes.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!TryParseConnectionId(request.DedicatedMasterConnectionId, out var dedicatedConnectionId) ||
+            !m_Connections.TryGetValue(dedicatedConnectionId, out var dedicatedConnection) ||
+            !dedicatedConnection.IsTrusted ||
+            dedicatedConnection.NodeKind != MasterNodeKind.Dedicated)
+        {
+            await WriteDirectConnectCodeFailureAsync(
+                source,
+                request.RequestId,
+                "Target Dedicated node is not connected.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var ticket = await directConnectCodeStore.CreateAsync(
+            source.ConnectionId.ToString("N"),
+            source.NodeId,
+            dedicatedConnection.ConnectionId.ToString("N"),
+            dedicatedConnection.NodeId,
+            cancellationToken).ConfigureAwait(false);
+        var response = new DirectConnectCodeResponse(
+            request.RequestId,
+            success: true,
+            ticket.Code,
+            ticket.ExpiresAt,
+            string.Empty);
+        await source.WriteControlAsync(
+            MasterControlPacketIds.DirectConnectCodeResponse,
+            response,
+            DirectConnectCodeResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task HandleDirectConnectCodeValidationRequestAsync(
+        MasterConnection source,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.DirectConnectCodeValidationRequest);
+        var request = PacketCodec.Decode(frame, DirectConnectCodeValidationRequest.Codec);
+
+        if (source.NodeKind != MasterNodeKind.Dedicated)
+        {
+            await WriteDirectConnectCodeValidationFailureAsync(
+                source,
+                request.RequestId,
+                "Only Dedicated nodes can validate direct connect codes.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var ticket = await directConnectCodeStore.ConsumeAsync(request.Code, cancellationToken).ConfigureAwait(false);
+        if (ticket == null ||
+            !string.Equals(ticket.DedicatedMasterConnectionId, source.ConnectionId.ToString("N"), StringComparison.Ordinal) ||
+            !string.Equals(ticket.GatewayMasterConnectionId, request.GatewayMasterConnectionId, StringComparison.Ordinal) ||
+            !string.Equals(ticket.GatewayNodeId, request.GatewayNodeId, StringComparison.Ordinal))
+        {
+            await WriteDirectConnectCodeValidationFailureAsync(
+                source,
+                request.RequestId,
+                "Direct connect code is invalid or expired.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!TryParseConnectionId(ticket.GatewayMasterConnectionId, out var gatewayConnectionId) ||
+            !m_Connections.TryGetValue(gatewayConnectionId, out var gatewayConnection) ||
+            !gatewayConnection.IsTrusted ||
+            gatewayConnection.NodeKind != MasterNodeKind.Gateway ||
+            !string.Equals(gatewayConnection.NodeId, ticket.GatewayNodeId, StringComparison.Ordinal))
+        {
+            await WriteDirectConnectCodeValidationFailureAsync(
+                source,
+                request.RequestId,
+                "Gateway node is no longer connected.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var response = new DirectConnectCodeValidationResponse(
+            request.RequestId,
+            success: true,
+            ticket.GatewayNodeId,
+            ticket.GatewayMasterConnectionId,
+            ticket.DedicatedMasterConnectionId,
+            string.Empty);
+        await source.WriteControlAsync(
+            MasterControlPacketIds.DirectConnectCodeValidationResponse,
+            response,
+            DirectConnectCodeValidationResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteDirectConnectCodeFailureAsync(
+        MasterConnection connection,
+        Guid requestId,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.DirectConnectCodeResponse,
+            DirectConnectCodeResponse.Failure(requestId, errorMessage),
+            DirectConnectCodeResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteDirectConnectCodeValidationFailureAsync(
+        MasterConnection connection,
+        Guid requestId,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.DirectConnectCodeValidationResponse,
+            DirectConnectCodeValidationResponse.Failure(requestId, errorMessage),
+            DirectConnectCodeValidationResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task ExpireAdminStatusRouteAsync(Guid requestId, CancellationToken cancellationToken)
     {
         try
@@ -621,6 +770,12 @@ internal sealed class ConnectionManager(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
+    }
+
+    private static bool TryParseConnectionId(string value, out Guid connectionId)
+    {
+        return Guid.TryParseExact(value, "N", out connectionId) ||
+               Guid.TryParse(value, out connectionId);
     }
 
     private MasterOverviewSnapshot CreateOverviewSnapshot()

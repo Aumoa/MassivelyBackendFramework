@@ -12,7 +12,5 @@ public sealed record GatewayListenerOptions
 
     public int Backlog { get; set; } = 512;
 
-    public string SharedSecret { get; set; } = string.Empty;
-
     public int HandshakeTimeoutMilliseconds { get; set; } = 5000;
 }

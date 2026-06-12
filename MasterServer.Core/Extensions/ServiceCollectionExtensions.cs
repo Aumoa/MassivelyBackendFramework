@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
         services.Configure<MasterSocketOptions>(config.GetRequiredSection("MasterSocket"));
         services.Configure<MasterAdminConnectionOptions>(config.GetRequiredSection("MasterAdminConnection"));
         services.Configure<ServiceConnectionCredentialOptions>(config.GetRequiredSection("ServiceConnectionCredentials"));
+        services.Configure<DirectConnectCodeOptions>(config.GetSection("DirectConnectCodes"));
 
         var serviceConnectionCredentials = config.GetRequiredSection("ServiceConnectionCredentials").Get<ServiceConnectionCredentialOptions>() ?? new();
         var redisConnectionString = config.GetValue<string>("DataProtection:RedisConnectionString");
@@ -31,10 +32,14 @@ public static class ServiceCollectionExtensions
             throw new InvalidOperationException("DataProtection:RedisConnectionString must be configured for Master service credentials.");
         }
 
+        var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+        services.AddSingleton<IConnectionMultiplexer>(redis);
+
         services.AddDataProtection()
-            .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
+            .PersistKeysToStackExchangeRedis(redis)
             .SetApplicationName(serviceConnectionCredentials.DataProtectionApplicationName);
         services.AddSingleton<INodeAuthSecretProvider, MySqlNodeAuthSecretProvider>();
+        services.AddSingleton<IDirectConnectCodeStore, RedisDirectConnectCodeStore>();
 
         services.AddSingleton<IConnectionManager, ConnectionManager>();
         services.AddHostedService(provider => (ConnectionManager)provider.GetRequiredService<IConnectionManager>());

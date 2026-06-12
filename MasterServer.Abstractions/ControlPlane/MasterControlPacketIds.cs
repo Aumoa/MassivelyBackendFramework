@@ -13,4 +13,9 @@ public static class MasterControlPacketIds
     public const ushort ServiceAdminStatusResponse = 108;
     public const ushort BackendEndpointAdvertise = 109;
     public const ushort BackendNodeSnapshot = 110;
+    public const ushort DirectConnectCodeRequest = 111;
+    public const ushort DirectConnectCodeResponse = 112;
+    public const ushort DirectConnectCodeValidationRequest = 113;
+    public const ushort DirectConnectCodeValidationResponse = 114;
+    public const ushort DirectConnectCode = 115;
 }
