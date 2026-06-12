@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "UnityRemoteDebug.Backend": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:11808",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
