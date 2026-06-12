@@ -9,15 +9,6 @@ namespace MasterServer.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddMasterServiceConnectionCredentialManagement(
-        this IServiceCollection services,
-        IConfiguration config)
-    {
-        services.Configure<ServiceConnectionCredentialOptions>(config.GetRequiredSection("ServiceConnectionCredentials"));
-        services.AddTransient<IServiceConnectionCredentials, MySqlServiceConnectionCredentials>();
-        return services;
-    }
-
     public static IServiceCollection AddMasterServer(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<MasterSocketOptions>(config.GetRequiredSection("MasterSocket"));
@@ -38,6 +29,7 @@ public static class ServiceCollectionExtensions
         services.AddDataProtection()
             .PersistKeysToStackExchangeRedis(redis)
             .SetApplicationName(serviceConnectionCredentials.DataProtectionApplicationName);
+        services.AddSingleton<IServiceConnectionCredentials, MySqlServiceConnectionCredentials>();
         services.AddSingleton<INodeAuthSecretProvider, MySqlNodeAuthSecretProvider>();
         services.AddSingleton<IDirectConnectCodeStore, RedisDirectConnectCodeStore>();
 

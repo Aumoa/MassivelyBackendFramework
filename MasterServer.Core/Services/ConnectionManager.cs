@@ -19,10 +19,12 @@ internal sealed class ConnectionManager(
     IOptions<ServiceConnectionCredentialOptions> serviceCredentialOptions,
     INodeAuthSecretProvider nodeAuthSecretProvider,
     IDirectConnectCodeStore directConnectCodeStore,
+    IServiceConnectionCredentials serviceConnectionCredentials,
     ILogger<ConnectionManager> logger) : IHostedService, IConnectionManager
 {
     private readonly MasterSocketOptions m_Options = options.Value;
     private readonly ServiceConnectionCredentialOptions m_ServiceCredentialOptions = serviceCredentialOptions.Value;
+    private readonly IServiceConnectionCredentials m_ServiceConnectionCredentials = serviceConnectionCredentials;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly ConcurrentDictionary<Guid, MasterConnection> m_Connections = [];
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
@@ -397,6 +399,13 @@ internal sealed class ConnectionManager(
         if (frame.Header.PacketId == MasterControlPacketIds.DirectConnectCodeValidationRequest)
         {
             await HandleDirectConnectCodeValidationRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (frame.Header.PacketId == MasterControlPacketIds.ServiceConnectionCredentialManagementRequest)
+        {
+            await HandleServiceConnectionCredentialManagementRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+            return;
         }
     }
 
@@ -759,6 +768,102 @@ internal sealed class ConnectionManager(
             response,
             DirectConnectCodeValidationResponse.Codec,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task HandleServiceConnectionCredentialManagementRequestAsync(
+        MasterConnection source,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.ServiceConnectionCredentialManagementRequest);
+        var request = PacketCodec.Decode(frame, ServiceConnectionCredentialManagementRequest.Codec);
+
+        if (source.NodeKind != MasterNodeKind.MasterAdmin)
+        {
+            logger.LogWarning(
+                "Rejected service connection credential management request from non-admin node. SourceConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
+                source.ConnectionId,
+                source.NodeKind,
+                source.NodeId);
+            return;
+        }
+
+        ServiceConnectionCredentialManagementResponse response;
+        try
+        {
+            response = await ExecuteServiceConnectionCredentialRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Failed to process service connection credential management request. RequestId={RequestId}, Operation={Operation}.",
+                request.RequestId,
+                request.Operation);
+            response = ServiceConnectionCredentialManagementResponse.Failure(request.RequestId, e.Message);
+        }
+
+        await source.WriteControlAsync(
+            MasterControlPacketIds.ServiceConnectionCredentialManagementResponse,
+            response,
+            ServiceConnectionCredentialManagementResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask<ServiceConnectionCredentialManagementResponse> ExecuteServiceConnectionCredentialRequestAsync(
+        ServiceConnectionCredentialManagementRequest request,
+        CancellationToken cancellationToken)
+    {
+        switch (request.Operation)
+        {
+            case ServiceConnectionCredentialOperation.List:
+            {
+                var credentials = await m_ServiceConnectionCredentials.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
+                return ServiceConnectionCredentialManagementResponse.SuccessResult(request.RequestId, credentials);
+            }
+
+            case ServiceConnectionCredentialOperation.Create:
+            {
+                var created = await m_ServiceConnectionCredentials.CreateCredentialAsync(request.ToInput(), cancellationToken).ConfigureAwait(false);
+                return ServiceConnectionCredentialManagementResponse.SuccessResult(
+                    request.RequestId,
+                    [created.Credential],
+                    created.SharedSecret);
+            }
+
+            case ServiceConnectionCredentialOperation.Update:
+                await m_ServiceConnectionCredentials.UpdateCredentialAsync(
+                    request.CredentialId,
+                    request.ToInput(),
+                    cancellationToken).ConfigureAwait(false);
+                return ServiceConnectionCredentialManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<ServiceConnectionCredentialInfo>());
+
+            case ServiceConnectionCredentialOperation.RotateSecret:
+            {
+                var sharedSecret = await m_ServiceConnectionCredentials.RotateSecretAsync(
+                    request.CredentialId,
+                    cancellationToken).ConfigureAwait(false);
+                return ServiceConnectionCredentialManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<ServiceConnectionCredentialInfo>(),
+                    sharedSecret);
+            }
+
+            case ServiceConnectionCredentialOperation.Remove:
+                await m_ServiceConnectionCredentials.RemoveCredentialAsync(request.CredentialId, cancellationToken).ConfigureAwait(false);
+                return ServiceConnectionCredentialManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<ServiceConnectionCredentialInfo>());
+
+            default:
+                throw new InvalidOperationException($"Unsupported credential management operation '{request.Operation}'.");
+        }
     }
 
     private async Task WriteDirectConnectCodeFailureAsync(
