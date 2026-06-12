@@ -4,6 +4,7 @@ using MasterAdmin.Options;
 using MasterAdmin.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using MasterServer.Extensions;
 using OpenIDConnect.Extensions;
 using StackExchange.Redis;
 
@@ -17,9 +18,8 @@ builder.Services.AddControllers();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
-builder.Services.Configure<MySqlOptions>(builder.Configuration.GetRequiredSection("MySql"));
 builder.Services.Configure<MasterConnectionOptions>(builder.Configuration.GetRequiredSection("MasterConnection"));
-builder.Services.AddTransient<IServiceConnectionCredentials, MySqlServiceConnectionCredentials>();
+builder.Services.AddMasterServiceConnectionCredentialManagement(builder.Configuration);
 builder.Services.AddSingleton<MasterOverviewSocketClient>();
 builder.Services.AddSingleton<IMasterOverviewProvider>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 builder.Services.AddHostedService(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
@@ -33,7 +33,9 @@ if (string.IsNullOrWhiteSpace(redisConnectionString))
 
 builder.Services.AddDataProtection()
     .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
-    .SetApplicationName("MasterAdmin");
+    .SetApplicationName(
+        builder.Configuration.GetValue<string>("ServiceConnectionCredentials:DataProtectionApplicationName") ??
+        "MasterAdmin");
 
 builder.Services.AddAuthorizationCore(options =>
 {

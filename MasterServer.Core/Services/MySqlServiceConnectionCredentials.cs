@@ -1,15 +1,15 @@
 using System.Security.Cryptography;
 using Dapper;
-using MasterAdmin.Options;
 using MasterServer.ControlPlane;
+using MasterServer.Options;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 using MySql.Data.MySqlClient;
 
-namespace MasterAdmin.Services;
+namespace MasterServer.Services;
 
 internal sealed class MySqlServiceConnectionCredentials(
-    IOptions<MySqlOptions> options,
+    IOptions<ServiceConnectionCredentialOptions> options,
     IDataProtectionProvider dataProtectionProvider) : IServiceConnectionCredentials
 {
     private const string ProtectorPurpose = "MasterServer.ServiceConnectionCredentials.v1";

@@ -9,6 +9,15 @@ namespace MasterServer.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    public static IServiceCollection AddMasterServiceConnectionCredentialManagement(
+        this IServiceCollection services,
+        IConfiguration config)
+    {
+        services.Configure<ServiceConnectionCredentialOptions>(config.GetRequiredSection("ServiceConnectionCredentials"));
+        services.AddTransient<IServiceConnectionCredentials, MySqlServiceConnectionCredentials>();
+        return services;
+    }
+
     public static IServiceCollection AddMasterServer(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<MasterSocketOptions>(config.GetRequiredSection("MasterSocket"));

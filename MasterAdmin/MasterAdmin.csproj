@@ -8,15 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.5" />
-    <PackageReference Include="MySql.Data" Version="9.4.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.9.25" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\BlazorSharedComponent\BlazorSharedComponent.csproj" />
     <ProjectReference Include="..\MasterServer.Abstractions\MasterServer.Abstractions.csproj" />
+    <ProjectReference Include="..\MasterServer.Core\MasterServer.Core.csproj" />
     <ProjectReference Include="..\OpenIDConnect.Core\OpenIDConnect.Core.csproj" />
     <ProjectReference Include="..\PacketCore\PacketCore.csproj" />
   </ItemGroup>

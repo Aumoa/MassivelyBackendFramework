@@ -1,6 +1,6 @@
 using MasterServer.ControlPlane;
 
-namespace MasterAdmin.Services;
+namespace MasterServer.Services;
 
 public sealed record ServiceConnectionCredentialInfo(
     long Id,

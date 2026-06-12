@@ -1,4 +1,4 @@
-namespace MasterAdmin.Services;
+namespace MasterServer.Services;
 
 public sealed record ServiceConnectionCredentialCreated(
     ServiceConnectionCredentialInfo Credential,
