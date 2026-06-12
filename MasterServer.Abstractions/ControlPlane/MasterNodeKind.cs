@@ -6,5 +6,5 @@ public enum MasterNodeKind
     Gateway = 1,
     Dedicated = 2,
     MasterAdmin = 3,
-    RemoteDebug = 4
+    Backend = 4
 }

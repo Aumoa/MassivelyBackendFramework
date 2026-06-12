@@ -171,6 +171,9 @@
   <data name="NODE_KIND_MASTER_ADMIN" xml:space="preserve">
     <value>Master Admin</value>
   </data>
+  <data name="NODE_KIND_BACKEND" xml:space="preserve">
+    <value>Backend</value>
+  </data>
   <data name="NODE_PAGE_TITLE" xml:space="preserve">
     <value>노드 관리</value>
   </data>

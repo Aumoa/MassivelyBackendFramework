@@ -68,7 +68,7 @@ public sealed class BackendNodeSnapshot
 
         private static int GetNodeSize(BackendNodeEndpoint value)
         {
-            return sizeof(byte) +
+            return PacketWriter.GetStringSize(value.BackendKind) +
                    PacketWriter.GetStringSize(value.NodeId) +
                    PacketWriter.GetStringSize(value.DisplayName) +
                    PacketWriter.GetStringSize(value.MasterConnectionId) +
@@ -78,7 +78,7 @@ public sealed class BackendNodeSnapshot
 
         private static void WriteNode(BackendNodeEndpoint value, ref PacketWriter writer)
         {
-            writer.WriteByte((byte)value.NodeKind);
+            writer.WriteString(value.BackendKind);
             writer.WriteString(value.NodeId);
             writer.WriteString(value.DisplayName);
             writer.WriteString(value.MasterConnectionId);
@@ -88,13 +88,13 @@ public sealed class BackendNodeSnapshot
 
         private static BackendNodeEndpoint ReadNode(ref PacketReader reader)
         {
-            var nodeKind = (MasterNodeKind)reader.ReadByte();
+            string backendKind = reader.ReadString();
             string nodeId = reader.ReadString();
             string displayName = reader.ReadString();
             string masterConnectionId = reader.ReadString();
             var gatewayEndpoint = ReadEndpoint(ref reader);
             var advertisedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.ReadInt64());
-            return new BackendNodeEndpoint(nodeKind, nodeId, displayName, masterConnectionId, gatewayEndpoint, advertisedAt);
+            return new BackendNodeEndpoint(backendKind, nodeId, displayName, masterConnectionId, gatewayEndpoint, advertisedAt);
         }
 
         private static int GetEndpointSize(MasterSocketEndpoint value)

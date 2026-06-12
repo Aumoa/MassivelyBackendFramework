@@ -310,9 +310,12 @@ internal sealed class MasterConnectionManager(
                     var snapshot = PacketCodec.Decode(frame, BackendNodeSnapshot.Codec);
                     backendNodeCatalog.Publish(snapshot);
                     logger.LogInformation(
-                        "Gateway received backend discovery snapshot. BackendCount={Count}, RemoteDebugCount={RemoteDebugCount}.",
+                        "Gateway received backend discovery snapshot. BackendCount={Count}, BackendKinds={BackendKinds}.",
                         snapshot.Nodes.Length,
-                        snapshot.Nodes.Count(static node => node.NodeKind == MasterNodeKind.RemoteDebug));
+                        string.Join(", ", snapshot.Nodes
+                            .Select(static node => node.BackendKind)
+                            .Distinct(StringComparer.Ordinal)
+                            .OrderBy(static backendKind => backendKind, StringComparer.Ordinal)));
                     continue;
                 }
 

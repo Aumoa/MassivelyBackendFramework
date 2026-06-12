@@ -149,7 +149,7 @@
             MasterNodeKind.Gateway => Strings.NODE_KIND_GATEWAY,
             MasterNodeKind.Dedicated => Strings.NODE_KIND_DEDICATED,
             MasterNodeKind.MasterAdmin => Strings.NODE_KIND_MASTER_ADMIN,
-            MasterNodeKind.RemoteDebug => "RemoteDebug",
+            MasterNodeKind.Backend => T("NODE_KIND_BACKEND"),
             _ => Strings.NODE_KIND_UNKNOWN
         };
     }
@@ -170,7 +170,12 @@
 
     private static bool CanOpenNodePage(MasterNodeKind nodeKind)
     {
-        return nodeKind is MasterNodeKind.Gateway or MasterNodeKind.Dedicated;
+        return nodeKind is MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.Backend;
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, Strings.Culture) ?? key;
     }
 
     private static string GetNodePageHref(MasterConnectionSnapshot connection)

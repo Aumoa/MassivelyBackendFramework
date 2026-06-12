@@ -5,16 +5,16 @@ namespace MasterServer.ControlPlane;
 public sealed class BackendNodeEndpoint
 {
     public BackendNodeEndpoint(
-        MasterNodeKind nodeKind,
+        string backendKind,
         string nodeId,
         string displayName,
         string masterConnectionId,
         MasterSocketEndpoint gatewayEndpoint,
         DateTimeOffset advertisedAt)
     {
-        if (!IsBackendNodeKind(nodeKind))
+        if (string.IsNullOrWhiteSpace(backendKind))
         {
-            throw new ArgumentOutOfRangeException(nameof(nodeKind));
+            throw new ArgumentException("Backend kind is required.", nameof(backendKind));
         }
 
         if (string.IsNullOrWhiteSpace(nodeId))
@@ -32,7 +32,7 @@ public sealed class BackendNodeEndpoint
             throw new ArgumentException("Master connection id is required.", nameof(masterConnectionId));
         }
 
-        NodeKind = nodeKind;
+        BackendKind = backendKind;
         NodeId = nodeId;
         DisplayName = displayName;
         MasterConnectionId = masterConnectionId;
@@ -40,7 +40,7 @@ public sealed class BackendNodeEndpoint
         AdvertisedAt = advertisedAt;
     }
 
-    public MasterNodeKind NodeKind { get; }
+    public string BackendKind { get; }
 
     public string NodeId { get; }
 
@@ -54,6 +54,6 @@ public sealed class BackendNodeEndpoint
 
     public static bool IsBackendNodeKind(MasterNodeKind nodeKind)
     {
-        return nodeKind is MasterNodeKind.RemoteDebug;
+        return nodeKind is MasterNodeKind.Backend;
     }
 }

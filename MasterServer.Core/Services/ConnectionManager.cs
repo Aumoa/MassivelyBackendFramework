@@ -351,11 +351,12 @@ internal sealed class ConnectionManager(
         {
             MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendEndpointAdvertise);
             var advertised = PacketCodec.Decode(frame, BackendEndpointAdvertise.Codec);
-            connection.UpdateBackendGatewayEndpoint(advertised.GatewayEndpoint);
+            connection.UpdateBackendGatewayEndpoint(advertised.BackendKind, advertised.GatewayEndpoint);
             logger.LogInformation(
-                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
+                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, BackendKind={BackendKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
                 connection.ConnectionId,
                 connection.NodeKind,
+                advertised.BackendKind,
                 connection.NodeId,
                 advertised.GatewayEndpoint.IPAddress,
                 advertised.GatewayEndpoint.Port,
@@ -538,7 +539,7 @@ internal sealed class ConnectionManager(
 
         if (!m_Connections.TryGetValue(targetConnectionId, out var target) ||
             !target.IsTrusted ||
-            target.NodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated))
+            target.NodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.Backend))
         {
             await WriteServiceAdminFailureAsync(source, request, "Target node is not connected or cannot provide a management page.", cancellationToken).ConfigureAwait(false);
             return;
@@ -648,7 +649,7 @@ internal sealed class ConnectionManager(
                 .Select(static connection => connection.TryCreateBackendNodeEndpoint())
                 .Where(static endpoint => endpoint != null)
                 .Select(static endpoint => endpoint!)
-                .OrderBy(static endpoint => endpoint.NodeKind)
+                .OrderBy(static endpoint => endpoint.BackendKind, StringComparer.Ordinal)
                 .ThenBy(static endpoint => endpoint.NodeId, StringComparer.Ordinal)],
             DateTimeOffset.UtcNow);
     }
@@ -889,6 +890,8 @@ internal sealed class ConnectionManager(
 
         public MasterSocketEndpoint? BackendGatewayEndpoint { get; private set; }
 
+        public string BackendKind { get; private set; } = string.Empty;
+
         public DateTimeOffset? BackendGatewayEndpointAdvertisedAt { get; private set; }
 
         public void AttachStream(Stream stream)
@@ -913,8 +916,9 @@ internal sealed class ConnectionManager(
             MarkSeen();
         }
 
-        public void UpdateBackendGatewayEndpoint(MasterSocketEndpoint endpoint)
+        public void UpdateBackendGatewayEndpoint(string backendKind, MasterSocketEndpoint endpoint)
         {
+            BackendKind = backendKind;
             BackendGatewayEndpoint = endpoint;
             BackendGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
             MarkSeen();
@@ -961,6 +965,7 @@ internal sealed class ConnectionManager(
             var advertisedAt = BackendGatewayEndpointAdvertisedAt;
             if (!IsTrusted ||
                 !BackendNodeEndpoint.IsBackendNodeKind(NodeKind) ||
+                string.IsNullOrWhiteSpace(BackendKind) ||
                 endpoint == null ||
                 !advertisedAt.HasValue)
             {
@@ -968,7 +973,7 @@ internal sealed class ConnectionManager(
             }
 
             return new BackendNodeEndpoint(
-                NodeKind,
+                BackendKind,
                 NodeId,
                 DisplayName,
                 ConnectionId.ToString("N"),
