@@ -30,6 +30,7 @@ internal class ConnectionManager(
 {
     private readonly BackendRouteOptions m_BackendRouteOptions = backendRouteOptions.Value;
     private readonly CancellationTokenSource m_GracefulCancellation = new();
+    private readonly object m_BackendRouteRegistrationSync = new();
     private readonly ConcurrentDictionary<Guid, PendingBackendRoute> m_PendingBackendRoutes = [];
 
     private Socket? m_Socket;
@@ -434,7 +435,9 @@ internal class ConnectionManager(
                 ? "None"
                 : string.Join(", ", allowedBackendKinds.OrderBy(static item => item, StringComparer.Ordinal))),
             new("Backend routes", "Pending routes", pendingRoutes.Length.ToString()),
-            new("Backend routes", "Request timeout", $"{GetBackendRouteTimeoutMilliseconds()} ms")
+            new("Backend routes", "Request timeout", $"{GetBackendRouteTimeoutMilliseconds()} ms"),
+            new("Backend routes", "Max pending routes", FormatLimit(m_BackendRouteOptions.MaxPendingRoutes)),
+            new("Backend routes", "Max pending routes per client", FormatLimit(m_BackendRouteOptions.MaxPendingRoutesPerClient))
         };
 
         foreach (var group in pendingRoutes
@@ -461,14 +464,35 @@ internal class ConnectionManager(
             now.AddMilliseconds(GetBackendRouteTimeoutMilliseconds()),
             CancellationTokenSource.CreateLinkedTokenSource(m_GracefulCancellation.Token));
 
-        if (!m_PendingBackendRoutes.TryAdd(routeId, pendingRoute))
+        lock (m_BackendRouteRegistrationSync)
         {
-            pendingRoute.TimeoutCancellation.Cancel();
-            pendingRoute.TimeoutCancellation.Dispose();
-            throw new InvalidOperationException("Backend route id is already active.");
+            EnsureBackendRouteCapacity(client);
+            if (!m_PendingBackendRoutes.TryAdd(routeId, pendingRoute))
+            {
+                pendingRoute.TimeoutCancellation.Cancel();
+                pendingRoute.TimeoutCancellation.Dispose();
+                throw new InvalidOperationException("Backend route id is already active.");
+            }
         }
 
         pendingRoute.TimeoutTask = ExpireBackendRouteAsync(pendingRoute);
+    }
+
+    private void EnsureBackendRouteCapacity(Client client)
+    {
+        var maxPendingRoutes = m_BackendRouteOptions.MaxPendingRoutes;
+        if (maxPendingRoutes > 0 &&
+            m_PendingBackendRoutes.Count >= maxPendingRoutes)
+        {
+            throw new InvalidOperationException("Gateway Backend route capacity is exhausted.");
+        }
+
+        var maxPendingRoutesPerClient = m_BackendRouteOptions.MaxPendingRoutesPerClient;
+        if (maxPendingRoutesPerClient > 0 &&
+            m_PendingBackendRoutes.Values.Count(route => ReferenceEquals(route.Client, client)) >= maxPendingRoutesPerClient)
+        {
+            throw new InvalidOperationException("Gateway Backend route capacity is exhausted for this client.");
+        }
     }
 
     private async Task ExpireBackendRouteAsync(PendingBackendRoute pendingRoute)
@@ -549,6 +573,11 @@ internal class ConnectionManager(
     private int GetBackendRouteTimeoutMilliseconds()
     {
         return Math.Max(1000, m_BackendRouteOptions.RequestTimeoutMilliseconds);
+    }
+
+    private static string FormatLimit(int limit)
+    {
+        return limit <= 0 ? "Unlimited" : limit.ToString();
     }
 
     private async Task DisposeClientsAsync()
