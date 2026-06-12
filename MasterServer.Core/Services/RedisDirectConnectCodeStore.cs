@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using MasterServer.ControlPlane;
 using MasterServer.Options;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
@@ -27,8 +28,9 @@ return value
     public async ValueTask<DirectConnectCodeTicket> CreateAsync(
         string gatewayMasterConnectionId,
         string gatewayNodeId,
-        string dedicatedMasterConnectionId,
-        string dedicatedNodeId,
+        MasterNodeKind targetNodeKind,
+        string targetMasterConnectionId,
+        string targetNodeId,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(gatewayMasterConnectionId))
@@ -41,14 +43,19 @@ return value
             throw new ArgumentException("Gateway node id is required.", nameof(gatewayNodeId));
         }
 
-        if (string.IsNullOrWhiteSpace(dedicatedMasterConnectionId))
+        if (targetNodeKind is not (MasterNodeKind.Dedicated or MasterNodeKind.Backend))
         {
-            throw new ArgumentException("Dedicated Master connection id is required.", nameof(dedicatedMasterConnectionId));
+            throw new ArgumentOutOfRangeException(nameof(targetNodeKind));
         }
 
-        if (string.IsNullOrWhiteSpace(dedicatedNodeId))
+        if (string.IsNullOrWhiteSpace(targetMasterConnectionId))
         {
-            throw new ArgumentException("Dedicated node id is required.", nameof(dedicatedNodeId));
+            throw new ArgumentException("Target Master connection id is required.", nameof(targetMasterConnectionId));
+        }
+
+        if (string.IsNullOrWhiteSpace(targetNodeId))
+        {
+            throw new ArgumentException("Target node id is required.", nameof(targetNodeId));
         }
 
         var ttl = GetTtl();
@@ -62,8 +69,9 @@ return value
                 CreateCode(),
                 gatewayMasterConnectionId,
                 gatewayNodeId,
-                dedicatedMasterConnectionId,
-                dedicatedNodeId,
+                targetNodeKind,
+                targetMasterConnectionId,
+                targetNodeId,
                 expiresAt);
             bool created = await m_Database.StringSetAsync(
                 GetKey(ticket.Code),

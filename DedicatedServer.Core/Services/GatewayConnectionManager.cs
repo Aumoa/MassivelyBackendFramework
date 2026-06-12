@@ -260,9 +260,10 @@ internal sealed class GatewayConnectionManager(
             hello.MasterConnectionId,
             handshakeTimeout.Token).ConfigureAwait(false);
         if (!string.Equals(validation.GatewayNodeId, hello.NodeId, StringComparison.Ordinal) ||
-            !string.Equals(validation.GatewayMasterConnectionId, hello.MasterConnectionId, StringComparison.Ordinal))
+            !string.Equals(validation.GatewayMasterConnectionId, hello.MasterConnectionId, StringComparison.Ordinal) ||
+            validation.TargetNodeKind != MasterNodeKind.Dedicated)
         {
-            throw new UnauthorizedAccessException("Direct connect code validation returned a different Gateway identity.");
+            throw new UnauthorizedAccessException("Direct connect code validation returned an unexpected connection identity.");
         }
 
         var accepted = new NodeAccepted(hello.NodeId, connectionId.ToString("N"));

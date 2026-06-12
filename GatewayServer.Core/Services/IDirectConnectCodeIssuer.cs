@@ -5,6 +5,7 @@ namespace GatewayServer.Services;
 internal interface IDirectConnectCodeIssuer
 {
     Task<DirectConnectCodeResponse> RequestDirectConnectCodeAsync(
-        DedicatedNodeEndpoint dedicatedNode,
+        MasterNodeKind targetNodeKind,
+        string targetMasterConnectionId,
         CancellationToken cancellationToken);
 }

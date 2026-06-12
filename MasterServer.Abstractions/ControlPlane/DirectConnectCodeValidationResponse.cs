@@ -10,7 +10,9 @@ public sealed class DirectConnectCodeValidationResponse
         bool success,
         string gatewayNodeId,
         string gatewayMasterConnectionId,
-        string dedicatedMasterConnectionId,
+        MasterNodeKind targetNodeKind,
+        string targetNodeId,
+        string targetMasterConnectionId,
         string errorMessage)
     {
         if (requestId == Guid.Empty)
@@ -28,9 +30,19 @@ public sealed class DirectConnectCodeValidationResponse
             throw new ArgumentNullException(nameof(gatewayMasterConnectionId));
         }
 
-        if (dedicatedMasterConnectionId == null)
+        if (targetNodeKind is not (MasterNodeKind.Dedicated or MasterNodeKind.Backend or MasterNodeKind.Unknown))
         {
-            throw new ArgumentNullException(nameof(dedicatedMasterConnectionId));
+            throw new ArgumentOutOfRangeException(nameof(targetNodeKind));
+        }
+
+        if (targetNodeId == null)
+        {
+            throw new ArgumentNullException(nameof(targetNodeId));
+        }
+
+        if (targetMasterConnectionId == null)
+        {
+            throw new ArgumentNullException(nameof(targetMasterConnectionId));
         }
 
         if (errorMessage == null)
@@ -42,7 +54,9 @@ public sealed class DirectConnectCodeValidationResponse
         Success = success;
         GatewayNodeId = gatewayNodeId;
         GatewayMasterConnectionId = gatewayMasterConnectionId;
-        DedicatedMasterConnectionId = dedicatedMasterConnectionId;
+        TargetNodeKind = targetNodeKind;
+        TargetNodeId = targetNodeId;
+        TargetMasterConnectionId = targetMasterConnectionId;
         ErrorMessage = errorMessage;
     }
 
@@ -54,7 +68,11 @@ public sealed class DirectConnectCodeValidationResponse
 
     public string GatewayMasterConnectionId { get; }
 
-    public string DedicatedMasterConnectionId { get; }
+    public MasterNodeKind TargetNodeKind { get; }
+
+    public string TargetNodeId { get; }
+
+    public string TargetMasterConnectionId { get; }
 
     public string ErrorMessage { get; }
 
@@ -64,6 +82,8 @@ public sealed class DirectConnectCodeValidationResponse
             requestId,
             false,
             string.Empty,
+            string.Empty,
+            MasterNodeKind.Unknown,
             string.Empty,
             string.Empty,
             errorMessage);
@@ -79,7 +99,9 @@ public sealed class DirectConnectCodeValidationResponse
                    sizeof(byte) +
                    PacketWriter.GetStringSize(value.GatewayNodeId) +
                    PacketWriter.GetStringSize(value.GatewayMasterConnectionId) +
-                   PacketWriter.GetStringSize(value.DedicatedMasterConnectionId) +
+                   sizeof(byte) +
+                   PacketWriter.GetStringSize(value.TargetNodeId) +
+                   PacketWriter.GetStringSize(value.TargetMasterConnectionId) +
                    PacketWriter.GetStringSize(value.ErrorMessage);
         }
 
@@ -89,7 +111,9 @@ public sealed class DirectConnectCodeValidationResponse
             writer.WriteByte(value.Success ? (byte)1 : (byte)0);
             writer.WriteString(value.GatewayNodeId);
             writer.WriteString(value.GatewayMasterConnectionId);
-            writer.WriteString(value.DedicatedMasterConnectionId);
+            writer.WriteByte((byte)value.TargetNodeKind);
+            writer.WriteString(value.TargetNodeId);
+            writer.WriteString(value.TargetMasterConnectionId);
             writer.WriteString(value.ErrorMessage);
         }
 
@@ -99,6 +123,8 @@ public sealed class DirectConnectCodeValidationResponse
                 reader.ReadGuid(),
                 reader.ReadByte() != 0,
                 reader.ReadString(),
+                reader.ReadString(),
+                (MasterNodeKind)reader.ReadByte(),
                 reader.ReadString(),
                 reader.ReadString(),
                 reader.ReadString());

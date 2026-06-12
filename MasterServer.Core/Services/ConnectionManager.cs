@@ -642,15 +642,25 @@ internal sealed class ConnectionManager(
             return;
         }
 
-        if (!TryParseConnectionId(request.DedicatedMasterConnectionId, out var dedicatedConnectionId) ||
-            !m_Connections.TryGetValue(dedicatedConnectionId, out var dedicatedConnection) ||
-            !dedicatedConnection.IsTrusted ||
-            dedicatedConnection.NodeKind != MasterNodeKind.Dedicated)
+        if (!IsDirectConnectTargetNodeKind(request.TargetNodeKind))
         {
             await WriteDirectConnectCodeFailureAsync(
                 source,
                 request.RequestId,
-                "Target Dedicated node is not connected.",
+                "Target node kind cannot accept direct connections.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!TryParseConnectionId(request.TargetMasterConnectionId, out var targetConnectionId) ||
+            !m_Connections.TryGetValue(targetConnectionId, out var targetConnection) ||
+            !targetConnection.IsTrusted ||
+            targetConnection.NodeKind != request.TargetNodeKind)
+        {
+            await WriteDirectConnectCodeFailureAsync(
+                source,
+                request.RequestId,
+                "Target node is not connected.",
                 cancellationToken).ConfigureAwait(false);
             return;
         }
@@ -658,8 +668,9 @@ internal sealed class ConnectionManager(
         var ticket = await directConnectCodeStore.CreateAsync(
             source.ConnectionId.ToString("N"),
             source.NodeId,
-            dedicatedConnection.ConnectionId.ToString("N"),
-            dedicatedConnection.NodeId,
+            targetConnection.NodeKind,
+            targetConnection.ConnectionId.ToString("N"),
+            targetConnection.NodeId,
             cancellationToken).ConfigureAwait(false);
         var response = new DirectConnectCodeResponse(
             request.RequestId,
@@ -682,19 +693,20 @@ internal sealed class ConnectionManager(
         MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.DirectConnectCodeValidationRequest);
         var request = PacketCodec.Decode(frame, DirectConnectCodeValidationRequest.Codec);
 
-        if (source.NodeKind != MasterNodeKind.Dedicated)
+        if (!IsDirectConnectTargetNodeKind(source.NodeKind))
         {
             await WriteDirectConnectCodeValidationFailureAsync(
                 source,
                 request.RequestId,
-                "Only Dedicated nodes can validate direct connect codes.",
+                "Only direct-connect target nodes can validate direct connect codes.",
                 cancellationToken).ConfigureAwait(false);
             return;
         }
 
         var ticket = await directConnectCodeStore.ConsumeAsync(request.Code, cancellationToken).ConfigureAwait(false);
         if (ticket == null ||
-            !string.Equals(ticket.DedicatedMasterConnectionId, source.ConnectionId.ToString("N"), StringComparison.Ordinal) ||
+            ticket.TargetNodeKind != source.NodeKind ||
+            !string.Equals(ticket.TargetMasterConnectionId, source.ConnectionId.ToString("N"), StringComparison.Ordinal) ||
             !string.Equals(ticket.GatewayMasterConnectionId, request.GatewayMasterConnectionId, StringComparison.Ordinal) ||
             !string.Equals(ticket.GatewayNodeId, request.GatewayNodeId, StringComparison.Ordinal))
         {
@@ -725,7 +737,9 @@ internal sealed class ConnectionManager(
             success: true,
             ticket.GatewayNodeId,
             ticket.GatewayMasterConnectionId,
-            ticket.DedicatedMasterConnectionId,
+            ticket.TargetNodeKind,
+            ticket.TargetNodeId,
+            ticket.TargetMasterConnectionId,
             string.Empty);
         await source.WriteControlAsync(
             MasterControlPacketIds.DirectConnectCodeValidationResponse,
@@ -776,6 +790,11 @@ internal sealed class ConnectionManager(
     {
         return Guid.TryParseExact(value, "N", out connectionId) ||
                Guid.TryParse(value, out connectionId);
+    }
+
+    private static bool IsDirectConnectTargetNodeKind(MasterNodeKind nodeKind)
+    {
+        return nodeKind is MasterNodeKind.Dedicated or MasterNodeKind.Backend;
     }
 
     private MasterOverviewSnapshot CreateOverviewSnapshot()

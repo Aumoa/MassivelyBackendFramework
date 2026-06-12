@@ -44,16 +44,22 @@ internal sealed class MasterConnectionManager(
     }
 
     public async Task<DirectConnectCodeResponse> RequestDirectConnectCodeAsync(
-        DedicatedNodeEndpoint dedicatedNode,
+        MasterNodeKind targetNodeKind,
+        string targetMasterConnectionId,
         CancellationToken cancellationToken)
     {
-        if (dedicatedNode == null)
+        if (targetNodeKind is not (MasterNodeKind.Dedicated or MasterNodeKind.Backend))
         {
-            throw new ArgumentNullException(nameof(dedicatedNode));
+            throw new ArgumentOutOfRangeException(nameof(targetNodeKind));
+        }
+
+        if (string.IsNullOrWhiteSpace(targetMasterConnectionId))
+        {
+            throw new ArgumentException("Target Master connection id is required.", nameof(targetMasterConnectionId));
         }
 
         var stream = m_ActiveStream ?? throw new InvalidOperationException("Master control-plane connection is not trusted.");
-        var request = new DirectConnectCodeRequest(Guid.NewGuid(), dedicatedNode.MasterConnectionId);
+        var request = new DirectConnectCodeRequest(Guid.NewGuid(), targetNodeKind, targetMasterConnectionId);
         var completion = new TaskCompletionSource<DirectConnectCodeResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         if (!m_PendingDirectConnectCodeRequests.TryAdd(request.RequestId, completion))
         {

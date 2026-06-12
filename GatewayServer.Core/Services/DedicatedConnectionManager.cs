@@ -247,7 +247,10 @@ internal sealed class DedicatedConnectionManager(
             PacketCodec.Decode(challengeFrame, NodeAuthChallenge.Codec);
             handshakeStep = "DirectConnectCodeRequest";
             var directConnectCode = await directConnectCodeIssuer
-                .RequestDirectConnectCodeAsync(node, handshakeTimeout.Token)
+                .RequestDirectConnectCodeAsync(
+                    MasterNodeKind.Dedicated,
+                    node.MasterConnectionId,
+                    handshakeTimeout.Token)
                 .ConfigureAwait(false);
 
             var hello = new NodeHello(

@@ -1,3 +1,5 @@
+using MasterServer.ControlPlane;
+
 namespace MasterServer.Services;
 
 internal interface IDirectConnectCodeStore
@@ -5,8 +7,9 @@ internal interface IDirectConnectCodeStore
     ValueTask<DirectConnectCodeTicket> CreateAsync(
         string gatewayMasterConnectionId,
         string gatewayNodeId,
-        string dedicatedMasterConnectionId,
-        string dedicatedNodeId,
+        MasterNodeKind targetNodeKind,
+        string targetMasterConnectionId,
+        string targetNodeId,
         CancellationToken cancellationToken);
 
     ValueTask<DirectConnectCodeTicket?> ConsumeAsync(
@@ -18,6 +21,7 @@ internal sealed record DirectConnectCodeTicket(
     string Code,
     string GatewayMasterConnectionId,
     string GatewayNodeId,
-    string DedicatedMasterConnectionId,
-    string DedicatedNodeId,
+    MasterNodeKind TargetNodeKind,
+    string TargetMasterConnectionId,
+    string TargetNodeId,
     DateTimeOffset ExpiresAt);

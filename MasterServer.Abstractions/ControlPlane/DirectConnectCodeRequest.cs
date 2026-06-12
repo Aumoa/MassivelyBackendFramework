@@ -5,25 +5,36 @@ namespace MasterServer.ControlPlane;
 
 public sealed class DirectConnectCodeRequest
 {
-    public DirectConnectCodeRequest(Guid requestId, string dedicatedMasterConnectionId)
+    public DirectConnectCodeRequest(
+        Guid requestId,
+        MasterNodeKind targetNodeKind,
+        string targetMasterConnectionId)
     {
         if (requestId == Guid.Empty)
         {
             throw new ArgumentException("Request id is required.", nameof(requestId));
         }
 
-        if (string.IsNullOrWhiteSpace(dedicatedMasterConnectionId))
+        if (targetNodeKind is not (MasterNodeKind.Dedicated or MasterNodeKind.Backend))
         {
-            throw new ArgumentException("Dedicated Master connection id is required.", nameof(dedicatedMasterConnectionId));
+            throw new ArgumentOutOfRangeException(nameof(targetNodeKind));
+        }
+
+        if (string.IsNullOrWhiteSpace(targetMasterConnectionId))
+        {
+            throw new ArgumentException("Target Master connection id is required.", nameof(targetMasterConnectionId));
         }
 
         RequestId = requestId;
-        DedicatedMasterConnectionId = dedicatedMasterConnectionId;
+        TargetNodeKind = targetNodeKind;
+        TargetMasterConnectionId = targetMasterConnectionId;
     }
 
     public Guid RequestId { get; }
 
-    public string DedicatedMasterConnectionId { get; }
+    public MasterNodeKind TargetNodeKind { get; }
+
+    public string TargetMasterConnectionId { get; }
 
     public static IPacketCodec<DirectConnectCodeRequest> Codec { get; } = new DirectConnectCodeRequestCodec();
 
@@ -32,18 +43,23 @@ public sealed class DirectConnectCodeRequest
         public int GetPayloadSize(DirectConnectCodeRequest value)
         {
             return sizeof(long) + sizeof(long) +
-                   PacketWriter.GetStringSize(value.DedicatedMasterConnectionId);
+                   sizeof(byte) +
+                   PacketWriter.GetStringSize(value.TargetMasterConnectionId);
         }
 
         public void Encode(DirectConnectCodeRequest value, ref PacketWriter writer)
         {
             writer.WriteGuid(value.RequestId);
-            writer.WriteString(value.DedicatedMasterConnectionId);
+            writer.WriteByte((byte)value.TargetNodeKind);
+            writer.WriteString(value.TargetMasterConnectionId);
         }
 
         public DirectConnectCodeRequest Decode(ref PacketReader reader)
         {
-            return new DirectConnectCodeRequest(reader.ReadGuid(), reader.ReadString());
+            return new DirectConnectCodeRequest(
+                reader.ReadGuid(),
+                (MasterNodeKind)reader.ReadByte(),
+                reader.ReadString());
         }
     }
 }
