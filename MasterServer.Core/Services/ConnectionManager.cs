@@ -16,10 +16,12 @@ namespace MasterServer.Services;
 
 internal sealed class ConnectionManager(
     IOptions<MasterSocketOptions> options,
+    IOptions<ServiceConnectionCredentialOptions> serviceCredentialOptions,
     INodeAuthSecretProvider nodeAuthSecretProvider,
     ILogger<ConnectionManager> logger) : IHostedService, IConnectionManager
 {
     private readonly MasterSocketOptions m_Options = options.Value;
+    private readonly ServiceConnectionCredentialOptions m_ServiceCredentialOptions = serviceCredentialOptions.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly ConcurrentDictionary<Guid, MasterConnection> m_Connections = [];
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
@@ -27,6 +29,7 @@ internal sealed class ConnectionManager(
 
     private Socket? m_Socket;
     private Task? m_AcceptTask;
+    private Task? m_CredentialRevalidationTask;
     private X509Certificate2? m_Cert;
 
     public event Action? ConnectionsChanged;
@@ -68,6 +71,12 @@ internal sealed class ConnectionManager(
         m_Socket.Listen(m_Options.Backlog);
 
         m_AcceptTask = AcceptLoopAsync(m_Shutdown.Token);
+        if (m_ServiceCredentialOptions.Enabled &&
+            m_ServiceCredentialOptions.RevalidationIntervalMilliseconds > 0)
+        {
+            m_CredentialRevalidationTask = RevalidateCredentialsUntilStoppedAsync(m_Shutdown.Token);
+        }
+
         logger.LogInformation("Master socket server is listening on {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
     }
 
@@ -79,6 +88,11 @@ internal sealed class ConnectionManager(
         if (m_AcceptTask != null)
         {
             await WaitForShutdownAsync(m_AcceptTask, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (m_CredentialRevalidationTask != null)
+        {
+            await WaitForShutdownAsync(m_CredentialRevalidationTask, cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var connection in m_Connections.Values)
@@ -119,6 +133,76 @@ internal sealed class ConnectionManager(
                 socket?.Dispose();
                 logger.LogError(e, "Error occurred while accepting a Master node connection.");
             }
+        }
+    }
+
+    private async Task RevalidateCredentialsUntilStoppedAsync(CancellationToken cancellationToken)
+    {
+        var interval = TimeSpan.FromMilliseconds(Math.Max(1, m_ServiceCredentialOptions.RevalidationIntervalMilliseconds));
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+                await RevalidateTrustedConnectionCredentialsAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Failed to revalidate Master node credentials.");
+            }
+        }
+    }
+
+    private async Task RevalidateTrustedConnectionCredentialsAsync(CancellationToken cancellationToken)
+    {
+        foreach (var connection in m_Connections.Values)
+        {
+            if (!connection.IsTrusted ||
+                string.IsNullOrWhiteSpace(connection.CredentialVersion))
+            {
+                continue;
+            }
+
+            bool isCurrent;
+            try
+            {
+                isCurrent = await nodeAuthSecretProvider.IsCredentialCurrentAsync(
+                    connection.NodeKind,
+                    connection.NodeId,
+                    connection.CredentialVersion,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(
+                    e,
+                    "Failed to revalidate Master node credential. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
+                    connection.ConnectionId,
+                    connection.NodeKind,
+                    connection.NodeId);
+                continue;
+            }
+
+            if (isCurrent)
+            {
+                continue;
+            }
+
+            logger.LogWarning(
+                "Closing Master node connection because its credential is no longer current. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
+                connection.ConnectionId,
+                connection.NodeKind,
+                connection.NodeId);
+            connection.Dispose();
         }
     }
 
@@ -603,12 +687,12 @@ internal sealed class ConnectionManager(
             handshakeTimeout.Token).ConfigureAwait(false);
         var proof = PacketCodec.Decode(proofFrame, NodeAuthProof.Codec);
 
-        var sharedSecret = await nodeAuthSecretProvider.GetSharedSecretAsync(
+        var credential = await nodeAuthSecretProvider.GetSharedSecretAsync(
             hello.NodeKind,
             hello.NodeId,
             handshakeTimeout.Token).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(sharedSecret) ||
-            !MasterNodeAuthenticator.VerifyProof(challenge, hello, proof, sharedSecret))
+        if (credential == null ||
+            !MasterNodeAuthenticator.VerifyProof(challenge, hello, proof, credential.SharedSecret))
         {
             throw new UnauthorizedAccessException($"Node authentication proof was rejected for node '{hello.NodeId}'.");
         }
@@ -624,7 +708,7 @@ internal sealed class ConnectionManager(
             await PacketFrameWriter.WriteAsync(stream, acceptedFrame, handshakeTimeout.Token).ConfigureAwait(false);
         }
 
-        connection.MarkAccepted(hello.NodeKind, hello.NodeId, hello.DisplayName);
+        connection.MarkAccepted(hello.NodeKind, hello.NodeId, hello.DisplayName, credential.CredentialVersion);
         NotifyConnectionsChanged();
         logger.LogInformation(
             "Master node accepted. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
@@ -792,6 +876,8 @@ internal sealed class ConnectionManager(
 
         public string DisplayName { get; private set; } = string.Empty;
 
+        public string CredentialVersion { get; private set; } = string.Empty;
+
         public string RemoteEndPoint { get; } = socket.RemoteEndPoint?.ToString() ?? "unknown";
 
         public DateTimeOffset ConnectedAt { get; } = DateTimeOffset.UtcNow;
@@ -811,11 +897,12 @@ internal sealed class ConnectionManager(
             m_Stream = stream ?? throw new ArgumentNullException(nameof(stream));
         }
 
-        public void MarkAccepted(MasterNodeKind nodeKind, string nodeId, string displayName)
+        public void MarkAccepted(MasterNodeKind nodeKind, string nodeId, string displayName, string credentialVersion)
         {
             NodeKind = nodeKind;
             NodeId = nodeId;
             DisplayName = displayName;
+            CredentialVersion = credentialVersion;
             MarkSeen();
             Volatile.Write(ref m_Trusted, 1);
         }

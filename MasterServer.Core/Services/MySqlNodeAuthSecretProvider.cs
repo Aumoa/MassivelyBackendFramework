@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using Dapper;
 using MasterServer.ControlPlane;
 using MasterServer.Options;
@@ -37,7 +38,56 @@ internal sealed class MySqlNodeAuthSecretProvider(
         }
     }
 
-    public async ValueTask<string?> GetSharedSecretAsync(
+    public async ValueTask<NodeAuthSecret?> GetSharedSecretAsync(
+        MasterNodeKind nodeKind,
+        string nodeId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(nodeId))
+        {
+            return null;
+        }
+
+        var protectedSecret = await GetProtectedSecretAsync(nodeKind, nodeId, cancellationToken).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(protectedSecret))
+        {
+            return null;
+        }
+
+        try
+        {
+            return new NodeAuthSecret(
+                m_SecretProtector.Unprotect(protectedSecret),
+                CreateVersion(protectedSecret));
+        }
+        catch (CryptographicException e)
+        {
+            logger.LogError(
+                e,
+                "Failed to unprotect service connection credential. NodeKind={NodeKind}, NodeId={NodeId}.",
+                nodeKind,
+                nodeId);
+            return null;
+        }
+    }
+
+    public async ValueTask<bool> IsCredentialCurrentAsync(
+        MasterNodeKind nodeKind,
+        string nodeId,
+        string credentialVersion,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(credentialVersion))
+        {
+            return false;
+        }
+
+        var protectedSecret = await GetProtectedSecretAsync(nodeKind, nodeId, cancellationToken).ConfigureAwait(false);
+        return !string.IsNullOrWhiteSpace(protectedSecret) &&
+               string.Equals(credentialVersion, CreateVersion(protectedSecret), StringComparison.Ordinal);
+    }
+
+    private async ValueTask<string?> GetProtectedSecretAsync(
         MasterNodeKind nodeKind,
         string nodeId,
         CancellationToken cancellationToken)
@@ -65,24 +115,11 @@ LIMIT 1;
                 nodeId
             },
             cancellationToken: cancellationToken);
-        var protectedSecret = await connection.QuerySingleOrDefaultAsync<string?>(command).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(protectedSecret))
-        {
-            return null;
-        }
+        return await connection.QuerySingleOrDefaultAsync<string?>(command).ConfigureAwait(false);
+    }
 
-        try
-        {
-            return m_SecretProtector.Unprotect(protectedSecret);
-        }
-        catch (CryptographicException e)
-        {
-            logger.LogError(
-                e,
-                "Failed to unprotect service connection credential. NodeKind={NodeKind}, NodeId={NodeId}.",
-                nodeKind,
-                nodeId);
-            return null;
-        }
+    private static string CreateVersion(string protectedSecret)
+    {
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(protectedSecret)));
     }
 }

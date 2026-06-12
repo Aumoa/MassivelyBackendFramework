@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using MasterServer.ControlPlane;
 using MasterServer.Options;
 using Microsoft.Extensions.Options;
@@ -17,11 +19,29 @@ internal sealed class OptionsNodeAuthSecretProvider(
         }
     }
 
-    public ValueTask<string?> GetSharedSecretAsync(
+    public ValueTask<NodeAuthSecret?> GetSharedSecretAsync(
         MasterNodeKind nodeKind,
         string nodeId,
         CancellationToken cancellationToken)
     {
-        return ValueTask.FromResult<string?>(m_Options.NodeAuthSecret);
+        return ValueTask.FromResult<NodeAuthSecret?>(
+            new NodeAuthSecret(m_Options.NodeAuthSecret, CreateVersion(m_Options.NodeAuthSecret)));
+    }
+
+    public ValueTask<bool> IsCredentialCurrentAsync(
+        MasterNodeKind nodeKind,
+        string nodeId,
+        string credentialVersion,
+        CancellationToken cancellationToken)
+    {
+        return ValueTask.FromResult(string.Equals(
+            credentialVersion,
+            CreateVersion(m_Options.NodeAuthSecret),
+            StringComparison.Ordinal));
+    }
+
+    private static string CreateVersion(string value)
+    {
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
     }
 }

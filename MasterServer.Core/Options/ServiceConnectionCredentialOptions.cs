@@ -16,5 +16,7 @@ public sealed record ServiceConnectionCredentialOptions
 
     public string DataProtectionApplicationName { get; init; } = "MasterAdmin";
 
+    public int RevalidationIntervalMilliseconds { get; init; } = 10000;
+
     public string ConnectionString => $"Server={Server};Port={Port};Database={Database};Uid={User};Pwd={Password};";
 }
