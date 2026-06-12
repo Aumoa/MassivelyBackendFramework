@@ -16,6 +16,7 @@ namespace MasterServer.Services;
 
 internal sealed class ConnectionManager(
     IOptions<MasterSocketOptions> options,
+    INodeAuthSecretProvider nodeAuthSecretProvider,
     ILogger<ConnectionManager> logger) : IHostedService, IConnectionManager
 {
     private readonly MasterSocketOptions m_Options = options.Value;
@@ -44,10 +45,7 @@ internal sealed class ConnectionManager(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(m_Options.NodeAuthSecret))
-        {
-            throw new InvalidOperationException("MasterSocket:NodeAuthSecret must be configured before accepting node connections.");
-        }
+        nodeAuthSecretProvider.EnsureConfigured();
 
         if (m_Options.UseTls)
         {
@@ -605,7 +603,12 @@ internal sealed class ConnectionManager(
             handshakeTimeout.Token).ConfigureAwait(false);
         var proof = PacketCodec.Decode(proofFrame, NodeAuthProof.Codec);
 
-        if (!MasterNodeAuthenticator.VerifyProof(challenge, hello, proof, m_Options.NodeAuthSecret))
+        var sharedSecret = await nodeAuthSecretProvider.GetSharedSecretAsync(
+            hello.NodeKind,
+            hello.NodeId,
+            handshakeTimeout.Token).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(sharedSecret) ||
+            !MasterNodeAuthenticator.VerifyProof(challenge, hello, proof, sharedSecret))
         {
             throw new UnauthorizedAccessException($"Node authentication proof was rejected for node '{hello.NodeId}'.");
         }
