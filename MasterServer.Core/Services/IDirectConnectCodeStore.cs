@@ -14,6 +14,11 @@ internal interface IDirectConnectCodeStore
 
     ValueTask<DirectConnectCodeTicket?> ConsumeAsync(
         string code,
+        string expectedGatewayMasterConnectionId,
+        string expectedGatewayNodeId,
+        MasterNodeKind expectedTargetNodeKind,
+        string expectedTargetMasterConnectionId,
+        string expectedTargetNodeId,
         CancellationToken cancellationToken);
 }
 

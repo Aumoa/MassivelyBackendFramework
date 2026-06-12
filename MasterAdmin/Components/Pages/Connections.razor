@@ -43,6 +43,10 @@
                 <span>@T("CONNECTION_CREDENTIALS_DISPLAY_NAME")</span>
                 <InputText @bind-Value="Form.DisplayName" />
             </label>
+            <label>
+                <span>@T("CONNECTION_CREDENTIALS_BACKEND_KIND")</span>
+                <InputText @bind-Value="Form.BackendKind" disabled="@(!IsBackendCredential)" />
+            </label>
             <label class="toggle-row">
                 <InputCheckbox @bind-Value="Form.Enabled" />
                 <span>@T("CONNECTION_CREDENTIALS_ENABLED")</span>
@@ -100,6 +104,7 @@
                         <th>@T("CONNECTION_CREDENTIALS_NODE_KIND")</th>
                         <th>@T("CONNECTION_CREDENTIALS_NODE_ID")</th>
                         <th>@T("CONNECTION_CREDENTIALS_DISPLAY_NAME")</th>
+                        <th>@T("CONNECTION_CREDENTIALS_BACKEND_KIND")</th>
                         <th>@T("CONNECTION_CREDENTIALS_STATUS")</th>
                         <th>@T("CONNECTION_CREDENTIALS_UPDATED")</th>
                         <th>@T("CONNECTION_CREDENTIALS_ACTIONS")</th>
@@ -112,6 +117,7 @@
                             <td>@GetNodeKindText(item.NodeKind)</td>
                             <td><code>@item.NodeId</code></td>
                             <td>@item.DisplayName</td>
+                            <td>@GetBackendKindText(item)</td>
                             <td>@(item.Enabled ? T("CONNECTION_CREDENTIALS_ENABLED") : T("CONNECTION_CREDENTIALS_DISABLED"))</td>
                             <td>@item.UpdatedAt</td>
                             <td>
@@ -165,6 +171,8 @@
             ? T("CONNECTION_CREDENTIALS_SAVE")
             : T("CONNECTION_CREDENTIALS_CREATE");
 
+    private bool IsBackendCredential => BackendNodeEndpoint.IsBackendNodeKind(Form.NodeKind);
+
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
@@ -186,6 +194,7 @@
                 Form.NodeKind,
                 Form.NodeId.Trim(),
                 Form.DisplayName.Trim(),
+                IsBackendCredential ? Form.BackendKind.Trim() : null,
                 Form.Enabled);
 
             if (EditingId.HasValue)
@@ -234,6 +243,7 @@
             NodeKind = item.NodeKind,
             NodeId = item.NodeId,
             DisplayName = item.DisplayName,
+            BackendKind = item.BackendKind ?? string.Empty,
             Enabled = item.Enabled
         };
     }
@@ -279,6 +289,14 @@
         };
     }
 
+    private static string GetBackendKindText(ServiceConnectionCredentialInfo item)
+    {
+        return BackendNodeEndpoint.IsBackendNodeKind(item.NodeKind) &&
+               !string.IsNullOrWhiteSpace(item.BackendKind)
+            ? item.BackendKind
+            : T("CONNECTION_CREDENTIALS_NOT_APPLICABLE");
+    }
+
     private static string T(string key)
     {
         return Strings.ResourceManager.GetString(key, Strings.Culture) ?? key;
@@ -294,6 +312,8 @@
 
         [Required]
         public string DisplayName { get; set; } = string.Empty;
+
+        public string BackendKind { get; set; } = string.Empty;
 
         public bool Enabled { get; set; } = true;
     }

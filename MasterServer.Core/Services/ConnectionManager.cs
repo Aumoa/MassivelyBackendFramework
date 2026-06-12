@@ -352,12 +352,18 @@ internal sealed class ConnectionManager(
         {
             MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendEndpointAdvertise);
             var advertised = PacketCodec.Decode(frame, BackendEndpointAdvertise.Codec);
-            connection.UpdateBackendGatewayEndpoint(advertised.BackendKind, advertised.GatewayEndpoint);
+            if (!string.Equals(connection.AuthorizedBackendKind, advertised.BackendKind, StringComparison.Ordinal))
+            {
+                throw new UnauthorizedAccessException(
+                    $"Backend node '{connection.NodeId}' advertised unauthorized backend kind '{advertised.BackendKind}'.");
+            }
+
+            connection.UpdateBackendGatewayEndpoint(connection.AuthorizedBackendKind!, advertised.GatewayEndpoint);
             logger.LogInformation(
                 "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, BackendKind={BackendKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
                 connection.ConnectionId,
                 connection.NodeKind,
-                advertised.BackendKind,
+                connection.AuthorizedBackendKind,
                 connection.NodeId,
                 advertised.GatewayEndpoint.IPAddress,
                 advertised.GatewayEndpoint.Port,
@@ -703,7 +709,14 @@ internal sealed class ConnectionManager(
             return;
         }
 
-        var ticket = await directConnectCodeStore.ConsumeAsync(request.Code, cancellationToken).ConfigureAwait(false);
+        var ticket = await directConnectCodeStore.ConsumeAsync(
+            request.Code,
+            request.GatewayMasterConnectionId,
+            request.GatewayNodeId,
+            source.NodeKind,
+            source.ConnectionId.ToString("N"),
+            source.NodeId,
+            cancellationToken).ConfigureAwait(false);
         if (ticket == null ||
             ticket.TargetNodeKind != source.NodeKind ||
             !string.Equals(ticket.TargetMasterConnectionId, source.ConnectionId.ToString("N"), StringComparison.Ordinal) ||
@@ -882,7 +895,12 @@ internal sealed class ConnectionManager(
             await PacketFrameWriter.WriteAsync(stream, acceptedFrame, handshakeTimeout.Token).ConfigureAwait(false);
         }
 
-        connection.MarkAccepted(hello.NodeKind, hello.NodeId, hello.DisplayName, credential.CredentialVersion);
+        connection.MarkAccepted(
+            hello.NodeKind,
+            hello.NodeId,
+            hello.DisplayName,
+            credential.CredentialVersion,
+            credential.AuthorizedBackendKind);
         NotifyConnectionsChanged();
         logger.LogInformation(
             "Master node accepted. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
@@ -1052,6 +1070,8 @@ internal sealed class ConnectionManager(
 
         public string CredentialVersion { get; private set; } = string.Empty;
 
+        public string? AuthorizedBackendKind { get; private set; }
+
         public string RemoteEndPoint { get; } = socket.RemoteEndPoint?.ToString() ?? "unknown";
 
         public DateTimeOffset ConnectedAt { get; } = DateTimeOffset.UtcNow;
@@ -1073,12 +1093,18 @@ internal sealed class ConnectionManager(
             m_Stream = stream ?? throw new ArgumentNullException(nameof(stream));
         }
 
-        public void MarkAccepted(MasterNodeKind nodeKind, string nodeId, string displayName, string credentialVersion)
+        public void MarkAccepted(
+            MasterNodeKind nodeKind,
+            string nodeId,
+            string displayName,
+            string credentialVersion,
+            string? authorizedBackendKind)
         {
             NodeKind = nodeKind;
             NodeId = nodeId;
             DisplayName = displayName;
             CredentialVersion = credentialVersion;
+            AuthorizedBackendKind = authorizedBackendKind;
             MarkSeen();
             Volatile.Write(ref m_Trusted, 1);
         }

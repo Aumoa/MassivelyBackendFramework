@@ -59,7 +59,7 @@ h1 {
 
 .credential-form {
     display: grid;
-    grid-template-columns: minmax(10rem, 0.8fr) minmax(12rem, 1fr) minmax(12rem, 1fr) auto auto;
+    grid-template-columns: minmax(10rem, 0.8fr) minmax(12rem, 1fr) minmax(12rem, 1fr) minmax(12rem, 1fr) auto auto;
     gap: 0.75rem;
     align-items: end;
     padding: 1rem;

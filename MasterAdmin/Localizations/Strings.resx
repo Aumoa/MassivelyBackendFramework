@@ -309,6 +309,12 @@
   <data name="CONNECTION_CREDENTIALS_DISPLAY_NAME" xml:space="preserve">
     <value>Display Name</value>
   </data>
+  <data name="CONNECTION_CREDENTIALS_BACKEND_KIND" xml:space="preserve">
+    <value>Backend Kind</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_NOT_APPLICABLE" xml:space="preserve">
+    <value>N/A</value>
+  </data>
   <data name="CONNECTION_CREDENTIALS_ENABLED" xml:space="preserve">
     <value>Enabled</value>
   </data>

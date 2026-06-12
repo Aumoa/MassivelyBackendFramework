@@ -20,4 +20,5 @@ internal interface INodeAuthSecretProvider
 
 internal sealed record NodeAuthSecret(
     string SharedSecret,
-    string CredentialVersion);
+    string CredentialVersion,
+    string? AuthorizedBackendKind);

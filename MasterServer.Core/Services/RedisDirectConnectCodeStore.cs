@@ -16,9 +16,15 @@ internal sealed class RedisDirectConnectCodeStore(
     private const int MaxCreateAttempts = 4;
     private const string ConsumeScript = """
 local value = redis.call('GET', KEYS[1])
-if value then
-  redis.call('DEL', KEYS[1])
+if not value then
+  return nil
 end
+for i = 1, #ARGV do
+  if string.find(value, ARGV[i], 1, true) == nil then
+    return nil
+  end
+end
+redis.call('DEL', KEYS[1])
 return value
 """;
 
@@ -90,18 +96,35 @@ return value
 
     public async ValueTask<DirectConnectCodeTicket?> ConsumeAsync(
         string code,
+        string expectedGatewayMasterConnectionId,
+        string expectedGatewayNodeId,
+        MasterNodeKind expectedTargetNodeKind,
+        string expectedTargetMasterConnectionId,
+        string expectedTargetNodeId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(code))
+        if (string.IsNullOrWhiteSpace(code) ||
+            string.IsNullOrWhiteSpace(expectedGatewayMasterConnectionId) ||
+            string.IsNullOrWhiteSpace(expectedGatewayNodeId) ||
+            string.IsNullOrWhiteSpace(expectedTargetMasterConnectionId) ||
+            string.IsNullOrWhiteSpace(expectedTargetNodeId))
         {
             return null;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        RedisValue[] expectedFields =
+        [
+            CreateJsonStringMatch(nameof(DirectConnectCodeTicket.GatewayMasterConnectionId), expectedGatewayMasterConnectionId),
+            CreateJsonStringMatch(nameof(DirectConnectCodeTicket.GatewayNodeId), expectedGatewayNodeId),
+            CreateJsonNumberMatch(nameof(DirectConnectCodeTicket.TargetNodeKind), (int)expectedTargetNodeKind),
+            CreateJsonStringMatch(nameof(DirectConnectCodeTicket.TargetMasterConnectionId), expectedTargetMasterConnectionId),
+            CreateJsonStringMatch(nameof(DirectConnectCodeTicket.TargetNodeId), expectedTargetNodeId)
+        ];
         var result = await m_Database.ScriptEvaluateAsync(
             ConsumeScript,
             [GetKey(code)],
-            []).ConfigureAwait(false);
+            expectedFields).ConfigureAwait(false);
         if (result.IsNull)
         {
             return null;
@@ -145,5 +168,15 @@ return value
     private static string HashCode(string code)
     {
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(code)));
+    }
+
+    private static string CreateJsonStringMatch(string propertyName, string value)
+    {
+        return $"\"{propertyName}\":{JsonSerializer.Serialize(value)}";
+    }
+
+    private static string CreateJsonNumberMatch(string propertyName, int value)
+    {
+        return $"\"{propertyName}\":{value}";
     }
 }

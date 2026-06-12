@@ -37,48 +37,29 @@ internal sealed class GatewayConnectionManager(
     private Task? m_AcceptTask;
     private X509Certificate2? m_Cert;
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(CancellationToken cancellationToken)
     {
-        m_AcceptTask = Task.Run(() => RunListenerAsync(m_Shutdown.Token));
-        return Task.CompletedTask;
-    }
-
-    private async Task RunListenerAsync(CancellationToken cancellationToken)
-    {
-        try
+        if (m_Options.UseTls)
         {
-            if (m_Options.UseTls)
-            {
-                m_Cert = await LoadCertificateAsync(m_Options, cancellationToken).ConfigureAwait(false);
-            }
+            m_Cert = await LoadCertificateAsync(m_Options, cancellationToken).ConfigureAwait(false);
+        }
 
-            var listenAddress = await MasterEndpointResolver.ResolveBindAddressAsync(
-                m_Options.IPAddress,
-                cancellationToken).ConfigureAwait(false);
-            m_Socket = new Socket(listenAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-            if (listenAddress.Equals(IPAddress.IPv6Any))
-            {
-                m_Socket.DualMode = true;
-            }
+        var listenAddress = await MasterEndpointResolver.ResolveBindAddressAsync(
+            m_Options.IPAddress,
+            cancellationToken).ConfigureAwait(false);
+        m_Socket = new Socket(listenAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        if (listenAddress.Equals(IPAddress.IPv6Any))
+        {
+            m_Socket.DualMode = true;
+        }
 
-            m_Socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
-            m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-            m_Socket.Bind(new IPEndPoint(listenAddress, m_Options.Port));
-            m_Socket.Listen(m_Options.Backlog);
+        m_Socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+        m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+        m_Socket.Bind(new IPEndPoint(listenAddress, m_Options.Port));
+        m_Socket.Listen(m_Options.Backlog);
 
-            logger.LogInformation("Dedicated Gateway listener is running on {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
-            await AcceptLoopAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "Dedicated Gateway listener stopped because startup or accept loop failed.");
-        }
+        logger.LogInformation("Dedicated Gateway listener is running on {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
+        m_AcceptTask = AcceptLoopAsync(m_Shutdown.Token);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)

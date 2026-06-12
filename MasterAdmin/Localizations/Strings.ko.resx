@@ -309,6 +309,12 @@
   <data name="CONNECTION_CREDENTIALS_DISPLAY_NAME" xml:space="preserve">
     <value>표시 이름</value>
   </data>
+  <data name="CONNECTION_CREDENTIALS_BACKEND_KIND" xml:space="preserve">
+    <value>백엔드 종류</value>
+  </data>
+  <data name="CONNECTION_CREDENTIALS_NOT_APPLICABLE" xml:space="preserve">
+    <value>해당 없음</value>
+  </data>
   <data name="CONNECTION_CREDENTIALS_ENABLED" xml:space="preserve">
     <value>활성</value>
   </data>

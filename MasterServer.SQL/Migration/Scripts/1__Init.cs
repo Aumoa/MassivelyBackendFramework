@@ -16,6 +16,7 @@ CREATE TABLE `service_connection_credential` (
     `node_kind` TINYINT UNSIGNED NOT NULL,
     `node_id` VARCHAR(128) NOT NULL,
     `display_name` VARCHAR(256) NOT NULL,
+    `backend_kind` VARCHAR(128),
     `protected_secret` TEXT NOT NULL,
     `enabled` TINYINT(1) NOT NULL DEFAULT 1,
     `created_at` DATETIME NOT NULL DEFAULT NOW(),

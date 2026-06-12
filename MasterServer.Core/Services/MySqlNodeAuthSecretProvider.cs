@@ -60,17 +60,29 @@ internal sealed class MySqlNodeAuthSecretProvider(
             return null;
         }
 
-        var protectedSecret = await GetProtectedSecretAsync(nodeKind, nodeId, cancellationToken).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(protectedSecret))
+        var credential = await GetCredentialAsync(nodeKind, nodeId, cancellationToken).ConfigureAwait(false);
+        if (credential == null ||
+            string.IsNullOrWhiteSpace(credential.ProtectedSecret))
         {
+            return null;
+        }
+
+        if (BackendNodeEndpoint.IsBackendNodeKind(nodeKind) &&
+            string.IsNullOrWhiteSpace(credential.BackendKind))
+        {
+            logger.LogWarning(
+                "Backend node credential has no authorized backend kind. NodeKind={NodeKind}, NodeId={NodeId}.",
+                nodeKind,
+                nodeId);
             return null;
         }
 
         try
         {
             return new NodeAuthSecret(
-                m_SecretProtector.Unprotect(protectedSecret),
-                CreateVersion(protectedSecret));
+                m_SecretProtector.Unprotect(credential.ProtectedSecret),
+                CreateVersion(credential.ProtectedSecret, credential.BackendKind),
+                credential.BackendKind);
         }
         catch (CryptographicException e)
         {
@@ -102,12 +114,13 @@ internal sealed class MySqlNodeAuthSecretProvider(
                 StringComparison.Ordinal);
         }
 
-        var protectedSecret = await GetProtectedSecretAsync(nodeKind, nodeId, cancellationToken).ConfigureAwait(false);
-        return !string.IsNullOrWhiteSpace(protectedSecret) &&
-               string.Equals(credentialVersion, CreateVersion(protectedSecret), StringComparison.Ordinal);
+        var credential = await GetCredentialAsync(nodeKind, nodeId, cancellationToken).ConfigureAwait(false);
+        return credential != null &&
+               !string.IsNullOrWhiteSpace(credential.ProtectedSecret) &&
+               string.Equals(credentialVersion, CreateVersion(credential.ProtectedSecret, credential.BackendKind), StringComparison.Ordinal);
     }
 
-    private async ValueTask<string?> GetProtectedSecretAsync(
+    private async ValueTask<StoredCredential?> GetCredentialAsync(
         MasterNodeKind nodeKind,
         string nodeId,
         CancellationToken cancellationToken)
@@ -119,7 +132,9 @@ internal sealed class MySqlNodeAuthSecretProvider(
 
         await using var connection = new MySqlConnection(m_Options.ConnectionString);
         const string QUERY = """
-SELECT `protected_secret`
+SELECT
+    `protected_secret` AS `ProtectedSecret`,
+    `backend_kind` AS `BackendKind`
 FROM `service_connection_credential`
 WHERE `node_kind` = @nodeKind
   AND `node_id` = @nodeId
@@ -135,7 +150,7 @@ LIMIT 1;
                 nodeId
             },
             cancellationToken: cancellationToken);
-        return await connection.QuerySingleOrDefaultAsync<string?>(command).ConfigureAwait(false);
+        return await connection.QuerySingleOrDefaultAsync<StoredCredential>(command).ConfigureAwait(false);
     }
 
     private NodeAuthSecret? GetMasterAdminSharedSecret(string nodeId)
@@ -147,7 +162,8 @@ LIMIT 1;
 
         return new NodeAuthSecret(
             m_MasterAdminOptions.SharedSecret,
-            CreateConfiguredSecretVersion(MasterNodeKind.MasterAdmin, nodeId, m_MasterAdminOptions.SharedSecret));
+            CreateConfiguredSecretVersion(MasterNodeKind.MasterAdmin, nodeId, m_MasterAdminOptions.SharedSecret),
+            null);
     }
 
     private string GetMasterAdminCredentialVersion(string nodeId)
@@ -160,13 +176,17 @@ LIMIT 1;
         return CreateConfiguredSecretVersion(MasterNodeKind.MasterAdmin, nodeId, m_MasterAdminOptions.SharedSecret);
     }
 
-    private static string CreateVersion(string protectedSecret)
+    private static string CreateVersion(string protectedSecret, string? authorizedBackendKind = null)
     {
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(protectedSecret)));
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{protectedSecret}\n{authorizedBackendKind ?? string.Empty}")));
     }
 
     private static string CreateConfiguredSecretVersion(MasterNodeKind nodeKind, string nodeId, string sharedSecret)
     {
         return CreateVersion($"{(byte)nodeKind}:{nodeId}:{sharedSecret}");
     }
+
+    private sealed record StoredCredential(
+        string ProtectedSecret,
+        string? BackendKind);
 }

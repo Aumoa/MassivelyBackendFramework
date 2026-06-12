@@ -25,6 +25,7 @@ SELECT
     `node_kind` AS `NodeKind`,
     `node_id` AS `NodeId`,
     `display_name` AS `DisplayName`,
+    `backend_kind` AS `BackendKind`,
     `enabled` AS `Enabled`,
     `created_at` AS `CreatedAt`,
     `updated_at` AS `UpdatedAt`
@@ -47,6 +48,7 @@ ORDER BY `node_kind`, `node_id`;
     {
         ValidateInput(input);
 
+        var backendKind = NormalizeBackendKind(input);
         var sharedSecret = CreateSharedSecret();
         var protectedSecret = m_SecretProtector.Protect(sharedSecret);
 
@@ -55,9 +57,9 @@ ORDER BY `node_kind`, `node_id`;
 
         const string INSERT_QUERY = """
 INSERT INTO `service_connection_credential`
-    (`node_kind`, `node_id`, `display_name`, `protected_secret`, `enabled`)
+    (`node_kind`, `node_id`, `display_name`, `backend_kind`, `protected_secret`, `enabled`)
 VALUES
-    (@nodeKind, @nodeId, @displayName, @protectedSecret, @enabled);
+    (@nodeKind, @nodeId, @displayName, @backendKind, @protectedSecret, @enabled);
 """;
         var command = new CommandDefinition(
             INSERT_QUERY,
@@ -66,6 +68,7 @@ VALUES
                 nodeKind = (byte)input.NodeKind,
                 input.NodeId,
                 input.DisplayName,
+                backendKind,
                 protectedSecret,
                 input.Enabled
             },
@@ -78,6 +81,7 @@ SELECT
     `node_kind` AS `NodeKind`,
     `node_id` AS `NodeId`,
     `display_name` AS `DisplayName`,
+    `backend_kind` AS `BackendKind`,
     `enabled` AS `Enabled`,
     `created_at` AS `CreatedAt`,
     `updated_at` AS `UpdatedAt`
@@ -101,6 +105,7 @@ WHERE `id` = LAST_INSERT_ID();
 
         ValidateInput(input);
 
+        var backendKind = NormalizeBackendKind(input);
         await using var connection = GetConnection();
         const string QUERY = """
 UPDATE `service_connection_credential`
@@ -108,6 +113,7 @@ SET
     `node_kind` = @nodeKind,
     `node_id` = @nodeId,
     `display_name` = @displayName,
+    `backend_kind` = @backendKind,
     `enabled` = @enabled,
     `updated_at` = NOW()
 WHERE `id` = @id
@@ -121,6 +127,7 @@ WHERE `id` = @id
                 nodeKind = (byte)input.NodeKind,
                 input.NodeId,
                 input.DisplayName,
+                backendKind,
                 input.Enabled
             },
             cancellationToken: cancellationToken);
@@ -201,6 +208,31 @@ WHERE `id` = @id
         {
             throw new ArgumentException("Display name is required.", nameof(input));
         }
+
+        var backendKind = input.BackendKind?.Trim();
+        if (BackendNodeEndpoint.IsBackendNodeKind(input.NodeKind))
+        {
+            if (string.IsNullOrWhiteSpace(backendKind))
+            {
+                throw new ArgumentException("Backend kind is required for Backend credentials.", nameof(input));
+            }
+
+            if (backendKind.Length > 128)
+            {
+                throw new ArgumentException("Backend kind must be 128 characters or fewer.", nameof(input));
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(input.BackendKind))
+        {
+            throw new ArgumentException("Backend kind can only be set for Backend credentials.", nameof(input));
+        }
+    }
+
+    private static string? NormalizeBackendKind(ServiceConnectionCredentialInput input)
+    {
+        return BackendNodeEndpoint.IsBackendNodeKind(input.NodeKind)
+            ? input.BackendKind?.Trim()
+            : null;
     }
 
     private sealed record ServiceConnectionCredentialRow(
@@ -208,6 +240,7 @@ WHERE `id` = @id
         byte NodeKind,
         string NodeId,
         string DisplayName,
+        string? BackendKind,
         bool Enabled,
         DateTime CreatedAt,
         DateTime UpdatedAt)
@@ -219,6 +252,7 @@ WHERE `id` = @id
                 (MasterNodeKind)NodeKind,
                 NodeId,
                 DisplayName,
+                BackendKind,
                 Enabled,
                 CreatedAt,
                 UpdatedAt);

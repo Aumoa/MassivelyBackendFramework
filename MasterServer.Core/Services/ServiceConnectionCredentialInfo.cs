@@ -7,6 +7,7 @@ public sealed record ServiceConnectionCredentialInfo(
     MasterNodeKind NodeKind,
     string NodeId,
     string DisplayName,
+    string? BackendKind,
     bool Enabled,
     DateTime CreatedAt,
     DateTime UpdatedAt);
