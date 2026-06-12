@@ -71,8 +71,7 @@ internal sealed class ConnectionManager(
         m_Socket.Listen(m_Options.Backlog);
 
         m_AcceptTask = AcceptLoopAsync(m_Shutdown.Token);
-        if (m_ServiceCredentialOptions.Enabled &&
-            m_ServiceCredentialOptions.RevalidationIntervalMilliseconds > 0)
+        if (m_ServiceCredentialOptions.RevalidationIntervalMilliseconds > 0)
         {
             m_CredentialRevalidationTask = RevalidateCredentialsUntilStoppedAsync(m_Shutdown.Token);
         }

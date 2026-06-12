@@ -2,8 +2,6 @@ namespace MasterServer.Options;
 
 public sealed record ServiceConnectionCredentialOptions
 {
-    public bool Enabled { get; init; }
-
     public string Server { get; init; } = "localhost";
 
     public int Port { get; init; } = 3306;

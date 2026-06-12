@@ -24,17 +24,12 @@ internal sealed class MySqlNodeAuthSecretProvider(
     {
         if (string.IsNullOrWhiteSpace(m_Options.User))
         {
-            throw new InvalidOperationException("ServiceConnectionCredentials:User must be configured when service credentials are enabled.");
-        }
-
-        if (string.IsNullOrWhiteSpace(m_Options.Password))
-        {
-            throw new InvalidOperationException("ServiceConnectionCredentials:Password must be configured when service credentials are enabled.");
+            throw new InvalidOperationException("ServiceConnectionCredentials:User must be configured for Master node authentication.");
         }
 
         if (string.IsNullOrWhiteSpace(m_Options.DataProtectionApplicationName))
         {
-            throw new InvalidOperationException("ServiceConnectionCredentials:DataProtectionApplicationName must be configured when service credentials are enabled.");
+            throw new InvalidOperationException("ServiceConnectionCredentials:DataProtectionApplicationName must be configured for Master node authentication.");
         }
     }
 

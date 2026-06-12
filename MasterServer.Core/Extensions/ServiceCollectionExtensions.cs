@@ -21,26 +21,19 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddMasterServer(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<MasterSocketOptions>(config.GetRequiredSection("MasterSocket"));
-        services.Configure<ServiceConnectionCredentialOptions>(config.GetSection("ServiceConnectionCredentials"));
+        services.Configure<ServiceConnectionCredentialOptions>(config.GetRequiredSection("ServiceConnectionCredentials"));
 
-        var serviceConnectionCredentials = config.GetSection("ServiceConnectionCredentials").Get<ServiceConnectionCredentialOptions>() ?? new();
-        if (serviceConnectionCredentials.Enabled)
+        var serviceConnectionCredentials = config.GetRequiredSection("ServiceConnectionCredentials").Get<ServiceConnectionCredentialOptions>() ?? new();
+        var redisConnectionString = config.GetValue<string>("DataProtection:RedisConnectionString");
+        if (string.IsNullOrWhiteSpace(redisConnectionString))
         {
-            var redisConnectionString = config.GetValue<string>("DataProtection:RedisConnectionString");
-            if (string.IsNullOrWhiteSpace(redisConnectionString))
-            {
-                throw new InvalidOperationException("DataProtection:RedisConnectionString must be configured when service credentials are enabled.");
-            }
+            throw new InvalidOperationException("DataProtection:RedisConnectionString must be configured for Master service credentials.");
+        }
 
-            services.AddDataProtection()
-                .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
-                .SetApplicationName(serviceConnectionCredentials.DataProtectionApplicationName);
-            services.AddSingleton<INodeAuthSecretProvider, MySqlNodeAuthSecretProvider>();
-        }
-        else
-        {
-            services.AddSingleton<INodeAuthSecretProvider, OptionsNodeAuthSecretProvider>();
-        }
+        services.AddDataProtection()
+            .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
+            .SetApplicationName(serviceConnectionCredentials.DataProtectionApplicationName);
+        services.AddSingleton<INodeAuthSecretProvider, MySqlNodeAuthSecretProvider>();
 
         services.AddSingleton<IConnectionManager, ConnectionManager>();
         services.AddHostedService(provider => (ConnectionManager)provider.GetRequiredService<IConnectionManager>());
