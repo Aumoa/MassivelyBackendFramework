@@ -16,9 +16,13 @@ namespace MasterServer.Services;
 
 internal sealed class ConnectionManager(
     IOptions<MasterSocketOptions> options,
+    IOptions<ServiceConnectionCredentialOptions> serviceCredentialOptions,
+    INodeAuthSecretProvider nodeAuthSecretProvider,
+    IDirectConnectCodeStore directConnectCodeStore,
     ILogger<ConnectionManager> logger) : IHostedService, IConnectionManager
 {
     private readonly MasterSocketOptions m_Options = options.Value;
+    private readonly ServiceConnectionCredentialOptions m_ServiceCredentialOptions = serviceCredentialOptions.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly ConcurrentDictionary<Guid, MasterConnection> m_Connections = [];
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
@@ -26,6 +30,7 @@ internal sealed class ConnectionManager(
 
     private Socket? m_Socket;
     private Task? m_AcceptTask;
+    private Task? m_CredentialRevalidationTask;
     private X509Certificate2? m_Cert;
 
     public event Action? ConnectionsChanged;
@@ -44,10 +49,7 @@ internal sealed class ConnectionManager(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(m_Options.NodeAuthSecret))
-        {
-            throw new InvalidOperationException("MasterSocket:NodeAuthSecret must be configured before accepting node connections.");
-        }
+        nodeAuthSecretProvider.EnsureConfigured();
 
         if (m_Options.UseTls)
         {
@@ -70,6 +72,11 @@ internal sealed class ConnectionManager(
         m_Socket.Listen(m_Options.Backlog);
 
         m_AcceptTask = AcceptLoopAsync(m_Shutdown.Token);
+        if (m_ServiceCredentialOptions.RevalidationIntervalMilliseconds > 0)
+        {
+            m_CredentialRevalidationTask = RevalidateCredentialsUntilStoppedAsync(m_Shutdown.Token);
+        }
+
         logger.LogInformation("Master socket server is listening on {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
     }
 
@@ -81,6 +88,11 @@ internal sealed class ConnectionManager(
         if (m_AcceptTask != null)
         {
             await WaitForShutdownAsync(m_AcceptTask, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (m_CredentialRevalidationTask != null)
+        {
+            await WaitForShutdownAsync(m_CredentialRevalidationTask, cancellationToken).ConfigureAwait(false);
         }
 
         foreach (var connection in m_Connections.Values)
@@ -121,6 +133,76 @@ internal sealed class ConnectionManager(
                 socket?.Dispose();
                 logger.LogError(e, "Error occurred while accepting a Master node connection.");
             }
+        }
+    }
+
+    private async Task RevalidateCredentialsUntilStoppedAsync(CancellationToken cancellationToken)
+    {
+        var interval = TimeSpan.FromMilliseconds(Math.Max(1, m_ServiceCredentialOptions.RevalidationIntervalMilliseconds));
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+                await RevalidateTrustedConnectionCredentialsAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Failed to revalidate Master node credentials.");
+            }
+        }
+    }
+
+    private async Task RevalidateTrustedConnectionCredentialsAsync(CancellationToken cancellationToken)
+    {
+        foreach (var connection in m_Connections.Values)
+        {
+            if (!connection.IsTrusted ||
+                string.IsNullOrWhiteSpace(connection.CredentialVersion))
+            {
+                continue;
+            }
+
+            bool isCurrent;
+            try
+            {
+                isCurrent = await nodeAuthSecretProvider.IsCredentialCurrentAsync(
+                    connection.NodeKind,
+                    connection.NodeId,
+                    connection.CredentialVersion,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(
+                    e,
+                    "Failed to revalidate Master node credential. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
+                    connection.ConnectionId,
+                    connection.NodeKind,
+                    connection.NodeId);
+                continue;
+            }
+
+            if (isCurrent)
+            {
+                continue;
+            }
+
+            logger.LogWarning(
+                "Closing Master node connection because its credential is no longer current. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
+                connection.ConnectionId,
+                connection.NodeKind,
+                connection.NodeId);
+            connection.Dispose();
         }
     }
 
@@ -270,11 +352,18 @@ internal sealed class ConnectionManager(
         {
             MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendEndpointAdvertise);
             var advertised = PacketCodec.Decode(frame, BackendEndpointAdvertise.Codec);
-            connection.UpdateBackendGatewayEndpoint(advertised.GatewayEndpoint);
+            if (!string.Equals(connection.AuthorizedBackendKind, advertised.BackendKind, StringComparison.Ordinal))
+            {
+                throw new UnauthorizedAccessException(
+                    $"Backend node '{connection.NodeId}' advertised unauthorized backend kind '{advertised.BackendKind}'.");
+            }
+
+            connection.UpdateBackendGatewayEndpoint(connection.AuthorizedBackendKind!, advertised.GatewayEndpoint);
             logger.LogInformation(
-                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
+                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, BackendKind={BackendKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
                 connection.ConnectionId,
                 connection.NodeKind,
+                connection.AuthorizedBackendKind,
                 connection.NodeId,
                 advertised.GatewayEndpoint.IPAddress,
                 advertised.GatewayEndpoint.Port,
@@ -296,6 +385,18 @@ internal sealed class ConnectionManager(
         if (frame.Header.PacketId == MasterControlPacketIds.ServiceAdminStatusResponse)
         {
             await RelayServiceAdminStatusResponseAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (frame.Header.PacketId == MasterControlPacketIds.DirectConnectCodeRequest)
+        {
+            await HandleDirectConnectCodeRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (frame.Header.PacketId == MasterControlPacketIds.DirectConnectCodeValidationRequest)
+        {
+            await HandleDirectConnectCodeValidationRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -457,7 +558,7 @@ internal sealed class ConnectionManager(
 
         if (!m_Connections.TryGetValue(targetConnectionId, out var target) ||
             !target.IsTrusted ||
-            target.NodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated))
+            target.NodeKind is not (MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.Backend))
         {
             await WriteServiceAdminFailureAsync(source, request, "Target node is not connected or cannot provide a management page.", cancellationToken).ConfigureAwait(false);
             return;
@@ -529,6 +630,163 @@ internal sealed class ConnectionManager(
             cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task HandleDirectConnectCodeRequestAsync(
+        MasterConnection source,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.DirectConnectCodeRequest);
+        var request = PacketCodec.Decode(frame, DirectConnectCodeRequest.Codec);
+
+        if (source.NodeKind != MasterNodeKind.Gateway)
+        {
+            await WriteDirectConnectCodeFailureAsync(
+                source,
+                request.RequestId,
+                "Only Gateway nodes can request direct connect codes.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!IsDirectConnectTargetNodeKind(request.TargetNodeKind))
+        {
+            await WriteDirectConnectCodeFailureAsync(
+                source,
+                request.RequestId,
+                "Target node kind cannot accept direct connections.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!TryParseConnectionId(request.TargetMasterConnectionId, out var targetConnectionId) ||
+            !m_Connections.TryGetValue(targetConnectionId, out var targetConnection) ||
+            !targetConnection.IsTrusted ||
+            targetConnection.NodeKind != request.TargetNodeKind)
+        {
+            await WriteDirectConnectCodeFailureAsync(
+                source,
+                request.RequestId,
+                "Target node is not connected.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var ticket = await directConnectCodeStore.CreateAsync(
+            source.ConnectionId.ToString("N"),
+            source.NodeId,
+            targetConnection.NodeKind,
+            targetConnection.ConnectionId.ToString("N"),
+            targetConnection.NodeId,
+            cancellationToken).ConfigureAwait(false);
+        var response = new DirectConnectCodeResponse(
+            request.RequestId,
+            success: true,
+            ticket.Code,
+            ticket.ExpiresAt,
+            string.Empty);
+        await source.WriteControlAsync(
+            MasterControlPacketIds.DirectConnectCodeResponse,
+            response,
+            DirectConnectCodeResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task HandleDirectConnectCodeValidationRequestAsync(
+        MasterConnection source,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.DirectConnectCodeValidationRequest);
+        var request = PacketCodec.Decode(frame, DirectConnectCodeValidationRequest.Codec);
+
+        if (!IsDirectConnectTargetNodeKind(source.NodeKind))
+        {
+            await WriteDirectConnectCodeValidationFailureAsync(
+                source,
+                request.RequestId,
+                "Only direct-connect target nodes can validate direct connect codes.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var ticket = await directConnectCodeStore.ConsumeAsync(
+            request.Code,
+            request.GatewayMasterConnectionId,
+            request.GatewayNodeId,
+            source.NodeKind,
+            source.ConnectionId.ToString("N"),
+            source.NodeId,
+            cancellationToken).ConfigureAwait(false);
+        if (ticket == null ||
+            ticket.TargetNodeKind != source.NodeKind ||
+            !string.Equals(ticket.TargetMasterConnectionId, source.ConnectionId.ToString("N"), StringComparison.Ordinal) ||
+            !string.Equals(ticket.GatewayMasterConnectionId, request.GatewayMasterConnectionId, StringComparison.Ordinal) ||
+            !string.Equals(ticket.GatewayNodeId, request.GatewayNodeId, StringComparison.Ordinal))
+        {
+            await WriteDirectConnectCodeValidationFailureAsync(
+                source,
+                request.RequestId,
+                "Direct connect code is invalid or expired.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (!TryParseConnectionId(ticket.GatewayMasterConnectionId, out var gatewayConnectionId) ||
+            !m_Connections.TryGetValue(gatewayConnectionId, out var gatewayConnection) ||
+            !gatewayConnection.IsTrusted ||
+            gatewayConnection.NodeKind != MasterNodeKind.Gateway ||
+            !string.Equals(gatewayConnection.NodeId, ticket.GatewayNodeId, StringComparison.Ordinal))
+        {
+            await WriteDirectConnectCodeValidationFailureAsync(
+                source,
+                request.RequestId,
+                "Gateway node is no longer connected.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var response = new DirectConnectCodeValidationResponse(
+            request.RequestId,
+            success: true,
+            ticket.GatewayNodeId,
+            ticket.GatewayMasterConnectionId,
+            ticket.TargetNodeKind,
+            ticket.TargetNodeId,
+            ticket.TargetMasterConnectionId,
+            string.Empty);
+        await source.WriteControlAsync(
+            MasterControlPacketIds.DirectConnectCodeValidationResponse,
+            response,
+            DirectConnectCodeValidationResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteDirectConnectCodeFailureAsync(
+        MasterConnection connection,
+        Guid requestId,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.DirectConnectCodeResponse,
+            DirectConnectCodeResponse.Failure(requestId, errorMessage),
+            DirectConnectCodeResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteDirectConnectCodeValidationFailureAsync(
+        MasterConnection connection,
+        Guid requestId,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.DirectConnectCodeValidationResponse,
+            DirectConnectCodeValidationResponse.Failure(requestId, errorMessage),
+            DirectConnectCodeValidationResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task ExpireAdminStatusRouteAsync(Guid requestId, CancellationToken cancellationToken)
     {
         try
@@ -539,6 +797,17 @@ internal sealed class ConnectionManager(
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
+    }
+
+    private static bool TryParseConnectionId(string value, out Guid connectionId)
+    {
+        return Guid.TryParseExact(value, "N", out connectionId) ||
+               Guid.TryParse(value, out connectionId);
+    }
+
+    private static bool IsDirectConnectTargetNodeKind(MasterNodeKind nodeKind)
+    {
+        return nodeKind is MasterNodeKind.Dedicated or MasterNodeKind.Backend;
     }
 
     private MasterOverviewSnapshot CreateOverviewSnapshot()
@@ -567,7 +836,7 @@ internal sealed class ConnectionManager(
                 .Select(static connection => connection.TryCreateBackendNodeEndpoint())
                 .Where(static endpoint => endpoint != null)
                 .Select(static endpoint => endpoint!)
-                .OrderBy(static endpoint => endpoint.NodeKind)
+                .OrderBy(static endpoint => endpoint.BackendKind, StringComparer.Ordinal)
                 .ThenBy(static endpoint => endpoint.NodeId, StringComparer.Ordinal)],
             DateTimeOffset.UtcNow);
     }
@@ -605,7 +874,12 @@ internal sealed class ConnectionManager(
             handshakeTimeout.Token).ConfigureAwait(false);
         var proof = PacketCodec.Decode(proofFrame, NodeAuthProof.Codec);
 
-        if (!MasterNodeAuthenticator.VerifyProof(challenge, hello, proof, m_Options.NodeAuthSecret))
+        var credential = await nodeAuthSecretProvider.GetSharedSecretAsync(
+            hello.NodeKind,
+            hello.NodeId,
+            handshakeTimeout.Token).ConfigureAwait(false);
+        if (credential == null ||
+            !MasterNodeAuthenticator.VerifyProof(challenge, hello, proof, credential.SharedSecret))
         {
             throw new UnauthorizedAccessException($"Node authentication proof was rejected for node '{hello.NodeId}'.");
         }
@@ -621,7 +895,12 @@ internal sealed class ConnectionManager(
             await PacketFrameWriter.WriteAsync(stream, acceptedFrame, handshakeTimeout.Token).ConfigureAwait(false);
         }
 
-        connection.MarkAccepted(hello.NodeKind, hello.NodeId, hello.DisplayName);
+        connection.MarkAccepted(
+            hello.NodeKind,
+            hello.NodeId,
+            hello.DisplayName,
+            credential.CredentialVersion,
+            credential.AuthorizedBackendKind);
         NotifyConnectionsChanged();
         logger.LogInformation(
             "Master node accepted. ConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
@@ -789,6 +1068,10 @@ internal sealed class ConnectionManager(
 
         public string DisplayName { get; private set; } = string.Empty;
 
+        public string CredentialVersion { get; private set; } = string.Empty;
+
+        public string? AuthorizedBackendKind { get; private set; }
+
         public string RemoteEndPoint { get; } = socket.RemoteEndPoint?.ToString() ?? "unknown";
 
         public DateTimeOffset ConnectedAt { get; } = DateTimeOffset.UtcNow;
@@ -801,6 +1084,8 @@ internal sealed class ConnectionManager(
 
         public MasterSocketEndpoint? BackendGatewayEndpoint { get; private set; }
 
+        public string BackendKind { get; private set; } = string.Empty;
+
         public DateTimeOffset? BackendGatewayEndpointAdvertisedAt { get; private set; }
 
         public void AttachStream(Stream stream)
@@ -808,11 +1093,18 @@ internal sealed class ConnectionManager(
             m_Stream = stream ?? throw new ArgumentNullException(nameof(stream));
         }
 
-        public void MarkAccepted(MasterNodeKind nodeKind, string nodeId, string displayName)
+        public void MarkAccepted(
+            MasterNodeKind nodeKind,
+            string nodeId,
+            string displayName,
+            string credentialVersion,
+            string? authorizedBackendKind)
         {
             NodeKind = nodeKind;
             NodeId = nodeId;
             DisplayName = displayName;
+            CredentialVersion = credentialVersion;
+            AuthorizedBackendKind = authorizedBackendKind;
             MarkSeen();
             Volatile.Write(ref m_Trusted, 1);
         }
@@ -824,8 +1116,9 @@ internal sealed class ConnectionManager(
             MarkSeen();
         }
 
-        public void UpdateBackendGatewayEndpoint(MasterSocketEndpoint endpoint)
+        public void UpdateBackendGatewayEndpoint(string backendKind, MasterSocketEndpoint endpoint)
         {
+            BackendKind = backendKind;
             BackendGatewayEndpoint = endpoint;
             BackendGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
             MarkSeen();
@@ -872,6 +1165,7 @@ internal sealed class ConnectionManager(
             var advertisedAt = BackendGatewayEndpointAdvertisedAt;
             if (!IsTrusted ||
                 !BackendNodeEndpoint.IsBackendNodeKind(NodeKind) ||
+                string.IsNullOrWhiteSpace(BackendKind) ||
                 endpoint == null ||
                 !advertisedAt.HasValue)
             {
@@ -879,7 +1173,7 @@ internal sealed class ConnectionManager(
             }
 
             return new BackendNodeEndpoint(
-                NodeKind,
+                BackendKind,
                 NodeId,
                 DisplayName,
                 ConnectionId.ToString("N"),

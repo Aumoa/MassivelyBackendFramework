@@ -1,9 +1,13 @@
 using MasterAdmin.Authorization;
+using MasterAdmin.Authentication;
 using MasterAdmin.Components;
 using MasterAdmin.Options;
 using MasterAdmin.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using MasterServer.Extensions;
 using OpenIDConnect.Extensions;
 using StackExchange.Redis;
 
@@ -18,6 +22,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
 builder.Services.Configure<MasterConnectionOptions>(builder.Configuration.GetRequiredSection("MasterConnection"));
+builder.Services.AddMasterServiceConnectionCredentialManagement(builder.Configuration);
 builder.Services.AddSingleton<MasterOverviewSocketClient>();
 builder.Services.AddSingleton<IMasterOverviewProvider>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 builder.Services.AddHostedService(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
@@ -31,16 +36,16 @@ if (string.IsNullOrWhiteSpace(redisConnectionString))
 
 builder.Services.AddDataProtection()
     .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
-    .SetApplicationName("MasterAdmin");
+    .SetApplicationName(
+        builder.Configuration.GetValue<string>("ServiceConnectionCredentials:DataProtectionApplicationName") ??
+        "MasterAdmin");
 
-builder.Services.AddAuthorizationCore(options =>
-{
-    options.AddPolicy(MasterAuthorizationPolicies.Admin, policy =>
-    {
-        policy.RequireAuthenticatedUser();
-        policy.RequireAssertion(context => MasterAuthorizationPolicies.HasAdminGroup(context.User));
-    });
-});
+builder.Services.AddAuthentication(MasterAdminAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, MasterAdminAuthenticationHandler>(
+        MasterAdminAuthenticationHandler.SchemeName,
+        options => { });
+builder.Services.AddAuthorization(ConfigureAuthorization);
+builder.Services.AddAuthorizationCore(ConfigureAuthorization);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenIDConnect(builder.Configuration);
 
@@ -68,6 +73,8 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapControllers();
@@ -76,3 +83,12 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+static void ConfigureAuthorization(AuthorizationOptions options)
+{
+    options.AddPolicy(MasterAuthorizationPolicies.Admin, policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireAssertion(context => MasterAuthorizationPolicies.HasAdminGroup(context.User));
+    });
+}

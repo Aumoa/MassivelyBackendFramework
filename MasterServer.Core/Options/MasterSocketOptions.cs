@@ -14,7 +14,5 @@ public sealed record MasterSocketOptions
 
     public int ReceiveBufferSize { get; set; } = 4096;
 
-    public string NodeAuthSecret { get; set; } = string.Empty;
-
     public int HandshakeTimeoutMilliseconds { get; set; } = 5000;
 }

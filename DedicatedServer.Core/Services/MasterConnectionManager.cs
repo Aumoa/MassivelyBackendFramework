@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
+using System.Collections.Concurrent;
 using DedicatedServer.Options;
 using MasterServer.ControlPlane;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -14,20 +16,64 @@ namespace DedicatedServer.Services;
 internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
     IOptions<GatewayListenerOptions> gatewayListenerOptions,
-    IGatewayConnectionStatusProvider gatewayConnectionStatusProvider,
-    ILogger<MasterConnectionManager> logger) : IHostedService
+    IServiceProvider serviceProvider,
+    ILogger<MasterConnectionManager> logger) : IHostedService, IDirectConnectCodeValidator
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
     private readonly GatewayListenerOptions m_GatewayListenerOptions = gatewayListenerOptions.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly object m_StatusSync = new();
+    private readonly SemaphoreSlim m_WriteLock = new(1, 1);
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<DirectConnectCodeValidationResponse>> m_PendingDirectConnectCodeValidationRequests = [];
     private Task? m_RunTask;
+    private Stream? m_ActiveStream;
     private string m_State = "Disconnected";
     private string? m_MasterConnectionId;
     private string? m_LastError;
     private DateTimeOffset m_LastChangedAt = DateTimeOffset.UtcNow;
     private DateTimeOffset? m_LastConnectedAt;
     private DateTimeOffset? m_LastTrustedAt;
+
+    public async Task<DirectConnectCodeValidationResponse> ValidateDirectConnectCodeAsync(
+        string code,
+        string gatewayNodeId,
+        string gatewayMasterConnectionId,
+        CancellationToken cancellationToken)
+    {
+        var stream = m_ActiveStream ?? throw new InvalidOperationException("Master control-plane connection is not trusted.");
+        var request = new DirectConnectCodeValidationRequest(
+            Guid.NewGuid(),
+            code,
+            gatewayNodeId,
+            gatewayMasterConnectionId);
+        var completion = new TaskCompletionSource<DirectConnectCodeValidationResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!m_PendingDirectConnectCodeValidationRequests.TryAdd(request.RequestId, completion))
+        {
+            throw new InvalidOperationException("A duplicate direct connect code validation request id was generated.");
+        }
+
+        try
+        {
+            await WriteControlAsync(
+                stream,
+                MasterControlPacketIds.DirectConnectCodeValidationRequest,
+                request,
+                DirectConnectCodeValidationRequest.Codec,
+                cancellationToken).ConfigureAwait(false);
+
+            var response = await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (!response.Success)
+            {
+                throw new UnauthorizedAccessException(response.ErrorMessage);
+            }
+
+            return response;
+        }
+        finally
+        {
+            m_PendingDirectConnectCodeValidationRequests.TryRemove(request.RequestId, out _);
+        }
+    }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -39,7 +85,7 @@ internal sealed class MasterConnectionManager(
         }
 
         EnsureConfigured();
-        m_RunTask = RunAsync(m_Shutdown.Token);
+        m_RunTask = Task.Run(() => RunAsync(m_Shutdown.Token));
         return Task.CompletedTask;
     }
 
@@ -133,11 +179,15 @@ internal sealed class MasterConnectionManager(
                 accepted.NodeId,
                 accepted.ConnectionId);
 
+            m_ActiveStream = activeStream;
             await AdvertiseGatewayEndpointAsync(activeStream, cancellationToken).ConfigureAwait(false);
             await DrainTrustedFramesAsync(activeStream, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
+            m_ActiveStream = null;
+            FailPendingDirectConnectCodeValidationRequests(new IOException("Master control-plane connection closed."));
+
             if (sslStream != null)
             {
                 await sslStream.DisposeAsync().ConfigureAwait(false);
@@ -225,7 +275,7 @@ internal sealed class MasterConnectionManager(
             MasterControlProtocol.SchemaVersion,
             advertise,
             DedicatedEndpointAdvertise.Codec);
-        await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+        await WriteFrameAsync(stream, frame, cancellationToken).ConfigureAwait(false);
         logger.LogInformation(
             "Dedicated advertised Gateway listener endpoint to Master. Endpoint={Address}:{Port}, UseTls={UseTls}.",
             advertise.GatewayEndpoint.IPAddress,
@@ -282,6 +332,18 @@ internal sealed class MasterConnectionManager(
                     MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.ServiceAdminStatusRequest);
                     var request = PacketCodec.Decode(frame, ServiceAdminStatusRequest.Codec);
                     await WriteServiceAdminStatusResponseAsync(stream, request, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.DirectConnectCodeValidationResponse)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.DirectConnectCodeValidationResponse);
+                    var response = PacketCodec.Decode(frame, DirectConnectCodeValidationResponse.Codec);
+                    if (m_PendingDirectConnectCodeValidationRequests.TryRemove(response.RequestId, out var completion))
+                    {
+                        completion.TrySetResult(response);
+                    }
                 }
             }
         }
@@ -331,7 +393,7 @@ internal sealed class MasterConnectionManager(
             items.Add(new ServiceAdminStatusItem("Master", "Last error", lastError));
         }
 
-        items.AddRange(gatewayConnectionStatusProvider.GetStatusItems());
+        items.AddRange(serviceProvider.GetRequiredService<IGatewayConnectionStatusProvider>().GetStatusItems());
 
         var response = new ServiceAdminStatusResponse(
             request.RequestId,
@@ -349,7 +411,50 @@ internal sealed class MasterConnectionManager(
             MasterControlProtocol.SchemaVersion,
             response,
             ServiceAdminStatusResponse.Codec);
-        await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+        await WriteFrameAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteControlAsync<TPacket>(
+        Stream stream,
+        ushort packetId,
+        TPacket value,
+        IPacketCodec<TPacket> codec,
+        CancellationToken cancellationToken)
+    {
+        using var frame = PacketCodec.Encode(
+            PacketKind.Control,
+            packetId,
+            MasterControlProtocol.SchemaVersion,
+            value,
+            codec);
+        await WriteFrameAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteFrameAsync(
+        Stream stream,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        await m_WriteLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            m_WriteLock.Release();
+        }
+    }
+
+    private void FailPendingDirectConnectCodeValidationRequests(Exception exception)
+    {
+        foreach (var pair in m_PendingDirectConnectCodeValidationRequests.ToArray())
+        {
+            if (m_PendingDirectConnectCodeValidationRequests.TryRemove(pair.Key, out var completion))
+            {
+                completion.TrySetException(exception);
+            }
+        }
     }
 
     private void EnsureConfigured()

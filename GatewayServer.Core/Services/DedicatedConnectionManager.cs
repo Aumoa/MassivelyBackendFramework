@@ -26,6 +26,7 @@ internal sealed class DedicatedConnectionManager(
     IOptions<DedicatedConnectionOptions> options,
     IOptions<MasterConnectionOptions> gatewayIdentity,
     IDedicatedNodeCatalog catalog,
+    IDirectConnectCodeIssuer directConnectCodeIssuer,
     ILogger<DedicatedConnectionManager> logger) : IHostedService, IDedicatedConnectionStatusProvider, IGatewayMasterConnectionIdentitySink
 {
     private readonly DedicatedConnectionOptions m_Options = options.Value;
@@ -207,7 +208,7 @@ internal sealed class DedicatedConnectionManager(
                 activeStream = sslStream;
             }
 
-            var accepted = await CompleteHandshakeAsync(activeStream, cancellationToken).ConfigureAwait(false);
+            var accepted = await CompleteHandshakeAsync(activeStream, node, cancellationToken).ConfigureAwait(false);
             m_PeerDirectConnectionIds[node.MasterConnectionId] = accepted.ConnectionId;
             m_PeerStates[node.MasterConnectionId] = "Trusted";
             logger.LogInformation(
@@ -227,7 +228,10 @@ internal sealed class DedicatedConnectionManager(
         }
     }
 
-    private async Task<NodeAccepted> CompleteHandshakeAsync(Stream stream, CancellationToken cancellationToken)
+    private async Task<NodeAccepted> CompleteHandshakeAsync(
+        Stream stream,
+        DedicatedNodeEndpoint node,
+        CancellationToken cancellationToken)
     {
         using var handshakeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         handshakeTimeout.CancelAfter(TimeSpan.FromMilliseconds(Math.Max(1, m_Options.HandshakeTimeoutMilliseconds)));
@@ -240,7 +244,14 @@ internal sealed class DedicatedConnectionManager(
                 stream,
                 MasterControlPacketIds.NodeAuthChallenge,
                 handshakeTimeout.Token).ConfigureAwait(false);
-            var challenge = PacketCodec.Decode(challengeFrame, NodeAuthChallenge.Codec);
+            PacketCodec.Decode(challengeFrame, NodeAuthChallenge.Codec);
+            handshakeStep = "DirectConnectCodeRequest";
+            var directConnectCode = await directConnectCodeIssuer
+                .RequestDirectConnectCodeAsync(
+                    MasterNodeKind.Dedicated,
+                    node.MasterConnectionId,
+                    handshakeTimeout.Token)
+                .ConfigureAwait(false);
 
             var hello = new NodeHello(
                 MasterNodeKind.Gateway,
@@ -260,18 +271,15 @@ internal sealed class DedicatedConnectionManager(
                 await PacketFrameWriter.WriteAsync(stream, helloFrame, handshakeTimeout.Token).ConfigureAwait(false);
             }
 
-            handshakeStep = "NodeAuthProof";
-            var proof = new NodeAuthProof(
-                hello.NodeId,
-                MasterNodeAuthenticator.ComputeProof(challenge, hello, m_Options.SharedSecret));
-            using (var proofFrame = PacketCodec.Encode(
+            handshakeStep = "DirectConnectCode";
+            using (var codeFrame = PacketCodec.Encode(
                        PacketKind.Control,
-                       MasterControlPacketIds.NodeAuthProof,
+                       MasterControlPacketIds.DirectConnectCode,
                        MasterControlProtocol.SchemaVersion,
-                       proof,
-                       NodeAuthProof.Codec))
+                       new DirectConnectCode(directConnectCode.Code),
+                       DirectConnectCode.Codec))
             {
-                await PacketFrameWriter.WriteAsync(stream, proofFrame, handshakeTimeout.Token).ConfigureAwait(false);
+                await PacketFrameWriter.WriteAsync(stream, codeFrame, handshakeTimeout.Token).ConfigureAwait(false);
             }
 
             handshakeStep = "NodeAccepted";
@@ -349,10 +357,6 @@ internal sealed class DedicatedConnectionManager(
             throw new InvalidOperationException("MasterConnection:NodeId must be configured before connecting to Dedicated nodes.");
         }
 
-        if (string.IsNullOrWhiteSpace(m_Options.SharedSecret))
-        {
-            throw new InvalidOperationException("DedicatedConnection:SharedSecret must be configured.");
-        }
     }
 
     public ServiceAdminStatusItem[] GetStatusItems()

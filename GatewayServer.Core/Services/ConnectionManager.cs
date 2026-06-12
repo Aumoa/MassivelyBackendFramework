@@ -47,6 +47,8 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
         m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
         m_Socket.Bind(new IPEndPoint(listenAddress, options.Value.Port));
         m_Socket.Listen();
+        logger.LogInformation("Gateway client listener is running on {Address}:{Port}.", options.Value.IPAddress, options.Value.Port);
+
         m_AcceptTask = StartAcceptAsync(m_GracefulCancellation.Token);
     }
 

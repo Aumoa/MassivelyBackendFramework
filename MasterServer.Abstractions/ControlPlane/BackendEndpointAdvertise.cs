@@ -5,10 +5,18 @@ namespace MasterServer.ControlPlane;
 
 public sealed class BackendEndpointAdvertise
 {
-    public BackendEndpointAdvertise(MasterSocketEndpoint gatewayEndpoint)
+    public BackendEndpointAdvertise(string backendKind, MasterSocketEndpoint gatewayEndpoint)
     {
+        if (string.IsNullOrWhiteSpace(backendKind))
+        {
+            throw new ArgumentException("Backend kind is required.", nameof(backendKind));
+        }
+
+        BackendKind = backendKind;
         GatewayEndpoint = gatewayEndpoint ?? throw new ArgumentNullException(nameof(gatewayEndpoint));
     }
+
+    public string BackendKind { get; }
 
     public MasterSocketEndpoint GatewayEndpoint { get; }
 
@@ -18,17 +26,20 @@ public sealed class BackendEndpointAdvertise
     {
         public int GetPayloadSize(BackendEndpointAdvertise value)
         {
-            return GetEndpointSize(value.GatewayEndpoint);
+            return PacketWriter.GetStringSize(value.BackendKind) +
+                   GetEndpointSize(value.GatewayEndpoint);
         }
 
         public void Encode(BackendEndpointAdvertise value, ref PacketWriter writer)
         {
+            writer.WriteString(value.BackendKind);
             WriteEndpoint(value.GatewayEndpoint, ref writer);
         }
 
         public BackendEndpointAdvertise Decode(ref PacketReader reader)
         {
-            return new BackendEndpointAdvertise(ReadEndpoint(ref reader));
+            string backendKind = reader.ReadString();
+            return new BackendEndpointAdvertise(backendKind, ReadEndpoint(ref reader));
         }
 
         private static int GetEndpointSize(MasterSocketEndpoint value)
