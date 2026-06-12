@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
         s.Configure<MasterConnectionOptions>(config.GetSection("MasterConnection"));
         s.Configure<DedicatedConnectionOptions>(config.GetSection("DedicatedConnection"));
         s.Configure<BackendConnectionOptions>(config.GetSection("BackendConnection"));
+        s.Configure<BackendRouteOptions>(config.GetSection("BackendRoute"));
 
         s.AddSingleton<IConnectionManager, ConnectionManager>();
         s.AddHostedService(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());

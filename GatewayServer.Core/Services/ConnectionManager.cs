@@ -15,8 +15,14 @@ using PacketCore;
 
 namespace GatewayServer.Services;
 
-internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILogger<ConnectionManager> logger, IHostEnvironment env) : IHostedService, IConnectionManager
+internal class ConnectionManager(
+    IOptions<ConnectionManagerOptions> options,
+    IOptions<BackendRouteOptions> backendRouteOptions,
+    IBackendRouteManager backendRouteManager,
+    ILogger<ConnectionManager> logger,
+    IHostEnvironment env) : IHostedService, IConnectionManager
 {
+    private readonly BackendRouteOptions m_BackendRouteOptions = backendRouteOptions.Value;
     private readonly CancellationTokenSource m_GracefulCancellation = new();
 
     private Socket? m_Socket;
@@ -184,7 +190,7 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
                 };
 
                 client.Start();
-                SimpleEcho(client, cancellationToken);
+                HandleClientPacketsAsync(client, cancellationToken);
             }
         }
 
@@ -196,22 +202,19 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
         }
     }
 
-    private async void SimpleEcho(Client client, CancellationToken cancellationToken)
+    private async void HandleClientPacketsAsync(Client client, CancellationToken cancellationToken)
     {
         try
         {
             await foreach (var packet in client.ReadPacketsAsync(cancellationToken))
             {
-                var payloadString = Encoding.UTF8.GetString(packet.Payload.Span);
-                Console.WriteLine(payloadString);
+                if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE)
+                {
+                    await HandleBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
 
-                var responseMessage = $"Response: {payloadString}";
-                using var response = PacketFrame.Create(
-                    PacketKind.Response,
-                    packet.Header.PacketId,
-                    packet.Header.Version,
-                    Encoding.UTF8.GetBytes(responseMessage));
-                await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
+                await EchoPacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -238,6 +241,118 @@ internal class ConnectionManager(IOptions<ConnectionManagerOptions> options, ILo
                 logger.LogDebug(e, "Gateway client disposal completed with an error after echo loop.");
             }
         }
+    }
+
+    private async Task HandleBackendRoutePacketAsync(
+        Client client,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        var backendKind = string.Empty;
+
+        try
+        {
+            if (packet.Header.Kind is not (PacketKind.Request or PacketKind.Notify))
+            {
+                throw new InvalidOperationException("Backend route packets must be Request or Notify packets.");
+            }
+
+            if (packet.Header.Version != GatewayBackendRouteEnvelope.ProtocolVersion)
+            {
+                throw new InvalidOperationException($"Unsupported Backend route protocol version {packet.Header.Version}.");
+            }
+
+            var envelope = PacketCodec.Decode(packet, GatewayBackendRouteEnvelope.Codec);
+            backendKind = envelope.BackendKind;
+            EnsureBackendKindAllowed(backendKind);
+
+            using var routedFrame = envelope.CreateRoutedFrame();
+            await backendRouteManager.RelayFrameAsync(
+                backendKind,
+                routedFrame,
+                cancellationToken).ConfigureAwait(false);
+
+            if (packet.Header.Kind == PacketKind.Request)
+            {
+                await WriteBackendRouteResponseAsync(
+                    client,
+                    packet.Header.Version,
+                    GatewayBackendRouteResponse.Accepted(backendKind),
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Gateway rejected Backend route packet. BackendKind={BackendKind}, PacketKind={PacketKind}, PacketId={PacketId}.",
+                backendKind,
+                packet.Header.Kind,
+                packet.Header.PacketId);
+
+            if (packet.Header.Kind == PacketKind.Request)
+            {
+                await WriteBackendRouteResponseAsync(
+                    client,
+                    packet.Header.Version,
+                    GatewayBackendRouteResponse.Rejected(backendKind, "Backend route was rejected."),
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task EchoPacketAsync(
+        Client client,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        if (packet.Header.Kind != PacketKind.Request)
+        {
+            return;
+        }
+
+        var payloadString = Encoding.UTF8.GetString(packet.Payload.Span);
+        Console.WriteLine(payloadString);
+
+        using var response = PacketFrame.Create(
+            PacketKind.Response,
+            packet.Header.PacketId,
+            packet.Header.Version,
+            Encoding.UTF8.GetBytes($"Response: {payloadString}"));
+        await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteBackendRouteResponseAsync(
+        Client client,
+        ushort version,
+        GatewayBackendRouteResponse routeResponse,
+        CancellationToken cancellationToken)
+    {
+        using var response = PacketCodec.Encode(
+            PacketKind.Response,
+            Pid.GATE_BACKEND_ROUTE,
+            version,
+            routeResponse,
+            GatewayBackendRouteResponse.Codec);
+        await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void EnsureBackendKindAllowed(string backendKind)
+    {
+        var allowedBackendKinds = m_BackendRouteOptions.AllowedBackendKinds ?? [];
+        if (allowedBackendKinds.Any(candidate => string.Equals(
+                candidate?.Trim(),
+                backendKind,
+                StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        throw new UnauthorizedAccessException($"Backend kind '{backendKind}' is not enabled for client routing.");
     }
 
     private async Task DisposeClientsAsync()
