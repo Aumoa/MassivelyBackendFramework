@@ -18,14 +18,22 @@ Local `git commit` does not require GitHub credentials. Apply this policy when a
 
 ## Credential Selection
 
-- Use the current ordinary GitHub user account for PR review feedback that evaluates code, opens new review findings, approves, or requests changes.
-- Do not use the GitHub App, bot identity, or installation token for review feedback that should appear as the current user's reviewer judgment. If suitable current-user credentials are unavailable, return the review findings to the user instead of posting them remotely.
-- The GitHub App may be the right credential for author-side PR activity, including replies to existing review feedback, pushed-commit explanations, PR description updates, validation-result updates, and user-requested re-review notes. Keep bot-authored responses clearly in the author or implementer role, not as independent reviewer judgments.
+- For PR comments and review-adjacent writes, follow `PR Comment Credential Rule` below before applying branch-class credential defaults.
 - For protected root branches, require ordinary user credentials. If the user provides ordinary user credentials and final approval, use those credentials for the operation.
 - Do not use the GitHub App to push directly to protected root branches or to bypass branch protection, review, CI, release, or production safeguards.
 - For isolated work branches, prefer the GitHub App when it is available and can satisfy the needed operation.
 - If the GitHub App is unavailable for an isolated work branch, and the user provides ordinary user credentials, those credentials may be used.
 - If neither the GitHub App nor user-provided ordinary credentials are available, do not perform the online operation. Continue with local validation and report the blocker.
+
+## PR Comment Credential Rule
+
+- PR review feedback, approvals, change requests, and independent code evaluation must use the current ordinary GitHub user account.
+- Do not use the GitHub App, bot identity, or installation token for review feedback that should appear as the current user's reviewer judgment. If suitable current-user credentials are unavailable, return the review findings to the user instead of posting them remotely.
+- PR author or implementer responses must use the GitHub App or bot account. This includes replies to review feedback, pushed-commit explanations, PR description updates, validation-result updates, and user-requested re-review notes.
+- If an author-side response cannot be posted with the bot account, do not fall back to the ordinary user account. Stop and report the failure, including the missing broker purpose, App permission, or connector capability that is needed.
+- Do not assume the GitHub connector's integration credential is equivalent to the local `codex-worker-aumoa` GitHub App broker credential.
+- For GitHub writes that must be bot-authored, prefer the broker token and verify the resulting `user.login` is the expected bot login, `codex-worker-aumoa[bot]`.
+- If a write has a required actor and receives a 401/403 or permission error, do not retry with a different actor. Diagnose and report the credential or permission mismatch.
 
 ## GitHub App Broker
 
@@ -33,7 +41,8 @@ Local `git commit` does not require GitHub credentials. Apply this policy when a
   - Broker URL: `http://127.0.0.1:5657`
   - Client project: `CodexWorker.GitHubAuth.Client`
   - Secret file: `C:\Users\liberty\.secrets\codex-worker-aumoa-broker.secret`
-- Request purpose-specific tokens instead of broad credentials. Use `push-codex-branch` for App-authenticated pushes to allowed work branches and `create-pr` for App-authenticated pull request creation or author-side PR updates when no narrower broker purpose is available.
+- Request purpose-specific tokens instead of broad credentials. Use `push-codex-branch` for App-authenticated pushes to allowed work branches, `create-pr` for App-authenticated pull request creation or updates, and `comment-pr` for bot-authored author-side PR comments or responses when configured.
+- If `comment-pr` is missing or cannot satisfy a required bot-authored PR response, report the broker gap instead of silently using a non-bot actor.
 - Pass the branch name when requesting a token for branch-scoped purposes, and expect non-allowed branches to fail closed.
 - Never print, persist, commit, or place installation tokens in git remotes, repository files, shell history snippets, logs, or PR text.
 
