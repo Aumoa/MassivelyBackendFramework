@@ -1,7 +1,6 @@
 @page "/connections"
 @attribute [Authorize(Policy = MasterAuthorizationPolicies.Admin)]
 @inject IServiceConnectionCredentials Credentials
-@inject IStringLocalizer<MasterAdmin.Localizations.Strings> L
 
 <PageTitle>@T("CONNECTION_CREDENTIALS_TITLE")</PageTitle>
 
@@ -283,7 +282,7 @@
 
     private string T(string key)
     {
-        return L[key].Value;
+        return Strings.ResourceManager.GetString(key, Strings.Culture) ?? key;
     }
 
     private sealed class CredentialFormModel
