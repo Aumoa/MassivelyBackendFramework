@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
         s.Configure<BackendRouteOptions>(config.GetSection("BackendRoute"));
 
         s.AddSingleton<IConnectionManager, ConnectionManager>();
+        s.AddSingleton<IBackendRouteStatusProvider>(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
         s.AddHostedService(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
         s.AddSingleton<DedicatedNodeCatalog>();
         s.AddSingleton<IDedicatedNodeCatalog>(p => p.GetRequiredService<DedicatedNodeCatalog>());

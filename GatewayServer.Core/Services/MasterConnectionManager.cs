@@ -427,6 +427,7 @@ internal sealed class MasterConnectionManager(
 
         items.AddRange(serviceProvider.GetRequiredService<IDedicatedConnectionStatusProvider>().GetStatusItems());
         items.AddRange(serviceProvider.GetRequiredService<IBackendConnectionStatusProvider>().GetStatusItems());
+        items.AddRange(serviceProvider.GetRequiredService<IBackendRouteStatusProvider>().GetStatusItems());
 
         var response = new ServiceAdminStatusResponse(
             request.RequestId,

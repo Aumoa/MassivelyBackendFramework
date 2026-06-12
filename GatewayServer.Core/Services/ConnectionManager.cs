@@ -16,16 +16,21 @@ using PacketCore;
 
 namespace GatewayServer.Services;
 
+internal interface IBackendRouteStatusProvider
+{
+    ServiceAdminStatusItem[] GetStatusItems();
+}
+
 internal class ConnectionManager(
     IOptions<ConnectionManagerOptions> options,
     IOptions<BackendRouteOptions> backendRouteOptions,
     IBackendRouteManager backendRouteManager,
     ILogger<ConnectionManager> logger,
-    IHostEnvironment env) : IHostedService, IConnectionManager
+    IHostEnvironment env) : IHostedService, IConnectionManager, IBackendRouteStatusProvider
 {
     private readonly BackendRouteOptions m_BackendRouteOptions = backendRouteOptions.Value;
     private readonly CancellationTokenSource m_GracefulCancellation = new();
-    private readonly ConcurrentDictionary<Guid, Client> m_BackendRouteClients = [];
+    private readonly ConcurrentDictionary<Guid, PendingBackendRoute> m_PendingBackendRoutes = [];
 
     private Socket? m_Socket;
     private Task? m_AcceptTask;
@@ -67,6 +72,7 @@ internal class ConnectionManager(
         backendRouteManager.RouteFrameReceived -= OnBackendRouteFrameReceivedAsync;
         await m_GracefulCancellation.CancelAsync().ConfigureAwait(false);
         m_Socket?.Dispose();
+        CancelPendingBackendRoutes();
 
         if (m_AcceptTask != null)
         {
@@ -288,11 +294,8 @@ internal class ConnectionManager(
 
             if (envelope.RoutedKind == PacketKind.Request)
             {
-                routeRegistered = m_BackendRouteClients.TryAdd(routeId, client);
-                if (!routeRegistered)
-                {
-                    throw new InvalidOperationException("Backend route id is already active.");
-                }
+                RegisterBackendRoute(routeId, backendKind, client);
+                routeRegistered = true;
             }
 
             using var routedFrame = PacketCodec.Encode(
@@ -332,7 +335,7 @@ internal class ConnectionManager(
             {
                 if (routeRegistered)
                 {
-                    m_BackendRouteClients.TryRemove(routeId, out _);
+                    RemoveBackendRoute(routeId);
                 }
 
                 await WriteBackendRouteResponseAsync(
@@ -348,7 +351,7 @@ internal class ConnectionManager(
         BackendRouteFrameReceived frame,
         CancellationToken cancellationToken)
     {
-        if (!m_BackendRouteClients.TryGetValue(frame.Envelope.RouteId, out var client))
+        if (!m_PendingBackendRoutes.TryGetValue(frame.Envelope.RouteId, out var pendingRoute))
         {
             logger.LogWarning(
                 "Gateway received Backend route frame for an unknown client route. BackendKind={BackendKind}, RouteId={RouteId}.",
@@ -359,7 +362,7 @@ internal class ConnectionManager(
 
         if (frame.Envelope.RoutedKind == PacketKind.Response)
         {
-            m_BackendRouteClients.TryRemove(frame.Envelope.RouteId, out _);
+            RemoveBackendRoute(frame.Envelope.RouteId);
         }
 
         using var clientFrame = PacketCodec.Encode(
@@ -368,7 +371,7 @@ internal class ConnectionManager(
             GatewayBackendRouteEnvelope.ProtocolVersion,
             frame.Envelope,
             GatewayBackendRouteEnvelope.Codec);
-        await client.WriteAsync(clientFrame, cancellationToken).ConfigureAwait(false);
+        await pendingRoute.Client.WriteAsync(clientFrame, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task EchoPacketAsync(
@@ -421,20 +424,131 @@ internal class ConnectionManager(
         throw new UnauthorizedAccessException($"Backend kind '{backendKind}' is not enabled for client routing.");
     }
 
+    public ServiceAdminStatusItem[] GetStatusItems()
+    {
+        var pendingRoutes = m_PendingBackendRoutes.Values.ToArray();
+        var allowedBackendKinds = m_BackendRouteOptions.AllowedBackendKinds ?? [];
+        var items = new List<ServiceAdminStatusItem>
+        {
+            new("Backend routes", "Allowed kinds", allowedBackendKinds.Length == 0
+                ? "None"
+                : string.Join(", ", allowedBackendKinds.OrderBy(static item => item, StringComparer.Ordinal))),
+            new("Backend routes", "Pending routes", pendingRoutes.Length.ToString()),
+            new("Backend routes", "Request timeout", $"{GetBackendRouteTimeoutMilliseconds()} ms")
+        };
+
+        foreach (var group in pendingRoutes
+                     .GroupBy(static route => route.BackendKind, StringComparer.Ordinal)
+                     .OrderBy(static group => group.Key, StringComparer.Ordinal))
+        {
+            items.Add(new ServiceAdminStatusItem($"Backend route {group.Key}", "Pending routes", group.Count().ToString()));
+        }
+
+        return [.. items];
+    }
+
+    private void RegisterBackendRoute(
+        Guid routeId,
+        string backendKind,
+        Client client)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var pendingRoute = new PendingBackendRoute(
+            routeId,
+            backendKind,
+            client,
+            now,
+            now.AddMilliseconds(GetBackendRouteTimeoutMilliseconds()),
+            CancellationTokenSource.CreateLinkedTokenSource(m_GracefulCancellation.Token));
+
+        if (!m_PendingBackendRoutes.TryAdd(routeId, pendingRoute))
+        {
+            pendingRoute.TimeoutCancellation.Cancel();
+            pendingRoute.TimeoutCancellation.Dispose();
+            throw new InvalidOperationException("Backend route id is already active.");
+        }
+
+        pendingRoute.TimeoutTask = ExpireBackendRouteAsync(pendingRoute);
+    }
+
+    private async Task ExpireBackendRouteAsync(PendingBackendRoute pendingRoute)
+    {
+        try
+        {
+            var delay = pendingRoute.ExpiresAt - DateTimeOffset.UtcNow;
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, pendingRoute.TimeoutCancellation.Token).ConfigureAwait(false);
+            }
+
+            if (m_PendingBackendRoutes.TryRemove(pendingRoute.RouteId, out _))
+            {
+                logger.LogWarning(
+                    "Gateway Backend route expired. BackendKind={BackendKind}, RouteId={RouteId}, CreatedAt={CreatedAt:O}, ExpiresAt={ExpiresAt:O}.",
+                    pendingRoute.BackendKind,
+                    pendingRoute.RouteId,
+                    pendingRoute.CreatedAt,
+                    pendingRoute.ExpiresAt);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Gateway Backend route expiration task failed. BackendKind={BackendKind}, RouteId={RouteId}.",
+                pendingRoute.BackendKind,
+                pendingRoute.RouteId);
+        }
+        finally
+        {
+            pendingRoute.TimeoutCancellation.Dispose();
+        }
+    }
+
+    private bool RemoveBackendRoute(Guid routeId)
+    {
+        if (!m_PendingBackendRoutes.TryRemove(routeId, out var pendingRoute))
+        {
+            return false;
+        }
+
+        pendingRoute.TimeoutCancellation.Cancel();
+        return true;
+    }
+
     private void RemoveBackendRoutes(Client client)
     {
-        foreach (var pair in m_BackendRouteClients.ToArray())
+        foreach (var pair in m_PendingBackendRoutes.ToArray())
         {
-            if (ReferenceEquals(pair.Value, client))
+            if (ReferenceEquals(pair.Value.Client, client))
             {
-                m_BackendRouteClients.TryRemove(pair.Key, out _);
+                RemoveBackendRoute(pair.Key);
             }
+        }
+    }
+
+    private void CancelPendingBackendRoutes()
+    {
+        foreach (var routeId in m_PendingBackendRoutes.Keys)
+        {
+            RemoveBackendRoute(routeId);
         }
     }
 
     private static Guid GetResponseRouteId(Guid routeId)
     {
         return routeId == Guid.Empty ? Guid.NewGuid() : routeId;
+    }
+
+    private int GetBackendRouteTimeoutMilliseconds()
+    {
+        return Math.Max(1000, m_BackendRouteOptions.RequestTimeoutMilliseconds);
     }
 
     private async Task DisposeClientsAsync()
@@ -497,5 +611,28 @@ internal class ConnectionManager(
 
             return certs[0];
         }, cancellationToken);
+    }
+
+    private sealed class PendingBackendRoute(
+        Guid routeId,
+        string backendKind,
+        Client client,
+        DateTimeOffset createdAt,
+        DateTimeOffset expiresAt,
+        CancellationTokenSource timeoutCancellation)
+    {
+        public Guid RouteId { get; } = routeId;
+
+        public string BackendKind { get; } = backendKind;
+
+        public Client Client { get; } = client;
+
+        public DateTimeOffset CreatedAt { get; } = createdAt;
+
+        public DateTimeOffset ExpiresAt { get; } = expiresAt;
+
+        public CancellationTokenSource TimeoutCancellation { get; } = timeoutCancellation;
+
+        public Task? TimeoutTask { get; set; }
     }
 }
