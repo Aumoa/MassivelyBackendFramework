@@ -9,6 +9,7 @@ public sealed class GatewayBackendRouteEnvelope
 
     public GatewayBackendRouteEnvelope(
         string backendKind,
+        Guid routeId,
         PacketKind routedKind,
         ushort routedPacketId,
         ushort routedVersion,
@@ -19,7 +20,12 @@ public sealed class GatewayBackendRouteEnvelope
             throw new ArgumentException("Backend kind is required.", nameof(backendKind));
         }
 
-        if (routedKind is not (PacketKind.Request or PacketKind.Notify))
+        if (routeId == Guid.Empty)
+        {
+            throw new ArgumentException("Route id is required.", nameof(routeId));
+        }
+
+        if (routedKind is not (PacketKind.Request or PacketKind.Response or PacketKind.Notify))
         {
             throw new ArgumentOutOfRangeException(nameof(routedKind));
         }
@@ -45,6 +51,7 @@ public sealed class GatewayBackendRouteEnvelope
         }
 
         BackendKind = backendKind.Trim();
+        RouteId = routeId;
         RoutedKind = routedKind;
         RoutedPacketId = routedPacketId;
         RoutedVersion = routedVersion;
@@ -52,6 +59,8 @@ public sealed class GatewayBackendRouteEnvelope
     }
 
     public string BackendKind { get; }
+
+    public Guid RouteId { get; }
 
     public PacketKind RoutedKind { get; }
 
@@ -82,6 +91,7 @@ public sealed class GatewayBackendRouteEnvelope
             }
 
             return PacketWriter.GetStringSize(value.BackendKind) +
+                   16 +
                    sizeof(byte) +
                    sizeof(ushort) +
                    sizeof(ushort) +
@@ -97,6 +107,7 @@ public sealed class GatewayBackendRouteEnvelope
             }
 
             writer.WriteString(value.BackendKind);
+            writer.WriteGuid(value.RouteId);
             writer.WriteByte((byte)value.RoutedKind);
             writer.WriteUInt16(value.RoutedPacketId);
             writer.WriteUInt16(value.RoutedVersion);
@@ -107,6 +118,7 @@ public sealed class GatewayBackendRouteEnvelope
         public GatewayBackendRouteEnvelope Decode(ref PacketReader reader)
         {
             string backendKind = reader.ReadString();
+            Guid routeId = reader.ReadGuid();
             var routedKind = (PacketKind)reader.ReadByte();
             ushort routedPacketId = reader.ReadUInt16();
             ushort routedVersion = reader.ReadUInt16();
@@ -119,6 +131,7 @@ public sealed class GatewayBackendRouteEnvelope
             byte[] routedPayload = reader.ReadBytes(routedPayloadLength).ToArray();
             return new GatewayBackendRouteEnvelope(
                 backendKind,
+                routeId,
                 routedKind,
                 routedPacketId,
                 routedVersion,

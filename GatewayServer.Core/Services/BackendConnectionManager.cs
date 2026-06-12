@@ -3,6 +3,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using GatewayServer.Options;
+using GatewayServer.Protocols;
 using MasterServer.ControlPlane;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -13,6 +14,8 @@ namespace GatewayServer.Services;
 
 internal interface IBackendRouteManager
 {
+    event BackendRouteFrameReceivedHandler? RouteFrameReceived;
+
     string[] GetDiscoveredBackendKinds();
 
     ValueTask<IBackendRouteSession> ConnectAsync(
@@ -38,6 +41,25 @@ internal interface IBackendRouteSession
     ValueTask WriteAsync(PacketFrame frame, CancellationToken cancellationToken);
 }
 
+internal delegate ValueTask BackendRouteFrameReceivedHandler(
+    BackendRouteFrameReceived frame,
+    CancellationToken cancellationToken);
+
+internal sealed class BackendRouteFrameReceived(
+    string backendKind,
+    string nodeId,
+    string masterConnectionId,
+    GatewayBackendRouteEnvelope envelope)
+{
+    public string BackendKind { get; } = backendKind;
+
+    public string NodeId { get; } = nodeId;
+
+    public string MasterConnectionId { get; } = masterConnectionId;
+
+    public GatewayBackendRouteEnvelope Envelope { get; } = envelope;
+}
+
 internal interface IBackendConnectionStatusProvider
 {
     ServiceAdminStatusItem[] GetStatusItems();
@@ -59,6 +81,8 @@ internal sealed class BackendConnectionManager(
     private readonly ConcurrentDictionary<string, string> m_PeerStates = [];
     private readonly ConcurrentDictionary<string, string> m_PeerDirectConnectionIds = [];
     private string? m_MasterConnectionId;
+
+    public event BackendRouteFrameReceivedHandler? RouteFrameReceived;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -518,6 +542,10 @@ internal sealed class BackendConnectionManager(
 
                 using (frame)
                 {
+                    if (frame.Header.PacketId == Pid.GATE_BACKEND_ROUTE)
+                    {
+                        await HandleBackendRouteFrameAsync(peer, frame, cancellationToken).ConfigureAwait(false);
+                    }
                 }
             }
         }
@@ -544,6 +572,44 @@ internal sealed class BackendConnectionManager(
             }
 
             await session.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask HandleBackendRouteFrameAsync(
+        BackendPeer peer,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (frame.Header.Version != GatewayBackendRouteEnvelope.ProtocolVersion)
+        {
+            logger.LogWarning(
+                "Backend route frame used unsupported version. BackendKind={BackendKind}, BackendNodeId={NodeId}, Version={Version}.",
+                peer.Node.BackendKind,
+                peer.Node.NodeId,
+                frame.Header.Version);
+            return;
+        }
+
+        var envelope = PacketCodec.Decode(frame, GatewayBackendRouteEnvelope.Codec);
+        if (!string.Equals(envelope.BackendKind, peer.Node.BackendKind, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Backend route frame used a different Backend kind than the trusted session.");
+        }
+
+        var received = new BackendRouteFrameReceived(
+            peer.Node.BackendKind,
+            peer.Node.NodeId,
+            peer.Node.MasterConnectionId,
+            envelope);
+        var handlers = RouteFrameReceived;
+        if (handlers == null)
+        {
+            return;
+        }
+
+        foreach (BackendRouteFrameReceivedHandler handler in handlers.GetInvocationList())
+        {
+            await handler(received, cancellationToken).ConfigureAwait(false);
         }
     }
 

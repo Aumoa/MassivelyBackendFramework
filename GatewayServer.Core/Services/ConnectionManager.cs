@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -24,6 +25,7 @@ internal class ConnectionManager(
 {
     private readonly BackendRouteOptions m_BackendRouteOptions = backendRouteOptions.Value;
     private readonly CancellationTokenSource m_GracefulCancellation = new();
+    private readonly ConcurrentDictionary<Guid, Client> m_BackendRouteClients = [];
 
     private Socket? m_Socket;
     private Task? m_AcceptTask;
@@ -32,6 +34,8 @@ internal class ConnectionManager(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        backendRouteManager.RouteFrameReceived += OnBackendRouteFrameReceivedAsync;
+
         if (options.Value.UseTls)
         {
             if (env.IsDevelopment())
@@ -60,6 +64,7 @@ internal class ConnectionManager(
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        backendRouteManager.RouteFrameReceived -= OnBackendRouteFrameReceivedAsync;
         await m_GracefulCancellation.CancelAsync().ConfigureAwait(false);
         m_Socket?.Dispose();
 
@@ -187,6 +192,8 @@ internal class ConnectionManager(
                         bool removed = m_Clients.Remove(client);
                         Debug.Assert(removed);
                     }
+
+                    RemoveBackendRoutes(client);
                 };
 
                 client.Start();
@@ -249,6 +256,8 @@ internal class ConnectionManager(
         CancellationToken cancellationToken)
     {
         var backendKind = string.Empty;
+        var routeId = Guid.Empty;
+        var routeRegistered = false;
 
         try
         {
@@ -264,9 +273,34 @@ internal class ConnectionManager(
 
             var envelope = PacketCodec.Decode(packet, GatewayBackendRouteEnvelope.Codec);
             backendKind = envelope.BackendKind;
+            routeId = envelope.RouteId;
+            if (envelope.RoutedKind is not (PacketKind.Request or PacketKind.Notify))
+            {
+                throw new InvalidOperationException("Client Backend route envelopes must contain Request or Notify packets.");
+            }
+
+            if (packet.Header.Kind != envelope.RoutedKind)
+            {
+                throw new InvalidOperationException("Backend route packet kind must match the routed packet kind.");
+            }
+
             EnsureBackendKindAllowed(backendKind);
 
-            using var routedFrame = envelope.CreateRoutedFrame();
+            if (envelope.RoutedKind == PacketKind.Request)
+            {
+                routeRegistered = m_BackendRouteClients.TryAdd(routeId, client);
+                if (!routeRegistered)
+                {
+                    throw new InvalidOperationException("Backend route id is already active.");
+                }
+            }
+
+            using var routedFrame = PacketCodec.Encode(
+                envelope.RoutedKind,
+                Pid.GATE_BACKEND_ROUTE,
+                GatewayBackendRouteEnvelope.ProtocolVersion,
+                envelope,
+                GatewayBackendRouteEnvelope.Codec);
             await backendRouteManager.RelayFrameAsync(
                 backendKind,
                 routedFrame,
@@ -277,7 +311,7 @@ internal class ConnectionManager(
                 await WriteBackendRouteResponseAsync(
                     client,
                     packet.Header.Version,
-                    GatewayBackendRouteResponse.Accepted(backendKind),
+                    GatewayBackendRouteResponse.Accepted(routeId, backendKind),
                     cancellationToken).ConfigureAwait(false);
             }
         }
@@ -296,13 +330,45 @@ internal class ConnectionManager(
 
             if (packet.Header.Kind == PacketKind.Request)
             {
+                if (routeRegistered)
+                {
+                    m_BackendRouteClients.TryRemove(routeId, out _);
+                }
+
                 await WriteBackendRouteResponseAsync(
                     client,
                     packet.Header.Version,
-                    GatewayBackendRouteResponse.Rejected(backendKind, "Backend route was rejected."),
+                    GatewayBackendRouteResponse.Rejected(GetResponseRouteId(routeId), backendKind, "Backend route was rejected."),
                     cancellationToken).ConfigureAwait(false);
             }
         }
+    }
+
+    private async ValueTask OnBackendRouteFrameReceivedAsync(
+        BackendRouteFrameReceived frame,
+        CancellationToken cancellationToken)
+    {
+        if (!m_BackendRouteClients.TryGetValue(frame.Envelope.RouteId, out var client))
+        {
+            logger.LogWarning(
+                "Gateway received Backend route frame for an unknown client route. BackendKind={BackendKind}, RouteId={RouteId}.",
+                frame.BackendKind,
+                frame.Envelope.RouteId);
+            return;
+        }
+
+        if (frame.Envelope.RoutedKind == PacketKind.Response)
+        {
+            m_BackendRouteClients.TryRemove(frame.Envelope.RouteId, out _);
+        }
+
+        using var clientFrame = PacketCodec.Encode(
+            PacketKind.Notify,
+            Pid.GATE_BACKEND_ROUTE,
+            GatewayBackendRouteEnvelope.ProtocolVersion,
+            frame.Envelope,
+            GatewayBackendRouteEnvelope.Codec);
+        await client.WriteAsync(clientFrame, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task EchoPacketAsync(
@@ -353,6 +419,22 @@ internal class ConnectionManager(
         }
 
         throw new UnauthorizedAccessException($"Backend kind '{backendKind}' is not enabled for client routing.");
+    }
+
+    private void RemoveBackendRoutes(Client client)
+    {
+        foreach (var pair in m_BackendRouteClients.ToArray())
+        {
+            if (ReferenceEquals(pair.Value, client))
+            {
+                m_BackendRouteClients.TryRemove(pair.Key, out _);
+            }
+        }
+    }
+
+    private static Guid GetResponseRouteId(Guid routeId)
+    {
+        return routeId == Guid.Empty ? Guid.NewGuid() : routeId;
     }
 
     private async Task DisposeClientsAsync()
