@@ -99,7 +99,7 @@ internal sealed class MasterConnectionManager(
         }
 
         EnsureConfigured();
-        m_RunTask = RunAsync(m_Shutdown.Token);
+        m_RunTask = Task.Run(() => RunAsync(m_Shutdown.Token));
         return Task.CompletedTask;
     }
 
