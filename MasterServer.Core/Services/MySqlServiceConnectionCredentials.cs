@@ -30,9 +30,13 @@ SELECT
     `updated_at` AS `UpdatedAt`
 FROM `service_connection_credential`
 WHERE `removed_at` IS NULL
+  AND `node_kind` <> @masterAdminNodeKind
 ORDER BY `node_kind`, `node_id`;
 """;
-        var command = new CommandDefinition(QUERY, cancellationToken: cancellationToken);
+        var command = new CommandDefinition(
+            QUERY,
+            new { masterAdminNodeKind = (byte)MasterNodeKind.MasterAdmin },
+            cancellationToken: cancellationToken);
         var results = await connection.QueryAsync<ServiceConnectionCredentialRow>(command);
         return [.. results.Select(static row => row.ToInfo())];
     }
@@ -183,7 +187,7 @@ WHERE `id` = @id
     private static void ValidateInput(ServiceConnectionCredentialInput input)
     {
         if (!BackendNodeEndpoint.IsBackendNodeKind(input.NodeKind) &&
-            input.NodeKind is not MasterNodeKind.Gateway and not MasterNodeKind.Dedicated and not MasterNodeKind.MasterAdmin)
+            input.NodeKind is not MasterNodeKind.Gateway and not MasterNodeKind.Dedicated)
         {
             throw new ArgumentOutOfRangeException(nameof(input), "Unsupported node kind.");
         }

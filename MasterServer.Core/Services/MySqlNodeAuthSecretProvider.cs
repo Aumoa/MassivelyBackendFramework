@@ -12,16 +12,28 @@ namespace MasterServer.Services;
 
 internal sealed class MySqlNodeAuthSecretProvider(
     IOptions<ServiceConnectionCredentialOptions> options,
+    IOptions<MasterAdminConnectionOptions> masterAdminOptions,
     IDataProtectionProvider dataProtectionProvider,
     ILogger<MySqlNodeAuthSecretProvider> logger) : INodeAuthSecretProvider
 {
     private const string ProtectorPurpose = "MasterServer.ServiceConnectionCredentials.v1";
 
     private readonly ServiceConnectionCredentialOptions m_Options = options.Value;
+    private readonly MasterAdminConnectionOptions m_MasterAdminOptions = masterAdminOptions.Value;
     private readonly IDataProtector m_SecretProtector = dataProtectionProvider.CreateProtector(ProtectorPurpose);
 
     public void EnsureConfigured()
     {
+        if (string.IsNullOrWhiteSpace(m_MasterAdminOptions.NodeId))
+        {
+            throw new InvalidOperationException("MasterAdminConnection:NodeId must be configured for MasterAdmin node authentication.");
+        }
+
+        if (string.IsNullOrWhiteSpace(m_MasterAdminOptions.SharedSecret))
+        {
+            throw new InvalidOperationException("MasterAdminConnection:SharedSecret must be configured for MasterAdmin node authentication.");
+        }
+
         if (string.IsNullOrWhiteSpace(m_Options.User))
         {
             throw new InvalidOperationException("ServiceConnectionCredentials:User must be configured for Master node authentication.");
@@ -38,6 +50,11 @@ internal sealed class MySqlNodeAuthSecretProvider(
         string nodeId,
         CancellationToken cancellationToken)
     {
+        if (nodeKind == MasterNodeKind.MasterAdmin)
+        {
+            return GetMasterAdminSharedSecret(nodeId);
+        }
+
         if (string.IsNullOrWhiteSpace(nodeId))
         {
             return null;
@@ -77,6 +94,14 @@ internal sealed class MySqlNodeAuthSecretProvider(
             return false;
         }
 
+        if (nodeKind == MasterNodeKind.MasterAdmin)
+        {
+            return string.Equals(
+                credentialVersion,
+                GetMasterAdminCredentialVersion(nodeId),
+                StringComparison.Ordinal);
+        }
+
         var protectedSecret = await GetProtectedSecretAsync(nodeKind, nodeId, cancellationToken).ConfigureAwait(false);
         return !string.IsNullOrWhiteSpace(protectedSecret) &&
                string.Equals(credentialVersion, CreateVersion(protectedSecret), StringComparison.Ordinal);
@@ -113,8 +138,35 @@ LIMIT 1;
         return await connection.QuerySingleOrDefaultAsync<string?>(command).ConfigureAwait(false);
     }
 
+    private NodeAuthSecret? GetMasterAdminSharedSecret(string nodeId)
+    {
+        if (!string.Equals(nodeId, m_MasterAdminOptions.NodeId, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return new NodeAuthSecret(
+            m_MasterAdminOptions.SharedSecret,
+            CreateConfiguredSecretVersion(MasterNodeKind.MasterAdmin, nodeId, m_MasterAdminOptions.SharedSecret));
+    }
+
+    private string GetMasterAdminCredentialVersion(string nodeId)
+    {
+        if (!string.Equals(nodeId, m_MasterAdminOptions.NodeId, StringComparison.Ordinal))
+        {
+            return string.Empty;
+        }
+
+        return CreateConfiguredSecretVersion(MasterNodeKind.MasterAdmin, nodeId, m_MasterAdminOptions.SharedSecret);
+    }
+
     private static string CreateVersion(string protectedSecret)
     {
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(protectedSecret)));
+    }
+
+    private static string CreateConfiguredSecretVersion(MasterNodeKind nodeKind, string nodeId, string sharedSecret)
+    {
+        return CreateVersion($"{(byte)nodeKind}:{nodeId}:{sharedSecret}");
     }
 }

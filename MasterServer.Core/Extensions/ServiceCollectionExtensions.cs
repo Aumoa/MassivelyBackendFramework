@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddMasterServer(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<MasterSocketOptions>(config.GetRequiredSection("MasterSocket"));
+        services.Configure<MasterAdminConnectionOptions>(config.GetRequiredSection("MasterAdminConnection"));
         services.Configure<ServiceConnectionCredentialOptions>(config.GetRequiredSection("ServiceConnectionCredentials"));
 
         var serviceConnectionCredentials = config.GetRequiredSection("ServiceConnectionCredentials").Get<ServiceConnectionCredentialOptions>() ?? new();

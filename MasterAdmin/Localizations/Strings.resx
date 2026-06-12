@@ -286,7 +286,7 @@
     <value>Service Connection Credentials</value>
   </data>
   <data name="CONNECTION_CREDENTIALS_SUMMARY" xml:space="preserve">
-    <value>Manage internal node credentials used by Master, Gateway, and backend services.</value>
+    <value>Manage internal node credentials used by Gateway, Dedicated, and backend services.</value>
   </data>
   <data name="CONNECTION_CREDENTIALS_FORM_DESCRIPTION" xml:space="preserve">
     <value>Create or edit a node credential. Secrets are shown only when created or rotated.</value>
@@ -340,7 +340,7 @@
     <value>No credentials</value>
   </data>
   <data name="CONNECTION_CREDENTIALS_EMPTY_DESCRIPTION" xml:space="preserve">
-    <value>Create a credential before switching services from appsettings secrets to managed credentials.</value>
+    <value>Create a credential before switching non-admin services from appsettings secrets to managed credentials.</value>
   </data>
   <data name="CONNECTION_CREDENTIALS_STATUS" xml:space="preserve">
     <value>Status</value>

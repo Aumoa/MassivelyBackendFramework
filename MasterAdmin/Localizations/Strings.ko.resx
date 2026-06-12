@@ -286,7 +286,7 @@
     <value>서비스 연결 자격</value>
   </data>
   <data name="CONNECTION_CREDENTIALS_SUMMARY" xml:space="preserve">
-    <value>Master, Gateway, 백엔드 서비스가 사용하는 내부 노드 자격을 관리합니다.</value>
+    <value>Gateway, Dedicated, 백엔드 서비스가 사용하는 내부 노드 자격을 관리합니다.</value>
   </data>
   <data name="CONNECTION_CREDENTIALS_FORM_DESCRIPTION" xml:space="preserve">
     <value>노드 자격을 생성하거나 수정합니다. 시크릿은 생성 또는 회전 직후에만 표시됩니다.</value>
@@ -340,7 +340,7 @@
     <value>등록된 자격 없음</value>
   </data>
   <data name="CONNECTION_CREDENTIALS_EMPTY_DESCRIPTION" xml:space="preserve">
-    <value>서비스를 appsettings 시크릿에서 관리형 자격으로 전환하기 전에 자격을 생성하세요.</value>
+    <value>관리자 서비스를 제외한 서비스를 appsettings 시크릿에서 관리형 자격으로 전환하기 전에 자격을 생성하세요.</value>
   </data>
   <data name="CONNECTION_CREDENTIALS_STATUS" xml:space="preserve">
     <value>상태</value>
