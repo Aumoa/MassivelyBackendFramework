@@ -1,7 +1,10 @@
 using MasterAdmin.Authorization;
+using MasterAdmin.Authentication;
 using MasterAdmin.Components;
 using MasterAdmin.Options;
 using MasterAdmin.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using MasterServer.Extensions;
@@ -37,14 +40,12 @@ builder.Services.AddDataProtection()
         builder.Configuration.GetValue<string>("ServiceConnectionCredentials:DataProtectionApplicationName") ??
         "MasterAdmin");
 
-builder.Services.AddAuthorizationCore(options =>
-{
-    options.AddPolicy(MasterAuthorizationPolicies.Admin, policy =>
-    {
-        policy.RequireAuthenticatedUser();
-        policy.RequireAssertion(context => MasterAuthorizationPolicies.HasAdminGroup(context.User));
-    });
-});
+builder.Services.AddAuthentication(MasterAdminAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, MasterAdminAuthenticationHandler>(
+        MasterAdminAuthenticationHandler.SchemeName,
+        options => { });
+builder.Services.AddAuthorization(ConfigureAuthorization);
+builder.Services.AddAuthorizationCore(ConfigureAuthorization);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenIDConnect(builder.Configuration);
 
@@ -82,3 +83,12 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+static void ConfigureAuthorization(AuthorizationOptions options)
+{
+    options.AddPolicy(MasterAuthorizationPolicies.Admin, policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireAssertion(context => MasterAuthorizationPolicies.HasAdminGroup(context.User));
+    });
+}

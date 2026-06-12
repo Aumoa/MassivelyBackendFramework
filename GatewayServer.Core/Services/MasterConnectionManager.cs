@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using GatewayServer.ControlPlane;
 using GatewayServer.Options;
 using MasterServer.ControlPlane;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,8 +18,7 @@ internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
     IDedicatedNodeCatalogWriter dedicatedNodeCatalog,
     IBackendNodeCatalogWriter backendNodeCatalog,
-    IDedicatedConnectionStatusProvider dedicatedConnectionStatusProvider,
-    IGatewayMasterConnectionIdentitySink gatewayMasterConnectionIdentitySink,
+    IServiceProvider serviceProvider,
     ILogger<MasterConnectionManager> logger) : IHostedService, IMasterConnectionStatusProvider, IDirectConnectCodeIssuer
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
@@ -425,7 +425,7 @@ internal sealed class MasterConnectionManager(
             items.Add(new ServiceAdminStatusItem("Master", "Last error", status.LastError));
         }
 
-        items.AddRange(dedicatedConnectionStatusProvider.GetStatusItems());
+        items.AddRange(serviceProvider.GetRequiredService<IDedicatedConnectionStatusProvider>().GetStatusItems());
 
         var response = new ServiceAdminStatusResponse(
             request.RequestId,
@@ -538,7 +538,8 @@ internal sealed class MasterConnectionManager(
         }
 
         Volatile.Write(ref m_Trusted, status.IsTrusted ? 1 : 0);
-        gatewayMasterConnectionIdentitySink.SetMasterConnectionId(status.IsTrusted ? status.MasterConnectionId : null);
+        serviceProvider.GetRequiredService<IGatewayMasterConnectionIdentitySink>()
+            .SetMasterConnectionId(status.IsTrusted ? status.MasterConnectionId : null);
         StatusChanged?.Invoke(status);
     }
 

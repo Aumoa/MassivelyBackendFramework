@@ -5,6 +5,7 @@ using System.Security.Authentication;
 using System.Collections.Concurrent;
 using DedicatedServer.Options;
 using MasterServer.ControlPlane;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,7 +16,7 @@ namespace DedicatedServer.Services;
 internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
     IOptions<GatewayListenerOptions> gatewayListenerOptions,
-    IGatewayConnectionStatusProvider gatewayConnectionStatusProvider,
+    IServiceProvider serviceProvider,
     ILogger<MasterConnectionManager> logger) : IHostedService, IDirectConnectCodeValidator
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
@@ -392,7 +393,7 @@ internal sealed class MasterConnectionManager(
             items.Add(new ServiceAdminStatusItem("Master", "Last error", lastError));
         }
 
-        items.AddRange(gatewayConnectionStatusProvider.GetStatusItems());
+        items.AddRange(serviceProvider.GetRequiredService<IGatewayConnectionStatusProvider>().GetStatusItems());
 
         var response = new ServiceAdminStatusResponse(
             request.RequestId,
