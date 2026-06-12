@@ -50,9 +50,11 @@ Keep the real configuration outside this repository, for example:
 }
 ```
 
-Resolve `<user-secret-dir>` and `<user-cache-dir>` from a user-relative location such
-as `$env:USERPROFILE\.secrets\github-auth` before writing the configuration file. Do
-not put machine-specific absolute host paths in committed examples or shared instructions.
+Resolve `<user-secret-dir>` and `<user-cache-dir>` from a user-relative location before
+writing the configuration file. Use `$env:USERPROFILE\.secrets\github-auth` in
+PowerShell, or `$HOME/.secrets/github-auth` / `~/.secrets/github-auth` in Unix-like
+shells. Do not put machine-specific absolute host paths in committed examples or shared
+instructions.
 
 Run the broker with:
 
