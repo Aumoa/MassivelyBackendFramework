@@ -5,6 +5,7 @@ using System.Security.Authentication;
 using System.Collections.Concurrent;
 using MasterAdmin.Options;
 using MasterServer.ControlPlane;
+using MasterServer.Services;
 using Microsoft.Extensions.Options;
 using PacketCore;
 
@@ -12,13 +13,14 @@ namespace MasterAdmin.Services;
 
 public sealed class MasterOverviewSocketClient(
     IOptions<MasterConnectionOptions> options,
-    ILogger<MasterOverviewSocketClient> logger) : IHostedService, IMasterOverviewProvider
+    ILogger<MasterOverviewSocketClient> logger) : IHostedService, IMasterOverviewProvider, IServiceConnectionCredentials
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly object m_StateSync = new();
     private readonly SemaphoreSlim m_WriteLock = new(1, 1);
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<ServiceAdminStatusResponse>> m_PendingStatusRequests = [];
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<ServiceConnectionCredentialManagementResponse>> m_PendingCredentialRequests = [];
     private MasterOverviewState m_State = CreateInitialState(options.Value);
     private Task? m_RunTask;
     private Stream? m_ActiveStream;
@@ -31,6 +33,69 @@ public sealed class MasterOverviewSocketClient(
         {
             return m_State;
         }
+    }
+
+    public async ValueTask<ServiceConnectionCredentialInfo[]> GetCredentialsAsync(CancellationToken cancellationToken = default)
+    {
+        var response = await RequestCredentialManagementAsync(
+            ServiceConnectionCredentialManagementRequest.List(Guid.NewGuid()),
+            cancellationToken).ConfigureAwait(false);
+        EnsureCredentialResponseSucceeded(response);
+        return response.Credentials;
+    }
+
+    public async ValueTask<ServiceConnectionCredentialCreated> CreateCredentialAsync(
+        ServiceConnectionCredentialInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await RequestCredentialManagementAsync(
+            ServiceConnectionCredentialManagementRequest.Create(Guid.NewGuid(), input),
+            cancellationToken).ConfigureAwait(false);
+        EnsureCredentialResponseSucceeded(response);
+        if (response.Credentials.Length != 1)
+        {
+            throw new InvalidOperationException("Master did not return the created credential.");
+        }
+
+        if (string.IsNullOrWhiteSpace(response.SharedSecret))
+        {
+            throw new InvalidOperationException("Master did not return the created credential secret.");
+        }
+
+        return new ServiceConnectionCredentialCreated(response.Credentials[0], response.SharedSecret);
+    }
+
+    public async ValueTask UpdateCredentialAsync(
+        long id,
+        ServiceConnectionCredentialInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await RequestCredentialManagementAsync(
+            ServiceConnectionCredentialManagementRequest.Update(Guid.NewGuid(), id, input),
+            cancellationToken).ConfigureAwait(false);
+        EnsureCredentialResponseSucceeded(response);
+    }
+
+    public async ValueTask<string> RotateSecretAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var response = await RequestCredentialManagementAsync(
+            ServiceConnectionCredentialManagementRequest.RotateSecret(Guid.NewGuid(), id),
+            cancellationToken).ConfigureAwait(false);
+        EnsureCredentialResponseSucceeded(response);
+        if (string.IsNullOrWhiteSpace(response.SharedSecret))
+        {
+            throw new InvalidOperationException("Master did not return the rotated credential secret.");
+        }
+
+        return response.SharedSecret;
+    }
+
+    public async ValueTask RemoveCredentialAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var response = await RequestCredentialManagementAsync(
+            ServiceConnectionCredentialManagementRequest.Remove(Guid.NewGuid(), id),
+            cancellationToken).ConfigureAwait(false);
+        EnsureCredentialResponseSucceeded(response);
     }
 
     public async Task<ServiceAdminStatusResponse> RequestServiceAdminStatusAsync(
@@ -73,6 +138,43 @@ public sealed class MasterOverviewSocketClient(
         finally
         {
             m_PendingStatusRequests.TryRemove(request.RequestId, out _);
+        }
+    }
+
+    private async Task<ServiceConnectionCredentialManagementResponse> RequestCredentialManagementAsync(
+        ServiceConnectionCredentialManagementRequest request,
+        CancellationToken cancellationToken)
+    {
+        var stream = m_ActiveStream ?? throw new InvalidOperationException("Master overview socket is not connected.");
+        var completion = new TaskCompletionSource<ServiceConnectionCredentialManagementResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!m_PendingCredentialRequests.TryAdd(request.RequestId, completion))
+        {
+            throw new InvalidOperationException("A duplicate credential management request id was generated.");
+        }
+
+        try
+        {
+            using var frame = PacketCodec.Encode(
+                PacketKind.Control,
+                MasterControlPacketIds.ServiceConnectionCredentialManagementRequest,
+                MasterControlProtocol.SchemaVersion,
+                request,
+                ServiceConnectionCredentialManagementRequest.Codec);
+            await m_WriteLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                m_WriteLock.Release();
+            }
+
+            return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            m_PendingCredentialRequests.TryRemove(request.RequestId, out _);
         }
     }
 
@@ -220,7 +322,7 @@ public sealed class MasterOverviewSocketClient(
         finally
         {
             m_ActiveStream = null;
-            FailPendingStatusRequests(new IOException("Master overview socket closed."));
+            FailPendingRequests(new IOException("Master overview socket closed."));
 
             if (sslStream != null)
             {
@@ -332,6 +434,18 @@ public sealed class MasterOverviewSocketClient(
                     {
                         completion.TrySetResult(response);
                     }
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.ServiceConnectionCredentialManagementResponse)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.ServiceConnectionCredentialManagementResponse);
+                    var response = PacketCodec.Decode(frame, ServiceConnectionCredentialManagementResponse.Codec);
+                    if (m_PendingCredentialRequests.TryRemove(response.RequestId, out var completion))
+                    {
+                        completion.TrySetResult(response);
+                    }
                 }
             }
         }
@@ -412,7 +526,7 @@ public sealed class MasterOverviewSocketClient(
             DateTimeOffset.UtcNow);
     }
 
-    private void FailPendingStatusRequests(Exception exception)
+    private void FailPendingRequests(Exception exception)
     {
         foreach (var request in m_PendingStatusRequests.ToArray())
         {
@@ -421,6 +535,27 @@ public sealed class MasterOverviewSocketClient(
                 completion.TrySetException(exception);
             }
         }
+
+        foreach (var request in m_PendingCredentialRequests.ToArray())
+        {
+            if (m_PendingCredentialRequests.TryRemove(request.Key, out var completion))
+            {
+                completion.TrySetException(exception);
+            }
+        }
+    }
+
+    private static void EnsureCredentialResponseSucceeded(ServiceConnectionCredentialManagementResponse response)
+    {
+        if (response.Success)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(response.ErrorMessage)
+                ? "Master rejected the credential management request."
+                : response.ErrorMessage);
     }
 
     private static async Task WaitForShutdownAsync(Task task, CancellationToken cancellationToken)
