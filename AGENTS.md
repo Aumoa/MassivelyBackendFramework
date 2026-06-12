@@ -17,6 +17,10 @@
 
 - When adding, moving, or classifying projects in the solution, read and follow `.codex/skills/classify-solution-project/SKILL.md`.
 
+## Pull Request Review Skill
+
+- When reviewing pull requests, branch diffs, CI failures, architecture changes, or merge readiness, read and follow `.codex/skills/massivelybackend-pr-review/SKILL.md`.
+
 ## Coding Style Policy
 
 - Follow Microsoft's standard C# coding conventions by default.
@@ -31,6 +35,10 @@
 - Use the current ordinary GitHub user account when submitting pull request review feedback that evaluates code, opens new review findings, approves, or requests changes.
 - Do not use GitHub App, bot, or integration credentials for review feedback that should appear as the current user's reviewer judgment. If suitable current-user credentials are unavailable, report the review findings to the user instead of posting them remotely.
 - GitHub App or bot credentials may be used for author-side PR activity, such as replying to existing review feedback, explaining pushed commits, updating PR descriptions, reporting validation results, or asking for re-review after the user requests that workflow.
+- Before approving a pull request, understand the intent of the changed code.
+- Infer intent from the source, tests, pull request description, names, structure, comments, and surrounding implementation.
+- If the intent cannot be inferred, ask the pull request author to explain it.
+- Treat unresolved intent uncertainty as a merge-readiness blocker, and do not approve the pull request until the author explains the intent or the code is clarified enough to review its behavior.
 - When reviewing pull requests, prioritize issues that could let a client gain, request, or exercise privileges beyond what the server explicitly authorizes.
 - Treat client-to-server capability negotiation as security-sensitive. Clients may request capabilities, but the server must make the final authorization decision with least privilege and default-deny behavior.
 - Flag risky defaults where client SDKs request powerful capabilities by default, especially remote control, file transfer, admin operations, payment, session, group, authorization, or data export capabilities.
