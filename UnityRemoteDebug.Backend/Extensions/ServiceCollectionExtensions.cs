@@ -14,7 +14,10 @@ public static class ServiceCollectionExtensions
         services.Configure<MasterConnectionOptions>(config.GetSection("MasterConnection"));
 
         services.AddSingleton<MasterConnectionManager>();
+        services.AddSingleton<IDirectConnectCodeValidator>(static provider => provider.GetRequiredService<MasterConnectionManager>());
         services.AddHostedService(static provider => provider.GetRequiredService<MasterConnectionManager>());
+        services.AddSingleton<GatewayConnectionManager>();
+        services.AddHostedService(static provider => provider.GetRequiredService<GatewayConnectionManager>());
 
         return services;
     }

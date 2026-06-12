@@ -7,4 +7,10 @@ public sealed record GatewayListenerOptions
     public int Port { get; set; } = 11708;
 
     public bool UseTls { get; set; }
+
+    public string CertificateSubjectName { get; set; } = "localhost";
+
+    public int Backlog { get; set; } = 512;
+
+    public int HandshakeTimeoutMilliseconds { get; set; } = 5000;
 }
