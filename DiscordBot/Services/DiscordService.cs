@@ -165,7 +165,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         List<string> toolNames = [];
         try
         {
-            var promptContent = BuildPromptContent(message.Content, processedAttachments);
+            var promptContent = DiscordMessageAttachmentPlanner.BuildPromptContent(message.Content, processedAttachments);
             var prompt = isChessMode
                 ? BuildChessModePrompt(chessGameService, message, promptContent)
                 : isOthelloMode
@@ -366,26 +366,6 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         return chunks;
     }
 
-    private static string BuildPromptContent(
-        string content,
-        IReadOnlyList<ProcessedChatAttachment> attachments)
-    {
-        var attachmentTexts = attachments
-            .Select(static attachment => attachment.PromptText)
-            .Where(static text => !string.IsNullOrWhiteSpace(text))
-            .ToList();
-        if (attachmentTexts.Count == 0)
-        {
-            return content;
-        }
-
-        return $"""
-{content}
-
-{string.Join("\n\n", attachmentTexts)}
-""";
-    }
-
     private static string BuildChessModePrompt(
         IChessGameService chessGameService,
         SocketMessage message,
@@ -448,7 +428,9 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
     private async Task<List<ProcessedChatImage>> ProcessImageAttachmentsAsync(SocketMessage message, IServiceProvider serviceProvider)
     {
         var imageAttachments = message.Attachments
-            .Where(IsImageAttachment)
+            .Where(attachment => DiscordMessageAttachmentPlanner.IsImageAttachment(
+                attachment.Filename,
+                attachment.ContentType))
             .ToList();
         if (imageAttachments.Count == 0)
         {
@@ -482,11 +464,11 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
     {
         var attachmentProcessor = serviceProvider.GetRequiredService<IChatLogAttachmentProcessor>();
         var documentAttachments = message.Attachments
-            .Where(attachment => !IsImageAttachment(attachment))
-            .Where(attachment => attachmentProcessor.IsSupported(
+            .Where(attachment => DiscordMessageAttachmentPlanner.IsDocumentAttachment(
                 attachment.Filename,
                 attachment.ContentType,
-                attachment.Size))
+                attachment.Size,
+                attachmentProcessor))
             .ToList();
         if (documentAttachments.Count == 0)
         {
@@ -516,21 +498,6 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         }
 
         return attachments;
-    }
-
-    private static bool IsImageAttachment(Attachment attachment)
-    {
-        if (attachment.ContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true)
-        {
-            return true;
-        }
-
-        var extension = Path.GetExtension(attachment.Filename);
-        return extension.Equals(".png", StringComparison.OrdinalIgnoreCase)
-            || extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
-            || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase)
-            || extension.Equals(".gif", StringComparison.OrdinalIgnoreCase)
-            || extension.Equals(".webp", StringComparison.OrdinalIgnoreCase);
     }
 
     private string BuildAdminUrl(string path)
