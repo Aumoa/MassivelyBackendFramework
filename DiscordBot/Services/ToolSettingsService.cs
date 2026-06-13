@@ -39,7 +39,14 @@ internal sealed class ToolSettingsService(
 {
     private const string DisabledToolNamesCacheKey = "DiscordBot.ToolSettings.DisabledToolNames";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(30);
-    private static readonly Type[] ToolTypes = [typeof(DiscordTools), typeof(DiscordImageTools), typeof(DiscordChatImageTools), typeof(AI.Tools.CalculationTools)];
+    private static readonly Type[] ToolTypes =
+    [
+        typeof(DiscordTools),
+        typeof(DiscordImageTools),
+        typeof(DiscordChatImageTools),
+        typeof(DiscordChatAttachmentTools),
+        typeof(AI.Tools.CalculationTools)
+    ];
     private static readonly Lazy<IReadOnlyList<ToolCatalogItem>> Catalog = new(BuildCatalog);
 
     public async ValueTask<IReadOnlyList<ToolSettingsView>> GetAllAsync(CancellationToken cancellationToken = default)

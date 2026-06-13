@@ -18,4 +18,6 @@ public static class MasterControlPacketIds
     public const ushort DirectConnectCodeValidationRequest = 113;
     public const ushort DirectConnectCodeValidationResponse = 114;
     public const ushort DirectConnectCode = 115;
+    public const ushort ServiceConnectionCredentialManagementRequest = 116;
+    public const ushort ServiceConnectionCredentialManagementResponse = 117;
 }

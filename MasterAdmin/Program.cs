@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
-using MasterServer.Extensions;
+using MasterServer.Services;
 using OpenIDConnect.Extensions;
 using StackExchange.Redis;
 
@@ -22,9 +22,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddLocalization(o => o.ResourcesPath = "Localizations");
 builder.Services.Configure<MasterConnectionOptions>(builder.Configuration.GetRequiredSection("MasterConnection"));
-builder.Services.AddMasterServiceConnectionCredentialManagement(builder.Configuration);
 builder.Services.AddSingleton<MasterOverviewSocketClient>();
 builder.Services.AddSingleton<IMasterOverviewProvider>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
+builder.Services.AddSingleton<IServiceConnectionCredentials>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 builder.Services.AddHostedService(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 
 var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");
@@ -36,9 +36,7 @@ if (string.IsNullOrWhiteSpace(redisConnectionString))
 
 builder.Services.AddDataProtection()
     .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
-    .SetApplicationName(
-        builder.Configuration.GetValue<string>("ServiceConnectionCredentials:DataProtectionApplicationName") ??
-        "MasterAdmin");
+    .SetApplicationName("MasterAdmin");
 
 builder.Services.AddAuthentication(MasterAdminAuthenticationHandler.SchemeName)
     .AddScheme<AuthenticationSchemeOptions, MasterAdminAuthenticationHandler>(
