@@ -437,25 +437,19 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             return [];
         }
 
-        List<ProcessedChatImage> images = [];
         using var httpClient = httpClientFactory.CreateClient();
         var imageProcessor = serviceProvider.GetRequiredService<IChatLogImageProcessor>();
-
-        foreach (var attachment in imageAttachments)
-        {
-            try
+        return await DiscordAttachmentBatchProcessor.ProcessAsync(
+            imageAttachments,
+            async attachment =>
             {
                 var bytes = await httpClient.GetByteArrayAsync(attachment.Url);
-                var processedImage = await imageProcessor.ProcessAsync(attachment.Filename, bytes);
-                images.Add(processedImage);
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Failed to process attachment image: {url}", attachment.Url);
-            }
-        }
-
-        return images;
+                return await imageProcessor.ProcessAsync(attachment.Filename, bytes);
+            },
+            (attachment, exception) => logger.LogError(
+                exception,
+                "Failed to process attachment image: {url}",
+                attachment.Url));
     }
 
     private async Task<List<ProcessedChatAttachment>> ProcessDocumentAttachmentsAsync(
@@ -475,29 +469,23 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             return [];
         }
 
-        List<ProcessedChatAttachment> attachments = [];
         using var httpClient = httpClientFactory.CreateClient();
-
-        foreach (var attachment in documentAttachments)
-        {
-            try
+        return await DiscordAttachmentBatchProcessor.ProcessAsync(
+            documentAttachments,
+            async attachment =>
             {
                 var bytes = await httpClient.GetByteArrayAsync(attachment.Url);
-                var processedAttachment = await attachmentProcessor.ProcessAsync(
+                return await attachmentProcessor.ProcessAsync(
                     attachment.Id.ToString(),
                     attachment.Filename,
                     attachment.ContentType,
                     attachment.Size,
                     bytes);
-                attachments.Add(processedAttachment);
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Failed to process attachment document: {url}", attachment.Url);
-            }
-        }
-
-        return attachments;
+            },
+            (attachment, exception) => logger.LogError(
+                exception,
+                "Failed to process attachment document: {url}",
+                attachment.Url));
     }
 
     private string BuildAdminUrl(string path)
