@@ -37,6 +37,14 @@
 - Place test projects under the solution's `Tests` solution folder/filter. If the solution lacks that folder when adding a test project, create it and classify the test project there.
 - Before committing feature work with tests, run the relevant tests when practical and report the result.
 
+## Dependency Security Policy
+
+- Before adding or using an external library such as a NuGet package, make a first-pass judgment that the library is trustworthy, maintained, and appropriate for the repository.
+- Prefer libraries that are widely used in real projects, actively maintained, and aligned with the local platform conventions. Do not add obscure or low-adoption dependencies when the framework or existing repository code can reasonably cover the need.
+- Do not reject a library solely because no vulnerability information is available, but require stronger evidence of real-world use and maintenance when advisory metadata is unavailable.
+- When vulnerability information is available, especially for NuGet packages, check it before using the library and avoid known-vulnerable versions unless there is an explicit, documented reason and no safer practical alternative.
+- Treat Microsoft and framework-adjacent packages as dependencies that still require vulnerability checks; packages such as `Microsoft.AspNetCore.DataProtection` and `System.Security.Cryptography.Xml` can have reported vulnerabilities.
+
 ## Pull Request Review Policy
 
 - Use the current ordinary GitHub user account when submitting pull request review feedback that evaluates code, opens new review findings, approves, or requests changes.
@@ -48,6 +56,7 @@
 - Treat unresolved intent uncertainty as a merge-readiness blocker, and do not approve the pull request until the author explains the intent or the code is clarified enough to review its behavior.
 - When reviewing design changes, check that public/protected API surface, class responsibilities, and helper-method extraction are intentional and appropriately scoped.
 - When reviewing pull requests, verify that relevant test results are reported; treat missing tests as a blocker when the changed behavior is practical to cover with focused tests.
+- When reviewing dependency changes, verify that external libraries are trustworthy and that available vulnerability information, especially NuGet advisories, was checked.
 - When reviewing pull requests, prioritize issues that could let a client gain, request, or exercise privileges beyond what the server explicitly authorizes.
 - Treat client-to-server capability negotiation as security-sensitive. Clients may request capabilities, but the server must make the final authorization decision with least privilege and default-deny behavior.
 - Flag risky defaults where client SDKs request powerful capabilities by default, especially remote control, file transfer, admin operations, payment, session, group, authorization, or data export capabilities.

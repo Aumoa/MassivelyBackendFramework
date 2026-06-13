@@ -62,6 +62,15 @@ MassivelyBackendFramework PR reviews should protect correctness, build health, s
 - Accept a no-new-test path only when the change is not practical to isolate, is mostly mechanical, or is better validated through integration/runtime checks; require that rationale and validation result to be stated.
 - Verify that new test projects are placed under the solution's `Tests` solution folder/filter.
 
+## Dependency Review
+
+- Check newly added or updated external libraries, including NuGet packages, for trustworthiness, maintenance, real-world adoption, and fit with existing repository conventions.
+- For NuGet dependency changes, require vulnerability/advisory information to be checked before approval when that information is available. Prefer `dotnet list package --vulnerable --include-transitive` or equivalent package advisory evidence when practical.
+- Treat known-vulnerable package versions as merge-readiness blockers unless the PR documents why the version is necessary, why safer versions are not practical, and what mitigation or follow-up exists.
+- Do not block a package solely because no vulnerability data is available, but require stronger evidence that the package is established and maintained before accepting it.
+- Do not assume Microsoft or framework-adjacent packages are automatically safe. Packages such as `Microsoft.AspNetCore.DataProtection` and `System.Security.Cryptography.Xml` still need advisory checks when added or updated.
+- Ask the author to report the dependency trust and vulnerability-check result when a PR adds or updates external libraries without that evidence.
+
 ## GitHub And CI
 
 - Use the current ordinary GitHub user account when submitting PR review feedback, approvals, change requests, or independent code-evaluation comments.
