@@ -391,6 +391,36 @@
   <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_TIMEZONE" xml:space="preserve">
     <value>IANA timezone ID.</value>
   </data>
+  <data name="TOOLS_TOOL_LOAD_CHAT_ATTACHMENT_DESCRIPTION" xml:space="preserve">
+    <value>Loads a previously saved document attachment from the current Discord channel.</value>
+  </data>
+  <data name="TOOLS_TOOL_LOAD_CHAT_ATTACHMENT_PARAM_TARGET" xml:space="preserve">
+    <value>How to find the document attachment: latest, replied, or message_id.</value>
+  </data>
+  <data name="TOOLS_TOOL_LOAD_CHAT_ATTACHMENT_PARAM_MESSAGE_ID" xml:space="preserve">
+    <value>Discord message ID or message URL when target is message_id.</value>
+  </data>
+  <data name="TOOLS_TOOL_LOAD_CHAT_ATTACHMENT_PARAM_MAX_CHARACTERS" xml:space="preserve">
+    <value>Maximum number of extracted text characters to include.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_DESCRIPTION" xml:space="preserve">
+    <value>Searches extracted text from saved document attachments in the current Discord channel.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_PARAM_KEYWORDS" xml:space="preserve">
+    <value>Comma-separated keywords to search for in saved document attachments.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_PARAM_LIMIT" xml:space="preserve">
+    <value>Maximum number of attachment search results.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_PARAM_FROM_DATE" xml:space="preserve">
+    <value>Start date and time in the selected timezone.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_PARAM_TO_DATE" xml:space="preserve">
+    <value>End date and time in the selected timezone.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_PARAM_TIMEZONE" xml:space="preserve">
+    <value>IANA timezone ID.</value>
+  </data>
   <data name="TOOLS_TOOL_GET_CURRENT_DATE_DESCRIPTION" xml:space="preserve">
     <value>Returns the current date and time.</value>
   </data>
