@@ -1,5 +1,11 @@
 # Codex Workflow Rules
 
+## Local Instructions
+
+- If `AGENTS.local.md` exists in the repository root, read and keep it in mind the same way as `AGENTS.md`.
+- Treat `AGENTS.local.md` as a local, untracked override for user- or machine-specific instructions.
+- Instructions or decisions in `AGENTS.local.md` take precedence over conflicting instructions in `AGENTS.md`.
+
 ## Domain-Specific Instructions
 
 - Before starting domain-specific work, read and follow the matching instruction file below.
@@ -17,6 +23,10 @@
 
 - When adding, moving, or classifying projects in the solution, read and follow `.codex/skills/classify-solution-project/SKILL.md`.
 
+## Pull Request Review Skill
+
+- When reviewing pull requests, branch diffs, CI failures, architecture changes, or merge readiness, read and follow `.codex/skills/massivelybackend-pr-review/SKILL.md`.
+
 ## Coding Style Policy
 
 - Follow Microsoft's standard C# coding conventions by default.
@@ -26,11 +36,33 @@
 
 - Prefix private C# member fields with `m_`.
 
+## Testing Policy
+
+- When implementing features, actively write tests for deterministic or self-contained logic that is naturally testable, such as math utilities, parsers, serializers, protocol codecs, validators, pure business rules, and state transformations.
+- Use tests as self-validation for code that can be isolated without brittle infrastructure or excessive setup.
+- Place test projects under the solution's `Tests` solution folder/filter. If the solution lacks that folder when adding a test project, create it and classify the test project there.
+- Before committing feature work with tests, run the relevant tests when practical and report the result.
+
+## Dependency Security Policy
+
+- Before adding or using an external library such as a NuGet package, make a first-pass judgment that the library is trustworthy, maintained, and appropriate for the repository.
+- Prefer libraries that are widely used in real projects, actively maintained, and aligned with the local platform conventions. Do not add obscure or low-adoption dependencies when the framework or existing repository code can reasonably cover the need.
+- Do not reject a library solely because no vulnerability information is available, but require stronger evidence of real-world use and maintenance when advisory metadata is unavailable.
+- When vulnerability information is available, especially for NuGet packages, check it before using the library and avoid known-vulnerable versions unless there is an explicit, documented reason and no safer practical alternative.
+- Treat Microsoft and framework-adjacent packages as dependencies that still require vulnerability checks; packages such as `Microsoft.AspNetCore.DataProtection` and `System.Security.Cryptography.Xml` can have reported vulnerabilities.
+
 ## Pull Request Review Policy
 
 - Use the current ordinary GitHub user account when submitting pull request review feedback that evaluates code, opens new review findings, approves, or requests changes.
 - Do not use GitHub App, bot, or integration credentials for review feedback that should appear as the current user's reviewer judgment. If suitable current-user credentials are unavailable, report the review findings to the user instead of posting them remotely.
 - GitHub App or bot credentials may be used for author-side PR activity, such as replying to existing review feedback, explaining pushed commits, updating PR descriptions, reporting validation results, or asking for re-review after the user requests that workflow.
+- Before approving a pull request, understand the intent of the changed code.
+- Infer intent from the source, tests, pull request description, names, structure, comments, and surrounding implementation.
+- If the intent cannot be inferred, ask the pull request author to explain it.
+- Treat unresolved intent uncertainty as a merge-readiness blocker, and do not approve the pull request until the author explains the intent or the code is clarified enough to review its behavior.
+- When reviewing design changes, check that public/protected API surface, class responsibilities, and helper-method extraction are intentional and appropriately scoped.
+- When reviewing pull requests, verify that relevant test results are reported; treat missing tests as a blocker when the changed behavior is practical to cover with focused tests.
+- When reviewing dependency changes, verify that external libraries are trustworthy and that available vulnerability information, especially NuGet advisories, was checked.
 - When reviewing pull requests, prioritize issues that could let a client gain, request, or exercise privileges beyond what the server explicitly authorizes.
 - Treat client-to-server capability negotiation as security-sensitive. Clients may request capabilities, but the server must make the final authorization decision with least privilege and default-deny behavior.
 - Flag risky defaults where client SDKs request powerful capabilities by default, especially remote control, file transfer, admin operations, payment, session, group, authorization, or data export capabilities.
@@ -60,6 +92,7 @@
 - Do not commit user-made unrelated changes.
 - If the working tree already contains unrelated changes, isolate only Codex-made changes in the commit.
 - If a clean feature-sized commit is not possible, stop and explain why.
+- Do not amend commits unless the user explicitly requests an amend; create a follow-up commit instead when prior commits may already be shared.
 - For commits intended to participate in a GitHub App-authenticated isolated work-branch workflow, follow `.codex/skills/github-app-credential-policy/SKILL.md` before creating the commit identity.
 
 ## Commit Message Format
