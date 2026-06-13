@@ -21,6 +21,31 @@ MassivelyBackendFramework PR reviews should protect correctness, build health, s
 - When a PR touches web-based services, ASP.NET services, Blazor UI, OAuth/OIDC work, API services, or frontend-related changes, also follow `WEBAGENTS.md`.
 - When a PR touches high-performance socket server work, including Master, Gateway, Dedicated, channel execution, game networking, packet routing, or MMORPG server logic, also follow `SOCKETAGENTS.md`.
 
+## API Surface
+
+- Check whether newly added or widened `public` and `protected` members are intentionally part of an API surface or extension point.
+- Prefer the narrowest accessibility that supports the current design.
+- Flag unnecessary `public` or `protected` exposure when the member is only an implementation detail or can reasonably stay private/internal.
+- Allow `public` or `protected` members without current call sites when the code clearly defines an appropriate API, contract, override point, or future extension point.
+- Do not request narrower accessibility solely because a well-scoped API has no current in-repository caller.
+
+## Class Responsibility
+
+- Check whether each class has one clear primary responsibility.
+- Flag classes that combine unrelated responsibilities when the coupling makes behavior harder to reason about, test, extend, or review.
+- Accept responsibility mixing only when there is a clear optimization, platform constraint, hot-path requirement, compatibility concern, or similarly hard-to-avoid reason.
+- Prefer moving behavior into cohesive collaborators when it reduces coupling without adding needless indirection.
+- Do not request extra class splitting when the existing responsibility boundary is already understandable and further separation would mostly add ceremony.
+
+## Function Extraction
+
+- Review helper-method extraction by the meaning of the behavior, not by line count alone.
+- Avoid asking for one-off helper methods for trivial one- or two-line behavior when the extracted method has no distinct domain meaning and is only used in one fixed location.
+- Prefer extraction when the helper represents a clear feature unit, policy, validation rule, protocol step, or reusable decision.
+- Prefer extraction when a behavior change should naturally apply to every call site through one shared implementation.
+- Flag over-extraction when it obscures local flow, hides important context, or creates names that merely restate the code.
+- Flag under-extraction when repeated or conceptually distinct logic makes the caller harder to understand or risks inconsistent future changes.
+
 ## Security Review
 
 - Prioritize issues that could let a client gain, request, or exercise privileges beyond what the server explicitly authorizes.

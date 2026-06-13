@@ -39,6 +39,7 @@
 - Infer intent from the source, tests, pull request description, names, structure, comments, and surrounding implementation.
 - If the intent cannot be inferred, ask the pull request author to explain it.
 - Treat unresolved intent uncertainty as a merge-readiness blocker, and do not approve the pull request until the author explains the intent or the code is clarified enough to review its behavior.
+- When reviewing design changes, check that public/protected API surface, class responsibilities, and helper-method extraction are intentional and appropriately scoped.
 - When reviewing pull requests, prioritize issues that could let a client gain, request, or exercise privileges beyond what the server explicitly authorizes.
 - Treat client-to-server capability negotiation as security-sensitive. Clients may request capabilities, but the server must make the final authorization decision with least privilege and default-deny behavior.
 - Flag risky defaults where client SDKs request powerful capabilities by default, especially remote control, file transfer, admin operations, payment, session, group, authorization, or data export capabilities.
@@ -68,6 +69,7 @@
 - Do not commit user-made unrelated changes.
 - If the working tree already contains unrelated changes, isolate only Codex-made changes in the commit.
 - If a clean feature-sized commit is not possible, stop and explain why.
+- Do not amend commits unless the user explicitly requests an amend; create a follow-up commit instead when prior commits may already be shared.
 - For commits intended to participate in a GitHub App-authenticated isolated work-branch workflow, follow `.codex/skills/github-app-credential-policy/SKILL.md` before creating the commit identity.
 
 ## Commit Message Format
