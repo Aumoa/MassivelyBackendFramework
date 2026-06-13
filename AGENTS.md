@@ -30,6 +30,13 @@
 
 - Prefix private C# member fields with `m_`.
 
+## Testing Policy
+
+- When implementing features, actively write tests for deterministic or self-contained logic that is naturally testable, such as math utilities, parsers, serializers, protocol codecs, validators, pure business rules, and state transformations.
+- Use tests as self-validation for code that can be isolated without brittle infrastructure or excessive setup.
+- Place test projects under the solution's `Tests` solution folder/filter. If the solution lacks that folder when adding a test project, create it and classify the test project there.
+- Before committing feature work with tests, run the relevant tests when practical and report the result.
+
 ## Pull Request Review Policy
 
 - Use the current ordinary GitHub user account when submitting pull request review feedback that evaluates code, opens new review findings, approves, or requests changes.
@@ -40,6 +47,7 @@
 - If the intent cannot be inferred, ask the pull request author to explain it.
 - Treat unresolved intent uncertainty as a merge-readiness blocker, and do not approve the pull request until the author explains the intent or the code is clarified enough to review its behavior.
 - When reviewing design changes, check that public/protected API surface, class responsibilities, and helper-method extraction are intentional and appropriately scoped.
+- When reviewing pull requests, verify that relevant test results are reported; treat missing tests as a blocker when the changed behavior is practical to cover with focused tests.
 - When reviewing pull requests, prioritize issues that could let a client gain, request, or exercise privileges beyond what the server explicitly authorizes.
 - Treat client-to-server capability negotiation as security-sensitive. Clients may request capabilities, but the server must make the final authorization decision with least privilege and default-deny behavior.
 - Flag risky defaults where client SDKs request powerful capabilities by default, especially remote control, file transfer, admin operations, payment, session, group, authorization, or data export capabilities.

@@ -54,6 +54,14 @@ MassivelyBackendFramework PR reviews should protect correctness, build health, s
 - Do not treat client-provided roles, scopes, groups, permissions, or capability declarations as authoritative without server-side verification.
 - For Master, Gateway, and Dedicated changes, verify that the changed behavior preserves the intended trust boundary: Gateway is the external security boundary, Master is the control plane, and Dedicated owns authoritative game state.
 
+## Test Coverage Review
+
+- Check whether the PR reports relevant test results in the description, review discussion, CI, or validation notes.
+- Treat missing focused tests as a merge-readiness blocker when changed behavior is practical to cover with tests, especially math utilities, parsers, serializers, protocol codecs, validators, pure business rules, permission decisions, state transformations, and regression-prone edge cases.
+- Require the author to add tests and report the test result when testable behavior lacks coverage.
+- Accept a no-new-test path only when the change is not practical to isolate, is mostly mechanical, or is better validated through integration/runtime checks; require that rationale and validation result to be stated.
+- Verify that new test projects are placed under the solution's `Tests` solution folder/filter.
+
 ## GitHub And CI
 
 - Use the current ordinary GitHub user account when submitting PR review feedback, approvals, change requests, or independent code-evaluation comments.
