@@ -5,11 +5,13 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using GatewayServer.Protocols;
 using MasterServer.ControlPlane;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PacketCore;
+using RemoteDebugServer.Protocols;
 using UnityRemoteDebug.Backend.Options;
 
 namespace UnityRemoteDebug.Backend.Services;
@@ -17,11 +19,13 @@ namespace UnityRemoteDebug.Backend.Services;
 internal sealed class GatewayConnectionManager(
     IOptions<GatewayListenerOptions> options,
     IOptions<MasterConnectionOptions> backendIdentity,
+    IOptions<BackendRegistrationOptions> backendRegistration,
     IDirectConnectCodeValidator directConnectCodeValidator,
     ILogger<GatewayConnectionManager> logger) : IHostedService
 {
     private readonly GatewayListenerOptions m_Options = options.Value;
     private readonly MasterConnectionOptions m_BackendIdentity = backendIdentity.Value;
+    private readonly BackendRegistrationOptions m_BackendRegistration = backendRegistration.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
     private readonly ConcurrentDictionary<Guid, string> m_GatewayConnectionStates = [];
@@ -162,7 +166,7 @@ internal sealed class GatewayConnectionManager(
                 gatewayNodeId,
                 socket.RemoteEndPoint);
 
-            await DrainGatewayFramesAsync(activeStream, cancellationToken).ConfigureAwait(false);
+            await ProcessGatewayFramesAsync(connectionId, activeStream, cancellationToken).ConfigureAwait(false);
 
             logger.LogInformation(
                 "Unity RemoteDebug Backend Gateway direct connection closed. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, RemoteEndPoint={RemoteEndPoint}.",
@@ -274,7 +278,10 @@ internal sealed class GatewayConnectionManager(
         return accepted;
     }
 
-    private static async Task DrainGatewayFramesAsync(Stream stream, CancellationToken cancellationToken)
+    private async Task ProcessGatewayFramesAsync(
+        Guid connectionId,
+        Stream stream,
+        CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -288,8 +295,213 @@ internal sealed class GatewayConnectionManager(
                 return;
             }
 
-            frame.Dispose();
+            using (frame)
+            {
+                if (frame.Header.PacketId != Pid.GATE_BACKEND_ROUTE)
+                {
+                    logger.LogDebug(
+                        "Unity RemoteDebug Backend ignored Gateway frame. ConnectionId={ConnectionId}, PacketKind={PacketKind}, PacketId={PacketId}, Version={Version}.",
+                        connectionId,
+                        frame.Header.Kind,
+                        frame.Header.PacketId,
+                        frame.Header.Version);
+                    continue;
+                }
+
+                await HandleGatewayBackendRouteFrameAsync(connectionId, stream, frame, cancellationToken).ConfigureAwait(false);
+            }
         }
+    }
+
+    private async Task HandleGatewayBackendRouteFrameAsync(
+        Guid connectionId,
+        Stream stream,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (frame.Header.Version != GatewayBackendRouteEnvelope.ProtocolVersion)
+        {
+            logger.LogWarning(
+                "Unity RemoteDebug Backend ignored Gateway route frame with unsupported version. ConnectionId={ConnectionId}, Version={Version}.",
+                connectionId,
+                frame.Header.Version);
+            return;
+        }
+
+        var envelope = PacketCodec.Decode(frame, GatewayBackendRouteEnvelope.Codec);
+        if (envelope.RoutedKind == PacketKind.Response)
+        {
+            logger.LogWarning(
+                "Unity RemoteDebug Backend received an unexpected Gateway routed response. ConnectionId={ConnectionId}, RouteId={RouteId}.",
+                connectionId,
+                envelope.RouteId);
+            return;
+        }
+
+        if (!string.Equals(envelope.BackendKind, m_BackendRegistration.BackendKind, StringComparison.Ordinal))
+        {
+            logger.LogWarning(
+                "Unity RemoteDebug Backend received a route for another Backend kind. ConnectionId={ConnectionId}, ExpectedBackendKind={ExpectedBackendKind}, ReceivedBackendKind={ReceivedBackendKind}, RouteId={RouteId}.",
+                connectionId,
+                m_BackendRegistration.BackendKind,
+                envelope.BackendKind,
+                envelope.RouteId);
+
+            if (envelope.RoutedKind == PacketKind.Request)
+            {
+                await WriteErrorResponseAsync(
+                    stream,
+                    envelope,
+                    $"Backend kind '{envelope.BackendKind}' is not handled by this Unity RemoteDebug Backend.",
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        if (envelope.RoutedKind == PacketKind.Notify)
+        {
+            logger.LogDebug(
+                "Unity RemoteDebug Backend received Gateway routed notify. ConnectionId={ConnectionId}, RouteId={RouteId}, PacketId={PacketId}.",
+                connectionId,
+                envelope.RouteId,
+                envelope.RoutedPacketId);
+            return;
+        }
+
+        try
+        {
+            await HandleBackendRouteRequestAsync(connectionId, stream, envelope, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Unity RemoteDebug Backend failed to handle routed request. ConnectionId={ConnectionId}, RouteId={RouteId}, PacketId={PacketId}.",
+                connectionId,
+                envelope.RouteId,
+                envelope.RoutedPacketId);
+            await WriteErrorResponseAsync(stream, envelope, "Unity RemoteDebug Backend request failed.", cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task HandleBackendRouteRequestAsync(
+        Guid connectionId,
+        Stream stream,
+        GatewayBackendRouteEnvelope envelope,
+        CancellationToken cancellationToken)
+    {
+        if (envelope.RoutedVersion != RemoteDebugProtocol.SchemaVersion)
+        {
+            await WriteErrorResponseAsync(
+                stream,
+                envelope,
+                $"Unsupported Unity RemoteDebug Backend protocol version {envelope.RoutedVersion}.",
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        using var routedFrame = envelope.CreateRoutedFrame();
+        switch (envelope.RoutedPacketId)
+        {
+            case RemoteDebugPacketIds.BackendStatusRequest:
+                PacketCodec.Decode(routedFrame, RemoteDebugBackendStatusRequest.Codec);
+                await WriteRoutedResponseAsync(
+                    stream,
+                    envelope.RouteId,
+                    RemoteDebugPacketIds.BackendStatusResponse,
+                    new RemoteDebugBackendStatusResponse(
+                        m_BackendRegistration.BackendKind,
+                        GetTrustedGatewayConnectionCount(),
+                        remoteDebugClientCount: 0,
+                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+                    RemoteDebugBackendStatusResponse.Codec,
+                    cancellationToken).ConfigureAwait(false);
+                break;
+
+            case RemoteDebugPacketIds.BackendClientListRequest:
+                PacketCodec.Decode(routedFrame, RemoteDebugBackendClientListRequest.Codec);
+                await WriteRoutedResponseAsync(
+                    stream,
+                    envelope.RouteId,
+                    RemoteDebugPacketIds.BackendClientListResponse,
+                    new RemoteDebugBackendClientListResponse(
+                        Array.Empty<RemoteDebugBackendClientSnapshot>(),
+                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+                    RemoteDebugBackendClientListResponse.Codec,
+                    cancellationToken).ConfigureAwait(false);
+                break;
+
+            default:
+                logger.LogWarning(
+                    "Unity RemoteDebug Backend rejected unsupported routed request. ConnectionId={ConnectionId}, RouteId={RouteId}, PacketId={PacketId}.",
+                    connectionId,
+                    envelope.RouteId,
+                    envelope.RoutedPacketId);
+                await WriteErrorResponseAsync(
+                    stream,
+                    envelope,
+                    $"Unsupported Unity RemoteDebug Backend packet id {envelope.RoutedPacketId}.",
+                    cancellationToken).ConfigureAwait(false);
+                break;
+        }
+    }
+
+    private async Task WriteErrorResponseAsync(
+        Stream stream,
+        GatewayBackendRouteEnvelope request,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        await WriteRoutedResponseAsync(
+            stream,
+            request.RouteId,
+            RemoteDebugPacketIds.BackendErrorResponse,
+            new RemoteDebugBackendErrorResponse(
+                request.RoutedPacketId,
+                request.RoutedVersion,
+                errorMessage),
+            RemoteDebugBackendErrorResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteRoutedResponseAsync<TPacket>(
+        Stream stream,
+        Guid routeId,
+        ushort routedPacketId,
+        TPacket value,
+        IPacketCodec<TPacket> codec,
+        CancellationToken cancellationToken)
+    {
+        using var routedFrame = PacketCodec.Encode(
+            PacketKind.Response,
+            routedPacketId,
+            RemoteDebugProtocol.SchemaVersion,
+            value,
+            codec);
+        var responseEnvelope = new GatewayBackendRouteEnvelope(
+            m_BackendRegistration.BackendKind,
+            routeId,
+            PacketKind.Response,
+            routedPacketId,
+            RemoteDebugProtocol.SchemaVersion,
+            routedFrame.Payload.ToArray());
+        using var gatewayFrame = PacketCodec.Encode(
+            PacketKind.Response,
+            Pid.GATE_BACKEND_ROUTE,
+            GatewayBackendRouteEnvelope.ProtocolVersion,
+            responseEnvelope,
+            GatewayBackendRouteEnvelope.Codec);
+        await PacketFrameWriter.WriteAsync(stream, gatewayFrame, cancellationToken).ConfigureAwait(false);
+    }
+
+    private int GetTrustedGatewayConnectionCount()
+    {
+        return m_GatewayConnectionStates.Count(static pair => string.Equals(pair.Value, "Trusted", StringComparison.Ordinal));
     }
 
     private static async Task<PacketFrame> ReadRequiredHandshakeFrameAsync(
