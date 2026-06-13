@@ -1,5 +1,11 @@
 # Codex Workflow Rules
 
+## Local Instructions
+
+- If `AGENTS.local.md` exists in the repository root, read and keep it in mind the same way as `AGENTS.md`.
+- Treat `AGENTS.local.md` as a local, untracked override for user- or machine-specific instructions.
+- Instructions or decisions in `AGENTS.local.md` take precedence over conflicting instructions in `AGENTS.md`.
+
 ## Domain-Specific Instructions
 
 - Before starting domain-specific work, read and follow the matching instruction file below.
