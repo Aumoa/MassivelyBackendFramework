@@ -94,13 +94,15 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         }
 
         var processedImages = await ProcessImageAttachmentsAsync(message, scope.ServiceProvider);
+        var processedAttachments = await ProcessDocumentAttachmentsAsync(message, scope.ServiceProvider);
         await SaveChatLogAsync(
             message.Id.ToString(),
             guildId,
             channelId,
             message.Author.Id.ToString(),
             content,
-            processedImages.Select(image => image.StoredImage).ToList());
+            processedImages.Select(image => image.StoredImage).ToList(),
+            processedAttachments.Select(attachment => attachment.StoredAttachment).ToList());
 
         if (!isMentioned)
         {
@@ -160,11 +162,12 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         List<string> toolNames = [];
         try
         {
+            var promptContent = BuildPromptContent(message.Content, processedAttachments);
             var prompt = isChessMode
-                ? BuildChessModePrompt(chessGameService, message)
+                ? BuildChessModePrompt(chessGameService, message, promptContent)
                 : isOthelloMode
-                    ? BuildOthelloModePrompt(othelloGameService, message)
-                    : message.Content;
+                    ? BuildOthelloModePrompt(othelloGameService, message, promptContent)
+                    : promptContent;
 
             await foreach (var responseMessage in channel.AddAsync(message.Author, prompt, toolsProvider, imageData))
             {
@@ -360,7 +363,30 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         return chunks;
     }
 
-    private static string BuildChessModePrompt(IChessGameService chessGameService, SocketMessage message)
+    private static string BuildPromptContent(
+        string content,
+        IReadOnlyList<ProcessedChatAttachment> attachments)
+    {
+        var attachmentTexts = attachments
+            .Select(static attachment => attachment.PromptText)
+            .Where(static text => !string.IsNullOrWhiteSpace(text))
+            .ToList();
+        if (attachmentTexts.Count == 0)
+        {
+            return content;
+        }
+
+        return $"""
+{content}
+
+{string.Join("\n\n", attachmentTexts)}
+""";
+    }
+
+    private static string BuildChessModePrompt(
+        IChessGameService chessGameService,
+        SocketMessage message,
+        string promptContent)
     {
         var instruction = chessGameService.BuildActiveGameInstruction(
             message.Author.Id.ToString(),
@@ -376,11 +402,14 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 {instruction}
 
 [사용자 메시지]
-{message.Content}
+{promptContent}
 """;
     }
 
-    private static string BuildOthelloModePrompt(IOthelloGameService othelloGameService, SocketMessage message)
+    private static string BuildOthelloModePrompt(
+        IOthelloGameService othelloGameService,
+        SocketMessage message,
+        string promptContent)
     {
         var instruction = othelloGameService.BuildActiveGameInstruction(
             message.Author.Id.ToString(),
@@ -396,7 +425,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 {instruction}
 
 [사용자 메시지]
-{message.Content}
+{promptContent}
 """;
     }
 
@@ -444,6 +473,48 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         return images;
     }
 
+    private async Task<List<ProcessedChatAttachment>> ProcessDocumentAttachmentsAsync(
+        SocketMessage message,
+        IServiceProvider serviceProvider)
+    {
+        var attachmentProcessor = serviceProvider.GetRequiredService<IChatLogAttachmentProcessor>();
+        var documentAttachments = message.Attachments
+            .Where(attachment => !IsImageAttachment(attachment))
+            .Where(attachment => attachmentProcessor.IsSupported(
+                attachment.Filename,
+                attachment.ContentType,
+                attachment.Size))
+            .ToList();
+        if (documentAttachments.Count == 0)
+        {
+            return [];
+        }
+
+        List<ProcessedChatAttachment> attachments = [];
+        using var httpClient = httpClientFactory.CreateClient();
+
+        foreach (var attachment in documentAttachments)
+        {
+            try
+            {
+                var bytes = await httpClient.GetByteArrayAsync(attachment.Url);
+                var processedAttachment = await attachmentProcessor.ProcessAsync(
+                    attachment.Id.ToString(),
+                    attachment.Filename,
+                    attachment.ContentType,
+                    attachment.Size,
+                    bytes);
+                attachments.Add(processedAttachment);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Failed to process attachment document: {url}", attachment.Url);
+            }
+        }
+
+        return attachments;
+    }
+
     private static bool IsImageAttachment(Attachment attachment)
     {
         if (attachment.ContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true)
@@ -486,13 +557,14 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         string channelId,
         string userId,
         string content,
-        IReadOnlyList<ChatLogImageInput>? images = null)
+        IReadOnlyList<ChatLogImageInput>? images = null,
+        IReadOnlyList<ChatLogAttachmentInput>? attachments = null)
     {
         try
         {
             using var scope = scopeFactory.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
-            await repository.AddAsync(messageId, guildId, channelId, userId, content, images);
+            await repository.AddAsync(messageId, guildId, channelId, userId, content, images, attachments);
         }
         catch (Exception e)
         {
