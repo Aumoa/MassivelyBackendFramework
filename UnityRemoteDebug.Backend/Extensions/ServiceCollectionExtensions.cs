@@ -12,10 +12,12 @@ public static class ServiceCollectionExtensions
         services.Configure<BackendRegistrationOptions>(config.GetSection("BackendRegistration"));
         services.Configure<GatewayListenerOptions>(config.GetSection("GatewayListener"));
         services.Configure<MasterConnectionOptions>(config.GetSection("MasterConnection"));
+        services.Configure<RemoteDebugClientRegistryOptions>(config.GetSection("RemoteDebugClients"));
 
         services.AddSingleton<MasterConnectionManager>();
         services.AddSingleton<IDirectConnectCodeValidator>(static provider => provider.GetRequiredService<MasterConnectionManager>());
         services.AddHostedService(static provider => provider.GetRequiredService<MasterConnectionManager>());
+        services.AddSingleton<RemoteDebugClientRegistry>();
         services.AddSingleton<GatewayConnectionManager>();
         services.AddHostedService(static provider => provider.GetRequiredService<GatewayConnectionManager>());
 

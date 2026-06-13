@@ -57,7 +57,8 @@ public sealed class RemoteDebugBackendProtocolTests
                     "1.2.3",
                     "6000.0.1f1",
                     RemoteDebugCapabilities.LogStreaming | RemoteDebugCapabilities.RemoteControl,
-                    connectedAtUnixTimeMilliseconds: 1000)
+                    connectedAtUnixTimeMilliseconds: 1000,
+                    lastSeenAtUnixTimeMilliseconds: 1500)
             ],
             observedAtUnixTimeMilliseconds: 2000);
 
@@ -78,6 +79,113 @@ public sealed class RemoteDebugBackendProtocolTests
         Assert.Equal("6000.0.1f1", client.UnityVersion);
         Assert.Equal(RemoteDebugCapabilities.LogStreaming | RemoteDebugCapabilities.RemoteControl, client.Capabilities);
         Assert.Equal(1000, client.ConnectedAtUnixTimeMilliseconds);
+        Assert.Equal(1500, client.LastSeenAtUnixTimeMilliseconds);
+    }
+
+    [Fact]
+    public void ClientRegisterRequest_CodecRoundTrips_ClientMetadata()
+    {
+        var request = new RemoteDebugBackendClientRegisterRequest(
+            "client-a",
+            "Editor",
+            "1.2.3",
+            "6000.0.1f1",
+            RemoteDebugCapabilities.LogStreaming | RemoteDebugCapabilities.FileTransfer);
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Request,
+            RemoteDebugPacketIds.BackendClientRegisterRequest,
+            RemoteDebugProtocol.SchemaVersion,
+            request,
+            RemoteDebugBackendClientRegisterRequest.Codec);
+
+        var decoded = PacketCodec.Decode(frame, RemoteDebugBackendClientRegisterRequest.Codec);
+
+        Assert.Equal("client-a", decoded.ClientId);
+        Assert.Equal("Editor", decoded.DisplayName);
+        Assert.Equal("1.2.3", decoded.ClientVersion);
+        Assert.Equal("6000.0.1f1", decoded.UnityVersion);
+        Assert.Equal(RemoteDebugCapabilities.LogStreaming | RemoteDebugCapabilities.FileTransfer, decoded.RequestedCapabilities);
+    }
+
+    [Fact]
+    public void ClientRegisterResponse_CodecRoundTrips_AcceptedSession()
+    {
+        var response = new RemoteDebugBackendClientRegisterResponse(
+            "client-a",
+            "session-a",
+            RemoteDebugCapabilities.LogStreaming,
+            heartbeatIntervalMilliseconds: 15000,
+            registeredAtUnixTimeMilliseconds: 1000);
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Response,
+            RemoteDebugPacketIds.BackendClientRegisterResponse,
+            RemoteDebugProtocol.SchemaVersion,
+            response,
+            RemoteDebugBackendClientRegisterResponse.Codec);
+
+        var decoded = PacketCodec.Decode(frame, RemoteDebugBackendClientRegisterResponse.Codec);
+
+        Assert.Equal("client-a", decoded.ClientId);
+        Assert.Equal("session-a", decoded.SessionId);
+        Assert.Equal(RemoteDebugCapabilities.LogStreaming, decoded.EnabledCapabilities);
+        Assert.Equal(15000, decoded.HeartbeatIntervalMilliseconds);
+        Assert.Equal(1000, decoded.RegisteredAtUnixTimeMilliseconds);
+    }
+
+    [Fact]
+    public void ClientHeartbeat_CodecsRoundTrip_SessionMetadata()
+    {
+        var request = new RemoteDebugBackendClientHeartbeatRequest("client-a", "session-a");
+        using var requestFrame = PacketCodec.Encode(
+            PacketKind.Request,
+            RemoteDebugPacketIds.BackendClientHeartbeatRequest,
+            RemoteDebugProtocol.SchemaVersion,
+            request,
+            RemoteDebugBackendClientHeartbeatRequest.Codec);
+
+        var decodedRequest = PacketCodec.Decode(requestFrame, RemoteDebugBackendClientHeartbeatRequest.Codec);
+        Assert.Equal("client-a", decodedRequest.ClientId);
+        Assert.Equal("session-a", decodedRequest.SessionId);
+
+        var response = new RemoteDebugBackendClientHeartbeatResponse(
+            "client-a",
+            "session-a",
+            observedAtUnixTimeMilliseconds: 2000);
+        using var responseFrame = PacketCodec.Encode(
+            PacketKind.Response,
+            RemoteDebugPacketIds.BackendClientHeartbeatResponse,
+            RemoteDebugProtocol.SchemaVersion,
+            response,
+            RemoteDebugBackendClientHeartbeatResponse.Codec);
+
+        var decodedResponse = PacketCodec.Decode(responseFrame, RemoteDebugBackendClientHeartbeatResponse.Codec);
+        Assert.Equal("client-a", decodedResponse.ClientId);
+        Assert.Equal("session-a", decodedResponse.SessionId);
+        Assert.Equal(2000, decodedResponse.ObservedAtUnixTimeMilliseconds);
+    }
+
+    [Fact]
+    public void ClientDisconnectNotify_CodecRoundTrips_SessionMetadata()
+    {
+        var notify = new RemoteDebugBackendClientDisconnectNotify(
+            "client-a",
+            "session-a",
+            "shutdown");
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Notify,
+            RemoteDebugPacketIds.BackendClientDisconnectNotify,
+            RemoteDebugProtocol.SchemaVersion,
+            notify,
+            RemoteDebugBackendClientDisconnectNotify.Codec);
+
+        var decoded = PacketCodec.Decode(frame, RemoteDebugBackendClientDisconnectNotify.Codec);
+
+        Assert.Equal("client-a", decoded.ClientId);
+        Assert.Equal("session-a", decoded.SessionId);
+        Assert.Equal("shutdown", decoded.Reason);
     }
 
     [Fact]

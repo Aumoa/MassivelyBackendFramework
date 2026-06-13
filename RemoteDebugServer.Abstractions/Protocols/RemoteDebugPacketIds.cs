@@ -11,5 +11,10 @@ public static class RemoteDebugPacketIds
     public const ushort BackendStatusResponse = 2101;
     public const ushort BackendClientListRequest = 2102;
     public const ushort BackendClientListResponse = 2103;
+    public const ushort BackendClientRegisterRequest = 2110;
+    public const ushort BackendClientRegisterResponse = 2111;
+    public const ushort BackendClientHeartbeatRequest = 2112;
+    public const ushort BackendClientHeartbeatResponse = 2113;
+    public const ushort BackendClientDisconnectNotify = 2114;
     public const ushort BackendErrorResponse = 2199;
 }

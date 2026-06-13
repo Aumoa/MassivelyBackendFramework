@@ -21,6 +21,7 @@ internal sealed class GatewayConnectionManager(
     IOptions<MasterConnectionOptions> backendIdentity,
     IOptions<BackendRegistrationOptions> backendRegistration,
     IDirectConnectCodeValidator directConnectCodeValidator,
+    RemoteDebugClientRegistry remoteDebugClients,
     ILogger<GatewayConnectionManager> logger) : IHostedService
 {
     private readonly GatewayListenerOptions m_Options = options.Value;
@@ -361,11 +362,7 @@ internal sealed class GatewayConnectionManager(
 
         if (envelope.RoutedKind == PacketKind.Notify)
         {
-            logger.LogDebug(
-                "Unity RemoteDebug Backend received Gateway routed notify. ConnectionId={ConnectionId}, RouteId={RouteId}, PacketId={PacketId}.",
-                connectionId,
-                envelope.RouteId,
-                envelope.RoutedPacketId);
+            HandleBackendRouteNotify(connectionId, envelope);
             return;
         }
 
@@ -417,7 +414,7 @@ internal sealed class GatewayConnectionManager(
                     new RemoteDebugBackendStatusResponse(
                         m_BackendRegistration.BackendKind,
                         GetTrustedGatewayConnectionCount(),
-                        remoteDebugClientCount: 0,
+                        remoteDebugClients.Count,
                         DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
                     RemoteDebugBackendStatusResponse.Codec,
                     cancellationToken).ConfigureAwait(false);
@@ -430,9 +427,42 @@ internal sealed class GatewayConnectionManager(
                     envelope.RouteId,
                     RemoteDebugPacketIds.BackendClientListResponse,
                     new RemoteDebugBackendClientListResponse(
-                        Array.Empty<RemoteDebugBackendClientSnapshot>(),
+                        remoteDebugClients.GetClientSnapshots(),
                         DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
                     RemoteDebugBackendClientListResponse.Codec,
+                    cancellationToken).ConfigureAwait(false);
+                break;
+
+            case RemoteDebugPacketIds.BackendClientRegisterRequest:
+                var registerRequest = PacketCodec.Decode(routedFrame, RemoteDebugBackendClientRegisterRequest.Codec);
+                await WriteRoutedResponseAsync(
+                    stream,
+                    envelope.RouteId,
+                    RemoteDebugPacketIds.BackendClientRegisterResponse,
+                    remoteDebugClients.Register(registerRequest, DateTimeOffset.UtcNow),
+                    RemoteDebugBackendClientRegisterResponse.Codec,
+                    cancellationToken).ConfigureAwait(false);
+                break;
+
+            case RemoteDebugPacketIds.BackendClientHeartbeatRequest:
+                var heartbeatRequest = PacketCodec.Decode(routedFrame, RemoteDebugBackendClientHeartbeatRequest.Codec);
+                if (!remoteDebugClients.TryHeartbeat(heartbeatRequest, DateTimeOffset.UtcNow, out var heartbeatResponse) ||
+                    heartbeatResponse == null)
+                {
+                    await WriteErrorResponseAsync(
+                        stream,
+                        envelope,
+                        "RemoteDebug client session is not registered.",
+                        cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
+                await WriteRoutedResponseAsync(
+                    stream,
+                    envelope.RouteId,
+                    RemoteDebugPacketIds.BackendClientHeartbeatResponse,
+                    heartbeatResponse,
+                    RemoteDebugBackendClientHeartbeatResponse.Codec,
                     cancellationToken).ConfigureAwait(false);
                 break;
 
@@ -447,6 +477,45 @@ internal sealed class GatewayConnectionManager(
                     envelope,
                     $"Unsupported Unity RemoteDebug Backend packet id {envelope.RoutedPacketId}.",
                     cancellationToken).ConfigureAwait(false);
+                break;
+        }
+    }
+
+    private void HandleBackendRouteNotify(
+        Guid connectionId,
+        GatewayBackendRouteEnvelope envelope)
+    {
+        if (envelope.RoutedVersion != RemoteDebugProtocol.SchemaVersion)
+        {
+            logger.LogWarning(
+                "Unity RemoteDebug Backend ignored routed notify with unsupported protocol version. ConnectionId={ConnectionId}, RouteId={RouteId}, Version={Version}.",
+                connectionId,
+                envelope.RouteId,
+                envelope.RoutedVersion);
+            return;
+        }
+
+        using var routedFrame = envelope.CreateRoutedFrame();
+        switch (envelope.RoutedPacketId)
+        {
+            case RemoteDebugPacketIds.BackendClientDisconnectNotify:
+                var notify = PacketCodec.Decode(routedFrame, RemoteDebugBackendClientDisconnectNotify.Codec);
+                if (!remoteDebugClients.Disconnect(notify))
+                {
+                    logger.LogDebug(
+                        "Unity RemoteDebug Backend ignored disconnect notify for an unknown client session. ConnectionId={ConnectionId}, ClientId={ClientId}.",
+                        connectionId,
+                        notify.ClientId);
+                }
+
+                break;
+
+            default:
+                logger.LogDebug(
+                    "Unity RemoteDebug Backend ignored Gateway routed notify. ConnectionId={ConnectionId}, RouteId={RouteId}, PacketId={PacketId}.",
+                    connectionId,
+                    envelope.RouteId,
+                    envelope.RoutedPacketId);
                 break;
         }
     }

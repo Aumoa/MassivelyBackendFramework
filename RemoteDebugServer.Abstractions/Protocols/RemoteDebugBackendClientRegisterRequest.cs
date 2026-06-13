@@ -3,16 +3,14 @@ using PacketCore;
 
 namespace RemoteDebugServer.Protocols;
 
-public sealed class RemoteDebugBackendClientSnapshot
+public sealed class RemoteDebugBackendClientRegisterRequest
 {
-    public RemoteDebugBackendClientSnapshot(
+    public RemoteDebugBackendClientRegisterRequest(
         string clientId,
         string displayName,
         string clientVersion,
         string unityVersion,
-        RemoteDebugCapabilities capabilities,
-        long connectedAtUnixTimeMilliseconds,
-        long lastSeenAtUnixTimeMilliseconds)
+        RemoteDebugCapabilities requestedCapabilities)
     {
         if (string.IsNullOrWhiteSpace(clientId))
         {
@@ -23,9 +21,7 @@ public sealed class RemoteDebugBackendClientSnapshot
         DisplayName = displayName ?? throw new ArgumentNullException(nameof(displayName));
         ClientVersion = clientVersion ?? throw new ArgumentNullException(nameof(clientVersion));
         UnityVersion = unityVersion ?? throw new ArgumentNullException(nameof(unityVersion));
-        Capabilities = capabilities;
-        ConnectedAtUnixTimeMilliseconds = connectedAtUnixTimeMilliseconds;
-        LastSeenAtUnixTimeMilliseconds = lastSeenAtUnixTimeMilliseconds;
+        RequestedCapabilities = requestedCapabilities;
     }
 
     public string ClientId { get; }
@@ -36,17 +32,13 @@ public sealed class RemoteDebugBackendClientSnapshot
 
     public string UnityVersion { get; }
 
-    public RemoteDebugCapabilities Capabilities { get; }
+    public RemoteDebugCapabilities RequestedCapabilities { get; }
 
-    public long ConnectedAtUnixTimeMilliseconds { get; }
+    public static IPacketCodec<RemoteDebugBackendClientRegisterRequest> Codec { get; } = new RemoteDebugBackendClientRegisterRequestCodec();
 
-    public long LastSeenAtUnixTimeMilliseconds { get; }
-
-    public static IPacketCodec<RemoteDebugBackendClientSnapshot> Codec { get; } = new RemoteDebugBackendClientSnapshotCodec();
-
-    private sealed class RemoteDebugBackendClientSnapshotCodec : IPacketCodec<RemoteDebugBackendClientSnapshot>
+    private sealed class RemoteDebugBackendClientRegisterRequestCodec : IPacketCodec<RemoteDebugBackendClientRegisterRequest>
     {
-        public int GetPayloadSize(RemoteDebugBackendClientSnapshot value)
+        public int GetPayloadSize(RemoteDebugBackendClientRegisterRequest value)
         {
             if (value == null)
             {
@@ -57,12 +49,10 @@ public sealed class RemoteDebugBackendClientSnapshot
                    PacketWriter.GetStringSize(value.DisplayName) +
                    PacketWriter.GetStringSize(value.ClientVersion) +
                    PacketWriter.GetStringSize(value.UnityVersion) +
-                   sizeof(uint) +
-                   sizeof(long) +
-                   sizeof(long);
+                   sizeof(uint);
         }
 
-        public void Encode(RemoteDebugBackendClientSnapshot value, ref PacketWriter writer)
+        public void Encode(RemoteDebugBackendClientRegisterRequest value, ref PacketWriter writer)
         {
             if (value == null)
             {
@@ -73,21 +63,17 @@ public sealed class RemoteDebugBackendClientSnapshot
             writer.WriteString(value.DisplayName);
             writer.WriteString(value.ClientVersion);
             writer.WriteString(value.UnityVersion);
-            writer.WriteUInt32((uint)value.Capabilities);
-            writer.WriteInt64(value.ConnectedAtUnixTimeMilliseconds);
-            writer.WriteInt64(value.LastSeenAtUnixTimeMilliseconds);
+            writer.WriteUInt32((uint)value.RequestedCapabilities);
         }
 
-        public RemoteDebugBackendClientSnapshot Decode(ref PacketReader reader)
+        public RemoteDebugBackendClientRegisterRequest Decode(ref PacketReader reader)
         {
-            return new RemoteDebugBackendClientSnapshot(
+            return new RemoteDebugBackendClientRegisterRequest(
                 reader.ReadString(),
                 reader.ReadString(),
                 reader.ReadString(),
                 reader.ReadString(),
-                (RemoteDebugCapabilities)reader.ReadUInt32(),
-                reader.ReadInt64(),
-                reader.ReadInt64());
+                (RemoteDebugCapabilities)reader.ReadUInt32());
         }
     }
 }
