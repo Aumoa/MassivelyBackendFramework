@@ -62,6 +62,13 @@ MassivelyBackendFramework PR reviews should protect correctness, build health, s
 - Accept a no-new-test path only when the change is not practical to isolate, is mostly mechanical, or is better validated through integration/runtime checks; require that rationale and validation result to be stated.
 - Verify that new test projects are placed under the solution's `Tests` solution folder/filter.
 
+## Warning Policy
+
+- Treat build, test, analyzer, nullable, compiler, package, and runtime warnings as merge-readiness blockers by default.
+- Do not approve a pull request while warning-producing validation remains, even if the warning is outside the changed files, when the pull request reports or depends on that validation command.
+- Accept warnings only when there is a clearly documented exceptional reason, the warning is not practical to eliminate in the pull request, and the remaining risk is understood.
+- Require the author to either eliminate the warning or document the exceptional reason and provide clean validation for the commands that are expected to be warning-free.
+
 ## Dependency Review
 
 - Check newly added or updated external libraries, including NuGet packages, for trustworthiness, maintenance, real-world adoption, and fit with existing repository conventions.

@@ -12,8 +12,11 @@ public static class ServiceCollectionExtensions
         s.Configure<ConnectionManagerOptions>(config.GetSection("ConnectionManager"));
         s.Configure<MasterConnectionOptions>(config.GetSection("MasterConnection"));
         s.Configure<DedicatedConnectionOptions>(config.GetSection("DedicatedConnection"));
+        s.Configure<BackendConnectionOptions>(config.GetSection("BackendConnection"));
+        s.Configure<BackendRouteOptions>(config.GetSection("BackendRoute"));
 
         s.AddSingleton<IConnectionManager, ConnectionManager>();
+        s.AddSingleton<IBackendRouteStatusProvider>(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
         s.AddHostedService(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
         s.AddSingleton<DedicatedNodeCatalog>();
         s.AddSingleton<IDedicatedNodeCatalog>(p => p.GetRequiredService<DedicatedNodeCatalog>());
@@ -29,6 +32,11 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<IDedicatedConnectionStatusProvider>(p => p.GetRequiredService<DedicatedConnectionManager>());
         s.AddSingleton<IGatewayMasterConnectionIdentitySink>(p => p.GetRequiredService<DedicatedConnectionManager>());
         s.AddHostedService(p => p.GetRequiredService<DedicatedConnectionManager>());
+        s.AddSingleton<BackendConnectionManager>();
+        s.AddSingleton<IBackendRouteManager>(p => p.GetRequiredService<BackendConnectionManager>());
+        s.AddSingleton<IBackendConnectionStatusProvider>(p => p.GetRequiredService<BackendConnectionManager>());
+        s.AddSingleton<IGatewayMasterConnectionIdentitySink>(p => p.GetRequiredService<BackendConnectionManager>());
+        s.AddHostedService(p => p.GetRequiredService<BackendConnectionManager>());
 
         return s;
     }

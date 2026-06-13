@@ -62,6 +62,7 @@
 - Treat unresolved intent uncertainty as a merge-readiness blocker, and do not approve the pull request until the author explains the intent or the code is clarified enough to review its behavior.
 - When reviewing design changes, check that public/protected API surface, class responsibilities, and helper-method extraction are intentional and appropriately scoped.
 - When reviewing pull requests, verify that relevant test results are reported; treat missing tests as a blocker when the changed behavior is practical to cover with focused tests.
+- When reviewing pull requests, do not accept build, test, analyzer, or runtime warnings unless there is a clearly documented exceptional reason and the warning is not practical to eliminate.
 - When reviewing dependency changes, verify that external libraries are trustworthy and that available vulnerability information, especially NuGet advisories, was checked.
 - When reviewing pull requests, prioritize issues that could let a client gain, request, or exercise privileges beyond what the server explicitly authorizes.
 - Treat client-to-server capability negotiation as security-sensitive. Clients may request capabilities, but the server must make the final authorization decision with least privilege and default-deny behavior.

@@ -426,6 +426,8 @@ internal sealed class MasterConnectionManager(
         }
 
         items.AddRange(serviceProvider.GetRequiredService<IDedicatedConnectionStatusProvider>().GetStatusItems());
+        items.AddRange(serviceProvider.GetRequiredService<IBackendConnectionStatusProvider>().GetStatusItems());
+        items.AddRange(serviceProvider.GetRequiredService<IBackendRouteStatusProvider>().GetStatusItems());
 
         var response = new ServiceAdminStatusResponse(
             request.RequestId,
@@ -538,8 +540,11 @@ internal sealed class MasterConnectionManager(
         }
 
         Volatile.Write(ref m_Trusted, status.IsTrusted ? 1 : 0);
-        serviceProvider.GetRequiredService<IGatewayMasterConnectionIdentitySink>()
-            .SetMasterConnectionId(status.IsTrusted ? status.MasterConnectionId : null);
+        foreach (var sink in serviceProvider.GetServices<IGatewayMasterConnectionIdentitySink>())
+        {
+            sink.SetMasterConnectionId(status.IsTrusted ? status.MasterConnectionId : null);
+        }
+
         StatusChanged?.Invoke(status);
     }
 
