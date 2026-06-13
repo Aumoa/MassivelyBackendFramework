@@ -13,7 +13,6 @@ public record ChatAttachmentData(
     string ContentType,
     long SizeBytes,
     string Sha256,
-    byte[] Data,
     string? ExtractedText,
     string ExtractionStatus,
     string? ExtractionError,

@@ -21,7 +21,6 @@ SELECT
     a.`content_type` AS ContentType,
     a.`size_bytes` AS SizeBytes,
     a.`sha256` AS Sha256,
-    a.`data` AS Data,
     a.`extracted_text` AS ExtractedText,
     a.`extraction_status` AS ExtractionStatus,
     a.`extraction_error` AS ExtractionError,
