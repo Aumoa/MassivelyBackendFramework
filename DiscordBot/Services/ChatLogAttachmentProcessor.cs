@@ -56,15 +56,16 @@ internal sealed class ChatLogAttachmentProcessor(IOptions<AttachmentProcessingOp
         cancellationToken.ThrowIfCancellationRequested();
 
         var normalizedContentType = NormalizeContentType(contentType);
+        var actualSizeBytes = data.LongLength;
         var sha256 = Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant();
 
-        if (!IsSupported(fileName, normalizedContentType, sizeBytes))
+        if (!IsSupported(fileName, normalizedContentType, actualSizeBytes))
         {
             return ValueTask.FromResult(CreateResult(
                 discordAttachmentId,
                 fileName,
                 normalizedContentType,
-                sizeBytes,
+                actualSizeBytes,
                 sha256,
                 data,
                 null,
@@ -82,7 +83,7 @@ internal sealed class ChatLogAttachmentProcessor(IOptions<AttachmentProcessingOp
                     discordAttachmentId,
                     fileName,
                     normalizedContentType,
-                    sizeBytes,
+                    actualSizeBytes,
                     sha256,
                     data,
                     null,
@@ -95,7 +96,7 @@ internal sealed class ChatLogAttachmentProcessor(IOptions<AttachmentProcessingOp
                 discordAttachmentId,
                 fileName,
                 normalizedContentType,
-                sizeBytes,
+                actualSizeBytes,
                 sha256,
                 data,
                 storedText,
@@ -108,7 +109,7 @@ internal sealed class ChatLogAttachmentProcessor(IOptions<AttachmentProcessingOp
                 discordAttachmentId,
                 fileName,
                 normalizedContentType,
-                sizeBytes,
+                actualSizeBytes,
                 sha256,
                 data,
                 null,

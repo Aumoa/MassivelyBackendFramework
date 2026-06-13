@@ -3,13 +3,14 @@ using Discord.Rest;
 using Discord.WebSocket;
 using DiscordBot.Games.Chess;
 using DiscordBot.Games.Othello;
+using DiscordBot.Options;
 using DiscordBot.Repositories;
 using DiscordBot.Services.ImageGeneration;
 using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
-internal class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, IImageGenerationClient imageGenerationClient, IChessGameService chessGameService, IOthelloGameService othelloGameService) : IHostedService, IAsyncDisposable
+internal class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IDiscordAttachmentDownloader attachmentDownloader, IImageGenerationClient imageGenerationClient, IChessGameService chessGameService, IOthelloGameService othelloGameService) : IHostedService, IAsyncDisposable
 {
     public record Configuration
     {
@@ -437,13 +438,15 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             return [];
         }
 
-        using var httpClient = httpClientFactory.CreateClient();
+        var downloadOptions = serviceProvider.GetRequiredService<IOptions<AttachmentDownloadOptions>>().Value;
         var imageProcessor = serviceProvider.GetRequiredService<IChatLogImageProcessor>();
         return await DiscordAttachmentBatchProcessor.ProcessAsync(
             imageAttachments,
             async attachment =>
             {
-                var bytes = await httpClient.GetByteArrayAsync(attachment.Url);
+                var bytes = await attachmentDownloader.DownloadAsync(
+                    attachment.Url,
+                    downloadOptions.MaxImageBytes);
                 return await imageProcessor.ProcessAsync(attachment.Filename, bytes);
             },
             (attachment, exception) => logger.LogError(
@@ -469,17 +472,19 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             return [];
         }
 
-        using var httpClient = httpClientFactory.CreateClient();
+        var processingOptions = serviceProvider.GetRequiredService<IOptions<AttachmentProcessingOptions>>().Value;
         return await DiscordAttachmentBatchProcessor.ProcessAsync(
             documentAttachments,
             async attachment =>
             {
-                var bytes = await httpClient.GetByteArrayAsync(attachment.Url);
+                var bytes = await attachmentDownloader.DownloadAsync(
+                    attachment.Url,
+                    processingOptions.MaxAttachmentBytes);
                 return await attachmentProcessor.ProcessAsync(
                     attachment.Id.ToString(),
                     attachment.Filename,
                     attachment.ContentType,
-                    attachment.Size,
+                    bytes.LongLength,
                     bytes);
             },
             (attachment, exception) => logger.LogError(

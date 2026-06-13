@@ -97,6 +97,28 @@ public sealed class ChatLogAttachmentProcessorTests
     }
 
     [Fact]
+    public async Task ProcessAsync_RejectsActualDataLengthOverLimit()
+    {
+        var processor = CreateProcessor(new AttachmentProcessingOptions
+        {
+            MaxAttachmentBytes = 5
+        });
+        var data = Encoding.UTF8.GetBytes("abcdef");
+
+        var result = await processor.ProcessAsync(
+            null,
+            "notes.txt",
+            "text/plain",
+            1,
+            data);
+
+        Assert.Equal(data.Length, result.StoredAttachment.SizeBytes);
+        Assert.Null(result.StoredAttachment.ExtractedText);
+        Assert.Equal("unsupported", result.StoredAttachment.ExtractionStatus);
+        Assert.Null(result.PromptText);
+    }
+
+    [Fact]
     public async Task ProcessAsync_WhitespaceOnlyTextMarksEmpty()
     {
         var processor = CreateProcessor();

@@ -109,6 +109,13 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddSingleton<ImagePromptProfileProvider>();
     sc.AddSingleton<IChatLogImageProcessor, ChatLogImageProcessor>();
     sc.Configure<AttachmentProcessingOptions>(conf.GetRequiredSection("AttachmentProcessing"));
+    sc.Configure<AttachmentDownloadOptions>(conf.GetSection("AttachmentDownload"));
+    sc.AddHttpClient(AttachmentDownloadOptions.HttpClientName, (sp, client) =>
+    {
+        var downloadOptions = sp.GetRequiredService<IOptions<AttachmentDownloadOptions>>().Value;
+        client.Timeout = TimeSpan.FromSeconds(Math.Max(1, downloadOptions.TimeoutSeconds));
+    });
+    sc.AddSingleton<IDiscordAttachmentDownloader, DiscordAttachmentDownloader>();
     sc.AddSingleton<IChatLogAttachmentProcessor, ChatLogAttachmentProcessor>();
     sc.AddHttpClient<IImageGenerationClient, ComfyUIClient>((sp, client) =>
     {
