@@ -14,6 +14,7 @@ internal class MySqlChatLogRepository(IOptions<MySqlOptions> options)
         string userId,
         string content,
         IReadOnlyList<ChatLogImageInput>? images = null,
+        IReadOnlyList<ChatLogAttachmentInput>? attachments = null,
         CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
@@ -61,6 +62,37 @@ VALUES
                     transaction,
                     cancellationToken: cancellationToken);
                 await connection.ExecuteAsync(imageCommand);
+            }
+        }
+
+        if (attachments is { Count: > 0 })
+        {
+            const string INSERT_ATTACHMENT_QUERY = @"
+INSERT INTO `chat_log_attachment`
+    (`chat_log_id`, `discord_attachment_id`, `file_name`, `content_type`, `size_bytes`, `sha256`, `data`, `extracted_text`, `extraction_status`, `extraction_error`)
+VALUES
+    (@chatLogId, @discordAttachmentId, @fileName, @contentType, @sizeBytes, @sha256, @data, @extractedText, @extractionStatus, @extractionError)";
+
+            foreach (var attachment in attachments)
+            {
+                var attachmentCommand = new CommandDefinition(
+                    INSERT_ATTACHMENT_QUERY,
+                    new
+                    {
+                        chatLogId,
+                        discordAttachmentId = attachment.DiscordAttachmentId,
+                        fileName = attachment.FileName,
+                        contentType = attachment.ContentType,
+                        sizeBytes = attachment.SizeBytes,
+                        sha256 = attachment.Sha256,
+                        data = attachment.Data,
+                        extractedText = attachment.ExtractedText,
+                        extractionStatus = attachment.ExtractionStatus,
+                        extractionError = attachment.ExtractionError
+                    },
+                    transaction,
+                    cancellationToken: cancellationToken);
+                await connection.ExecuteAsync(attachmentCommand);
             }
         }
 

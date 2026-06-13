@@ -391,6 +391,36 @@
   <data name="TOOLS_TOOL_SEARCH_CHAT_HISTORY_PARAM_TIMEZONE" xml:space="preserve">
     <value>IANA 타임존 ID입니다.</value>
   </data>
+  <data name="TOOLS_TOOL_LOAD_CHAT_ATTACHMENT_DESCRIPTION" xml:space="preserve">
+    <value>현재 Discord 채널에 저장된 과거 문서 첨부를 불러옵니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_LOAD_CHAT_ATTACHMENT_PARAM_TARGET" xml:space="preserve">
+    <value>문서 첨부를 찾는 방식입니다. latest, replied, message_id 중 하나입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_LOAD_CHAT_ATTACHMENT_PARAM_MESSAGE_ID" xml:space="preserve">
+    <value>target이 message_id일 때 사용할 Discord 메시지 ID 또는 메시지 URL입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_LOAD_CHAT_ATTACHMENT_PARAM_MAX_CHARACTERS" xml:space="preserve">
+    <value>응답에 포함할 추출 텍스트 최대 글자 수입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_DESCRIPTION" xml:space="preserve">
+    <value>현재 Discord 채널에 저장된 문서 첨부의 추출 텍스트를 검색합니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_PARAM_KEYWORDS" xml:space="preserve">
+    <value>저장된 문서 첨부에서 검색할 키워드를 콤마로 구분한 문자열입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_PARAM_LIMIT" xml:space="preserve">
+    <value>첨부 검색 결과 최대 개수입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_PARAM_FROM_DATE" xml:space="preserve">
+    <value>선택한 타임존 기준 조회 시작 날짜와 시간입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_PARAM_TO_DATE" xml:space="preserve">
+    <value>선택한 타임존 기준 조회 종료 날짜와 시간입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_SEARCH_CHAT_ATTACHMENTS_PARAM_TIMEZONE" xml:space="preserve">
+    <value>IANA 타임존 ID입니다.</value>
+  </data>
   <data name="TOOLS_TOOL_GET_CURRENT_DATE_DESCRIPTION" xml:space="preserve">
     <value>현재 날짜와 시간을 반환합니다.</value>
   </data>

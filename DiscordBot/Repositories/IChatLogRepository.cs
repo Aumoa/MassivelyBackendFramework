@@ -9,6 +9,17 @@ public record ChatLogImageInput(
     int Height,
     byte[] Data);
 
+public record ChatLogAttachmentInput(
+    string? DiscordAttachmentId,
+    string? FileName,
+    string ContentType,
+    long SizeBytes,
+    string Sha256,
+    byte[] Data,
+    string? ExtractedText,
+    string ExtractionStatus,
+    string? ExtractionError);
+
 public interface IChatLogRepository
 {
     ValueTask AddAsync(
@@ -18,6 +29,7 @@ public interface IChatLogRepository
         string userId,
         string content,
         IReadOnlyList<ChatLogImageInput>? images = null,
+        IReadOnlyList<ChatLogAttachmentInput>? attachments = null,
         CancellationToken cancellationToken = default);
 
     ValueTask<IReadOnlyList<ChatLogData>> GetAsync(string channelId, int limit, int offset = 0,
