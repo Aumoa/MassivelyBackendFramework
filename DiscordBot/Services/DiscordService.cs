@@ -131,10 +131,12 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
         var chatLogRepository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
         var chatImageRepository = scope.ServiceProvider.GetRequiredService<IChatImageRepository>();
+        var chatAttachmentRepository = scope.ServiceProvider.GetRequiredService<IChatAttachmentRepository>();
         var appointmentRepository = scope.ServiceProvider.GetRequiredService<IAppointmentRepository>();
         var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository, appointmentRepository);
         var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
         var chatImageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatImageTools>>();
+        var chatAttachmentToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatAttachmentTools>>();
         var chessToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChessTools>>();
         var othelloToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordOthelloTools>>();
         var promptProfileProvider = scope.ServiceProvider.GetRequiredService<ImagePromptProfileProvider>();
@@ -142,6 +144,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         var claudeSettings = scope.ServiceProvider.GetRequiredService<IClaudeSettingsService>();
         var imageTools = new DiscordImageTools(message, chatClient, claudeSettings, imageGenerationClient, promptProfileProvider, imageToolsLogger);
         var chatImageTools = new DiscordChatImageTools(message, chatImageRepository, chatImageToolsLogger);
+        var chatAttachmentTools = new DiscordChatAttachmentTools(message, chatAttachmentRepository, chatAttachmentToolsLogger);
         var chessTools = new DiscordChessTools(m_Socket.CurrentUser, message, chessGameService, othelloGameService, chatLogRepository, chessToolsLogger);
         var othelloTools = new DiscordOthelloTools(m_Socket.CurrentUser, message, othelloGameService, chessGameService, chatLogRepository, othelloToolsLogger);
         var calculationTools = new AI.Tools.CalculationTools();
@@ -149,7 +152,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             ? AI.ToolsProvider.CreateFrom(chessTools)
             : isOthelloMode
                 ? AI.ToolsProvider.CreateFrom(othelloTools)
-                : AI.ToolsProvider.CreateFrom(discordTools, imageTools, chatImageTools, chessTools, othelloTools, calculationTools);
+                : AI.ToolsProvider.CreateFrom(discordTools, imageTools, chatImageTools, chatAttachmentTools, chessTools, othelloTools, calculationTools);
         var toolSettings = scope.ServiceProvider.GetRequiredService<IToolSettingsService>();
         await toolSettings.ApplyAsync(toolsProvider);
 
