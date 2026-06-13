@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
-    <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="10.0.9" />
     <PackageReference Include="MySql.Data" Version="9.4.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.9.25" />
   </ItemGroup>
