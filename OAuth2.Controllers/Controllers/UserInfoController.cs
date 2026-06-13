@@ -27,7 +27,13 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
     {
         return await VerifiedAsync(async access =>
         {
-            var rawAccount = (await accounts.GetRawAccountAsync(access.Id)).Value!;
+            var rawAccountResult = await accounts.GetRawAccountAsync(access.Id, cancellationToken);
+            if (!rawAccountResult.HasValue)
+            {
+                return Unauthorized("account is not found.");
+            }
+
+            var rawAccount = rawAccountResult.Value;
             AccountClaim[] accountClaims = [.. await claims.GetClaimsAsync(access.Id, cancellationToken), .. await groups.GetClientUserGroupsAsync(access.ClientId, access.Sub)];
             var scopedClaims = jwt.ConfigureClaims(rawAccount, access.Scope, accountClaims, null, false, additionalClaims: access.UserInfoClaims);
             return Ok(scopedClaims.ToDictionary(c => c.Type, c => GetClaimValue(c)));
