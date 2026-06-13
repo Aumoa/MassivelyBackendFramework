@@ -12,6 +12,7 @@ internal class Client(NetworkStream networkStream, Stream stream, ILogger logger
     private readonly NetworkStream m_NetworkStream = networkStream;
     private readonly CancellationTokenSource m_Cancellation = new();
     private readonly Channel<PacketFrame> m_RequestsChannel = Channel.CreateUnbounded<PacketFrame>();
+    private readonly SemaphoreSlim m_WriteLock = new(1, 1);
     private ExceptionDispatchInfo? m_ExceptionDispatchInfo;
     private int m_Completion;
 
@@ -69,7 +70,20 @@ internal class Client(NetworkStream networkStream, Stream stream, ILogger logger
 
     public ValueTask WriteAsync(PacketFrame frame, CancellationToken cancellationToken)
     {
-        return PacketFrameWriter.WriteAsync(stream, frame, cancellationToken);
+        return WriteInternalAsync(frame, cancellationToken);
+    }
+
+    private async ValueTask WriteInternalAsync(PacketFrame frame, CancellationToken cancellationToken)
+    {
+        await m_WriteLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            m_WriteLock.Release();
+        }
     }
 
     public async void Start()
