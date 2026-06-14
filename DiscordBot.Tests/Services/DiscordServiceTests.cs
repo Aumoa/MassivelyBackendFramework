@@ -44,6 +44,50 @@ public sealed class DiscordServiceTests
     }
 
     [Fact]
+    public void AppendToolUseNotice_InsertsSummaryBeforeResumedContent()
+    {
+        var shouldSeparateBeforeContent = false;
+        var content = DiscordService.AppendResponseContent(
+            string.Empty,
+            "잠깐, 채팅 기록에서 해당 내용을 먼저 찾아볼게요.",
+            ref shouldSeparateBeforeContent);
+
+        content = DiscordService.AppendToolUseNotice(
+            content,
+            1,
+            ref shouldSeparateBeforeContent);
+        content = DiscordService.AppendResponseContent(
+            content,
+            "어제 나온 메시지를 찾았어요.",
+            ref shouldSeparateBeforeContent);
+
+        Assert.Equal(
+            """
+잠깐, 채팅 기록에서 해당 내용을 먼저 찾아볼게요.
+
+1개 도구 사용됨
+
+어제 나온 메시지를 찾았어요.
+""",
+            content);
+        Assert.False(shouldSeparateBeforeContent);
+    }
+
+    [Fact]
+    public void AppendToolUseNotice_SummarizesMultipleTools()
+    {
+        var shouldSeparateBeforeContent = false;
+
+        var content = DiscordService.AppendToolUseNotice(
+            string.Empty,
+            2,
+            ref shouldSeparateBeforeContent);
+
+        Assert.Equal("2개 도구 사용됨", content);
+        Assert.True(shouldSeparateBeforeContent);
+    }
+
+    [Fact]
     public void AppendResponseContent_DoesNotAddLeadingSeparatorWithoutPriorContent()
     {
         var shouldSeparateBeforeContent = true;
