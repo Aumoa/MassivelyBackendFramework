@@ -164,6 +164,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         IDisposable? typingState = message.Channel.EnterTypingState();
         string thinkingTicker = "";
         List<string> toolNames = [];
+        bool shouldSeparateNextAssistantContent = false;
         try
         {
             var promptContent = DiscordMessageAttachmentPlanner.BuildPromptContent(message.Content, processedAttachments);
@@ -176,11 +177,15 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             await foreach (var responseMessage in channel.AddAsync(message.Author, prompt, toolsProvider, imageData))
             {
                 totalReasoning += responseMessage.Thinking;
-                totalMessage += responseMessage.Content;
+                totalMessage = AppendResponseContent(
+                    totalMessage,
+                    responseMessage.Content,
+                    ref shouldSeparateNextAssistantContent);
 
                 if (!string.IsNullOrEmpty(responseMessage.ToolName))
                 {
                     toolNames.Add(responseMessage.ToolName);
+                    shouldSeparateNextAssistantContent = !string.IsNullOrWhiteSpace(totalMessage);
                 }
 
                 if (logger.IsEnabled(LogLevel.Debug))
@@ -300,6 +305,26 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
         const string suffix = "\n\n...(응답이 길어 이어서 생성 중입니다.)";
         return content[..(DiscordSafeMessageLength - suffix.Length)].TrimEnd() + suffix;
+    }
+
+    internal static string AppendResponseContent(
+        string currentMessage,
+        string content,
+        ref bool shouldSeparateBeforeContent)
+    {
+        if (string.IsNullOrEmpty(content))
+        {
+            return currentMessage;
+        }
+
+        if (shouldSeparateBeforeContent && !string.IsNullOrWhiteSpace(currentMessage))
+        {
+            shouldSeparateBeforeContent = false;
+            return currentMessage.TrimEnd('\r', '\n') + "\n\n" + content.TrimStart('\r', '\n');
+        }
+
+        shouldSeparateBeforeContent = false;
+        return currentMessage + content;
     }
 
     private static async Task<RestUserMessage?> SendDiscordResponseAsync(ISocketMessageChannel channel, string content)
