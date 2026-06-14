@@ -82,6 +82,58 @@ Content: 의견입니다.
         Assert.Contains("Content: 후속 답장", context);
     }
 
+    [Fact]
+    public void NormalizeDiscussionKeywords_IncludesWholeTopicAndTokens()
+    {
+        var keywords = DiscordTools.NormalizeDiscussionKeywords(" 디스코드 봇, 배포 ");
+
+        Assert.Equal(["디스코드 봇, 배포", "디스코드", "배포"], keywords);
+    }
+
+    [Theory]
+    [InlineData("decision", "decisions")]
+    [InlineData("actions", "action_items")]
+    [InlineData("timeline", "timeline")]
+    [InlineData("open_questions", "open_questions")]
+    [InlineData("anything-else", "summary")]
+    public void NormalizeDiscussionMode_MapsKnownModes(string value, string expected)
+    {
+        var mode = DiscordTools.NormalizeDiscussionMode(value);
+
+        Assert.Equal(expected, mode);
+    }
+
+    [Fact]
+    public void BuildDiscussionSummaryInput_FormatsActionItemsWithoutLinks()
+    {
+        var logs = new[]
+        {
+            CreateLog(id: 1, messageId: "111", content: "내일까지 초안을 올릴게요."),
+            CreateLog(id: 2, messageId: "222", content: "좋아요. 리뷰는 제가 볼게요.")
+        };
+
+        var summaryInput = DiscordTools.BuildDiscussionSummaryInput(
+            "222",
+            "초안",
+            "action_items",
+            80,
+            null,
+            null,
+            TimeZoneInfo.Utc,
+            ["초안"],
+            logs,
+            includeLinks: false,
+            source: "topic_search",
+            contextEachSide: 2,
+            selfUserId: "bot");
+
+        Assert.Contains("- 조회 방식: 주제 검색 + 주변 맥락", summaryInput);
+        Assert.Contains("- 요약 모드: 액션아이템", summaryInput);
+        Assert.Contains("Content: 내일까지 초안을 올릴게요.", summaryInput);
+        Assert.Contains("- 액션아이템은 담당자, 할 일, 기한이 발췌에서 확인될 때만 적으세요.", summaryInput);
+        Assert.DoesNotContain("Link:", summaryInput);
+    }
+
     private static ChatLogData CreateLog(
         long id = 10,
         string? messageId = "333",

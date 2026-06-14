@@ -11,6 +11,9 @@ internal class DiscordTools(SocketSelfUser selfUser, SocketMessage message, ICha
     private const int DefaultAppointmentRetentionDays = 30;
     private const int MaxAppointmentRetentionDays = 365;
     private const int MaxReplyContextReplies = 50;
+    private const int MaxDiscussionSummaryMessages = 100;
+    private const int MaxDiscussionSearchResults = 50;
+    private const int MaxDiscussionContextEachSide = 5;
     private static readonly (DayOfWeek Day, string[] Aliases)[] KoreanDayOfWeekAliases =
     [
         (DayOfWeek.Sunday, ["일요일", "일욜"]),
@@ -139,6 +142,91 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         }
 
         return string.Join("\n", lines);
+    }
+
+    [ToolFunction(
+        Name = "summarize_recent_discussion",
+        Description = """
+현재 채팅방의 최근 대화나 특정 주제 대화를 요약하기 위한 발췌를 준비합니다.
+사용자가 '어제 얘기 요약해줘', '방탈출 얘기 결론 뭐였어?', '오늘 나온 액션아이템만 정리해줘', '최근 배포 관련 대화 정리해줘'처럼 요청할 때 사용하세요.
+
+topic이 비어 있으면 날짜 범위와 limit 기준으로 최근 대화를 가져옵니다.
+topic이 있으면 현재 채팅방에서 주제 키워드를 검색하고, 검색된 메시지 주변 맥락을 함께 가져옵니다.
+이 도구는 최종 요약문을 저장하지 않으며 현재 채널에서 저장된 대화만 조회합니다.
+""")]
+    public async Task<string> SummarizeRecentDiscussionAsync(
+        [ToolParameterInfo(Description = "요약할 주제입니다. 비워두면 최근/기간 대화를 요약합니다. 예: 방탈출, 배포, 디스코드 봇")]
+        string topic = "",
+        [ToolParameterInfo(Description = "요약 모드입니다. summary, decisions, action_items, timeline, open_questions 중 하나입니다. 기본 summary.")]
+        string mode = "summary",
+        [ToolParameterInfo(Description = "요약에 사용할 최대 메시지 수입니다. 1~100, 기본 80.")]
+        int limit = 80,
+        [ToolParameterInfo(Description = "조회 시작 날짜/시간 (timezone 기준, 예: 2026-06-13T00:00:00). 미지정 시 제한 없음.")]
+        string? from_date = null,
+        [ToolParameterInfo(Description = "조회 종료 날짜/시간 (timezone 기준, 예: 2026-06-14T00:00:00). 미지정 시 제한 없음.")]
+        string? to_date = null,
+        [ToolParameterInfo(Description = "IANA 타임존 ID입니다. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
+        string timezone = "Asia/Seoul",
+        [ToolParameterInfo(Description = "원본 Discord 메시지 링크를 발췌에 포함할지 여부입니다. 기본 true.")]
+        bool include_links = true,
+        [ToolParameterInfo(Description = "topic 검색 결과마다 앞뒤로 포함할 메시지 수입니다. 0~5, 기본 2.")]
+        int context_each_side = 2,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 1, MaxDiscussionSummaryMessages);
+        context_each_side = Math.Clamp(context_each_side, 0, MaxDiscussionContextEachSide);
+
+        var tz = ResolveTimeZone(string.IsNullOrWhiteSpace(timezone) ? "Asia/Seoul" : timezone);
+        var utcOffset = tz.BaseUtcOffset;
+        DateTimeOffset? from = !string.IsNullOrWhiteSpace(from_date) ? ParseInTimeZone(from_date, utcOffset) : null;
+        DateTimeOffset? to = !string.IsNullOrWhiteSpace(to_date) ? ParseInTimeZone(to_date, utcOffset) : null;
+
+        var channelId = message.Channel.Id.ToString();
+        var selfId = selfUser.Id.ToString();
+        var normalizedMode = NormalizeDiscussionMode(mode);
+        var keywords = NormalizeDiscussionKeywords(topic);
+        var source = keywords.Count == 0
+            ? "recent"
+            : "topic_search";
+
+        IReadOnlyList<ChatLogData> logs;
+        if (keywords.Count == 0)
+        {
+            logs = await chatLogRepository.GetAsync(channelId, limit, 0, from, to, cancellationToken);
+        }
+        else
+        {
+            var searchLimit = Math.Min(limit, MaxDiscussionSearchResults);
+            var searchResults = await chatLogRepository.SearchAsync(channelId, keywords, searchLimit, from, to, cancellationToken);
+            logs = context_each_side == 0
+                ? OrderDiscussionLogs(searchResults).Take(limit).ToList()
+                : await LoadDiscussionSearchContextsAsync(
+                    channelId,
+                    searchResults,
+                    context_each_side,
+                    limit,
+                    cancellationToken);
+        }
+
+        if (logs.Count == 0)
+        {
+            return "요약할 대화를 현재 채팅방의 저장된 채팅 기록에서 찾지 못했습니다.";
+        }
+
+        return BuildDiscussionSummaryInput(
+            channelId,
+            topic,
+            normalizedMode,
+            limit,
+            from,
+            to,
+            tz,
+            keywords,
+            logs,
+            include_links,
+            source,
+            context_each_side,
+            selfId);
     }
 
     [ToolFunction(
@@ -401,6 +489,227 @@ message_id_or_url에는 Discord 메시지 ID, 메시지 URL, 또는 사용자가
         lines.Add("");
         lines.Add("응답 규칙: 답장 흐름을 바탕으로 사용자의 질문에 필요한 맥락만 간결하게 정리하세요. 원본 URL이 필요하면 Link 값을 그대로 적으세요.");
         return string.Join("\n", lines);
+    }
+
+    internal static IReadOnlyList<string> NormalizeDiscussionKeywords(string? topic)
+    {
+        var normalized = (topic ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return [];
+        }
+
+        List<string> keywords = [];
+        if (normalized.Length >= 2)
+        {
+            keywords.Add(normalized);
+        }
+
+        foreach (var keyword in normalized.Split(
+                     [',', ';', '\r', '\n', '\t', ' '],
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (keyword.Length >= 2)
+            {
+                keywords.Add(keyword);
+            }
+        }
+
+        return keywords
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    internal static string NormalizeDiscussionMode(string? mode)
+    {
+        return (mode ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "decision" or "decisions" => "decisions",
+            "action" or "actions" or "action_item" or "action_items" => "action_items",
+            "timeline" => "timeline",
+            "question" or "questions" or "open_question" or "open_questions" => "open_questions",
+            _ => "summary"
+        };
+    }
+
+    internal static string BuildDiscussionSummaryInput(
+        string channelId,
+        string? topic,
+        string mode,
+        int limit,
+        DateTimeOffset? from,
+        DateTimeOffset? to,
+        TimeZoneInfo timezone,
+        IReadOnlyList<string> keywords,
+        IReadOnlyList<ChatLogData> logs,
+        bool includeLinks,
+        string source,
+        int contextEachSide,
+        string selfUserId)
+    {
+        List<string> lines =
+        [
+            "요약 대상:",
+            $"- 채널: 현재 채널 ({channelId})",
+            $"- 조회 방식: {FormatDiscussionSource(source)}",
+            $"- 요약 모드: {FormatDiscussionMode(mode)}",
+            $"- 주제: {NormalizeOptionalDisplay(topic)}",
+            $"- 키워드: {(keywords.Count == 0 ? "없음" : string.Join(", ", keywords))}",
+            $"- 범위: {FormatDiscussionRange(from, to, timezone)}",
+            $"- 메시지 수: {logs.Count}개 (최대 {limit}개)",
+            $"- 검색 주변 맥락: {(keywords.Count == 0 ? "해당 없음" : $"앞뒤 {contextEachSide}개")}",
+            "",
+            "[대화 발췌]"
+        ];
+
+        for (int i = 0; i < logs.Count; i++)
+        {
+            lines.Add("");
+            lines.Add($"--- 메시지 #{i + 1} ---");
+            lines.Add(BuildDiscussionLogExcerpt(logs[i], timezone, selfUserId, includeLinks));
+        }
+
+        lines.Add("");
+        lines.Add("[응답 규칙]");
+        lines.AddRange(BuildDiscussionModeRules(mode, includeLinks));
+        return string.Join("\n", lines);
+    }
+
+    private async ValueTask<IReadOnlyList<ChatLogData>> LoadDiscussionSearchContextsAsync(
+        string channelId,
+        IReadOnlyList<ChatLogData> searchResults,
+        int contextEachSide,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<long, ChatLogData> logs = [];
+        foreach (var result in searchResults)
+        {
+            var context = await chatLogRepository.GetContextAsync(
+                channelId,
+                result.Id,
+                contextEachSide,
+                contextEachSide,
+                cancellationToken);
+            foreach (var log in context)
+            {
+                logs.TryAdd(log.Id, log);
+            }
+        }
+
+        return OrderDiscussionLogs(logs.Values)
+            .Take(limit)
+            .ToList();
+    }
+
+    private static IOrderedEnumerable<ChatLogData> OrderDiscussionLogs(IEnumerable<ChatLogData> logs)
+    {
+        return logs
+            .OrderBy(log => log.CreatedAt)
+            .ThenBy(log => log.Id);
+    }
+
+    private static string BuildDiscussionLogExcerpt(
+        ChatLogData log,
+        TimeZoneInfo timezone,
+        string selfUserId,
+        bool includeLinks)
+    {
+        var localTime = TimeZoneInfo.ConvertTimeFromUtc(log.CreatedAt, timezone);
+        List<string> lines =
+        [
+            $"ChatLogId: {log.Id}",
+            $"Time: {localTime:yyyy-MM-dd HH:mm:ss}",
+            $"Author: {FormatAuthor(log, selfUserId)}"
+        ];
+
+        if (includeLinks)
+        {
+            lines.Add($"Link: {BuildMessageReference(log)}");
+            if (!string.IsNullOrWhiteSpace(log.ReferencedMessageId))
+            {
+                var referencedChannelId = string.IsNullOrWhiteSpace(log.ReferencedChannelId)
+                    ? log.ChannelId
+                    : log.ReferencedChannelId;
+                lines.Add($"ReplyTo: {BuildMessageReference(log.ReferencedGuildId, referencedChannelId, log.ReferencedMessageId)}");
+            }
+        }
+
+        lines.Add($"Content: {log.Content}");
+        return string.Join("\n", lines);
+    }
+
+    private static IEnumerable<string> BuildDiscussionModeRules(string mode, bool includeLinks)
+    {
+        yield return "- 제공된 [대화 발췌]만 근거로 삼고, 발췌에 없는 내용은 확정하지 마세요.";
+        yield return "- 먼저 3~6줄의 핵심 요약을 작성하세요.";
+
+        switch (mode)
+        {
+            case "decisions":
+                yield return "- 결정된 사항과 아직 결정되지 않은 사항을 분리하세요.";
+                yield return "- 결정 근거가 약하면 '명확히 결정되지 않음'으로 표시하세요.";
+                break;
+            case "action_items":
+                yield return "- 액션아이템은 담당자, 할 일, 기한이 발췌에서 확인될 때만 적으세요.";
+                yield return "- 담당자나 기한이 불명확하면 '미정'으로 표시하고 임의로 만들지 마세요.";
+                break;
+            case "timeline":
+                yield return "- 중요한 흐름을 시간순으로 정리하세요.";
+                yield return "- 중복 메시지는 합쳐서 설명하고, 방향이 바뀐 지점을 표시하세요.";
+                break;
+            case "open_questions":
+                yield return "- 아직 답이 없거나 추가 확인이 필요한 질문만 추려 주세요.";
+                yield return "- 이미 결론이 난 질문은 제외하거나 결론과 함께 짧게 표시하세요.";
+                break;
+            default:
+                yield return "- 결정사항, 액션아이템, 미해결 질문이 보이면 짧은 별도 목록으로 덧붙이세요.";
+                break;
+        }
+
+        yield return includeLinks
+            ? "- 근거가 중요한 항목에는 Link URL을 그대로 포함하세요."
+            : "- 원본 링크는 생략하고 내용 중심으로 정리하세요.";
+    }
+
+    private static string FormatDiscussionSource(string source)
+    {
+        return source == "topic_search"
+            ? "주제 검색 + 주변 맥락"
+            : "최근/기간 대화";
+    }
+
+    private static string FormatDiscussionMode(string mode)
+    {
+        return mode switch
+        {
+            "decisions" => "결정사항",
+            "action_items" => "액션아이템",
+            "timeline" => "타임라인",
+            "open_questions" => "미해결 질문",
+            _ => "일반 요약"
+        };
+    }
+
+    private static string FormatDiscussionRange(DateTimeOffset? from, DateTimeOffset? to, TimeZoneInfo timezone)
+    {
+        var fromText = from.HasValue
+            ? FormatDiscussionDateTime(from.Value, timezone)
+            : "제한 없음";
+        var toText = to.HasValue
+            ? FormatDiscussionDateTime(to.Value, timezone)
+            : "제한 없음";
+        return $"{fromText} ~ {toText} ({timezone.Id})";
+    }
+
+    private static string FormatDiscussionDateTime(DateTimeOffset value, TimeZoneInfo timezone)
+    {
+        return TimeZoneInfo.ConvertTime(value, timezone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+    }
+
+    private static string NormalizeOptionalDisplay(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "없음" : value.Trim();
     }
 
     private DiscordMessageReferenceTarget? ResolveMessageReferenceTarget(string? messageIdOrUrl)
