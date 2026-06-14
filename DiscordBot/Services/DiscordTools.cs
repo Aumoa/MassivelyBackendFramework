@@ -948,15 +948,79 @@ ID: {id}
         }
 
         lines.Add("");
-        lines.Add("응답 규칙: 현재 채널의 공유 약속 중 사용자에게 필요한 약속만 간결하게 정리하세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요. 삭제가 필요하면 ID를 기준으로 forget_appointment를 사용할 수 있습니다.");
+        lines.Add("응답 규칙: 현재 채널의 공유 약속 중 사용자에게 필요한 약속만 간결하게 정리하세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요. 수정/삭제할 약속 ID가 불분명하면 find_appointments로 후보를 먼저 좁히세요.");
         return string.Join("\n", lines);
+    }
+
+    [ToolFunction(
+        Name = "find_appointments",
+        Description = """
+현재 채널에 저장된 공유 약속 중 수정/삭제/상세 확인 대상이 될 후보를 찾습니다.
+사용자가 '닭한마리 약속 지워줘', '파티룸 약속 시간 바꿔줘'처럼 자연어로 특정 약속을 가리키지만 ID를 말하지 않았으면 update_appointment나 forget_appointment를 호출하기 전에 이 도구로 후보를 먼저 조회하세요.
+
+조회 범위는 현재 Discord 채널로 제한됩니다. 다른 채널이나 다른 서버의 약속은 조회할 수 없습니다.
+query에는 약속을 식별할 수 있는 핵심 단어를 넣고, 날짜 단서가 있으면 from_date/to_date를 함께 지정하세요.
+결과가 하나로 좁혀지면 해당 ID로 update_appointment 또는 forget_appointment를 호출할 수 있습니다. 후보가 여러 개면 사용자에게 어떤 약속인지 확인하세요.
+""")]
+    public async Task<string> FindAppointmentsAsync(
+        [ToolParameterInfo(Description = "약속 제목/설명에서 찾을 핵심 단어. 예: 닭한마리, 파티룸, 치과")]
+        string query = "",
+        [ToolParameterInfo(Description = "최대 후보 수. 1~20, 기본 10.")]
+        int limit = 10,
+        [ToolParameterInfo(Description = "조회 시작 날짜/시간. timezone 기준. 예: 2026-05-28T00:00:00. 미지정 시 제한 없음.")]
+        string? from_date = null,
+        [ToolParameterInfo(Description = "조회 종료 날짜/시간. timezone 기준. 예: 2026-05-28T23:59:59. 미지정 시 제한 없음.")]
+        string? to_date = null,
+        [ToolParameterInfo(Description = "IANA 타임존 ID. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
+        string timezone = "Asia/Seoul",
+        [ToolParameterInfo(Description = "지난 약속도 포함할지 여부. 기본 false.")]
+        bool include_past = false,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 1, 20);
+
+        var tz = ResolveTimeZone(string.IsNullOrWhiteSpace(timezone) ? "Asia/Seoul" : timezone);
+        if (!TryParseOptionalDateTime(from_date, tz, out var fromUtc, out var fromError))
+        {
+            return fromError;
+        }
+
+        if (!TryParseOptionalDateTime(to_date, tz, out var toUtc, out var toError))
+        {
+            return toError;
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var fetchLimit = string.IsNullOrWhiteSpace(query) ? limit : Math.Max(limit * 5, 50);
+        var appointments = await appointmentRepository.GetActiveAsync(
+            channelId,
+            guildId,
+            nowUtc,
+            fetchLimit,
+            fromUtc,
+            toUtc,
+            include_past,
+            cancellationToken);
+
+        var candidates = FilterAppointmentsByQuery(appointments, query)
+            .Take(limit)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            return "조건에 맞는 약속 후보가 없습니다.";
+        }
+
+        return BuildAppointmentCandidateList(candidates);
     }
 
     [ToolFunction(
         Name = "forget_appointment",
         Description = """
 사용자가 현재 채널에 저장된 공유 약속을 삭제하거나 잊어달라고 요청할 때 사용합니다.
-id는 list_appointments 결과의 ID를 사용하세요. 사용자가 특정 약속을 자연어로만 말해 ID가 불분명하면 먼저 list_appointments로 후보를 조회하거나 사용자에게 확인하세요.
+id는 find_appointments 또는 list_appointments 결과의 ID를 사용하세요. 사용자가 특정 약속을 자연어로만 말해 ID가 불분명하면 먼저 find_appointments로 후보를 조회하거나 사용자에게 확인하세요.
 """)]
     public async Task<string> ForgetAppointmentAsync(
         [ToolParameterInfo(Description = "삭제할 약속 ID. list_appointments 결과의 ID.")]
@@ -1011,7 +1075,7 @@ ID: {appointment.Id}
         Name = "update_appointment",
         Description = """
 현재 채널에 저장된 공유 약속의 제목, 날짜, 시간, 설명을 수정합니다.
-id는 list_appointments 결과의 ID를 사용하세요. ID가 불분명하면 먼저 list_appointments로 후보를 조회하거나 사용자에게 확인하세요.
+id는 find_appointments 또는 list_appointments 결과의 ID를 사용하세요. ID가 불분명하면 먼저 find_appointments로 후보를 조회하거나 사용자에게 확인하세요.
 
 시간만 나중에 정해진 경우 time에 HH:mm 값을 넣으세요. 예: '방탈출 약속은 오후 3시로 정해졌어' -> 기존 날짜 유지, time='15:00'.
 시간이 다시 미정이 된 경우 time_unspecified=true로 호출하세요. 임의의 시간을 만들지 마세요.
@@ -1128,6 +1192,63 @@ ID: {appointment.Id}
         var tz = ResolveTimeZone(timezone);
         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
         return Task.FromResult($"{now:yyyy-MM-dd HH:mm:ss} ({tz.Id})");
+    }
+
+    internal static IReadOnlyList<AppointmentData> FilterAppointmentsByQuery(
+        IEnumerable<AppointmentData> appointments,
+        string? query)
+    {
+        var keywords = SplitSearchKeywords(query);
+        if (keywords.Length == 0)
+        {
+            return appointments.ToList();
+        }
+
+        return appointments
+            .Where(appointment =>
+            {
+                var target = $"{appointment.Title} {appointment.Description}";
+                return keywords.All(keyword => target.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+            })
+            .ToList();
+    }
+
+    internal static string BuildAppointmentCandidateList(IReadOnlyList<AppointmentData> appointments)
+    {
+        List<string> lines = [$"약속 후보 {appointments.Count}건:"];
+        foreach (var appointment in appointments)
+        {
+            var appointmentTz = ResolveTimeZone(appointment.Timezone);
+            var startText = FormatAppointmentStart(EnsureUtc(appointment.StartsAtUtc), appointment.HasTime, appointmentTz);
+            var reference = BuildAppointmentReference(appointment);
+            lines.Add("");
+            lines.Add($"ID: {appointment.Id}");
+            lines.Add($"제목: {appointment.Title}");
+            lines.Add($"일시: {startText}");
+            if (!string.IsNullOrWhiteSpace(appointment.Description))
+            {
+                lines.Add($"설명: {appointment.Description}");
+            }
+            lines.Add($"원본: {reference}");
+        }
+
+        lines.Add("");
+        lines.Add("응답 규칙: 후보가 하나이고 사용자 요청과 명확히 일치하면 해당 ID로 update_appointment 또는 forget_appointment를 호출하세요. 후보가 여러 개이거나 확신이 낮으면 사용자에게 어떤 약속인지 확인하세요. 원본 URL은 사용자 응답에 그대로 적어 Discord 인용 카드가 뜨게 하세요.");
+        return string.Join("\n", lines);
+    }
+
+    private static string[] SplitSearchKeywords(string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        return query
+            .Split([' ', ',', '，', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(keyword => keyword.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static TimeZoneInfo ResolveTimeZone(string? timezone)

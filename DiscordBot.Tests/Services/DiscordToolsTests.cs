@@ -134,6 +134,37 @@ Content: 의견입니다.
         Assert.DoesNotContain("Link:", summaryInput);
     }
 
+    [Fact]
+    public void FilterAppointmentsByQuery_MatchesTitleAndDescriptionTerms()
+    {
+        var appointments = new[]
+        {
+            CreateAppointment(id: 1, title: "닭한마리 + 파티룸", description: "7월 저녁 모임"),
+            CreateAppointment(id: 2, title: "치과 예약", description: "정기 검진")
+        };
+
+        var result = DiscordTools.FilterAppointmentsByQuery(appointments, "파티룸 저녁");
+
+        Assert.Collection(result, appointment => Assert.Equal(1, appointment.Id));
+    }
+
+    [Fact]
+    public void BuildAppointmentCandidateList_IncludesIdsAndResponseRule()
+    {
+        var appointments = new[]
+        {
+            CreateAppointment(id: 1, title: "닭한마리 + 파티룸", description: "저녁 약속")
+        };
+
+        var result = DiscordTools.BuildAppointmentCandidateList(appointments);
+
+        Assert.Contains("약속 후보 1건:", result);
+        Assert.Contains("ID: 1", result);
+        Assert.Contains("제목: 닭한마리 + 파티룸", result);
+        Assert.Contains("원본: https://discord.com/channels/999/222/333", result);
+        Assert.Contains("후보가 하나이고 사용자 요청과 명확히 일치하면", result);
+    }
+
     private static ChatLogData CreateLog(
         long id = 10,
         string? messageId = "333",
@@ -156,5 +187,39 @@ Content: 의견입니다.
             referencedMessageId,
             referencedChannelId,
             referencedGuildId);
+    }
+
+    private static AppointmentData CreateAppointment(
+        long id = 1,
+        string? guildId = "999",
+        string channelId = "222",
+        string userId = "user-1",
+        string? sourceMessageId = "333",
+        string title = "약속",
+        string? description = null,
+        DateTime? startsAtUtc = null,
+        bool hasTime = true,
+        string timezone = "UTC",
+        string status = "active",
+        DateTime? createdAt = null,
+        DateTime? updatedAt = null,
+        DateTime? expiresAtUtc = null)
+    {
+        var start = startsAtUtc ?? new DateTime(2026, 7, 18, 10, 0, 0, DateTimeKind.Utc);
+        return new AppointmentData(
+            id,
+            guildId,
+            channelId,
+            userId,
+            sourceMessageId,
+            title,
+            description,
+            start,
+            hasTime,
+            timezone,
+            status,
+            createdAt ?? new DateTime(2026, 6, 14, 1, 2, 3, DateTimeKind.Utc),
+            updatedAt,
+            expiresAtUtc ?? start.AddDays(30));
     }
 }
