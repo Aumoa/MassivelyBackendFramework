@@ -6,10 +6,18 @@ using DiscordBot.Repositories;
 
 namespace DiscordBot.Services;
 
-internal class DiscordTools(SocketSelfUser selfUser, SocketMessage message, IChatLogRepository chatLogRepository, IAppointmentRepository appointmentRepository)
+internal class DiscordTools(
+    SocketSelfUser selfUser,
+    SocketMessage message,
+    IChatLogRepository chatLogRepository,
+    IAppointmentRepository appointmentRepository,
+    IChannelNoteRepository channelNoteRepository)
 {
     private const int DefaultAppointmentRetentionDays = 30;
     private const int MaxAppointmentRetentionDays = 365;
+    private const int MaxChannelNoteTitleLength = 256;
+    private const int MaxChannelNoteContentLength = 4000;
+    private const int MaxChannelNoteTagsLength = 512;
     private const int MaxReplyContextReplies = 50;
     private const int MaxDiscussionSummaryMessages = 100;
     private const int MaxDiscussionSearchResults = 50;
@@ -1182,6 +1190,163 @@ ID: {appointment.Id}
     }
 
     [ToolFunction(
+        Name = "remember_channel_note",
+        Description = """
+현재 채널의 공유 메모를 저장합니다. 사용자가 '이 채널에 기억해줘', '이 내용 메모해줘', '앞으로 이 채널에서는 이 정보를 참고해'처럼 채널 단위 참고사항을 남기려 할 때 사용하세요.
+
+[중요]
+- 이 도구는 개인 지침이나 개인 기억을 저장하지 않습니다. 저장 범위는 현재 Discord 채널입니다.
+- 같은 채널의 사용자는 이 메모를 조회하거나 삭제할 수 있습니다. 다른 채널에서는 보이지 않습니다.
+- source_chat_log_id는 메모의 근거가 된 과거 메시지를 search_chat_history/get_chat_context로 찾은 경우에만 지정하세요. 없으면 0으로 두세요.
+- 원본 메시지 참조는 본문 복사가 아니라 Discord 메시지 식별자만 저장됩니다.
+""")]
+    public async Task<string> RememberChannelNoteAsync(
+        [ToolParameterInfo(Description = "채널 메모 제목. 짧고 구체적으로 작성하세요.")]
+        string title,
+        [ToolParameterInfo(Description = "저장할 채널 메모 내용.")]
+        string content,
+        [ToolParameterInfo(Description = "검색에 도움이 되는 태그. 쉼표로 구분하고, 없으면 빈 문자열.")]
+        string tags = "",
+        [ToolParameterInfo(Description = "메모 근거가 된 과거 메시지의 ChatLogId. search_chat_history/get_chat_context로 찾은 경우에만 지정하고, 없으면 0.")]
+        int source_chat_log_id = 0,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedTitle = NormalizeChannelNoteTitle(title);
+        if (string.IsNullOrWhiteSpace(normalizedTitle))
+        {
+            return "채널 메모 제목이 필요합니다.";
+        }
+
+        var normalizedContent = NormalizeChannelNoteContent(content);
+        if (string.IsNullOrWhiteSpace(normalizedContent))
+        {
+            return "채널 메모 내용이 필요합니다.";
+        }
+
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+        var sourceMessageId = message.Id.ToString();
+        if (source_chat_log_id > 0)
+        {
+            var sourceLogs = await chatLogRepository.GetContextAsync(
+                channelId,
+                source_chat_log_id,
+                0,
+                0,
+                cancellationToken);
+            var sourceLog = sourceLogs.FirstOrDefault(log => log.Id == source_chat_log_id);
+            if (sourceLog == null)
+            {
+                return "source_chat_log_id에 해당하는 현재 채널 메시지를 찾지 못했습니다.";
+            }
+
+            sourceMessageId = sourceLog.MessageId;
+        }
+
+        var input = new ChannelNoteInput(
+            guildId,
+            channelId,
+            message.Author.Id.ToString(),
+            normalizedTitle,
+            normalizedContent,
+            NormalizeChannelNoteTags(tags),
+            sourceMessageId);
+
+        var id = await channelNoteRepository.AddAsync(input, cancellationToken);
+        var reference = BuildChannelNoteReference(guildId, channelId, sourceMessageId);
+        return $"""
+채널 메모를 저장했습니다.
+ID: {id}
+제목: {normalizedTitle}
+태그: {input.Tags ?? "없음"}
+원본: {reference}
+응답 규칙: 사용자에게 현재 채널의 공유 메모로 저장했다고 짧게 알려주세요. 개인 지침이나 개인 기억으로 표현하지 마세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요.
+""";
+    }
+
+    [ToolFunction(
+        Name = "list_channel_notes",
+        Description = """
+현재 채널에 저장된 공유 메모를 조회합니다. 사용자가 '기억한 내용 알려줘', '채널 메모 찾아줘', '이 채널 규칙 뭐였지?'처럼 채널 단위 참고사항을 물으면 호출하세요.
+
+조회 범위는 현재 Discord 채널로 제한됩니다. 다른 채널이나 다른 서버의 메모는 조회할 수 없습니다.
+query가 있으면 제목, 내용, 태그에서 검색합니다.
+""")]
+    public async Task<string> ListChannelNotesAsync(
+        [ToolParameterInfo(Description = "제목/내용/태그에서 찾을 검색어. 없으면 빈 문자열.")]
+        string query = "",
+        [ToolParameterInfo(Description = "최대 조회 수. 1~20, 기본 10.")]
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 1, 20);
+
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+        var notes = await channelNoteRepository.GetActiveAsync(
+            channelId,
+            guildId,
+            limit,
+            query,
+            cancellationToken);
+        if (notes.Count == 0)
+        {
+            return "조회된 채널 메모가 없습니다.";
+        }
+
+        return BuildChannelNoteList(notes);
+    }
+
+    [ToolFunction(
+        Name = "forget_channel_note",
+        Description = """
+현재 채널에 저장된 공유 메모를 삭제합니다.
+id는 list_channel_notes 결과의 ID를 사용하세요. 사용자가 자연어로만 특정 메모를 말해 ID가 불분명하면 먼저 list_channel_notes로 후보를 조회하거나 사용자에게 확인하세요.
+""")]
+    public async Task<string> ForgetChannelNoteAsync(
+        [ToolParameterInfo(Description = "삭제할 채널 메모 ID. list_channel_notes 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "삭제 이유. 없으면 빈 문자열.")]
+        string reason = "",
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "삭제할 채널 메모 ID가 필요합니다. 먼저 채널 메모를 조회해서 ID를 확인해 주세요.";
+        }
+
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+        var note = await channelNoteRepository.GetActiveByIdAsync(
+            id,
+            channelId,
+            guildId,
+            cancellationToken);
+        if (note == null)
+        {
+            return "해당 ID의 활성 채널 메모를 찾지 못했습니다.";
+        }
+
+        var deleted = await channelNoteRepository.DeleteAsync(
+            id,
+            channelId,
+            guildId,
+            cancellationToken);
+        if (!deleted)
+        {
+            return "채널 메모 삭제에 실패했습니다. 이미 삭제되었거나 찾을 수 없습니다.";
+        }
+
+        return $"""
+채널 메모를 삭제했습니다.
+ID: {note.Id}
+제목: {note.Title}
+삭제 이유: {(string.IsNullOrWhiteSpace(reason) ? "미지정" : reason)}
+응답 규칙: 사용자에게 현재 채널의 공유 메모 삭제 완료를 짧게 알려주세요.
+""";
+    }
+
+    [ToolFunction(
         Name = "get_current_date",
         Description = "현재 날짜와 시간을 가져옵니다. 사용자의 언어에 맞는 timezone을 지정하세요 (한국어: Asia/Seoul, 영어(미국): America/New_York 등). 기본값은 UTC입니다.")]
     public Task<string> GetCurrentDateAsync(
@@ -1237,6 +1402,45 @@ ID: {appointment.Id}
         return string.Join("\n", lines);
     }
 
+    internal static string BuildChannelNoteList(IReadOnlyList<ChannelNoteData> notes)
+    {
+        List<string> lines = [$"채널 메모 {notes.Count}건:"];
+        foreach (var note in notes)
+        {
+            var reference = BuildChannelNoteReference(note);
+            lines.Add("");
+            lines.Add($"ID: {note.Id}");
+            lines.Add($"제목: {note.Title}");
+            if (!string.IsNullOrWhiteSpace(note.Tags))
+            {
+                lines.Add($"태그: {note.Tags}");
+            }
+            lines.Add($"내용: {FormatChannelNoteContent(note.Content)}");
+            lines.Add($"원본: {reference}");
+        }
+
+        lines.Add("");
+        lines.Add("응답 규칙: 현재 채널의 공유 메모만 바탕으로 답하세요. 개인 지침이나 개인 기억으로 표현하지 말고 채널 메모라고 표현하세요. 삭제가 필요하면 ID를 기준으로 forget_channel_note를 사용할 수 있습니다. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요.");
+        return string.Join("\n", lines);
+    }
+
+    internal static string NormalizeChannelNoteTitle(string title)
+    {
+        var normalized = (title ?? string.Empty).Trim();
+        return normalized.Length <= MaxChannelNoteTitleLength ? normalized : normalized[..MaxChannelNoteTitleLength];
+    }
+
+    internal static string NormalizeChannelNoteContent(string content)
+    {
+        var normalized = (content ?? string.Empty).Trim();
+        return normalized.Length <= MaxChannelNoteContentLength ? normalized : normalized[..MaxChannelNoteContentLength];
+    }
+
+    internal static string? NormalizeChannelNoteTags(string tags)
+    {
+        return NormalizeNullable(tags, MaxChannelNoteTagsLength);
+    }
+
     private static string[] SplitSearchKeywords(string? query)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -1249,6 +1453,15 @@ ID: {appointment.Id}
             .Where(keyword => keyword.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static string FormatChannelNoteContent(string content)
+    {
+        const int MAX_DISPLAY_LENGTH = 1200;
+        var normalized = content.Trim();
+        return normalized.Length <= MAX_DISPLAY_LENGTH
+            ? normalized
+            : $"{normalized[..MAX_DISPLAY_LENGTH]}...";
     }
 
     private static TimeZoneInfo ResolveTimeZone(string? timezone)
@@ -1679,6 +1892,22 @@ ID: {appointment.Id}
     }
 
     private static string BuildAppointmentReference(string? guildId, string channelId, string? messageId)
+    {
+        if (string.IsNullOrWhiteSpace(messageId))
+        {
+            return "(원본 메시지를 참조할 수 없어요)";
+        }
+
+        var guildPart = string.IsNullOrWhiteSpace(guildId) ? "@me" : guildId;
+        return $"https://discord.com/channels/{guildPart}/{channelId}/{messageId}";
+    }
+
+    private static string BuildChannelNoteReference(ChannelNoteData note)
+    {
+        return BuildChannelNoteReference(note.GuildId, note.ChannelId, note.SourceMessageId);
+    }
+
+    private static string BuildChannelNoteReference(string? guildId, string channelId, string? messageId)
     {
         if (string.IsNullOrWhiteSpace(messageId))
         {

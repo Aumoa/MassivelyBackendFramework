@@ -140,7 +140,8 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         var chatImageRepository = scope.ServiceProvider.GetRequiredService<IChatImageRepository>();
         var chatAttachmentRepository = scope.ServiceProvider.GetRequiredService<IChatAttachmentRepository>();
         var appointmentRepository = scope.ServiceProvider.GetRequiredService<IAppointmentRepository>();
-        var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository, appointmentRepository);
+        var channelNoteRepository = scope.ServiceProvider.GetRequiredService<IChannelNoteRepository>();
+        var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository, appointmentRepository, channelNoteRepository);
         var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
         var chatImageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatImageTools>>();
         var chatAttachmentToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatAttachmentTools>>();

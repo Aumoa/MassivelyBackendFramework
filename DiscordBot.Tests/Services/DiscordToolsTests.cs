@@ -165,6 +165,35 @@ Content: 의견입니다.
         Assert.Contains("후보가 하나이고 사용자 요청과 명확히 일치하면", result);
     }
 
+    [Fact]
+    public void BuildChannelNoteList_FormatsSharedChannelNotes()
+    {
+        var notes = new[]
+        {
+            CreateChannelNote(id: 5, title: "배포 규칙", content: "배포 전에는 채널에서 한 번 더 확인한다.", tags: "배포,확인")
+        };
+
+        var result = DiscordTools.BuildChannelNoteList(notes);
+
+        Assert.Contains("채널 메모 1건:", result);
+        Assert.Contains("ID: 5", result);
+        Assert.Contains("제목: 배포 규칙", result);
+        Assert.Contains("태그: 배포,확인", result);
+        Assert.Contains("내용: 배포 전에는 채널에서 한 번 더 확인한다.", result);
+        Assert.Contains("원본: https://discord.com/channels/999/222/333", result);
+        Assert.Contains("개인 지침이나 개인 기억으로 표현하지 말고 채널 메모라고 표현하세요.", result);
+    }
+
+    [Fact]
+    public void NormalizeChannelNoteContent_TruncatesLongContent()
+    {
+        var content = new string('a', 4_001);
+
+        var result = DiscordTools.NormalizeChannelNoteContent(content);
+
+        Assert.Equal(4_000, result.Length);
+    }
+
     private static ChatLogData CreateLog(
         long id = 10,
         string? messageId = "333",
@@ -221,5 +250,32 @@ Content: 의견입니다.
             createdAt ?? new DateTime(2026, 6, 14, 1, 2, 3, DateTimeKind.Utc),
             updatedAt,
             expiresAtUtc ?? start.AddDays(30));
+    }
+
+    private static ChannelNoteData CreateChannelNote(
+        long id = 1,
+        string? guildId = "999",
+        string channelId = "222",
+        string createdByUserId = "user-1",
+        string title = "메모",
+        string content = "내용",
+        string? tags = null,
+        string? sourceMessageId = "333",
+        string status = "active",
+        DateTime? createdAt = null,
+        DateTime? updatedAt = null)
+    {
+        return new ChannelNoteData(
+            id,
+            guildId,
+            channelId,
+            createdByUserId,
+            title,
+            content,
+            tags,
+            sourceMessageId,
+            status,
+            createdAt ?? new DateTime(2026, 6, 14, 1, 2, 3, DateTimeKind.Utc),
+            updatedAt);
     }
 }
