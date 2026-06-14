@@ -403,6 +403,7 @@ internal sealed class GatewayConnectionManager(
         }
 
         using var routedFrame = envelope.CreateRoutedFrame();
+        var now = DateTimeOffset.UtcNow;
         switch (envelope.RoutedPacketId)
         {
             case RemoteDebugPacketIds.BackendStatusRequest:
@@ -414,8 +415,8 @@ internal sealed class GatewayConnectionManager(
                     new RemoteDebugBackendStatusResponse(
                         m_BackendRegistration.BackendKind,
                         GetTrustedGatewayConnectionCount(),
-                        remoteDebugClients.Count,
-                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+                        remoteDebugClients.GetClientCount(now),
+                        now.ToUnixTimeMilliseconds()),
                     RemoteDebugBackendStatusResponse.Codec,
                     cancellationToken).ConfigureAwait(false);
                 break;
@@ -427,8 +428,8 @@ internal sealed class GatewayConnectionManager(
                     envelope.RouteId,
                     RemoteDebugPacketIds.BackendClientListResponse,
                     new RemoteDebugBackendClientListResponse(
-                        remoteDebugClients.GetClientSnapshots(),
-                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
+                        remoteDebugClients.GetClientSnapshots(now),
+                        now.ToUnixTimeMilliseconds()),
                     RemoteDebugBackendClientListResponse.Codec,
                     cancellationToken).ConfigureAwait(false);
                 break;
@@ -439,14 +440,14 @@ internal sealed class GatewayConnectionManager(
                     stream,
                     envelope.RouteId,
                     RemoteDebugPacketIds.BackendClientRegisterResponse,
-                    remoteDebugClients.Register(registerRequest, DateTimeOffset.UtcNow),
+                    remoteDebugClients.Register(registerRequest, now),
                     RemoteDebugBackendClientRegisterResponse.Codec,
                     cancellationToken).ConfigureAwait(false);
                 break;
 
             case RemoteDebugPacketIds.BackendClientHeartbeatRequest:
                 var heartbeatRequest = PacketCodec.Decode(routedFrame, RemoteDebugBackendClientHeartbeatRequest.Codec);
-                if (!remoteDebugClients.TryHeartbeat(heartbeatRequest, DateTimeOffset.UtcNow, out var heartbeatResponse) ||
+                if (!remoteDebugClients.TryHeartbeat(heartbeatRequest, now, out var heartbeatResponse) ||
                     heartbeatResponse == null)
                 {
                     await WriteErrorResponseAsync(

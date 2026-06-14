@@ -124,13 +124,88 @@ public sealed class RemoteDebugClientRegistryTests
         Assert.Empty(registry.GetClientSnapshots());
     }
 
-    private static RemoteDebugClientRegistry CreateRegistry(RemoteDebugCapabilities allowedCapabilities)
+    [Fact]
+    public void PruneExpired_RemovesClientsAtTimeoutBoundary()
+    {
+        var registry = CreateRegistry(
+            RemoteDebugCapabilities.LogStreaming,
+            heartbeatIntervalMilliseconds: 1000,
+            clientTimeoutMilliseconds: 3000);
+        registry.Register(
+            new RemoteDebugBackendClientRegisterRequest(
+                "client-a",
+                "Editor",
+                "1.0.0",
+                "2022.3",
+                RemoteDebugCapabilities.LogStreaming),
+            DateTimeOffset.FromUnixTimeMilliseconds(1000));
+
+        Assert.Equal(0, registry.PruneExpired(DateTimeOffset.FromUnixTimeMilliseconds(3999)));
+        Assert.Equal(1, registry.Count);
+
+        Assert.Equal(1, registry.PruneExpired(DateTimeOffset.FromUnixTimeMilliseconds(4000)));
+        Assert.Equal(0, registry.Count);
+        Assert.Empty(registry.GetClientSnapshots());
+    }
+
+    [Fact]
+    public void Heartbeat_RejectsAndRemovesExpiredClientSession()
+    {
+        var registry = CreateRegistry(
+            RemoteDebugCapabilities.LogStreaming,
+            heartbeatIntervalMilliseconds: 1000,
+            clientTimeoutMilliseconds: 3000);
+        var registered = registry.Register(
+            new RemoteDebugBackendClientRegisterRequest(
+                "client-a",
+                "Editor",
+                "1.0.0",
+                "2022.3",
+                RemoteDebugCapabilities.LogStreaming),
+            DateTimeOffset.FromUnixTimeMilliseconds(1000));
+
+        var success = registry.TryHeartbeat(
+            new RemoteDebugBackendClientHeartbeatRequest("client-a", registered.SessionId),
+            DateTimeOffset.FromUnixTimeMilliseconds(4000),
+            out var response);
+
+        Assert.False(success);
+        Assert.Null(response);
+        Assert.Equal(0, registry.Count);
+    }
+
+    [Fact]
+    public void SnapshotAndCountQueries_PruneExpiredClients()
+    {
+        var registry = CreateRegistry(
+            RemoteDebugCapabilities.LogStreaming,
+            heartbeatIntervalMilliseconds: 1000,
+            clientTimeoutMilliseconds: 3000);
+        registry.Register(
+            new RemoteDebugBackendClientRegisterRequest(
+                "client-a",
+                "Editor",
+                "1.0.0",
+                "2022.3",
+                RemoteDebugCapabilities.LogStreaming),
+            DateTimeOffset.FromUnixTimeMilliseconds(1000));
+
+        Assert.Equal(1, registry.GetClientCount(DateTimeOffset.FromUnixTimeMilliseconds(3999)));
+        Assert.Empty(registry.GetClientSnapshots(DateTimeOffset.FromUnixTimeMilliseconds(4000)));
+        Assert.Equal(0, registry.Count);
+    }
+
+    private static RemoteDebugClientRegistry CreateRegistry(
+        RemoteDebugCapabilities allowedCapabilities,
+        int heartbeatIntervalMilliseconds = 15000,
+        int clientTimeoutMilliseconds = 45000)
     {
         return new RemoteDebugClientRegistry(
             Microsoft.Extensions.Options.Options.Create(new RemoteDebugClientRegistryOptions
             {
                 AllowedCapabilities = allowedCapabilities,
-                HeartbeatIntervalMilliseconds = 15000
+                HeartbeatIntervalMilliseconds = heartbeatIntervalMilliseconds,
+                ClientTimeoutMilliseconds = clientTimeoutMilliseconds
             }));
     }
 }

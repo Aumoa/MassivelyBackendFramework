@@ -12,6 +12,12 @@ internal sealed class RemoteDebugClientRegistry(IOptions<RemoteDebugClientRegist
 
     public int Count => m_Clients.Count;
 
+    public int GetClientCount(DateTimeOffset now)
+    {
+        PruneExpired(now);
+        return m_Clients.Count;
+    }
+
     public RemoteDebugBackendClientRegisterResponse Register(
         RemoteDebugBackendClientRegisterRequest request,
         DateTimeOffset now)
@@ -57,6 +63,8 @@ internal sealed class RemoteDebugClientRegistry(IOptions<RemoteDebugClientRegist
         }
 
         response = null;
+        var observedAt = now.ToUnixTimeMilliseconds();
+        var clientTimeoutMilliseconds = GetClientTimeoutMilliseconds();
         while (m_Clients.TryGetValue(request.ClientId, out var current))
         {
             if (!string.Equals(current.SessionId, request.SessionId, StringComparison.Ordinal))
@@ -64,7 +72,16 @@ internal sealed class RemoteDebugClientRegistry(IOptions<RemoteDebugClientRegist
                 return false;
             }
 
-            var observedAt = now.ToUnixTimeMilliseconds();
+            if (current.IsExpired(observedAt, clientTimeoutMilliseconds))
+            {
+                if (Remove(request.ClientId, current))
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
             var updated = current.WithLastSeenAt(observedAt);
             if (!m_Clients.TryUpdate(request.ClientId, updated, current))
             {
@@ -95,8 +112,7 @@ internal sealed class RemoteDebugClientRegistry(IOptions<RemoteDebugClientRegist
                 return false;
             }
 
-            if (((ICollection<KeyValuePair<string, RemoteDebugClientSession>>)m_Clients)
-                .Remove(new KeyValuePair<string, RemoteDebugClientSession>(notify.ClientId, current)))
+            if (Remove(notify.ClientId, current))
             {
                 return true;
             }
@@ -119,9 +135,54 @@ internal sealed class RemoteDebugClientRegistry(IOptions<RemoteDebugClientRegist
                 client.LastSeenAtUnixTimeMilliseconds))];
     }
 
+    public RemoteDebugBackendClientSnapshot[] GetClientSnapshots(DateTimeOffset now)
+    {
+        PruneExpired(now);
+        return GetClientSnapshots();
+    }
+
+    public int PruneExpired(DateTimeOffset now)
+    {
+        var observedAt = now.ToUnixTimeMilliseconds();
+        var clientTimeoutMilliseconds = GetClientTimeoutMilliseconds();
+        var removed = 0;
+
+        foreach (var pair in m_Clients.ToArray())
+        {
+            if (!pair.Value.IsExpired(observedAt, clientTimeoutMilliseconds))
+            {
+                continue;
+            }
+
+            if (Remove(pair.Key, pair.Value))
+            {
+                removed++;
+            }
+        }
+
+        return removed;
+    }
+
     private int GetHeartbeatIntervalMilliseconds()
     {
         return Math.Max(1, m_Options.HeartbeatIntervalMilliseconds);
+    }
+
+    private int GetClientTimeoutMilliseconds()
+    {
+        var heartbeatIntervalMilliseconds = GetHeartbeatIntervalMilliseconds();
+        if (m_Options.ClientTimeoutMilliseconds <= 0)
+        {
+            return (int)Math.Min(int.MaxValue, (long)heartbeatIntervalMilliseconds * 3);
+        }
+
+        return Math.Max(heartbeatIntervalMilliseconds, m_Options.ClientTimeoutMilliseconds);
+    }
+
+    private bool Remove(string clientId, RemoteDebugClientSession session)
+    {
+        return ((ICollection<KeyValuePair<string, RemoteDebugClientSession>>)m_Clients)
+            .Remove(new KeyValuePair<string, RemoteDebugClientSession>(clientId, session));
     }
 
     private sealed class RemoteDebugClientSession(
@@ -161,6 +222,12 @@ internal sealed class RemoteDebugClientRegistry(IOptions<RemoteDebugClientRegist
                 EnabledCapabilities,
                 ConnectedAtUnixTimeMilliseconds,
                 lastSeenAtUnixTimeMilliseconds);
+        }
+
+        public bool IsExpired(long observedAtUnixTimeMilliseconds, int clientTimeoutMilliseconds)
+        {
+            return observedAtUnixTimeMilliseconds >= LastSeenAtUnixTimeMilliseconds &&
+                   observedAtUnixTimeMilliseconds - LastSeenAtUnixTimeMilliseconds >= clientTimeoutMilliseconds;
         }
     }
 }
