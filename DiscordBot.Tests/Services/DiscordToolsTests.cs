@@ -246,6 +246,59 @@ Content: 의견입니다.
     }
 
     [Fact]
+    public void BuildAppointmentDetails_SeparatesDetailsPlansAndSuggestions()
+    {
+        var appointment = CreateAppointment(id: 1, title: "닭한마리 + 파티룸", description: "저녁에 만나서 이동");
+        var items = new[]
+        {
+            CreateAppointmentItem(id: 10, appointmentId: 1, itemType: "plan", content: "닭한마리 먹기", sortOrder: 1),
+            CreateAppointmentItem(id: 20, appointmentId: 1, itemType: "suggestion", content: "보드게임 가져가기", sortOrder: 1)
+        };
+
+        var result = DiscordTools.BuildAppointmentDetails(appointment, items, TimeZoneInfo.Utc);
+
+        Assert.Contains("약속 상세 조회 결과:", result);
+        Assert.Contains("상세:\n저녁에 만나서 이동", result);
+        Assert.Contains("플랜:\n- ItemId 10: 닭한마리 먹기", result);
+        Assert.Contains("제안:\n- ItemId 20: 보드게임 가져가기", result);
+        Assert.Contains("플랜은 확정된 항목, 제안은 미확정 의견입니다.", result);
+    }
+
+    [Theory]
+    [InlineData("plan", "plan")]
+    [InlineData("플랜", "plan")]
+    [InlineData("suggestion", "suggestion")]
+    [InlineData("제안", "suggestion")]
+    [InlineData("all", "all")]
+    [InlineData("???", null)]
+    public void NormalizeAppointmentItemType_MapsAliases(string value, string? expected)
+    {
+        var itemType = DiscordTools.NormalizeAppointmentItemType(value);
+
+        Assert.Equal(expected, itemType);
+    }
+
+    [Fact]
+    public void SplitAppointmentItemContents_TrimsBulletsAndDeduplicates()
+    {
+        var items = DiscordTools.SplitAppointmentItemContents("""
+- 닭한마리 먹기
+* 파티룸 이동
+닭한마리 먹기
+""");
+
+        Assert.Equal(["닭한마리 먹기", "파티룸 이동"], items);
+    }
+
+    [Fact]
+    public void ParseAppointmentItemIds_ParsesDistinctPositiveIds()
+    {
+        var itemIds = DiscordTools.ParseAppointmentItemIds("10, 20\n10 nope -1");
+
+        Assert.Equal([10, 20], itemIds);
+    }
+
+    [Fact]
     public void BuildChannelNoteList_FormatsSharedChannelNotes()
     {
         var notes = new[]
@@ -330,6 +383,29 @@ Content: 의견입니다.
             createdAt ?? new DateTime(2026, 6, 14, 1, 2, 3, DateTimeKind.Utc),
             updatedAt,
             expiresAtUtc ?? start.AddDays(30));
+    }
+
+    private static AppointmentItemData CreateAppointmentItem(
+        long id = 1,
+        long appointmentId = 1,
+        string itemType = "plan",
+        string createdByUserId = "user-1",
+        string content = "항목",
+        string status = "active",
+        int sortOrder = 1,
+        DateTime? createdAt = null,
+        DateTime? updatedAt = null)
+    {
+        return new AppointmentItemData(
+            id,
+            appointmentId,
+            itemType,
+            createdByUserId,
+            content,
+            status,
+            sortOrder,
+            createdAt ?? new DateTime(2026, 6, 14, 1, 2, 3, DateTimeKind.Utc),
+            updatedAt);
     }
 
     private static ChannelNoteData CreateChannelNote(

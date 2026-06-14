@@ -15,6 +15,11 @@ internal class DiscordTools(
 {
     private const int DefaultAppointmentRetentionDays = 30;
     private const int MaxAppointmentRetentionDays = 365;
+    private const int MaxAppointmentDetailsLength = 12_000;
+    private const int MaxAppointmentItemLength = 1_000;
+    private const int MaxAppointmentItemsPerCall = 20;
+    private const string AppointmentItemTypePlan = "plan";
+    private const string AppointmentItemTypeSuggestion = "suggestion";
     private const int MaxChannelNoteTitleLength = 256;
     private const int MaxChannelNoteContentLength = 4000;
     private const int MaxChannelNoteTagsLength = 512;
@@ -908,7 +913,7 @@ message_id_or_url에는 Discord 메시지 ID, 메시지 URL, 또는 사용자가
         bool has_time = true,
         [ToolParameterInfo(Description = "IANA 타임존 ID. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
         string timezone = "Asia/Seoul",
-        [ToolParameterInfo(Description = "약속에 대한 추가 설명. 없으면 빈 문자열.")]
+        [ToolParameterInfo(Description = "약속에 대한 상세 내용. 커밋 메시지 본문처럼 디테일을 정리합니다. 없으면 빈 문자열.")]
         string description = "",
         [ToolParameterInfo(Description = "약속 근거가 된 과거 메시지의 ChatLogId. search_chat_history/get_chat_context로 찾은 경우에만 지정하고, 없으면 0.")]
         int source_chat_log_id = 0,
@@ -969,7 +974,7 @@ message_id_or_url에는 Discord 메시지 ID, 메시지 URL, 또는 사용자가
             message.Author.Id.ToString(),
             sourceMessageId,
             normalizedTitle,
-            NormalizeNullable(description, 2048),
+            NormalizeNullable(description, MaxAppointmentDetailsLength),
             startsAtUtc,
             effectiveHasTime,
             tz.Id,
@@ -1058,13 +1063,13 @@ ID: {id}
             lines.Add($"일시: {startText}");
             if (!string.IsNullOrWhiteSpace(appointment.Description))
             {
-                lines.Add($"설명: {appointment.Description}");
+                lines.Add($"상세: {appointment.Description}");
             }
             lines.Add($"원본: {reference}");
         }
 
         lines.Add("");
-        lines.Add("응답 규칙: 현재 채널의 공유 약속 중 사용자에게 필요한 약속만 간결하게 정리하세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요. 수정/삭제할 약속 ID가 불분명하면 find_appointments로 후보를 먼저 좁히세요.");
+        lines.Add("응답 규칙: 현재 채널의 공유 약속 중 사용자에게 필요한 약속만 간결하게 정리하세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요. 상세/플랜/제안이 필요하면 get_appointment_details를 사용하세요. 수정/삭제할 약속 ID가 불분명하면 find_appointments로 후보를 먼저 좁히세요.");
         return string.Join("\n", lines);
     }
 
@@ -1079,7 +1084,7 @@ query에는 약속을 식별할 수 있는 핵심 단어를 넣고, 날짜 단�
 결과가 하나로 좁혀지면 해당 ID로 update_appointment 또는 forget_appointment를 호출할 수 있습니다. 후보가 여러 개면 사용자에게 어떤 약속인지 확인하세요.
 """)]
     public async Task<string> FindAppointmentsAsync(
-        [ToolParameterInfo(Description = "약속 제목/설명에서 찾을 핵심 단어. 예: 닭한마리, 파티룸, 치과")]
+        [ToolParameterInfo(Description = "약속 제목/상세 내용에서 찾을 핵심 단어. 예: 닭한마리, 파티룸, 치과")]
         string query = "",
         [ToolParameterInfo(Description = "최대 후보 수. 1~20, 기본 10.")]
         int limit = 10,
@@ -1190,7 +1195,7 @@ ID: {appointment.Id}
     [ToolFunction(
         Name = "update_appointment",
         Description = """
-현재 채널에 저장된 공유 약속의 제목, 날짜, 시간, 설명을 수정합니다.
+현재 채널에 저장된 공유 약속의 제목, 날짜, 시간, 상세 내용을 수정합니다.
 id는 find_appointments 또는 list_appointments 결과의 ID를 사용하세요. ID가 불분명하면 먼저 find_appointments로 후보를 조회하거나 사용자에게 확인하세요.
 
 시간만 나중에 정해진 경우 time에 HH:mm 값을 넣으세요. 예: '방탈출 약속은 오후 3시로 정해졌어' -> 기존 날짜 유지, time='15:00'.
@@ -1208,7 +1213,7 @@ date가 비어 있으면 기존 날짜를 유지하고, time이 비어 있으면
         string time = "",
         [ToolParameterInfo(Description = "시간을 미정으로 바꿀지 여부.")]
         bool time_unspecified = false,
-        [ToolParameterInfo(Description = "새 설명. 변경하지 않으려면 빈 문자열.")]
+        [ToolParameterInfo(Description = "새 상세 내용. 변경하지 않으려면 빈 문자열. 플랜/제안 목록은 add_appointment_items/remove_appointment_items를 사용하세요.")]
         string description = "",
         [ToolParameterInfo(Description = "IANA 타임존 ID. 비워두면 기존 약속의 timezone을 유지합니다.")]
         string timezone = "",
@@ -1265,7 +1270,7 @@ date가 비어 있으면 기존 날짜를 유지하고, time이 비어 있으면
             : NormalizeAppointmentTitle(title);
         var normalizedDescription = string.IsNullOrWhiteSpace(description)
             ? appointment.Description
-            : NormalizeNullable(description, 2048);
+            : NormalizeNullable(description, MaxAppointmentDetailsLength);
         forget_after_days = Math.Clamp(forget_after_days, 1, MaxAppointmentRetentionDays);
         var expiresAtUtc = startsAtUtc.AddDays(forget_after_days);
 
@@ -1294,6 +1299,243 @@ ID: {appointment.Id}
 일시: {startText}
 원본: {reference}
 응답 규칙: 사용자에게 수정 완료를 짧게 알려주고, 변경된 날짜/시간을 확인해 주세요.
+""";
+    }
+
+    [ToolFunction(
+        Name = "get_appointment_details",
+        Description = """
+현재 채널에 저장된 공유 약속 하나의 상세 내용, 플랜, 제안 목록을 조회합니다.
+사용자가 특정 약속의 디테일, 준비할 일, 확정된 플랜, 아직 확정되지 않은 의견/제안을 물으면 호출하세요.
+id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
+""")]
+    public async Task<string> GetAppointmentDetailsAsync(
+        [ToolParameterInfo(Description = "조회할 약속 ID. find_appointments 또는 list_appointments 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "IANA 타임존 ID. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
+        string timezone = "Asia/Seoul",
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "조회할 약속 ID가 필요합니다. 먼저 약속을 조회해서 ID를 확인해 주세요.";
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var appointment = await GetCurrentChannelActiveAppointmentAsync(id, nowUtc, cancellationToken);
+        if (appointment == null)
+        {
+            return "해당 ID의 활성 약속을 찾지 못했습니다.";
+        }
+
+        var items = await appointmentRepository.GetActiveItemsAsync(id, cancellationToken: cancellationToken);
+        var tz = ResolveTimeZone(string.IsNullOrWhiteSpace(timezone) ? appointment.Timezone : timezone);
+        return BuildAppointmentDetails(appointment, items, tz);
+    }
+
+    [ToolFunction(
+        Name = "set_appointment_details",
+        Description = """
+현재 채널에 저장된 공유 약속의 상세 내용을 설정하거나 덧붙입니다.
+상세 내용은 커밋 메시지 본문처럼 약속의 배경, 장소 후보, 준비물, 관련 맥락 등을 자유 텍스트로 정리하는 용도입니다.
+플랜/제안 목록은 이 도구가 아니라 add_appointment_items/remove_appointment_items를 사용하세요.
+id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
+""")]
+    public async Task<string> SetAppointmentDetailsAsync(
+        [ToolParameterInfo(Description = "상세 내용을 설정할 약속 ID. find_appointments 또는 list_appointments 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "저장할 상세 내용. append=true이면 기존 상세 뒤에 덧붙입니다.")]
+        string details,
+        [ToolParameterInfo(Description = "기존 상세 내용 뒤에 덧붙일지 여부. false이면 상세 내용을 교체합니다.")]
+        bool append = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "상세 내용을 수정할 약속 ID가 필요합니다. 먼저 약속을 조회해서 ID를 확인해 주세요.";
+        }
+
+        var normalizedDetails = NormalizeNullable(details, MaxAppointmentDetailsLength);
+        if (string.IsNullOrWhiteSpace(normalizedDetails))
+        {
+            return "저장할 상세 내용이 필요합니다.";
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var appointment = await GetCurrentChannelActiveAppointmentAsync(id, nowUtc, cancellationToken);
+        if (appointment == null)
+        {
+            return "해당 ID의 활성 약속을 찾지 못했습니다.";
+        }
+
+        if (append && !string.IsNullOrWhiteSpace(appointment.Description))
+        {
+            normalizedDetails = NormalizeNullable(
+                $"{appointment.Description.Trim()}\n\n{normalizedDetails}",
+                MaxAppointmentDetailsLength);
+        }
+
+        var updated = await appointmentRepository.UpdateAsync(
+            id,
+            appointment.ChannelId,
+            appointment.GuildId,
+            appointment.Title,
+            normalizedDetails,
+            EnsureUtc(appointment.StartsAtUtc),
+            appointment.HasTime,
+            appointment.Timezone,
+            EnsureUtc(appointment.ExpiresAtUtc),
+            cancellationToken);
+        if (!updated)
+        {
+            return "약속 상세 내용 수정에 실패했습니다. 이미 삭제되었거나 찾을 수 없습니다.";
+        }
+
+        return $"""
+약속 상세 내용을 저장했습니다.
+ID: {appointment.Id}
+제목: {appointment.Title}
+상세: {normalizedDetails}
+응답 규칙: 사용자에게 현재 채널의 공유 약속 상세 내용을 저장했다고 짧게 알려주세요.
+""";
+    }
+
+    [ToolFunction(
+        Name = "add_appointment_items",
+        Description = """
+현재 채널에 저장된 공유 약속에 플랜 또는 제안 항목을 추가합니다.
+item_type='plan'은 확정된 일정/준비/진행 플랜이고, item_type='suggestion'은 아직 확정되지 않은 의견이나 후보입니다.
+사용자가 메시지를 바탕으로 플랜이나 제안을 정리해 달라고 하면, 대화를 읽고 확정된 것은 plan, 미확정 의견은 suggestion으로 나누어 추가하세요.
+id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
+""")]
+    public async Task<string> AddAppointmentItemsAsync(
+        [ToolParameterInfo(Description = "항목을 추가할 약속 ID. find_appointments 또는 list_appointments 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "항목 종류. plan 또는 suggestion.")]
+        string item_type,
+        [ToolParameterInfo(Description = "추가할 항목 목록. 줄바꿈으로 여러 항목을 나열하세요.")]
+        string items,
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "항목을 추가할 약속 ID가 필요합니다. 먼저 약속을 조회해서 ID를 확인해 주세요.";
+        }
+
+        var normalizedItemType = NormalizeAppointmentItemType(item_type);
+        if (normalizedItemType is null or "all")
+        {
+            return "item_type은 plan 또는 suggestion이어야 합니다.";
+        }
+
+        var itemContents = SplitAppointmentItemContents(items);
+        if (itemContents.Count == 0)
+        {
+            return "추가할 항목이 필요합니다. 줄바꿈으로 플랜 또는 제안을 적어 주세요.";
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var appointment = await GetCurrentChannelActiveAppointmentAsync(id, nowUtc, cancellationToken);
+        if (appointment == null)
+        {
+            return "해당 ID의 활성 약속을 찾지 못했습니다.";
+        }
+
+        List<AppointmentItemData> addedItems = [];
+        foreach (var itemContent in itemContents.Take(MaxAppointmentItemsPerCall))
+        {
+            var input = new AppointmentItemInput(
+                appointment.Id,
+                normalizedItemType,
+                message.Author.Id.ToString(),
+                itemContent);
+            var itemId = await appointmentRepository.AddItemAsync(input, cancellationToken);
+            addedItems.Add(new AppointmentItemData(
+                itemId,
+                appointment.Id,
+                normalizedItemType,
+                message.Author.Id.ToString(),
+                itemContent,
+                "active",
+                addedItems.Count + 1,
+                DateTime.UtcNow,
+                null));
+        }
+
+        return $"""
+약속 항목을 추가했습니다.
+ID: {appointment.Id}
+제목: {appointment.Title}
+종류: {FormatAppointmentItemType(normalizedItemType)}
+{BuildAppointmentItemSection("추가된 항목", addedItems)}
+응답 규칙: 사용자에게 플랜/제안 중 어느 목록에 몇 개를 추가했는지 짧게 알려주세요.
+""";
+    }
+
+    [ToolFunction(
+        Name = "remove_appointment_items",
+        Description = """
+현재 채널에 저장된 공유 약속의 플랜 또는 제안 항목을 삭제합니다.
+item_ids는 get_appointment_details 결과에 표시되는 ItemId를 사용하세요. 삭제할 항목이 불분명하면 먼저 get_appointment_details로 항목을 조회하거나 사용자에게 확인하세요.
+""")]
+    public async Task<string> RemoveAppointmentItemsAsync(
+        [ToolParameterInfo(Description = "항목을 삭제할 약속 ID. find_appointments 또는 list_appointments 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "항목 종류. plan, suggestion, all 중 하나. 모르면 all.")]
+        string item_type,
+        [ToolParameterInfo(Description = "삭제할 ItemId 목록. 콤마/공백/줄바꿈으로 구분할 수 있습니다.")]
+        string item_ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "항목을 삭제할 약속 ID가 필요합니다. 먼저 약속을 조회해서 ID를 확인해 주세요.";
+        }
+
+        var normalizedItemType = NormalizeAppointmentItemType(item_type);
+        if (normalizedItemType == null)
+        {
+            return "item_type은 plan, suggestion, all 중 하나여야 합니다.";
+        }
+
+        var itemIds = ParseAppointmentItemIds(item_ids);
+        if (itemIds.Count == 0)
+        {
+            return "삭제할 ItemId가 필요합니다. 먼저 get_appointment_details로 항목 ID를 확인해 주세요.";
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var appointment = await GetCurrentChannelActiveAppointmentAsync(id, nowUtc, cancellationToken);
+        if (appointment == null)
+        {
+            return "해당 ID의 활성 약속을 찾지 못했습니다.";
+        }
+
+        var deletedCount = 0;
+        foreach (var itemId in itemIds.Take(MaxAppointmentItemsPerCall))
+        {
+            var deleted = await appointmentRepository.DeleteItemAsync(
+                appointment.Id,
+                itemId,
+                normalizedItemType == "all" ? null : normalizedItemType,
+                cancellationToken);
+            if (deleted)
+            {
+                deletedCount++;
+            }
+        }
+
+        return $"""
+약속 항목을 삭제했습니다.
+ID: {appointment.Id}
+제목: {appointment.Title}
+요청 항목 수: {itemIds.Count}
+삭제 항목 수: {deletedCount}
+응답 규칙: 사용자에게 삭제된 항목 수를 짧게 알려주세요. 삭제 수가 요청보다 적으면 이미 삭제되었거나 찾지 못한 항목이 있을 수 있다고 안내하세요.
 """;
     }
 
@@ -1465,6 +1707,130 @@ ID: {note.Id}
         var tz = ResolveTimeZone(timezone);
         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
         return Task.FromResult($"{now:yyyy-MM-dd HH:mm:ss} ({tz.Id})");
+    }
+
+    private async ValueTask<AppointmentData?> GetCurrentChannelActiveAppointmentAsync(
+        int id,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+        return await appointmentRepository.GetActiveByIdAsync(
+            id,
+            channelId,
+            guildId,
+            nowUtc,
+            cancellationToken);
+    }
+
+    internal static string BuildAppointmentDetails(
+        AppointmentData appointment,
+        IReadOnlyList<AppointmentItemData> items,
+        TimeZoneInfo timezone)
+    {
+        var startText = FormatAppointmentStart(EnsureUtc(appointment.StartsAtUtc), appointment.HasTime, timezone);
+        var reference = BuildAppointmentReference(appointment);
+        var planItems = items
+            .Where(item => string.Equals(item.ItemType, AppointmentItemTypePlan, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var suggestionItems = items
+            .Where(item => string.Equals(item.ItemType, AppointmentItemTypeSuggestion, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        List<string> lines =
+        [
+            "약속 상세 조회 결과:",
+            $"ID: {appointment.Id}",
+            $"제목: {appointment.Title}",
+            $"일시: {startText}",
+            $"원본: {reference}",
+            "",
+            "상세:",
+            string.IsNullOrWhiteSpace(appointment.Description) ? "(저장된 상세 내용이 없습니다.)" : appointment.Description.Trim(),
+            "",
+            BuildAppointmentItemSection("플랜", planItems),
+            "",
+            BuildAppointmentItemSection("제안", suggestionItems),
+            "",
+            "응답 규칙: 상세 내용, 플랜, 제안을 구분해서 사용자에게 필요한 부분만 간결하게 답하세요. 플랜은 확정된 항목, 제안은 미확정 의견입니다. 원본 URL이 필요하면 그대로 적으세요."
+        ];
+
+        return string.Join("\n", lines);
+    }
+
+    internal static string BuildAppointmentItemSection(
+        string heading,
+        IReadOnlyList<AppointmentItemData> items)
+    {
+        List<string> lines = [$"{heading}:"];
+        if (items.Count == 0)
+        {
+            lines.Add("(없음)");
+            return string.Join("\n", lines);
+        }
+
+        foreach (var item in items.OrderBy(item => item.SortOrder).ThenBy(item => item.Id))
+        {
+            lines.Add($"- ItemId {item.Id}: {item.Content}");
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    internal static string? NormalizeAppointmentItemType(string? itemType)
+    {
+        var normalized = (itemType ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "plan" or "plans" or "플랜" or "계획" or "일정" => AppointmentItemTypePlan,
+            "suggestion" or "suggestions" or "suggest" or "제안" or "의견" or "후보" => AppointmentItemTypeSuggestion,
+            "all" or "전체" or "모두" => "all",
+            _ => null
+        };
+    }
+
+    internal static string FormatAppointmentItemType(string itemType)
+    {
+        return itemType switch
+        {
+            AppointmentItemTypePlan => "플랜",
+            AppointmentItemTypeSuggestion => "제안",
+            _ => itemType
+        };
+    }
+
+    internal static IReadOnlyList<string> SplitAppointmentItemContents(string? items)
+    {
+        if (string.IsNullOrWhiteSpace(items))
+        {
+            return [];
+        }
+
+        return items
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => item.TrimStart('-', '*', ' ', '\t').Trim())
+            .Where(item => item.Length > 0)
+            .Select(item => item.Length <= MaxAppointmentItemLength ? item : item[..MaxAppointmentItemLength])
+            .Distinct(StringComparer.Ordinal)
+            .Take(MaxAppointmentItemsPerCall)
+            .ToList();
+    }
+
+    internal static IReadOnlyList<long> ParseAppointmentItemIds(string? itemIds)
+    {
+        if (string.IsNullOrWhiteSpace(itemIds))
+        {
+            return [];
+        }
+
+        return itemIds
+            .Split([',', ' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => long.TryParse(item, out var id) ? id : 0)
+            .Where(id => id > 0)
+            .Distinct()
+            .Take(MaxAppointmentItemsPerCall)
+            .ToList();
     }
 
     internal static IReadOnlyList<string> NormalizeChatSearchKeywords(string? keywords)
@@ -1664,13 +2030,13 @@ ID: {note.Id}
             lines.Add($"일시: {startText}");
             if (!string.IsNullOrWhiteSpace(appointment.Description))
             {
-                lines.Add($"설명: {appointment.Description}");
+                lines.Add($"상세: {appointment.Description}");
             }
             lines.Add($"원본: {reference}");
         }
 
         lines.Add("");
-        lines.Add("응답 규칙: 후보가 하나이고 사용자 요청과 명확히 일치하면 해당 ID로 update_appointment 또는 forget_appointment를 호출하세요. 후보가 여러 개이거나 확신이 낮으면 사용자에게 어떤 약속인지 확인하세요. 원본 URL은 사용자 응답에 그대로 적어 Discord 인용 카드가 뜨게 하세요.");
+        lines.Add("응답 규칙: 후보가 하나이고 사용자 요청과 명확히 일치하면 해당 ID로 update_appointment, forget_appointment, get_appointment_details 중 필요한 도구를 호출하세요. 후보가 여러 개이거나 확신이 낮으면 사용자에게 어떤 약속인지 확인하세요. 원본 URL은 사용자 응답에 그대로 적어 Discord 인용 카드가 뜨게 하세요.");
         return string.Join("\n", lines);
     }
 

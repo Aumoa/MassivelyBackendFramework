@@ -188,6 +188,101 @@ WHERE `id` = @id
         return await connection.ExecuteAsync(command) > 0;
     }
 
+    public async ValueTask<long> AddItemAsync(AppointmentItemInput input, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        const string QUERY = @"
+INSERT INTO `appointment_item`
+    (`appointment_id`, `item_type`, `created_by_user_id`, `content`, `sort_order`)
+SELECT
+    @AppointmentId,
+    @ItemType,
+    @CreatedByUserId,
+    @Content,
+    COALESCE(MAX(`sort_order`), 0) + 1
+FROM `appointment_item`
+WHERE `appointment_id` = @AppointmentId
+  AND `item_type` = @ItemType
+  AND `status` = 'active'";
+
+        var command = new CommandDefinition(QUERY, input, cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
+
+        var idCommand = new CommandDefinition(
+            "SELECT LAST_INSERT_ID()",
+            cancellationToken: cancellationToken);
+        return await connection.ExecuteScalarAsync<long>(idCommand);
+    }
+
+    public async ValueTask<IReadOnlyList<AppointmentItemData>> GetActiveItemsAsync(
+        long appointmentId,
+        string? itemType = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        var queryBuilder = new System.Text.StringBuilder(@"
+SELECT
+    `id` AS Id,
+    `appointment_id` AS AppointmentId,
+    `item_type` AS ItemType,
+    `created_by_user_id` AS CreatedByUserId,
+    `content` AS Content,
+    `status` AS Status,
+    `sort_order` AS SortOrder,
+    `created_at` AS CreatedAt,
+    `updated_at` AS UpdatedAt
+FROM `appointment_item`
+WHERE `appointment_id` = @appointmentId
+  AND `status` = 'active'");
+
+        if (!string.IsNullOrWhiteSpace(itemType))
+        {
+            queryBuilder.Append(" AND `item_type` = @itemType");
+        }
+
+        queryBuilder.Append(" ORDER BY `item_type`, `sort_order`, `id`");
+
+        var command = new CommandDefinition(
+            queryBuilder.ToString(),
+            new { appointmentId, itemType },
+            cancellationToken: cancellationToken);
+
+        var results = await connection.QueryAsync<AppointmentItemData>(command);
+        return results.ToList();
+    }
+
+    public async ValueTask<bool> DeleteItemAsync(
+        long appointmentId,
+        long itemId,
+        string? itemType = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        var queryBuilder = new System.Text.StringBuilder(@"
+UPDATE `appointment_item`
+SET
+    `status` = 'deleted',
+    `updated_at` = NOW()
+WHERE `appointment_id` = @appointmentId
+  AND `id` = @itemId
+  AND `status` = 'active'");
+
+        if (!string.IsNullOrWhiteSpace(itemType))
+        {
+            queryBuilder.Append(" AND `item_type` = @itemType");
+        }
+
+        var command = new CommandDefinition(
+            queryBuilder.ToString(),
+            new { appointmentId, itemId, itemType },
+            cancellationToken: cancellationToken);
+        return await connection.ExecuteAsync(command) > 0;
+    }
+
     public async ValueTask<int> ExpireOldAsync(DateTime nowUtc, CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
