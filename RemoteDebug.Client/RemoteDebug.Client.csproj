@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\GatewayServer.Abstractions\GatewayServer.Abstractions.csproj" />
     <ProjectReference Include="..\PacketCore\PacketCore.csproj" />
     <ProjectReference Include="..\RemoteDebugServer.Abstractions\RemoteDebugServer.Abstractions.csproj" />
   </ItemGroup>
