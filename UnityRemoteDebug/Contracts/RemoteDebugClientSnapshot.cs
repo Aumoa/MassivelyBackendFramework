@@ -1,11 +1,10 @@
 namespace UnityRemoteDebug.Contracts;
 
 public sealed record RemoteDebugClientSnapshot(
-    Guid ClientId,
+    string ClientId,
     string DisplayName,
-    string ProjectName,
+    string ClientVersion,
     string UnityVersion,
-    string Platform,
-    string RemoteEndPoint,
+    string Capabilities,
     DateTimeOffset ConnectedAt,
     DateTimeOffset LastSeenAt);

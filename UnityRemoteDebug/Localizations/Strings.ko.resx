@@ -64,7 +64,7 @@
     <value>원격 디버그 콘솔</value>
   </data>
   <data name="HOME_SUMMARY" xml:space="preserve">
-    <value>Unity 원격 디버깅 도구를 위한 SSO 기반 프론트엔드 셸입니다. 백엔드 연동은 이후 단계로 남겨둡니다.</value>
+    <value>Gateway route 기반 Backend 관리 요청으로 동작하는 Unity 원격 디버깅 도구용 SSO 프론트엔드입니다.</value>
   </data>
   <data name="HOME_SUMMARY_ARIA" xml:space="preserve">
     <value>Unity RemoteDebug 요약</value>
@@ -103,13 +103,13 @@
     <value>초안</value>
   </data>
   <data name="METRIC_BACKEND_DETAIL" xml:space="preserve">
-    <value>Gateway TCP 연동은 이후 단계에서 진행합니다.</value>
+    <value>{0}, 신뢰된 Gateway 세션 {1}개 경유</value>
   </data>
   <data name="CLIENTS_TITLE" xml:space="preserve">
     <value>연결된 Unity 클라이언트</value>
   </data>
   <data name="CLIENTS_DESCRIPTION" xml:space="preserve">
-    <value>프론트엔드가 Gateway TCP 경로로 연결된 이후 Unity 클라이언트가 여기에 표시됩니다.</value>
+    <value>Gateway route를 통해 RemoteDebug Backend가 보고한 Unity 클라이언트입니다.</value>
   </data>
   <data name="CLIENTS_CONNECTED_FORMAT" xml:space="preserve">
     <value>{0}개 연결됨</value>
@@ -121,7 +121,10 @@
     <value>연결된 클라이언트 없음</value>
   </data>
   <data name="CLIENTS_EMPTY_DESCRIPTION" xml:space="preserve">
-    <value>Gateway 기반 RemoteDebug 클라이언트 탐색은 이후 연동 단계에서 표시됩니다.</value>
+    <value>Backend에 등록된 RemoteDebug 클라이언트 세션이 없습니다.</value>
+  </data>
+  <data name="CLIENTS_ERROR_FORMAT" xml:space="preserve">
+    <value>Gateway를 통해 RemoteDebug Backend를 조회하지 못했습니다: {0}</value>
   </data>
   <data name="CLIENTS_TABLE_CLIENT" xml:space="preserve">
     <value>클라이언트</value>
@@ -129,8 +132,14 @@
   <data name="CLIENTS_TABLE_PROJECT" xml:space="preserve">
     <value>프로젝트</value>
   </data>
+  <data name="CLIENTS_TABLE_VERSION" xml:space="preserve">
+    <value>버전</value>
+  </data>
   <data name="CLIENTS_TABLE_PLATFORM" xml:space="preserve">
     <value>플랫폼</value>
+  </data>
+  <data name="CLIENTS_TABLE_CAPABILITIES" xml:space="preserve">
+    <value>Capability</value>
   </data>
   <data name="CLIENTS_TABLE_UNITY" xml:space="preserve">
     <value>Unity</value>

@@ -14,7 +14,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BlazorSharedComponent\BlazorSharedComponent.csproj" />
+    <ProjectReference Include="..\GatewayServer.Abstractions\GatewayServer.Abstractions.csproj" />
     <ProjectReference Include="..\OpenIDConnect.Core\OpenIDConnect.Core.csproj" />
+    <ProjectReference Include="..\RemoteDebugServer.Abstractions\RemoteDebugServer.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

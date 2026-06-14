@@ -51,7 +51,11 @@ internal class Strings
 
     internal static string CLIENTS_EMPTY_TITLE => GetString(nameof(CLIENTS_EMPTY_TITLE));
 
+    internal static string CLIENTS_ERROR_FORMAT => GetString(nameof(CLIENTS_ERROR_FORMAT));
+
     internal static string CLIENTS_REFRESH => GetString(nameof(CLIENTS_REFRESH));
+
+    internal static string CLIENTS_TABLE_CAPABILITIES => GetString(nameof(CLIENTS_TABLE_CAPABILITIES));
 
     internal static string CLIENTS_TABLE_CLIENT => GetString(nameof(CLIENTS_TABLE_CLIENT));
 
@@ -66,6 +70,8 @@ internal class Strings
     internal static string CLIENTS_TABLE_REMOTE => GetString(nameof(CLIENTS_TABLE_REMOTE));
 
     internal static string CLIENTS_TABLE_UNITY => GetString(nameof(CLIENTS_TABLE_UNITY));
+
+    internal static string CLIENTS_TABLE_VERSION => GetString(nameof(CLIENTS_TABLE_VERSION));
 
     internal static string CLIENTS_TITLE => GetString(nameof(CLIENTS_TITLE));
 

@@ -7,6 +7,7 @@ using StackExchange.Redis;
 using UnityRemoteDebug.Authentication;
 using UnityRemoteDebug.Authorization;
 using UnityRemoteDebug.Components;
+using UnityRemoteDebug.Options;
 using UnityRemoteDebug.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,6 +20,8 @@ builder.Services.AddControllers();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddLocalization(options => options.ResourcesPath = "Localizations");
+builder.Services.Configure<GatewayBackendRouteOptions>(builder.Configuration.GetSection("GatewayBackendRoute"));
+builder.Services.AddSingleton<RemoteDebugGatewayRouteClient>();
 builder.Services.AddSingleton<RemoteDebugClientRegistry>();
 
 var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");

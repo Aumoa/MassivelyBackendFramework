@@ -12,8 +12,8 @@ public sealed class RemoteDebugClientsController(RemoteDebugClientRegistry clien
 {
     [HttpGet]
     [Authorize(Policy = RemoteDebugAuthorizationPolicies.Management)]
-    public RemoteDebugClientListResponse ListClients()
+    public async Task<RemoteDebugClientListResponse> ListClients(CancellationToken cancellationToken)
     {
-        return new RemoteDebugClientListResponse(clientRegistry.GetClients(), DateTimeOffset.UtcNow);
+        return await clientRegistry.GetClientsAsync(cancellationToken);
     }
 }

@@ -64,7 +64,7 @@
     <value>Remote Debug Console</value>
   </data>
   <data name="HOME_SUMMARY" xml:space="preserve">
-    <value>SSO-gated frontend shell for Unity remote debugging tools. Backend integration is intentionally left as a later step.</value>
+    <value>SSO-gated frontend for Unity remote debugging tools, backed by Gateway-routed Backend management requests.</value>
   </data>
   <data name="HOME_SUMMARY_ARIA" xml:space="preserve">
     <value>Unity RemoteDebug summary</value>
@@ -103,13 +103,13 @@
     <value>Draft</value>
   </data>
   <data name="METRIC_BACKEND_DETAIL" xml:space="preserve">
-    <value>Gateway TCP integration is pending.</value>
+    <value>{0} via {1} trusted Gateway session(s).</value>
   </data>
   <data name="CLIENTS_TITLE" xml:space="preserve">
     <value>Connected Unity Clients</value>
   </data>
   <data name="CLIENTS_DESCRIPTION" xml:space="preserve">
-    <value>Unity clients will appear here after the frontend connects through the Gateway TCP path.</value>
+    <value>Unity clients reported by the RemoteDebug Backend through the Gateway route.</value>
   </data>
   <data name="CLIENTS_CONNECTED_FORMAT" xml:space="preserve">
     <value>{0} connected</value>
@@ -121,7 +121,10 @@
     <value>No clients connected</value>
   </data>
   <data name="CLIENTS_EMPTY_DESCRIPTION" xml:space="preserve">
-    <value>Gateway-backed RemoteDebug client discovery will appear here in a later integration step.</value>
+    <value>No RemoteDebug client sessions are registered in the Backend.</value>
+  </data>
+  <data name="CLIENTS_ERROR_FORMAT" xml:space="preserve">
+    <value>Could not query the RemoteDebug Backend through Gateway: {0}</value>
   </data>
   <data name="CLIENTS_TABLE_CLIENT" xml:space="preserve">
     <value>Client</value>
@@ -129,8 +132,14 @@
   <data name="CLIENTS_TABLE_PROJECT" xml:space="preserve">
     <value>Project</value>
   </data>
+  <data name="CLIENTS_TABLE_VERSION" xml:space="preserve">
+    <value>Version</value>
+  </data>
   <data name="CLIENTS_TABLE_PLATFORM" xml:space="preserve">
     <value>Platform</value>
+  </data>
+  <data name="CLIENTS_TABLE_CAPABILITIES" xml:space="preserve">
+    <value>Capabilities</value>
   </data>
   <data name="CLIENTS_TABLE_UNITY" xml:space="preserve">
     <value>Unity</value>
