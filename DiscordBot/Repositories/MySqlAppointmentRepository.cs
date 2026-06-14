@@ -35,10 +35,45 @@ VALUES
         DateTime? fromUtc = null,
         DateTime? toUtc = null,
         bool includePast = false,
+        IReadOnlyList<string>? searchKeywords = null,
         CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
 
+        var normalizedSearchKeywords = NormalizeSearchKeywords(searchKeywords);
+        var query = BuildGetActiveQuery(
+            includePast,
+            fromUtc.HasValue,
+            toUtc.HasValue,
+            normalizedSearchKeywords);
+        var parameters = new DynamicParameters();
+        parameters.Add("channelId", channelId);
+        parameters.Add("guildId", guildId);
+        parameters.Add("nowUtc", nowUtc);
+        parameters.Add("limit", limit);
+        parameters.Add("fromUtc", fromUtc);
+        parameters.Add("toUtc", toUtc);
+        for (var i = 0; i < normalizedSearchKeywords.Count; i++)
+        {
+            parameters.Add($"searchKeyword{i}", $"%{EscapeLikePattern(normalizedSearchKeywords[i])}%");
+        }
+
+        var command = new CommandDefinition(
+            query,
+            parameters,
+            cancellationToken: cancellationToken);
+
+        var results = await connection.QueryAsync<AppointmentData>(command);
+        return results.ToList();
+    }
+
+    internal static string BuildGetActiveQuery(
+        bool includePast,
+        bool hasFromUtc,
+        bool hasToUtc,
+        IReadOnlyList<string>? searchKeywords)
+    {
+        var normalizedSearchKeywords = NormalizeSearchKeywords(searchKeywords);
         var queryBuilder = new System.Text.StringBuilder(@"
 SELECT
     `id` AS Id,
@@ -66,25 +101,49 @@ WHERE `channel_id` = CONVERT(@channelId USING utf8mb4) COLLATE utf8mb4_unicode_c
             queryBuilder.Append(" AND `starts_at_utc` >= @nowUtc");
         }
 
-        if (fromUtc.HasValue)
+        if (hasFromUtc)
         {
             queryBuilder.Append(" AND `starts_at_utc` >= @fromUtc");
         }
 
-        if (toUtc.HasValue)
+        if (hasToUtc)
         {
             queryBuilder.Append(" AND `starts_at_utc` <= @toUtc");
         }
 
+        for (var i = 0; i < normalizedSearchKeywords.Count; i++)
+        {
+            queryBuilder.Append($@"
+  AND (
+      `title` LIKE CONVERT(@searchKeyword{i} USING utf8mb4) COLLATE utf8mb4_unicode_ci ESCAPE '\\'
+      OR `description` LIKE CONVERT(@searchKeyword{i} USING utf8mb4) COLLATE utf8mb4_unicode_ci ESCAPE '\\'
+  )");
+        }
+
         queryBuilder.Append(" ORDER BY `starts_at_utc` ASC LIMIT @limit");
+        return queryBuilder.ToString();
+    }
 
-        var command = new CommandDefinition(
-            queryBuilder.ToString(),
-            new { channelId, guildId, nowUtc, limit, fromUtc, toUtc },
-            cancellationToken: cancellationToken);
+    internal static IReadOnlyList<string> NormalizeSearchKeywords(IReadOnlyList<string>? searchKeywords)
+    {
+        if (searchKeywords is null || searchKeywords.Count == 0)
+        {
+            return [];
+        }
 
-        var results = await connection.QueryAsync<AppointmentData>(command);
-        return results.ToList();
+        return searchKeywords
+            .Where(keyword => !string.IsNullOrWhiteSpace(keyword))
+            .Select(keyword => keyword.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    internal static string EscapeLikePattern(string value)
+    {
+        return value
+            .Replace(@"\", @"\\", StringComparison.Ordinal)
+            .Replace("%", @"\%", StringComparison.Ordinal)
+            .Replace("_", @"\_", StringComparison.Ordinal);
     }
 
     public async ValueTask<AppointmentData?> GetActiveByIdAsync(

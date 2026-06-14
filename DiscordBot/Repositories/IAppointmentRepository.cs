@@ -57,6 +57,7 @@ public interface IAppointmentRepository
         DateTime? fromUtc = null,
         DateTime? toUtc = null,
         bool includePast = false,
+        IReadOnlyList<string>? searchKeywords = null,
         CancellationToken cancellationToken = default);
 
     ValueTask<AppointmentData?> GetActiveByIdAsync(

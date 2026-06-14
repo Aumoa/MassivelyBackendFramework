@@ -1046,7 +1046,7 @@ ID: {id}
             fromUtc,
             toUtc,
             include_past,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         if (appointments.Count == 0)
         {
@@ -1117,20 +1117,18 @@ query에는 약속을 식별할 수 있는 핵심 단어를 넣고, 날짜 단�
         var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
         var channelId = message.Channel.Id.ToString();
         await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
-        var fetchLimit = string.IsNullOrWhiteSpace(query) ? limit : Math.Max(limit * 5, 50);
+        var searchKeywords = SplitSearchKeywords(query);
         var appointments = await appointmentRepository.GetActiveAsync(
             channelId,
             guildId,
             nowUtc,
-            fetchLimit,
+            limit,
             fromUtc,
             toUtc,
             include_past,
+            searchKeywords,
             cancellationToken);
-
-        var candidates = FilterAppointmentsByQuery(appointments, query)
-            .Take(limit)
-            .ToList();
+        var candidates = appointments.ToList();
         if (candidates.Count == 0)
         {
             return "조건에 맞는 약속 후보가 없습니다.";

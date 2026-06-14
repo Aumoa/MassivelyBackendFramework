@@ -229,6 +229,24 @@ Content: 의견입니다.
     }
 
     [Fact]
+    public void BuildGetActiveAppointmentQuery_AppliesSearchBeforeLimit()
+    {
+        var query = MySqlAppointmentRepository.BuildGetActiveQuery(
+            includePast: false,
+            hasFromUtc: false,
+            hasToUtc: false,
+            searchKeywords: ["파티룸"]);
+
+        var searchIndex = query.IndexOf("`title` LIKE CONVERT(@searchKeyword0", StringComparison.Ordinal);
+        var orderIndex = query.IndexOf("ORDER BY `starts_at_utc` ASC", StringComparison.Ordinal);
+        var limitIndex = query.IndexOf("LIMIT @limit", StringComparison.Ordinal);
+
+        Assert.True(searchIndex >= 0);
+        Assert.True(orderIndex > searchIndex);
+        Assert.True(limitIndex > orderIndex);
+    }
+
+    [Fact]
     public void BuildAppointmentCandidateList_IncludesIdsAndResponseRule()
     {
         var appointments = new[]
