@@ -48,8 +48,14 @@ public interface IChatLogRepository
     ValueTask<IReadOnlyList<ChatLogData>> GetAsync(string channelId, int limit, int offset = 0,
         DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken cancellationToken = default);
 
-    ValueTask<IReadOnlyList<ChatLogData>> SearchAsync(string channelId, IReadOnlyList<string> keywords, int limit,
-        DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken cancellationToken = default);
+    ValueTask<IReadOnlyList<ChatLogData>> SearchAsync(
+        string channelId,
+        IReadOnlyList<string> keywords,
+        int limit,
+        DateTimeOffset? from = null,
+        DateTimeOffset? to = null,
+        string? authorUserId = null,
+        CancellationToken cancellationToken = default);
 
     ValueTask<IReadOnlyList<ChatLogData>> GetContextAsync(
         string channelId,

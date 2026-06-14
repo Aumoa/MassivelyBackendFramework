@@ -159,8 +159,14 @@ WHERE `channel_id` = @channelId");
         return results.Reverse().ToList();
     }
 
-    public async ValueTask<IReadOnlyList<ChatLogData>> SearchAsync(string channelId, IReadOnlyList<string> keywords, int limit,
-        DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken cancellationToken = default)
+    public async ValueTask<IReadOnlyList<ChatLogData>> SearchAsync(
+        string channelId,
+        IReadOnlyList<string> keywords,
+        int limit,
+        DateTimeOffset? from = null,
+        DateTimeOffset? to = null,
+        string? authorUserId = null,
+        CancellationToken cancellationToken = default)
     {
         if (keywords.Count == 0)
             return [];
@@ -185,6 +191,8 @@ WHERE `channel_id` = @channelId
             queryBuilder.Append(" AND `created_at` >= @from");
         if (to.HasValue)
             queryBuilder.Append(" AND `created_at` <= @to");
+        if (!string.IsNullOrWhiteSpace(authorUserId))
+            queryBuilder.Append(" AND `user_id` = CONVERT(@authorUserId USING utf8mb4) COLLATE utf8mb4_unicode_ci");
 
         queryBuilder.Append(" ORDER BY MATCH(`content`) AGAINST(@searchQuery IN BOOLEAN MODE) DESC, `created_at` DESC LIMIT @limit");
 
@@ -196,7 +204,8 @@ WHERE `channel_id` = @channelId
                 searchQuery,
                 limit,
                 from = from?.UtcDateTime,
-                to = to?.UtcDateTime
+                to = to?.UtcDateTime,
+                authorUserId
             },
             cancellationToken: cancellationToken);
 

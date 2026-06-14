@@ -32,6 +32,31 @@ internal class DiscordTools(
         (DayOfWeek.Friday, ["금요일", "금욜"]),
         (DayOfWeek.Saturday, ["토요일", "토욜"])
     ];
+    private static readonly (string Keyword, string[] Expansions)[] ChatSearchKeywordExpansions =
+    [
+        ("방탈", ["방탈출"]),
+        ("방탈출", ["방탈"]),
+        ("닭집", ["닭한마리", "닭 한마리"]),
+        ("닭한마리", ["닭 한마리"]),
+        ("닭 한마리", ["닭한마리"]),
+        ("파티룸", ["파티 룸"]),
+        ("파티 룸", ["파티룸"]),
+        ("약속", ["일정", "모임", "예약"]),
+        ("일정", ["약속", "모임", "예약"]),
+        ("모임", ["약속", "일정"]),
+        ("예약", ["약속", "일정"]),
+        ("배포", ["릴리즈", "release"]),
+        ("릴리즈", ["배포", "release"]),
+        ("오류", ["에러", "버그"]),
+        ("에러", ["오류", "버그"]),
+        ("버그", ["오류", "에러"]),
+        ("결정", ["결론"]),
+        ("결론", ["결정"]),
+        ("이미지", ["사진", "그림"]),
+        ("사진", ["이미지", "그림"]),
+        ("문서", ["PDF", "파일"]),
+        ("pdf", ["문서", "파일"])
+    ];
 
     [ToolFunction(
         Name = "get_chat_history",
@@ -82,9 +107,11 @@ internal class DiscordTools(
 
     [ToolFunction(
         Name = "search_chat_history",
-        Description = @"현재 채팅방의 채팅 기록을 키워드로 검색합니다. 사용자 자연어 요청에서 검색에 도움이 될 키워드(동의어, 관련어 포함)를 여러 개 추출하여 콤마로 구분해 전달하세요. 각 키워드는 2글자 이상이어야 하며 OR 검색으로 동작합니다.
+        Description = @"현재 채팅방의 채팅 기록을 키워드로 검색합니다. 사용자 자연어 요청에서 검색에 도움이 될 키워드를 콤마로 구분해 전달하세요. 도구 내부에서 일부 동의어와 띄어쓰기 변형을 가볍게 확장합니다. 각 키워드는 2글자 이상이어야 하며 OR 검색으로 동작합니다.
 
 약속, 결정, 주제처럼 의미가 주변 메시지에 나뉘어 있을 수 있으면 검색 결과의 ChatLogId로 get_chat_context를 호출해 앞뒤 대화를 확인하세요.
+사용자가 '오늘', '어제', '지난주', '최근 일주일'처럼 기간을 말하면 time_preset을 함께 지정하세요.
+사용자가 특정 작성자를 Discord mention 또는 숫자 ID로 지정하면 author_user_id를 함께 지정하세요.
 
 [중요 — 결과 응답 작성 규칙]
 각 결과에는 'Link: https://...' 형식의 메시지 링크가 포함됩니다. 이 URL을 사용자에게 보여주는 답변 본문에 **반드시 그대로(전체 URL을) 복사해서 적어야** Discord가 자동으로 원본 메시지를 인용 카드로 표시합니다.
@@ -104,8 +131,14 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         string? from_date = null,
         [ToolParameterInfo(Description = "조회 종료 날짜/시간 (지정된 timezone 기준, 예: 2026-04-09T23:59:59). 미지정 시 제한 없음")]
         string? to_date = null,
+        [ToolParameterInfo(Description = "자주 쓰는 기간 preset. none, today, yesterday, last_7_days, this_week, last_week, this_month 중 하나. from_date/to_date가 비어 있을 때만 보완합니다.")]
+        string time_preset = "none",
         [ToolParameterInfo(Description = "IANA 타임존 ID (예: Asia/Seoul, America/New_York). 기본값: UTC")]
         string? timezone = null,
+        [ToolParameterInfo(Description = "특정 작성자의 메시지만 검색할 때 사용하는 Discord 사용자 숫자 ID 또는 mention. 없으면 빈 문자열.")]
+        string author_user_id = "",
+        [ToolParameterInfo(Description = "검색 결과가 답장 메시지일 때 같은 채널의 참조 원문을 함께 표시할지 여부. 기본 true.")]
+        bool include_references = true,
         CancellationToken cancellationToken = default)
     {
         if (limit > 50) limit = 50;
@@ -116,35 +149,69 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
 
         DateTimeOffset? from = !string.IsNullOrEmpty(from_date) ? ParseInTimeZone(from_date, utcOffset) : null;
         DateTimeOffset? to = !string.IsNullOrEmpty(to_date) ? ParseInTimeZone(to_date, utcOffset) : null;
+        if (!TryApplyChatSearchTimePreset(time_preset, tz, DateTime.UtcNow, ref from, ref to, out var presetError))
+        {
+            return presetError;
+        }
 
-        var validKeywords = (keywords ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(k => k.Length >= 2)
-            .ToList();
+        var authorUserId = NormalizeDiscordUserId(author_user_id);
+        if (!string.IsNullOrWhiteSpace(author_user_id) && authorUserId == null)
+        {
+            return "author_user_id는 Discord 사용자 숫자 ID 또는 mention 형식이어야 합니다. 예: 123456789012345678 또는 <@123456789012345678>";
+        }
+
+        var validKeywords = NormalizeChatSearchKeywords(keywords);
         if (validKeywords.Count == 0)
             return "검색에 사용할 2글자 이상의 키워드가 필요합니다.";
 
         var channelId = message.Channel.Id.ToString();
-        var logs = await chatLogRepository.SearchAsync(channelId, validKeywords, limit, from, to, cancellationToken);
+        var logs = await chatLogRepository.SearchAsync(
+            channelId,
+            validKeywords,
+            limit,
+            from,
+            to,
+            authorUserId,
+            cancellationToken);
 
         if (logs.Count == 0)
             return "검색 결과가 없습니다.";
 
         var selfId = selfUser.Id.ToString();
-        List<string> lines = [$"검색 키워드: {string.Join(", ", validKeywords)}", $"결과 {logs.Count}건:", ""];
+        List<string> lines = [$"검색 키워드: {string.Join(", ", validKeywords)}"];
+        if (!string.IsNullOrWhiteSpace(time_preset) && !string.Equals(time_preset, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            lines.Add($"기간 preset: {NormalizeChatSearchTimePreset(time_preset)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(authorUserId))
+        {
+            lines.Add($"작성자 필터: {authorUserId}");
+        }
+
+        lines.Add($"참조 원문 포함: {(include_references ? "예" : "아니오")}");
+        lines.Add($"결과 {logs.Count}건:");
+        lines.Add("");
 
         int index = 1;
         foreach (var log in logs)
         {
-            var localTime = TimeZoneInfo.ConvertTimeFromUtc(log.CreatedAt, tz);
-            var author = log.UserId == selfId ? "나의 응답" : $"사용자 {log.UserId}의 메시지";
-            var reference = BuildMessageReference(log);
-            lines.Add($"--- 결과 #{index} ---");
-            lines.Add($"ChatLogId: {log.Id}");
-            lines.Add($"Time: {localTime:yyyy-MM-dd HH:mm:ss}");
-            lines.Add($"Author: {author}");
-            lines.Add($"Link: {reference}");
-            lines.Add($"Content: {log.Content}");
+            ChatLogData? referencedLog = null;
+            if (include_references && !string.IsNullOrWhiteSpace(log.ReferencedMessageId))
+            {
+                var referencedChannelId = string.IsNullOrWhiteSpace(log.ReferencedChannelId)
+                    ? log.ChannelId
+                    : log.ReferencedChannelId;
+                if (string.Equals(referencedChannelId, channelId, StringComparison.Ordinal))
+                {
+                    referencedLog = await chatLogRepository.GetByMessageIdAsync(
+                        channelId,
+                        log.ReferencedMessageId,
+                        cancellationToken);
+                }
+            }
+
+            lines.Add(BuildChatSearchResultDetails(index, log, referencedLog, tz, selfId));
             lines.Add("");
             index++;
         }
@@ -205,7 +272,13 @@ topic이 있으면 현재 채팅방에서 주제 키워드를 검색하고, 검�
         else
         {
             var searchLimit = Math.Min(limit, MaxDiscussionSearchResults);
-            var searchResults = await chatLogRepository.SearchAsync(channelId, keywords, searchLimit, from, to, cancellationToken);
+            var searchResults = await chatLogRepository.SearchAsync(
+                channelId,
+                keywords,
+                searchLimit,
+                from,
+                to,
+                cancellationToken: cancellationToken);
             logs = context_each_side == 0
                 ? OrderDiscussionLogs(searchResults).Take(limit).ToList()
                 : await LoadDiscussionSearchContextsAsync(
@@ -399,6 +472,41 @@ message_id_or_url에는 Discord 메시지 ID, 메시지 URL, 또는 사용자가
     {
         var guildPart = string.IsNullOrEmpty(guildId) ? "@me" : guildId;
         return $"https://discord.com/channels/{guildPart}/{channelId}/{messageId}";
+    }
+
+    internal static string BuildChatSearchResultDetails(
+        int index,
+        ChatLogData log,
+        ChatLogData? referencedLog,
+        TimeZoneInfo timezone,
+        string selfUserId)
+    {
+        var localTime = TimeZoneInfo.ConvertTimeFromUtc(log.CreatedAt, timezone);
+        List<string> lines =
+        [
+            $"--- 결과 #{index} ---",
+            $"ChatLogId: {log.Id}",
+            $"Time: {localTime:yyyy-MM-dd HH:mm:ss}",
+            $"Author: {FormatAuthor(log, selfUserId)}",
+            $"Link: {BuildMessageReference(log)}"
+        ];
+
+        if (!string.IsNullOrWhiteSpace(log.ReferencedMessageId))
+        {
+            var referencedChannelId = string.IsNullOrWhiteSpace(log.ReferencedChannelId)
+                ? log.ChannelId
+                : log.ReferencedChannelId;
+            lines.Add($"ReplyTo: {BuildMessageReference(log.ReferencedGuildId, referencedChannelId, log.ReferencedMessageId)}");
+        }
+
+        if (referencedLog != null)
+        {
+            lines.Add($"ReferencedAuthor: {FormatAuthor(referencedLog, selfUserId)}");
+            lines.Add($"ReferencedContent: {referencedLog.Content}");
+        }
+
+        lines.Add($"Content: {log.Content}");
+        return string.Join("\n", lines);
     }
 
     internal static DiscordMessageReferenceTarget? ParseMessageReferenceTarget(string? messageIdOrUrl)
@@ -1357,6 +1465,170 @@ ID: {note.Id}
         var tz = ResolveTimeZone(timezone);
         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
         return Task.FromResult($"{now:yyyy-MM-dd HH:mm:ss} ({tz.Id})");
+    }
+
+    internal static IReadOnlyList<string> NormalizeChatSearchKeywords(string? keywords)
+    {
+        List<string> normalized = [];
+
+        void AddKeyword(string? keyword)
+        {
+            var value = (keyword ?? string.Empty).Trim();
+            if (value.Length < 2)
+            {
+                return;
+            }
+
+            if (!normalized.Contains(value, StringComparer.OrdinalIgnoreCase))
+            {
+                normalized.Add(value);
+            }
+        }
+
+        foreach (var rawKeyword in (keywords ?? string.Empty)
+            .Split([',', '，', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            AddKeyword(rawKeyword);
+            foreach (var token in rawKeyword.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                AddKeyword(token);
+            }
+        }
+
+        for (var i = 0; i < normalized.Count; i++)
+        {
+            var keyword = normalized[i];
+            var compactKeyword = RemoveSearchKeywordSpaces(keyword);
+            foreach (var (source, expansions) in ChatSearchKeywordExpansions)
+            {
+                if (!string.Equals(keyword, source, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(compactKeyword, RemoveSearchKeywordSpaces(source), StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                foreach (var expansion in expansions)
+                {
+                    AddKeyword(expansion);
+                }
+            }
+        }
+
+        return normalized;
+    }
+
+    internal static string? NormalizeDiscordUserId(string? userIdOrMention)
+    {
+        if (string.IsNullOrWhiteSpace(userIdOrMention))
+        {
+            return null;
+        }
+
+        var value = userIdOrMention.Trim();
+        if (value.StartsWith("<@", StringComparison.Ordinal) && value.EndsWith('>'))
+        {
+            value = value[2..^1];
+            if (value.StartsWith('!'))
+            {
+                value = value[1..];
+            }
+        }
+
+        return value.All(char.IsDigit) ? value : null;
+    }
+
+    internal static string NormalizeChatSearchTimePreset(string? preset)
+    {
+        var value = (preset ?? string.Empty)
+            .Trim()
+            .ToLowerInvariant()
+            .Replace("-", "_", StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal)
+            .Replace("\t", string.Empty, StringComparison.Ordinal);
+        return value switch
+        {
+            "" or "none" or "off" or "없음" => "none",
+            "today" or "오늘" => "today",
+            "yesterday" or "어제" => "yesterday",
+            "last7days" or "last_7_days" or "최근7일" or "최근_7일" or "최근일주일" => "last_7_days",
+            "thisweek" or "this_week" or "이번주" => "this_week",
+            "lastweek" or "last_week" or "지난주" => "last_week",
+            "thismonth" or "this_month" or "이번달" or "이번_달" => "this_month",
+            _ => value
+        };
+    }
+
+    internal static bool TryApplyChatSearchTimePreset(
+        string? preset,
+        TimeZoneInfo timezone,
+        DateTime nowUtc,
+        ref DateTimeOffset? from,
+        ref DateTimeOffset? to,
+        out string error)
+    {
+        error = string.Empty;
+        var normalizedPreset = NormalizeChatSearchTimePreset(preset);
+        if (normalizedPreset == "none")
+        {
+            return true;
+        }
+
+        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(EnsureUtc(nowUtc), timezone);
+        var todayStart = nowLocal.Date;
+        DateTime fromLocal;
+        DateTime toLocal;
+        switch (normalizedPreset)
+        {
+            case "today":
+                fromLocal = todayStart;
+                toLocal = nowLocal;
+                break;
+            case "yesterday":
+                fromLocal = todayStart.AddDays(-1);
+                toLocal = todayStart.AddTicks(-1);
+                break;
+            case "last_7_days":
+                fromLocal = nowLocal.AddDays(-7);
+                toLocal = nowLocal;
+                break;
+            case "this_week":
+                fromLocal = todayStart.AddDays(-GetDaysSinceMonday(nowLocal.DayOfWeek));
+                toLocal = nowLocal;
+                break;
+            case "last_week":
+                var thisWeekStart = todayStart.AddDays(-GetDaysSinceMonday(nowLocal.DayOfWeek));
+                fromLocal = thisWeekStart.AddDays(-7);
+                toLocal = thisWeekStart.AddTicks(-1);
+                break;
+            case "this_month":
+                fromLocal = new DateTime(nowLocal.Year, nowLocal.Month, 1);
+                toLocal = nowLocal;
+                break;
+            default:
+                error = "time_preset은 none, today, yesterday, last_7_days, this_week, last_week, this_month 중 하나여야 합니다.";
+                return false;
+        }
+
+        from ??= ToDateTimeOffsetInTimeZone(fromLocal, timezone);
+        to ??= ToDateTimeOffsetInTimeZone(toLocal, timezone);
+        return true;
+    }
+
+    private static string RemoveSearchKeywordSpaces(string value)
+    {
+        return value.Replace(" ", string.Empty, StringComparison.Ordinal)
+            .Replace("\t", string.Empty, StringComparison.Ordinal);
+    }
+
+    private static int GetDaysSinceMonday(DayOfWeek dayOfWeek)
+    {
+        return ((int)dayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+    }
+
+    private static DateTimeOffset ToDateTimeOffsetInTimeZone(DateTime localDateTime, TimeZoneInfo timezone)
+    {
+        var unspecified = DateTime.SpecifyKind(localDateTime, DateTimeKind.Unspecified);
+        return new DateTimeOffset(unspecified, timezone.GetUtcOffset(unspecified));
     }
 
     internal static IReadOnlyList<AppointmentData> FilterAppointmentsByQuery(

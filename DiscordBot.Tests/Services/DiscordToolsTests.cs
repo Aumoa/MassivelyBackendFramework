@@ -83,6 +83,86 @@ Content: 의견입니다.
     }
 
     [Fact]
+    public void BuildChatSearchResultDetails_IncludesReferencedContent()
+    {
+        var parent = CreateLog(id: 1, messageId: "111", content: "원 의견");
+        var target = CreateLog(
+            id: 2,
+            messageId: "222",
+            content: "답장 의견",
+            referencedMessageId: "111",
+            referencedChannelId: "222",
+            referencedGuildId: "999");
+
+        var result = DiscordTools.BuildChatSearchResultDetails(
+            1,
+            target,
+            parent,
+            TimeZoneInfo.Utc,
+            "bot");
+
+        Assert.Contains("--- 결과 #1 ---", result);
+        Assert.Contains("ReplyTo: https://discord.com/channels/999/222/111", result);
+        Assert.Contains("ReferencedContent: 원 의견", result);
+        Assert.Contains("Content: 답장 의견", result);
+    }
+
+    [Fact]
+    public void NormalizeChatSearchKeywords_ExpandsLightweightSynonyms()
+    {
+        var keywords = DiscordTools.NormalizeChatSearchKeywords("닭집, 배포");
+
+        Assert.Contains("닭집", keywords);
+        Assert.Contains("닭한마리", keywords);
+        Assert.Contains("닭 한마리", keywords);
+        Assert.Contains("배포", keywords);
+        Assert.Contains("릴리즈", keywords);
+        Assert.Contains("release", keywords);
+    }
+
+    [Theory]
+    [InlineData("<@1234567890>", "1234567890")]
+    [InlineData("<@!1234567890>", "1234567890")]
+    [InlineData("1234567890", "1234567890")]
+    [InlineData("user-name", null)]
+    public void NormalizeDiscordUserId_ParsesMentionsAndIds(string value, string? expected)
+    {
+        var userId = DiscordTools.NormalizeDiscordUserId(value);
+
+        Assert.Equal(expected, userId);
+    }
+
+    [Fact]
+    public void TryApplyChatSearchTimePreset_FillsLastSevenDays()
+    {
+        DateTimeOffset? from = null;
+        DateTimeOffset? to = null;
+
+        var ok = DiscordTools.TryApplyChatSearchTimePreset(
+            "last_7_days",
+            TimeZoneInfo.Utc,
+            new DateTime(2026, 6, 14, 12, 0, 0, DateTimeKind.Utc),
+            ref from,
+            ref to,
+            out var error);
+
+        Assert.True(ok, error);
+        Assert.Equal(new DateTimeOffset(2026, 6, 7, 12, 0, 0, TimeSpan.Zero), from);
+        Assert.Equal(new DateTimeOffset(2026, 6, 14, 12, 0, 0, TimeSpan.Zero), to);
+    }
+
+    [Theory]
+    [InlineData("최근 일주일", "last_7_days")]
+    [InlineData("last-7-days", "last_7_days")]
+    [InlineData("이번 주", "this_week")]
+    public void NormalizeChatSearchTimePreset_MapsCommonForms(string value, string expected)
+    {
+        var preset = DiscordTools.NormalizeChatSearchTimePreset(value);
+
+        Assert.Equal(expected, preset);
+    }
+
+    [Fact]
     public void NormalizeDiscussionKeywords_IncludesWholeTopicAndTokens()
     {
         var keywords = DiscordTools.NormalizeDiscussionKeywords(" 디스코드 봇, 배포 ");
