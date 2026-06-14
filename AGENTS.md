@@ -99,7 +99,7 @@
 - If the working tree already contains unrelated changes, isolate only Codex-made changes in the commit.
 - If a clean feature-sized commit is not possible, stop and explain why.
 - Do not amend commits unless the user explicitly requests an amend; create a follow-up commit instead when prior commits may already be shared.
-- For commits intended to participate in a GitHub App-authenticated isolated work-branch workflow, follow `.codex/skills/github-app-credential-policy/SKILL.md` before creating the commit identity.
+- For commits on isolated work branches intended to participate in a GitHub App-authenticated or bot-authored pull request workflow, use the broker-provided App identity by default unless the user explicitly directs using an ordinary user account; follow `.codex/skills/github-app-credential-policy/SKILL.md` before creating the commit identity.
 
 ## Commit Message Format
 

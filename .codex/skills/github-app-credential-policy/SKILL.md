@@ -9,7 +9,7 @@ description: Choose credentials for GitHub commit-adjacent and online operations
 
 Use this skill before choosing credentials for GitHub operations, including push, remote branch publication, pull request creation or updates, author-side PR responses, remote validation, or other online state changes.
 
-Local `git commit` does not require GitHub credentials. Apply this policy when a commit is about to be pushed, associated with a pull request, or otherwise used in a remote GitHub workflow.
+Local `git commit` does not require GitHub credentials by itself. Apply this policy when a commit is about to be pushed, associated with a pull request, or otherwise used in a remote GitHub workflow.
 
 ## Branch Classes
 
@@ -49,12 +49,14 @@ Local `git commit` does not require GitHub credentials. Apply this policy when a
 
 ## App Commit Identity
 
-- For new commits on isolated work branches that will use the GitHub App for the related remote workflow, prefer the broker-provided App identity for the commit author and committer.
+- For new commits on isolated work branches that will be pushed, associated with a pull request, or otherwise used in a GitHub App-authenticated or bot-authored remote workflow, require the broker-provided App identity for the commit author and committer by default.
+- If the user explicitly directs using an ordinary user account for a specific commit or workflow, that user instruction overrides the default App identity requirement for that scope.
 - Resolve identity with `CodexWorker.GitHubAuth.Client identity` and the broker secret file. The broker should be configured with an `AppIdentityCachePath`; use the cached identity first and let the broker call GitHub only when the cache is missing or invalid.
 - Store the `codex-worker-aumoa` identity cache under the user-relative GitHub Auth secret/cache directory, using the same shell-appropriate home directory syntax as the broker secret path. Docker deployments should mount the user-relative directory into the container and configure the container path consistently.
 - Use the returned `gitUserName` and `gitUserEmail` with per-command git config, for example `git -c user.name=... -c user.email=... commit ...`.
 - Do not rewrite existing commits solely to change author identity unless the user asks for that rewrite.
-- If the broker identity endpoint is unavailable, keep the normal local git identity rather than inventing a bot email.
+- If the broker identity endpoint is unavailable, stop before creating the commit and report the blocker unless the user explicitly authorizes using the normal local git identity for that commit.
+- Do not silently fall back to an ordinary user identity, and do not invent a bot email.
 
 ## Approval Rules
 
