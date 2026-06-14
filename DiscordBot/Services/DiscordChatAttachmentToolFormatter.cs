@@ -136,6 +136,28 @@ internal static partial class DiscordChatAttachmentToolFormatter
         return match.Success ? match.Groups["messageId"].Value : null;
     }
 
+    public static IReadOnlyList<string> ExtractMessageIds(string? messageIdsOrUrls)
+    {
+        if (string.IsNullOrWhiteSpace(messageIdsOrUrls))
+        {
+            return [];
+        }
+
+        List<string> messageIds = [];
+        foreach (var token in messageIdsOrUrls
+            .Split([',', ' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var messageId = ExtractMessageId(token);
+            if (!string.IsNullOrWhiteSpace(messageId)
+                && !messageIds.Contains(messageId, StringComparer.Ordinal))
+            {
+                messageIds.Add(messageId);
+            }
+        }
+
+        return messageIds;
+    }
+
     public static TimeZoneInfo ResolveTimeZone(string? timezone)
     {
         if (string.IsNullOrWhiteSpace(timezone))

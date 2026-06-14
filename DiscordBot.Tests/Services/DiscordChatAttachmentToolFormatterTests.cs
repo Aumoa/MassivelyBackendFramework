@@ -19,6 +19,15 @@ public sealed class DiscordChatAttachmentToolFormatterTests
     }
 
     [Fact]
+    public void ExtractMessageIds_ParsesMultipleIdsAndUrls()
+    {
+        var messageIds = DiscordChatAttachmentToolFormatter.ExtractMessageIds(
+            "123, https://discord.com/channels/111/222/333\n123 not-a-message https://discordapp.com/channels/@me/222/444");
+
+        Assert.Equal(["123", "333", "444"], messageIds);
+    }
+
+    [Fact]
     public void BuildMessageReference_UsesGuildWhenAvailable()
     {
         var attachment = CreateAttachment(guildId: "111", channelId: "222", messageId: "333");

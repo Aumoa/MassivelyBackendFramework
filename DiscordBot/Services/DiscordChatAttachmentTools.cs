@@ -11,6 +11,7 @@ internal class DiscordChatAttachmentTools(
 {
     private const int DefaultMaxCharacters = 24_000;
     private const int MaxCharactersLimit = 60_000;
+    private const int MaxBatchAttachmentCount = 4;
 
     [ToolFunction(
         Name = "load_chat_attachment",
@@ -52,6 +53,59 @@ target 값:
 
         logger.LogInformation(
             "Loaded {Count} chat attachments from target {Target} for tool call.",
+            attachments.Count,
+            normalizedTarget);
+
+        max_characters = Math.Clamp(max_characters, 1_000, MaxCharactersLimit);
+        return ToolExecutionResult.FromText(DiscordChatAttachmentToolFormatter.BuildAttachmentDetails(attachments, max_characters));
+    }
+
+    [ToolFunction(
+        Name = "load_chat_attachments",
+        Description = @"현재 메시지에 직접 첨부되지 않은 과거 채팅 문서 여러 개가 필요할 때 호출합니다.
+
+사용자가 '지난번 PDF랑 이번 PDF 차이 봐줘', '위 문서 두 개 비교해줘', '최근 올린 문서들 요약해줘'처럼 여러 과거 문서를 비교하거나 함께 읽어야 할 때 사용하세요.
+비용 관리를 위해 한 번에 최대 4개 문서만 로드하고, 추출 텍스트 총 글자 수도 제한합니다.
+
+target 값:
+- latest: 현재 채널에서 이 메시지보다 전에 올라온 최근 문서들을 가져옵니다.
+- replied: 사용자가 답글을 단 원본 메시지의 문서들을 가져옵니다.
+- message_ids: message_ids 파라미터로 지정한 여러 Discord 메시지의 문서들을 가져옵니다. Discord 메시지 URL을 줄바꿈 또는 콤마로 나열해도 됩니다.
+
+현재 사용자의 메시지에 문서가 직접 첨부되어 있다면 이미 AI 입력에 포함되어 있으므로, 과거 문서가 추가로 필요할 때만 호출하세요.")]
+    public async Task<ToolExecutionResult> LoadChatAttachmentsAsync(
+        [ToolParameterInfo(Description = "문서를 찾는 방식입니다. latest, replied, message_ids 중 하나를 사용하세요. 기본값은 latest입니다.")]
+        string target = "latest",
+        [ToolParameterInfo(Description = "target이 message_ids일 때 사용할 Discord 메시지 ID 또는 메시지 URL 목록입니다. 콤마/공백/줄바꿈으로 구분할 수 있습니다.")]
+        string message_ids = "",
+        [ToolParameterInfo(Description = "가져올 최대 문서 수입니다. 1~4, 기본 2입니다.")]
+        int limit = 2,
+        [ToolParameterInfo(Description = "응답에 포함할 추출 텍스트 총 최대 글자 수입니다. 기본 36000, 최대 60000입니다.")]
+        int max_characters = 36_000,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 1, MaxBatchAttachmentCount);
+        var normalizedTarget = string.IsNullOrWhiteSpace(target)
+            ? "latest"
+            : target.Trim().ToLowerInvariant();
+        var channelId = message.Channel.Id.ToString();
+
+        IReadOnlyList<ChatAttachmentData> attachments = normalizedTarget switch
+        {
+            "replied" => await LoadRepliedAttachmentsAsync(channelId, cancellationToken),
+            "message_id" => await LoadMessageAttachmentsAsync(channelId, message_ids, limit, cancellationToken),
+            "message_ids" => await LoadMessageAttachmentsAsync(channelId, message_ids, limit, cancellationToken),
+            _ => await chatAttachmentRepository.GetLatestAsync(channelId, message.Timestamp, limit, cancellationToken)
+        };
+
+        attachments = attachments.Take(limit).ToList();
+        if (attachments.Count == 0)
+        {
+            return ToolExecutionResult.FromText("조건에 맞는 과거 채팅 문서를 찾지 못했습니다.");
+        }
+
+        logger.LogInformation(
+            "Loaded {Count} chat attachments from target {Target} for batch tool call.",
             attachments.Count,
             normalizedTarget);
 
@@ -149,5 +203,20 @@ target 값:
         }
 
         return await chatAttachmentRepository.GetByMessageIdAsync(channelId, messageId, cancellationToken);
+    }
+
+    private async ValueTask<IReadOnlyList<ChatAttachmentData>> LoadMessageAttachmentsAsync(
+        string channelId,
+        string messageIdsOrUrls,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var messageIds = DiscordChatAttachmentToolFormatter.ExtractMessageIds(messageIdsOrUrls);
+        if (messageIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await chatAttachmentRepository.GetByMessageIdsAsync(channelId, messageIds, limit, cancellationToken);
     }
 }

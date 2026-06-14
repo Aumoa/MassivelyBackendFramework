@@ -96,6 +96,9 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
         var processedImages = await ProcessImageAttachmentsAsync(message, scope.ServiceProvider);
         var processedAttachments = await ProcessDocumentAttachmentsAsync(message, scope.ServiceProvider);
+        var referencedMessageId = GetReferencedMessageId(message);
+        var referencedChannelId = GetReferencedChannelId(message);
+        var referencedGuildId = GetReferencedGuildId(message);
         await SaveChatLogAsync(
             message.Id.ToString(),
             guildId,
@@ -103,7 +106,10 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             message.Author.Id.ToString(),
             content,
             processedImages.Select(image => image.StoredImage).ToList(),
-            processedAttachments.Select(attachment => attachment.StoredAttachment).ToList());
+            processedAttachments.Select(attachment => attachment.StoredAttachment).ToList(),
+            referencedMessageId,
+            referencedChannelId,
+            referencedGuildId);
 
         if (!isMentioned)
         {
@@ -134,7 +140,8 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         var chatImageRepository = scope.ServiceProvider.GetRequiredService<IChatImageRepository>();
         var chatAttachmentRepository = scope.ServiceProvider.GetRequiredService<IChatAttachmentRepository>();
         var appointmentRepository = scope.ServiceProvider.GetRequiredService<IAppointmentRepository>();
-        var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository, appointmentRepository);
+        var channelNoteRepository = scope.ServiceProvider.GetRequiredService<IChannelNoteRepository>();
+        var discordTools = new DiscordTools(m_Socket.CurrentUser, message, chatLogRepository, appointmentRepository, channelNoteRepository);
         var imageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordImageTools>>();
         var chatImageToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatImageTools>>();
         var chatAttachmentToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatAttachmentTools>>();
@@ -164,9 +171,19 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         IDisposable? typingState = message.Channel.EnterTypingState();
         string thinkingTicker = "";
         List<string> toolNames = [];
+        bool shouldSeparateNextAssistantContent = false;
         try
         {
             var promptContent = DiscordMessageAttachmentPlanner.BuildPromptContent(message.Content, processedAttachments);
+            var referencedChatLog = await GetReferencedChatLogAsync(
+                message,
+                chatLogRepository,
+                channelId);
+            promptContent = BuildPromptContentWithReferencedMessage(
+                promptContent,
+                referencedChatLog,
+                m_Socket.CurrentUser.Id.ToString());
+
             var prompt = isChessMode
                 ? BuildChessModePrompt(chessGameService, message, promptContent)
                 : isOthelloMode
@@ -176,11 +193,15 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             await foreach (var responseMessage in channel.AddAsync(message.Author, prompt, toolsProvider, imageData))
             {
                 totalReasoning += responseMessage.Thinking;
-                totalMessage += responseMessage.Content;
+                totalMessage = AppendResponseContent(
+                    totalMessage,
+                    responseMessage.Content,
+                    ref shouldSeparateNextAssistantContent);
 
                 if (!string.IsNullOrEmpty(responseMessage.ToolName))
                 {
                     toolNames.Add(responseMessage.ToolName);
+                    shouldSeparateNextAssistantContent = !string.IsNullOrWhiteSpace(totalMessage);
                 }
 
                 if (logger.IsEnabled(LogLevel.Debug))
@@ -300,6 +321,52 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
         const string suffix = "\n\n...(응답이 길어 이어서 생성 중입니다.)";
         return content[..(DiscordSafeMessageLength - suffix.Length)].TrimEnd() + suffix;
+    }
+
+    internal static string AppendResponseContent(
+        string currentMessage,
+        string content,
+        ref bool shouldSeparateBeforeContent)
+    {
+        if (string.IsNullOrEmpty(content))
+        {
+            return currentMessage;
+        }
+
+        if (shouldSeparateBeforeContent && !string.IsNullOrWhiteSpace(currentMessage))
+        {
+            shouldSeparateBeforeContent = false;
+            return currentMessage.TrimEnd('\r', '\n') + "\n\n" + content.TrimStart('\r', '\n');
+        }
+
+        shouldSeparateBeforeContent = false;
+        return currentMessage + content;
+    }
+
+    internal static string BuildPromptContentWithReferencedMessage(
+        string promptContent,
+        ChatLogData? referencedChatLog,
+        string selfUserId)
+    {
+        if (referencedChatLog == null)
+        {
+            return promptContent;
+        }
+
+        var author = referencedChatLog.UserId == selfUserId
+            ? "봇의 이전 응답"
+            : $"사용자 {referencedChatLog.UserId}의 메시지";
+
+        return $"""
+[사용자가 답장으로 참조한 메시지]
+작성자: {author}
+MessageId: {referencedChatLog.MessageId ?? "(unknown)"}
+내용:
+{referencedChatLog.Content}
+
+[사용자 메시지]
+{promptContent}
+""";
     }
 
     private static async Task<RestUserMessage?> SendDiscordResponseAsync(ISocketMessageChannel channel, string content)
@@ -505,6 +572,47 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         return normalizedPath;
     }
 
+    private static async ValueTask<ChatLogData?> GetReferencedChatLogAsync(
+        SocketMessage message,
+        IChatLogRepository chatLogRepository,
+        string currentChannelId)
+    {
+        var referencedMessageId = GetReferencedMessageId(message);
+        if (string.IsNullOrWhiteSpace(referencedMessageId))
+        {
+            return null;
+        }
+
+        var referencedChannelId = GetReferencedChannelId(message) ?? currentChannelId;
+        if (!string.Equals(referencedChannelId, currentChannelId, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        return await chatLogRepository.GetByMessageIdAsync(
+            currentChannelId,
+            referencedMessageId);
+    }
+
+    private static string? GetReferencedMessageId(SocketMessage message)
+    {
+        return message.Reference?.MessageId.IsSpecified == true
+            ? message.Reference.MessageId.Value.ToString()
+            : null;
+    }
+
+    private static string? GetReferencedChannelId(SocketMessage message)
+    {
+        return message.Reference?.ChannelId.ToString();
+    }
+
+    private static string? GetReferencedGuildId(SocketMessage message)
+    {
+        return message.Reference?.GuildId.IsSpecified == true
+            ? message.Reference.GuildId.Value.ToString()
+            : null;
+    }
+
     private Task OnLog(LogMessage message)
     {
         if (logger.IsEnabled(LogLevel.Trace))
@@ -521,13 +629,26 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         string userId,
         string content,
         IReadOnlyList<ChatLogImageInput>? images = null,
-        IReadOnlyList<ChatLogAttachmentInput>? attachments = null)
+        IReadOnlyList<ChatLogAttachmentInput>? attachments = null,
+        string? referencedMessageId = null,
+        string? referencedChannelId = null,
+        string? referencedGuildId = null)
     {
         try
         {
             using var scope = scopeFactory.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
-            await repository.AddAsync(messageId, guildId, channelId, userId, content, images, attachments);
+            await repository.AddAsync(
+                messageId,
+                guildId,
+                channelId,
+                userId,
+                content,
+                images,
+                attachments,
+                referencedMessageId,
+                referencedChannelId,
+                referencedGuildId);
         }
         catch (Exception e)
         {

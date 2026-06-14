@@ -6,10 +6,27 @@ using DiscordBot.Repositories;
 
 namespace DiscordBot.Services;
 
-internal class DiscordTools(SocketSelfUser selfUser, SocketMessage message, IChatLogRepository chatLogRepository, IAppointmentRepository appointmentRepository)
+internal class DiscordTools(
+    SocketSelfUser selfUser,
+    SocketMessage message,
+    IChatLogRepository chatLogRepository,
+    IAppointmentRepository appointmentRepository,
+    IChannelNoteRepository channelNoteRepository)
 {
     private const int DefaultAppointmentRetentionDays = 30;
     private const int MaxAppointmentRetentionDays = 365;
+    private const int MaxAppointmentDetailsLength = 12_000;
+    private const int MaxAppointmentItemLength = 1_000;
+    private const int MaxAppointmentItemsPerCall = 20;
+    private const string AppointmentItemTypePlan = "plan";
+    private const string AppointmentItemTypeSuggestion = "suggestion";
+    private const int MaxChannelNoteTitleLength = 256;
+    private const int MaxChannelNoteContentLength = 4000;
+    private const int MaxChannelNoteTagsLength = 512;
+    private const int MaxReplyContextReplies = 50;
+    private const int MaxDiscussionSummaryMessages = 100;
+    private const int MaxDiscussionSearchResults = 50;
+    private const int MaxDiscussionContextEachSide = 5;
     private static readonly (DayOfWeek Day, string[] Aliases)[] KoreanDayOfWeekAliases =
     [
         (DayOfWeek.Sunday, ["일요일", "일욜"]),
@@ -19,6 +36,31 @@ internal class DiscordTools(SocketSelfUser selfUser, SocketMessage message, ICha
         (DayOfWeek.Thursday, ["목요일", "목욜"]),
         (DayOfWeek.Friday, ["금요일", "금욜"]),
         (DayOfWeek.Saturday, ["토요일", "토욜"])
+    ];
+    private static readonly (string Keyword, string[] Expansions)[] ChatSearchKeywordExpansions =
+    [
+        ("방탈", ["방탈출"]),
+        ("방탈출", ["방탈"]),
+        ("닭집", ["닭한마리", "닭 한마리"]),
+        ("닭한마리", ["닭 한마리"]),
+        ("닭 한마리", ["닭한마리"]),
+        ("파티룸", ["파티 룸"]),
+        ("파티 룸", ["파티룸"]),
+        ("약속", ["일정", "모임", "예약"]),
+        ("일정", ["약속", "모임", "예약"]),
+        ("모임", ["약속", "일정"]),
+        ("예약", ["약속", "일정"]),
+        ("배포", ["릴리즈", "release"]),
+        ("릴리즈", ["배포", "release"]),
+        ("오류", ["에러", "버그"]),
+        ("에러", ["오류", "버그"]),
+        ("버그", ["오류", "에러"]),
+        ("결정", ["결론"]),
+        ("결론", ["결정"]),
+        ("이미지", ["사진", "그림"]),
+        ("사진", ["이미지", "그림"]),
+        ("문서", ["PDF", "파일"]),
+        ("pdf", ["문서", "파일"])
     ];
 
     [ToolFunction(
@@ -70,9 +112,11 @@ internal class DiscordTools(SocketSelfUser selfUser, SocketMessage message, ICha
 
     [ToolFunction(
         Name = "search_chat_history",
-        Description = @"현재 채팅방의 채팅 기록을 키워드로 검색합니다. 사용자 자연어 요청에서 검색에 도움이 될 키워드(동의어, 관련어 포함)를 여러 개 추출하여 콤마로 구분해 전달하세요. 각 키워드는 2글자 이상이어야 하며 OR 검색으로 동작합니다.
+        Description = @"현재 채팅방의 채팅 기록을 키워드로 검색합니다. 사용자 자연어 요청에서 검색에 도움이 될 키워드를 콤마로 구분해 전달하세요. 도구 내부에서 일부 동의어와 띄어쓰기 변형을 가볍게 확장합니다. 각 키워드는 2글자 이상이어야 하며 OR 검색으로 동작합니다.
 
 약속, 결정, 주제처럼 의미가 주변 메시지에 나뉘어 있을 수 있으면 검색 결과의 ChatLogId로 get_chat_context를 호출해 앞뒤 대화를 확인하세요.
+사용자가 '오늘', '어제', '지난주', '최근 일주일'처럼 기간을 말하면 time_preset을 함께 지정하세요.
+사용자가 특정 작성자를 Discord mention 또는 숫자 ID로 지정하면 author_user_id를 함께 지정하세요.
 
 [중요 — 결과 응답 작성 규칙]
 각 결과에는 'Link: https://...' 형식의 메시지 링크가 포함됩니다. 이 URL을 사용자에게 보여주는 답변 본문에 **반드시 그대로(전체 URL을) 복사해서 적어야** Discord가 자동으로 원본 메시지를 인용 카드로 표시합니다.
@@ -92,8 +136,14 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         string? from_date = null,
         [ToolParameterInfo(Description = "조회 종료 날짜/시간 (지정된 timezone 기준, 예: 2026-04-09T23:59:59). 미지정 시 제한 없음")]
         string? to_date = null,
+        [ToolParameterInfo(Description = "자주 쓰는 기간 preset. none, today, yesterday, last_7_days, this_week, last_week, this_month 중 하나. from_date/to_date가 비어 있을 때만 보완합니다.")]
+        string time_preset = "none",
         [ToolParameterInfo(Description = "IANA 타임존 ID (예: Asia/Seoul, America/New_York). 기본값: UTC")]
         string? timezone = null,
+        [ToolParameterInfo(Description = "특정 작성자의 메시지만 검색할 때 사용하는 Discord 사용자 숫자 ID 또는 mention. 없으면 빈 문자열.")]
+        string author_user_id = "",
+        [ToolParameterInfo(Description = "검색 결과가 답장 메시지일 때 같은 채널의 참조 원문을 함께 표시할지 여부. 기본 true.")]
+        bool include_references = true,
         CancellationToken cancellationToken = default)
     {
         if (limit > 50) limit = 50;
@@ -104,40 +154,261 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
 
         DateTimeOffset? from = !string.IsNullOrEmpty(from_date) ? ParseInTimeZone(from_date, utcOffset) : null;
         DateTimeOffset? to = !string.IsNullOrEmpty(to_date) ? ParseInTimeZone(to_date, utcOffset) : null;
+        if (!TryApplyChatSearchTimePreset(time_preset, tz, DateTime.UtcNow, ref from, ref to, out var presetError))
+        {
+            return presetError;
+        }
 
-        var validKeywords = (keywords ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(k => k.Length >= 2)
-            .ToList();
+        var authorUserId = NormalizeDiscordUserId(author_user_id);
+        if (!string.IsNullOrWhiteSpace(author_user_id) && authorUserId == null)
+        {
+            return "author_user_id는 Discord 사용자 숫자 ID 또는 mention 형식이어야 합니다. 예: 123456789012345678 또는 <@123456789012345678>";
+        }
+
+        var validKeywords = NormalizeChatSearchKeywords(keywords);
         if (validKeywords.Count == 0)
             return "검색에 사용할 2글자 이상의 키워드가 필요합니다.";
 
         var channelId = message.Channel.Id.ToString();
-        var logs = await chatLogRepository.SearchAsync(channelId, validKeywords, limit, from, to, cancellationToken);
+        var logs = await chatLogRepository.SearchAsync(
+            channelId,
+            validKeywords,
+            limit,
+            from,
+            to,
+            authorUserId,
+            cancellationToken);
 
         if (logs.Count == 0)
             return "검색 결과가 없습니다.";
 
         var selfId = selfUser.Id.ToString();
-        List<string> lines = [$"검색 키워드: {string.Join(", ", validKeywords)}", $"결과 {logs.Count}건:", ""];
+        List<string> lines = [$"검색 키워드: {string.Join(", ", validKeywords)}"];
+        if (!string.IsNullOrWhiteSpace(time_preset) && !string.Equals(time_preset, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            lines.Add($"기간 preset: {NormalizeChatSearchTimePreset(time_preset)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(authorUserId))
+        {
+            lines.Add($"작성자 필터: {authorUserId}");
+        }
+
+        lines.Add($"참조 원문 포함: {(include_references ? "예" : "아니오")}");
+        lines.Add($"결과 {logs.Count}건:");
+        lines.Add("");
 
         int index = 1;
         foreach (var log in logs)
         {
-            var localTime = TimeZoneInfo.ConvertTimeFromUtc(log.CreatedAt, tz);
-            var author = log.UserId == selfId ? "나의 응답" : $"사용자 {log.UserId}의 메시지";
-            var reference = BuildMessageReference(log);
-            lines.Add($"--- 결과 #{index} ---");
-            lines.Add($"ChatLogId: {log.Id}");
-            lines.Add($"Time: {localTime:yyyy-MM-dd HH:mm:ss}");
-            lines.Add($"Author: {author}");
-            lines.Add($"Link: {reference}");
-            lines.Add($"Content: {log.Content}");
+            ChatLogData? referencedLog = null;
+            if (include_references && !string.IsNullOrWhiteSpace(log.ReferencedMessageId))
+            {
+                var referencedChannelId = string.IsNullOrWhiteSpace(log.ReferencedChannelId)
+                    ? log.ChannelId
+                    : log.ReferencedChannelId;
+                if (string.Equals(referencedChannelId, channelId, StringComparison.Ordinal))
+                {
+                    referencedLog = await chatLogRepository.GetByMessageIdAsync(
+                        channelId,
+                        log.ReferencedMessageId,
+                        cancellationToken);
+                }
+            }
+
+            lines.Add(BuildChatSearchResultDetails(index, log, referencedLog, tz, selfId));
             lines.Add("");
             index++;
         }
 
         return string.Join("\n", lines);
+    }
+
+    [ToolFunction(
+        Name = "summarize_recent_discussion",
+        Description = """
+현재 채팅방의 최근 대화나 특정 주제 대화를 요약하기 위한 발췌를 준비합니다.
+사용자가 '어제 얘기 요약해줘', '방탈출 얘기 결론 뭐였어?', '오늘 나온 액션아이템만 정리해줘', '최근 배포 관련 대화 정리해줘'처럼 요청할 때 사용하세요.
+
+topic이 비어 있으면 날짜 범위와 limit 기준으로 최근 대화를 가져옵니다.
+topic이 있으면 현재 채팅방에서 주제 키워드를 검색하고, 검색된 메시지 주변 맥락을 함께 가져옵니다.
+이 도구는 최종 요약문을 저장하지 않으며 현재 채널에서 저장된 대화만 조회합니다.
+""")]
+    public async Task<string> SummarizeRecentDiscussionAsync(
+        [ToolParameterInfo(Description = "요약할 주제입니다. 비워두면 최근/기간 대화를 요약합니다. 예: 방탈출, 배포, 디스코드 봇")]
+        string topic = "",
+        [ToolParameterInfo(Description = "요약 모드입니다. summary, decisions, action_items, timeline, open_questions 중 하나입니다. 기본 summary.")]
+        string mode = "summary",
+        [ToolParameterInfo(Description = "요약에 사용할 최대 메시지 수입니다. 1~100, 기본 80.")]
+        int limit = 80,
+        [ToolParameterInfo(Description = "조회 시작 날짜/시간 (timezone 기준, 예: 2026-06-13T00:00:00). 미지정 시 제한 없음.")]
+        string? from_date = null,
+        [ToolParameterInfo(Description = "조회 종료 날짜/시간 (timezone 기준, 예: 2026-06-14T00:00:00). 미지정 시 제한 없음.")]
+        string? to_date = null,
+        [ToolParameterInfo(Description = "IANA 타임존 ID입니다. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
+        string timezone = "Asia/Seoul",
+        [ToolParameterInfo(Description = "원본 Discord 메시지 링크를 발췌에 포함할지 여부입니다. 기본 true.")]
+        bool include_links = true,
+        [ToolParameterInfo(Description = "topic 검색 결과마다 앞뒤로 포함할 메시지 수입니다. 0~5, 기본 2.")]
+        int context_each_side = 2,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 1, MaxDiscussionSummaryMessages);
+        context_each_side = Math.Clamp(context_each_side, 0, MaxDiscussionContextEachSide);
+
+        var tz = ResolveTimeZone(string.IsNullOrWhiteSpace(timezone) ? "Asia/Seoul" : timezone);
+        var utcOffset = tz.BaseUtcOffset;
+        DateTimeOffset? from = !string.IsNullOrWhiteSpace(from_date) ? ParseInTimeZone(from_date, utcOffset) : null;
+        DateTimeOffset? to = !string.IsNullOrWhiteSpace(to_date) ? ParseInTimeZone(to_date, utcOffset) : null;
+
+        var channelId = message.Channel.Id.ToString();
+        var selfId = selfUser.Id.ToString();
+        var normalizedMode = NormalizeDiscussionMode(mode);
+        var keywords = NormalizeDiscussionKeywords(topic);
+        var source = keywords.Count == 0
+            ? "recent"
+            : "topic_search";
+
+        IReadOnlyList<ChatLogData> logs;
+        if (keywords.Count == 0)
+        {
+            logs = await chatLogRepository.GetAsync(channelId, limit, 0, from, to, cancellationToken);
+        }
+        else
+        {
+            var searchLimit = Math.Min(limit, MaxDiscussionSearchResults);
+            var searchResults = await chatLogRepository.SearchAsync(
+                channelId,
+                keywords,
+                searchLimit,
+                from,
+                to,
+                cancellationToken: cancellationToken);
+            logs = context_each_side == 0
+                ? OrderDiscussionLogs(searchResults).Take(limit).ToList()
+                : await LoadDiscussionSearchContextsAsync(
+                    channelId,
+                    searchResults,
+                    context_each_side,
+                    limit,
+                    cancellationToken);
+        }
+
+        if (logs.Count == 0)
+        {
+            return "요약할 대화를 현재 채팅방의 저장된 채팅 기록에서 찾지 못했습니다.";
+        }
+
+        return BuildDiscussionSummaryInput(
+            channelId,
+            topic,
+            normalizedMode,
+            limit,
+            from,
+            to,
+            tz,
+            keywords,
+            logs,
+            include_links,
+            source,
+            context_each_side,
+            selfId);
+    }
+
+    [ToolFunction(
+        Name = "get_chat_by_message_id",
+        Description = """
+현재 채팅방에서 Discord 메시지 ID 또는 메시지 URL로 저장된 채팅 로그 하나를 직접 조회합니다.
+사용자가 Discord 메시지 링크를 붙여넣거나, 특정 메시지 ID를 말하며 그 내용을 확인/분석/참조해 달라고 할 때 사용하세요.
+이 도구는 현재 채팅방의 메시지만 조회합니다. 다른 채널 URL은 거부됩니다.
+""")]
+    public async Task<string> GetChatByMessageIdAsync(
+        [ToolParameterInfo(Description = "조회할 Discord 메시지 ID 또는 메시지 URL입니다.")]
+        string message_id_or_url,
+        [ToolParameterInfo(Description = "IANA 타임존 ID (예: Asia/Seoul, America/New_York). 기본값은 UTC입니다.")]
+        string? timezone = null,
+        CancellationToken cancellationToken = default)
+    {
+        var target = ResolveMessageReferenceTarget(message_id_or_url);
+        if (target == null)
+        {
+            return "조회할 Discord 메시지 ID 또는 메시지 URL이 필요합니다.";
+        }
+
+        var currentChannelId = message.Channel.Id.ToString();
+        if (!IsCurrentChannelTarget(target, currentChannelId))
+        {
+            return "현재 채팅방의 메시지만 조회할 수 있습니다.";
+        }
+
+        var log = await chatLogRepository.GetByMessageIdAsync(currentChannelId, target.MessageId, cancellationToken);
+        if (log == null)
+        {
+            return "해당 메시지를 현재 채팅방의 저장된 채팅 기록에서 찾지 못했습니다.";
+        }
+
+        var tz = ResolveTimeZone(timezone);
+        var details = BuildChatLogDetails(log, tz, selfUser.Id.ToString(), "메시지 조회 결과:");
+        return details + "\n\n응답 규칙: 사용자의 질문에 필요한 내용만 간결하게 답하고, 원본 URL이 필요하면 Link 값을 그대로 적으세요.";
+    }
+
+    [ToolFunction(
+        Name = "get_reply_thread_context",
+        Description = """
+현재 채팅방에서 특정 메시지의 답장 흐름을 조회합니다. 메시지가 답장한 부모 메시지와, 해당 메시지에 직접 달린 답장들을 함께 보여줍니다.
+사용자가 Discord 답장 흐름, 의견에 대한 후속 반응, 특정 메시지의 전후 논의 맥락을 묻거나 메시지 URL을 주며 '이 흐름을 봐줘'라고 할 때 사용하세요.
+message_id_or_url에는 Discord 메시지 ID, 메시지 URL, 또는 사용자가 현재 답장으로 참조한 메시지를 뜻하는 replied를 넣을 수 있습니다.
+이 도구는 현재 채팅방의 메시지만 조회합니다.
+""")]
+    public async Task<string> GetReplyThreadContextAsync(
+        [ToolParameterInfo(Description = "조회할 Discord 메시지 ID, 메시지 URL, 또는 현재 사용자 메시지가 답장으로 참조한 메시지를 뜻하는 replied입니다.")]
+        string message_id_or_url = "replied",
+        [ToolParameterInfo(Description = "가져올 직접 답장 수입니다. 0~50, 기본 20입니다.")]
+        int reply_limit = 20,
+        [ToolParameterInfo(Description = "IANA 타임존 ID (예: Asia/Seoul, America/New_York). 기본값은 UTC입니다.")]
+        string? timezone = null,
+        CancellationToken cancellationToken = default)
+    {
+        var target = ResolveMessageReferenceTarget(message_id_or_url);
+        if (target == null)
+        {
+            return "조회할 Discord 메시지 ID, 메시지 URL, 또는 현재 답장 참조가 필요합니다.";
+        }
+
+        var currentChannelId = message.Channel.Id.ToString();
+        if (!IsCurrentChannelTarget(target, currentChannelId))
+        {
+            return "현재 채팅방의 메시지만 조회할 수 있습니다.";
+        }
+
+        var targetLog = await chatLogRepository.GetByMessageIdAsync(currentChannelId, target.MessageId, cancellationToken);
+        if (targetLog == null)
+        {
+            return "해당 메시지를 현재 채팅방의 저장된 채팅 기록에서 찾지 못했습니다.";
+        }
+
+        ChatLogData? parentLog = null;
+        if (!string.IsNullOrWhiteSpace(targetLog.ReferencedMessageId)
+            && (string.IsNullOrWhiteSpace(targetLog.ReferencedChannelId)
+                || string.Equals(targetLog.ReferencedChannelId, currentChannelId, StringComparison.Ordinal)))
+        {
+            parentLog = await chatLogRepository.GetByMessageIdAsync(
+                currentChannelId,
+                targetLog.ReferencedMessageId,
+                cancellationToken);
+        }
+
+        var replyLimit = Math.Clamp(reply_limit, 0, MaxReplyContextReplies);
+        var replies = targetLog.MessageId == null || replyLimit == 0
+            ? []
+            : await chatLogRepository.GetRepliesAsync(
+                currentChannelId,
+                targetLog.MessageId,
+                replyLimit,
+                cancellationToken);
+
+        var tz = ResolveTimeZone(timezone);
+        return BuildReplyThreadContext(targetLog, parentLog, replies, tz, selfUser.Id.ToString());
     }
 
     [ToolFunction(
@@ -199,9 +470,419 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         if (string.IsNullOrEmpty(log.MessageId))
             return "(메시지가 오래되어 참조할 수 없어요)";
 
-        var guildPart = string.IsNullOrEmpty(log.GuildId) ? "@me" : log.GuildId;
-        return $"https://discord.com/channels/{guildPart}/{log.ChannelId}/{log.MessageId}";
+        return BuildMessageReference(log.GuildId, log.ChannelId, log.MessageId);
     }
+
+    internal static string BuildMessageReference(string? guildId, string channelId, string messageId)
+    {
+        var guildPart = string.IsNullOrEmpty(guildId) ? "@me" : guildId;
+        return $"https://discord.com/channels/{guildPart}/{channelId}/{messageId}";
+    }
+
+    internal static string BuildChatSearchResultDetails(
+        int index,
+        ChatLogData log,
+        ChatLogData? referencedLog,
+        TimeZoneInfo timezone,
+        string selfUserId)
+    {
+        var localTime = TimeZoneInfo.ConvertTimeFromUtc(log.CreatedAt, timezone);
+        List<string> lines =
+        [
+            $"--- 결과 #{index} ---",
+            $"ChatLogId: {log.Id}",
+            $"Time: {localTime:yyyy-MM-dd HH:mm:ss}",
+            $"Author: {FormatAuthor(log, selfUserId)}",
+            $"Link: {BuildMessageReference(log)}"
+        ];
+
+        if (!string.IsNullOrWhiteSpace(log.ReferencedMessageId))
+        {
+            var referencedChannelId = string.IsNullOrWhiteSpace(log.ReferencedChannelId)
+                ? log.ChannelId
+                : log.ReferencedChannelId;
+            lines.Add($"ReplyTo: {BuildMessageReference(log.ReferencedGuildId, referencedChannelId, log.ReferencedMessageId)}");
+        }
+
+        if (referencedLog != null)
+        {
+            lines.Add($"ReferencedAuthor: {FormatAuthor(referencedLog, selfUserId)}");
+            lines.Add($"ReferencedContent: {referencedLog.Content}");
+        }
+
+        lines.Add($"Content: {log.Content}");
+        return string.Join("\n", lines);
+    }
+
+    internal static DiscordMessageReferenceTarget? ParseMessageReferenceTarget(string? messageIdOrUrl)
+    {
+        if (string.IsNullOrWhiteSpace(messageIdOrUrl))
+        {
+            return null;
+        }
+
+        var trimmed = messageIdOrUrl.Trim();
+        if (trimmed.All(char.IsDigit))
+        {
+            return new DiscordMessageReferenceTarget(trimmed, null, null);
+        }
+
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            || !IsDiscordHost(uri.Host))
+        {
+            return null;
+        }
+
+        var segments = uri.AbsolutePath
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(Uri.UnescapeDataString)
+            .ToArray();
+
+        if (segments.Length < 4
+            || !string.Equals(segments[0], "channels", StringComparison.OrdinalIgnoreCase)
+            || (!string.Equals(segments[1], "@me", StringComparison.OrdinalIgnoreCase) && !segments[1].All(char.IsDigit))
+            || !segments[2].All(char.IsDigit)
+            || !segments[3].All(char.IsDigit))
+        {
+            return null;
+        }
+
+        var guildId = string.Equals(segments[1], "@me", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : segments[1];
+        return new DiscordMessageReferenceTarget(segments[3], segments[2], guildId);
+    }
+
+    internal static string BuildChatLogDetails(
+        ChatLogData log,
+        TimeZoneInfo timezone,
+        string selfUserId,
+        string? heading = null)
+    {
+        var localTime = TimeZoneInfo.ConvertTimeFromUtc(log.CreatedAt, timezone);
+        List<string> lines = [];
+        if (!string.IsNullOrWhiteSpace(heading))
+        {
+            lines.Add(heading);
+        }
+
+        lines.Add($"ChatLogId: {log.Id}");
+        lines.Add($"Time: {localTime:yyyy-MM-dd HH:mm:ss}");
+        lines.Add($"Author: {FormatAuthor(log, selfUserId)}");
+        lines.Add($"Link: {BuildMessageReference(log)}");
+        if (!string.IsNullOrWhiteSpace(log.ReferencedMessageId))
+        {
+            var referencedChannelId = string.IsNullOrWhiteSpace(log.ReferencedChannelId)
+                ? log.ChannelId
+                : log.ReferencedChannelId;
+            lines.Add($"ReplyTo: {BuildMessageReference(log.ReferencedGuildId, referencedChannelId, log.ReferencedMessageId)}");
+        }
+
+        lines.Add($"Content: {log.Content}");
+        return string.Join("\n", lines);
+    }
+
+    internal static string BuildReplyThreadContext(
+        ChatLogData target,
+        ChatLogData? parent,
+        IReadOnlyList<ChatLogData> replies,
+        TimeZoneInfo timezone,
+        string selfUserId)
+    {
+        List<string> lines = ["답장 흐름 조회 결과:"];
+
+        lines.Add("");
+        lines.Add(parent == null
+            ? "상위 참조 메시지: 저장된 현재 채팅방 로그에서 찾지 못했습니다."
+            : BuildChatLogDetails(parent, timezone, selfUserId, "상위 참조 메시지:"));
+
+        lines.Add("");
+        lines.Add(BuildChatLogDetails(target, timezone, selfUserId, "대상 메시지:"));
+
+        lines.Add("");
+        lines.Add($"직접 답장 {replies.Count}건:");
+        foreach (var reply in replies)
+        {
+            lines.Add("");
+            lines.Add(BuildChatLogDetails(reply, timezone, selfUserId));
+        }
+
+        lines.Add("");
+        lines.Add("응답 규칙: 답장 흐름을 바탕으로 사용자의 질문에 필요한 맥락만 간결하게 정리하세요. 원본 URL이 필요하면 Link 값을 그대로 적으세요.");
+        return string.Join("\n", lines);
+    }
+
+    internal static IReadOnlyList<string> NormalizeDiscussionKeywords(string? topic)
+    {
+        var normalized = (topic ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return [];
+        }
+
+        List<string> keywords = [];
+        if (normalized.Length >= 2)
+        {
+            keywords.Add(normalized);
+        }
+
+        foreach (var keyword in normalized.Split(
+                     [',', ';', '\r', '\n', '\t', ' '],
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (keyword.Length >= 2)
+            {
+                keywords.Add(keyword);
+            }
+        }
+
+        return keywords
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    internal static string NormalizeDiscussionMode(string? mode)
+    {
+        return (mode ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "decision" or "decisions" => "decisions",
+            "action" or "actions" or "action_item" or "action_items" => "action_items",
+            "timeline" => "timeline",
+            "question" or "questions" or "open_question" or "open_questions" => "open_questions",
+            _ => "summary"
+        };
+    }
+
+    internal static string BuildDiscussionSummaryInput(
+        string channelId,
+        string? topic,
+        string mode,
+        int limit,
+        DateTimeOffset? from,
+        DateTimeOffset? to,
+        TimeZoneInfo timezone,
+        IReadOnlyList<string> keywords,
+        IReadOnlyList<ChatLogData> logs,
+        bool includeLinks,
+        string source,
+        int contextEachSide,
+        string selfUserId)
+    {
+        List<string> lines =
+        [
+            "요약 대상:",
+            $"- 채널: 현재 채널 ({channelId})",
+            $"- 조회 방식: {FormatDiscussionSource(source)}",
+            $"- 요약 모드: {FormatDiscussionMode(mode)}",
+            $"- 주제: {NormalizeOptionalDisplay(topic)}",
+            $"- 키워드: {(keywords.Count == 0 ? "없음" : string.Join(", ", keywords))}",
+            $"- 범위: {FormatDiscussionRange(from, to, timezone)}",
+            $"- 메시지 수: {logs.Count}개 (최대 {limit}개)",
+            $"- 검색 주변 맥락: {(keywords.Count == 0 ? "해당 없음" : $"앞뒤 {contextEachSide}개")}",
+            "",
+            "[대화 발췌]"
+        ];
+
+        for (int i = 0; i < logs.Count; i++)
+        {
+            lines.Add("");
+            lines.Add($"--- 메시지 #{i + 1} ---");
+            lines.Add(BuildDiscussionLogExcerpt(logs[i], timezone, selfUserId, includeLinks));
+        }
+
+        lines.Add("");
+        lines.Add("[응답 규칙]");
+        lines.AddRange(BuildDiscussionModeRules(mode, includeLinks));
+        return string.Join("\n", lines);
+    }
+
+    private async ValueTask<IReadOnlyList<ChatLogData>> LoadDiscussionSearchContextsAsync(
+        string channelId,
+        IReadOnlyList<ChatLogData> searchResults,
+        int contextEachSide,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<long, ChatLogData> logs = [];
+        foreach (var result in searchResults)
+        {
+            var context = await chatLogRepository.GetContextAsync(
+                channelId,
+                result.Id,
+                contextEachSide,
+                contextEachSide,
+                cancellationToken);
+            foreach (var log in context)
+            {
+                logs.TryAdd(log.Id, log);
+            }
+        }
+
+        return OrderDiscussionLogs(logs.Values)
+            .Take(limit)
+            .ToList();
+    }
+
+    private static IOrderedEnumerable<ChatLogData> OrderDiscussionLogs(IEnumerable<ChatLogData> logs)
+    {
+        return logs
+            .OrderBy(log => log.CreatedAt)
+            .ThenBy(log => log.Id);
+    }
+
+    private static string BuildDiscussionLogExcerpt(
+        ChatLogData log,
+        TimeZoneInfo timezone,
+        string selfUserId,
+        bool includeLinks)
+    {
+        var localTime = TimeZoneInfo.ConvertTimeFromUtc(log.CreatedAt, timezone);
+        List<string> lines =
+        [
+            $"ChatLogId: {log.Id}",
+            $"Time: {localTime:yyyy-MM-dd HH:mm:ss}",
+            $"Author: {FormatAuthor(log, selfUserId)}"
+        ];
+
+        if (includeLinks)
+        {
+            lines.Add($"Link: {BuildMessageReference(log)}");
+            if (!string.IsNullOrWhiteSpace(log.ReferencedMessageId))
+            {
+                var referencedChannelId = string.IsNullOrWhiteSpace(log.ReferencedChannelId)
+                    ? log.ChannelId
+                    : log.ReferencedChannelId;
+                lines.Add($"ReplyTo: {BuildMessageReference(log.ReferencedGuildId, referencedChannelId, log.ReferencedMessageId)}");
+            }
+        }
+
+        lines.Add($"Content: {log.Content}");
+        return string.Join("\n", lines);
+    }
+
+    private static IEnumerable<string> BuildDiscussionModeRules(string mode, bool includeLinks)
+    {
+        yield return "- 제공된 [대화 발췌]만 근거로 삼고, 발췌에 없는 내용은 확정하지 마세요.";
+        yield return "- 먼저 3~6줄의 핵심 요약을 작성하세요.";
+
+        switch (mode)
+        {
+            case "decisions":
+                yield return "- 결정된 사항과 아직 결정되지 않은 사항을 분리하세요.";
+                yield return "- 결정 근거가 약하면 '명확히 결정되지 않음'으로 표시하세요.";
+                break;
+            case "action_items":
+                yield return "- 액션아이템은 담당자, 할 일, 기한이 발췌에서 확인될 때만 적으세요.";
+                yield return "- 담당자나 기한이 불명확하면 '미정'으로 표시하고 임의로 만들지 마세요.";
+                break;
+            case "timeline":
+                yield return "- 중요한 흐름을 시간순으로 정리하세요.";
+                yield return "- 중복 메시지는 합쳐서 설명하고, 방향이 바뀐 지점을 표시하세요.";
+                break;
+            case "open_questions":
+                yield return "- 아직 답이 없거나 추가 확인이 필요한 질문만 추려 주세요.";
+                yield return "- 이미 결론이 난 질문은 제외하거나 결론과 함께 짧게 표시하세요.";
+                break;
+            default:
+                yield return "- 결정사항, 액션아이템, 미해결 질문이 보이면 짧은 별도 목록으로 덧붙이세요.";
+                break;
+        }
+
+        yield return includeLinks
+            ? "- 근거가 중요한 항목에는 Link URL을 그대로 포함하세요."
+            : "- 원본 링크는 생략하고 내용 중심으로 정리하세요.";
+    }
+
+    private static string FormatDiscussionSource(string source)
+    {
+        return source == "topic_search"
+            ? "주제 검색 + 주변 맥락"
+            : "최근/기간 대화";
+    }
+
+    private static string FormatDiscussionMode(string mode)
+    {
+        return mode switch
+        {
+            "decisions" => "결정사항",
+            "action_items" => "액션아이템",
+            "timeline" => "타임라인",
+            "open_questions" => "미해결 질문",
+            _ => "일반 요약"
+        };
+    }
+
+    private static string FormatDiscussionRange(DateTimeOffset? from, DateTimeOffset? to, TimeZoneInfo timezone)
+    {
+        var fromText = from.HasValue
+            ? FormatDiscussionDateTime(from.Value, timezone)
+            : "제한 없음";
+        var toText = to.HasValue
+            ? FormatDiscussionDateTime(to.Value, timezone)
+            : "제한 없음";
+        return $"{fromText} ~ {toText} ({timezone.Id})";
+    }
+
+    private static string FormatDiscussionDateTime(DateTimeOffset value, TimeZoneInfo timezone)
+    {
+        return TimeZoneInfo.ConvertTime(value, timezone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+    }
+
+    private static string NormalizeOptionalDisplay(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "없음" : value.Trim();
+    }
+
+    private DiscordMessageReferenceTarget? ResolveMessageReferenceTarget(string? messageIdOrUrl)
+    {
+        if (string.IsNullOrWhiteSpace(messageIdOrUrl)
+            || string.Equals(messageIdOrUrl.Trim(), "replied", StringComparison.OrdinalIgnoreCase))
+        {
+            return ResolveCurrentReplyTarget();
+        }
+
+        return ParseMessageReferenceTarget(messageIdOrUrl);
+    }
+
+    private DiscordMessageReferenceTarget? ResolveCurrentReplyTarget()
+    {
+        var messageId = message.Reference?.MessageId.IsSpecified == true
+            ? message.Reference.MessageId.Value.ToString()
+            : null;
+        if (string.IsNullOrWhiteSpace(messageId))
+        {
+            return null;
+        }
+
+        var channelId = message.Reference?.ChannelId.ToString();
+        var guildId = message.Reference?.GuildId.IsSpecified == true
+            ? message.Reference.GuildId.Value.ToString()
+            : null;
+        return new DiscordMessageReferenceTarget(messageId, channelId, guildId);
+    }
+
+    private static bool IsCurrentChannelTarget(DiscordMessageReferenceTarget target, string currentChannelId)
+    {
+        return string.IsNullOrWhiteSpace(target.ChannelId)
+            || string.Equals(target.ChannelId, currentChannelId, StringComparison.Ordinal);
+    }
+
+    private static string FormatAuthor(ChatLogData log, string selfUserId)
+    {
+        return log.UserId == selfUserId
+            ? "나의 응답"
+            : $"사용자 {log.UserId}의 메시지";
+    }
+
+    private static bool IsDiscordHost(string host)
+    {
+        return string.Equals(host, "discord.com", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "www.discord.com", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "discordapp.com", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "www.discordapp.com", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal sealed record DiscordMessageReferenceTarget(string MessageId, string? ChannelId, string? GuildId);
 
     [ToolFunction(
         Name = "remember_appointment",
@@ -219,6 +900,8 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
 - 약속 저장은 현재 채널 공유용입니다. 같은 채널의 사용자는 이 약속을 조회, 수정, 삭제할 수 있습니다. 다른 채널에서는 보이지 않습니다.
 - user_id는 만든 사람 기록으로만 저장됩니다. guild_id, channel_id, user_id는 프로그램이 현재 메시지에서 자동으로 고정합니다.
 - 저장된 약속에는 원본 Discord 메시지 링크가 함께 보존됩니다. 조회 응답에는 해당 링크를 그대로 보여주세요.
+- 상세 내용, 플랜, 제안은 모두 선택 사항입니다. 사용자가 말했거나 대화에서 충분히 확인된 경우에만 저장하고, 없다고 해서 사용자에게 입력을 요구하지 마세요.
+- 플랜/제안은 약속 저장 후 add_appointment_items로 별도 저장할 수 있습니다. 약속 저장 자체에는 필요하지 않습니다.
 - 지난 약속은 기본적으로 약속 시간 30일 뒤 자동으로 잊어버립니다.
 """)]
     public async Task<string> RememberAppointmentAsync(
@@ -232,7 +915,7 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         bool has_time = true,
         [ToolParameterInfo(Description = "IANA 타임존 ID. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
         string timezone = "Asia/Seoul",
-        [ToolParameterInfo(Description = "약속에 대한 추가 설명. 없으면 빈 문자열.")]
+        [ToolParameterInfo(Description = "약속에 대한 선택 상세 내용. 커밋 메시지 본문처럼 디테일을 정리합니다. 없으면 빈 문자열. 상세가 없다는 이유로 사용자에게 추가 입력을 요구하지 마세요.")]
         string description = "",
         [ToolParameterInfo(Description = "약속 근거가 된 과거 메시지의 ChatLogId. search_chat_history/get_chat_context로 찾은 경우에만 지정하고, 없으면 0.")]
         int source_chat_log_id = 0,
@@ -293,7 +976,7 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
             message.Author.Id.ToString(),
             sourceMessageId,
             normalizedTitle,
-            NormalizeNullable(description, 2048),
+            NormalizeNullable(description, MaxAppointmentDetailsLength),
             startsAtUtc,
             effectiveHasTime,
             tz.Id,
@@ -363,7 +1046,7 @@ ID: {id}
             fromUtc,
             toUtc,
             include_past,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         if (appointments.Count == 0)
         {
@@ -382,21 +1065,83 @@ ID: {id}
             lines.Add($"일시: {startText}");
             if (!string.IsNullOrWhiteSpace(appointment.Description))
             {
-                lines.Add($"설명: {appointment.Description}");
+                lines.Add($"상세: {appointment.Description}");
             }
             lines.Add($"원본: {reference}");
         }
 
         lines.Add("");
-        lines.Add("응답 규칙: 현재 채널의 공유 약속 중 사용자에게 필요한 약속만 간결하게 정리하세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요. 삭제가 필요하면 ID를 기준으로 forget_appointment를 사용할 수 있습니다.");
+        lines.Add("응답 규칙: 현재 채널의 공유 약속 중 사용자에게 필요한 약속만 간결하게 정리하세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요. 상세/플랜/제안은 선택 사항이므로, 사용자가 요청하거나 답변에 필요할 때만 get_appointment_details를 사용하세요. 수정/삭제할 약속 ID가 불분명하면 find_appointments로 후보를 먼저 좁히세요.");
         return string.Join("\n", lines);
+    }
+
+    [ToolFunction(
+        Name = "find_appointments",
+        Description = """
+현재 채널에 저장된 공유 약속 중 수정/삭제/상세 확인 대상이 될 후보를 찾습니다.
+사용자가 '닭한마리 약속 지워줘', '파티룸 약속 시간 바꿔줘'처럼 자연어로 특정 약속을 가리키지만 ID를 말하지 않았으면 update_appointment나 forget_appointment를 호출하기 전에 이 도구로 후보를 먼저 조회하세요.
+
+조회 범위는 현재 Discord 채널로 제한됩니다. 다른 채널이나 다른 서버의 약속은 조회할 수 없습니다.
+query에는 약속을 식별할 수 있는 핵심 단어를 넣고, 날짜 단서가 있으면 from_date/to_date를 함께 지정하세요.
+결과가 하나로 좁혀지면 해당 ID로 update_appointment 또는 forget_appointment를 호출할 수 있습니다. 후보가 여러 개면 사용자에게 어떤 약속인지 확인하세요.
+""")]
+    public async Task<string> FindAppointmentsAsync(
+        [ToolParameterInfo(Description = "약속 제목/상세 내용에서 찾을 핵심 단어. 예: 닭한마리, 파티룸, 치과")]
+        string query = "",
+        [ToolParameterInfo(Description = "최대 후보 수. 1~20, 기본 10.")]
+        int limit = 10,
+        [ToolParameterInfo(Description = "조회 시작 날짜/시간. timezone 기준. 예: 2026-05-28T00:00:00. 미지정 시 제한 없음.")]
+        string? from_date = null,
+        [ToolParameterInfo(Description = "조회 종료 날짜/시간. timezone 기준. 예: 2026-05-28T23:59:59. 미지정 시 제한 없음.")]
+        string? to_date = null,
+        [ToolParameterInfo(Description = "IANA 타임존 ID. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
+        string timezone = "Asia/Seoul",
+        [ToolParameterInfo(Description = "지난 약속도 포함할지 여부. 기본 false.")]
+        bool include_past = false,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 1, 20);
+
+        var tz = ResolveTimeZone(string.IsNullOrWhiteSpace(timezone) ? "Asia/Seoul" : timezone);
+        if (!TryParseOptionalDateTime(from_date, tz, out var fromUtc, out var fromError))
+        {
+            return fromError;
+        }
+
+        if (!TryParseOptionalDateTime(to_date, tz, out var toUtc, out var toError))
+        {
+            return toError;
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var searchKeywords = SplitSearchKeywords(query);
+        var appointments = await appointmentRepository.GetActiveAsync(
+            channelId,
+            guildId,
+            nowUtc,
+            limit,
+            fromUtc,
+            toUtc,
+            include_past,
+            searchKeywords,
+            cancellationToken);
+        var candidates = appointments.ToList();
+        if (candidates.Count == 0)
+        {
+            return "조건에 맞는 약속 후보가 없습니다.";
+        }
+
+        return BuildAppointmentCandidateList(candidates);
     }
 
     [ToolFunction(
         Name = "forget_appointment",
         Description = """
 사용자가 현재 채널에 저장된 공유 약속을 삭제하거나 잊어달라고 요청할 때 사용합니다.
-id는 list_appointments 결과의 ID를 사용하세요. 사용자가 특정 약속을 자연어로만 말해 ID가 불분명하면 먼저 list_appointments로 후보를 조회하거나 사용자에게 확인하세요.
+id는 find_appointments 또는 list_appointments 결과의 ID를 사용하세요. 사용자가 특정 약속을 자연어로만 말해 ID가 불분명하면 먼저 find_appointments로 후보를 조회하거나 사용자에게 확인하세요.
 """)]
     public async Task<string> ForgetAppointmentAsync(
         [ToolParameterInfo(Description = "삭제할 약속 ID. list_appointments 결과의 ID.")]
@@ -450,12 +1195,13 @@ ID: {appointment.Id}
     [ToolFunction(
         Name = "update_appointment",
         Description = """
-현재 채널에 저장된 공유 약속의 제목, 날짜, 시간, 설명을 수정합니다.
-id는 list_appointments 결과의 ID를 사용하세요. ID가 불분명하면 먼저 list_appointments로 후보를 조회하거나 사용자에게 확인하세요.
+현재 채널에 저장된 공유 약속의 제목, 날짜, 시간, 상세 내용을 수정합니다.
+id는 find_appointments 또는 list_appointments 결과의 ID를 사용하세요. ID가 불분명하면 먼저 find_appointments로 후보를 조회하거나 사용자에게 확인하세요.
 
 시간만 나중에 정해진 경우 time에 HH:mm 값을 넣으세요. 예: '방탈출 약속은 오후 3시로 정해졌어' -> 기존 날짜 유지, time='15:00'.
 시간이 다시 미정이 된 경우 time_unspecified=true로 호출하세요. 임의의 시간을 만들지 마세요.
 date가 비어 있으면 기존 날짜를 유지하고, time이 비어 있으면 기존 시간 상태를 유지합니다.
+상세 내용은 선택 사항입니다. 사용자가 새 상세를 제공하지 않으면 기존 상세를 유지하고, 입력을 요구하지 마세요.
 """)]
     public async Task<string> UpdateAppointmentAsync(
         [ToolParameterInfo(Description = "수정할 약속 ID. list_appointments 결과의 ID.")]
@@ -468,7 +1214,7 @@ date가 비어 있으면 기존 날짜를 유지하고, time이 비어 있으면
         string time = "",
         [ToolParameterInfo(Description = "시간을 미정으로 바꿀지 여부.")]
         bool time_unspecified = false,
-        [ToolParameterInfo(Description = "새 설명. 변경하지 않으려면 빈 문자열.")]
+        [ToolParameterInfo(Description = "새 선택 상세 내용. 변경하지 않으려면 빈 문자열. 플랜/제안 목록은 add_appointment_items/remove_appointment_items를 사용하세요.")]
         string description = "",
         [ToolParameterInfo(Description = "IANA 타임존 ID. 비워두면 기존 약속의 timezone을 유지합니다.")]
         string timezone = "",
@@ -525,7 +1271,7 @@ date가 비어 있으면 기존 날짜를 유지하고, time이 비어 있으면
             : NormalizeAppointmentTitle(title);
         var normalizedDescription = string.IsNullOrWhiteSpace(description)
             ? appointment.Description
-            : NormalizeNullable(description, 2048);
+            : NormalizeNullable(description, MaxAppointmentDetailsLength);
         forget_after_days = Math.Clamp(forget_after_days, 1, MaxAppointmentRetentionDays);
         var expiresAtUtc = startsAtUtc.AddDays(forget_after_days);
 
@@ -558,6 +1304,403 @@ ID: {appointment.Id}
     }
 
     [ToolFunction(
+        Name = "get_appointment_details",
+        Description = """
+현재 채널에 저장된 공유 약속 하나의 상세 내용, 플랜, 제안 목록을 조회합니다.
+사용자가 특정 약속의 디테일, 준비할 일, 확정된 플랜, 아직 확정되지 않은 의견/제안을 물으면 호출하세요.
+상세/플랜/제안은 선택 사항이므로 비어 있어도 정상입니다. 비어 있다는 이유만으로 사용자에게 입력을 요구하지 마세요.
+id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
+""")]
+    public async Task<string> GetAppointmentDetailsAsync(
+        [ToolParameterInfo(Description = "조회할 약속 ID. find_appointments 또는 list_appointments 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "IANA 타임존 ID. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
+        string timezone = "Asia/Seoul",
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "조회할 약속 ID가 필요합니다. 먼저 약속을 조회해서 ID를 확인해 주세요.";
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var appointment = await GetCurrentChannelActiveAppointmentAsync(id, nowUtc, cancellationToken);
+        if (appointment == null)
+        {
+            return "해당 ID의 활성 약속을 찾지 못했습니다.";
+        }
+
+        var items = await appointmentRepository.GetActiveItemsAsync(id, cancellationToken: cancellationToken);
+        var tz = ResolveTimeZone(string.IsNullOrWhiteSpace(timezone) ? appointment.Timezone : timezone);
+        return BuildAppointmentDetails(appointment, items, tz);
+    }
+
+    [ToolFunction(
+        Name = "set_appointment_details",
+        Description = """
+현재 채널에 저장된 공유 약속의 상세 내용을 설정하거나 덧붙입니다.
+상세 내용은 커밋 메시지 본문처럼 약속의 배경, 장소 후보, 준비물, 관련 맥락 등을 자유 텍스트로 정리하는 용도입니다.
+사용자가 상세를 제공했거나 대화에서 충분히 확인된 경우에만 호출하세요. 약속 저장/조회 흐름에서 상세 입력을 강제하지 마세요.
+플랜/제안 목록은 이 도구가 아니라 add_appointment_items/remove_appointment_items를 사용하세요.
+id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
+""")]
+    public async Task<string> SetAppointmentDetailsAsync(
+        [ToolParameterInfo(Description = "상세 내용을 설정할 약속 ID. find_appointments 또는 list_appointments 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "저장할 상세 내용. append=true이면 기존 상세 뒤에 덧붙입니다.")]
+        string details,
+        [ToolParameterInfo(Description = "기존 상세 내용 뒤에 덧붙일지 여부. false이면 상세 내용을 교체합니다.")]
+        bool append = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "상세 내용을 수정할 약속 ID가 필요합니다. 먼저 약속을 조회해서 ID를 확인해 주세요.";
+        }
+
+        var normalizedDetails = NormalizeNullable(details, MaxAppointmentDetailsLength);
+        if (string.IsNullOrWhiteSpace(normalizedDetails))
+        {
+            return "상세 내용을 저장하려면 저장할 내용이 필요합니다. 약속 자체에는 상세 내용이 없어도 됩니다.";
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var appointment = await GetCurrentChannelActiveAppointmentAsync(id, nowUtc, cancellationToken);
+        if (appointment == null)
+        {
+            return "해당 ID의 활성 약속을 찾지 못했습니다.";
+        }
+
+        if (append && !string.IsNullOrWhiteSpace(appointment.Description))
+        {
+            normalizedDetails = NormalizeNullable(
+                $"{appointment.Description.Trim()}\n\n{normalizedDetails}",
+                MaxAppointmentDetailsLength);
+        }
+
+        var updated = await appointmentRepository.UpdateAsync(
+            id,
+            appointment.ChannelId,
+            appointment.GuildId,
+            appointment.Title,
+            normalizedDetails,
+            EnsureUtc(appointment.StartsAtUtc),
+            appointment.HasTime,
+            appointment.Timezone,
+            EnsureUtc(appointment.ExpiresAtUtc),
+            cancellationToken);
+        if (!updated)
+        {
+            return "약속 상세 내용 수정에 실패했습니다. 이미 삭제되었거나 찾을 수 없습니다.";
+        }
+
+        return $"""
+약속 상세 내용을 저장했습니다.
+ID: {appointment.Id}
+제목: {appointment.Title}
+상세: {normalizedDetails}
+응답 규칙: 사용자에게 현재 채널의 공유 약속 상세 내용을 저장했다고 짧게 알려주세요.
+""";
+    }
+
+    [ToolFunction(
+        Name = "add_appointment_items",
+        Description = """
+현재 채널에 저장된 공유 약속에 플랜 또는 제안 항목을 추가합니다.
+item_type='plan'은 확정된 일정/준비/진행 플랜이고, item_type='suggestion'은 아직 확정되지 않은 의견이나 후보입니다.
+플랜/제안은 선택 사항입니다. 사용자가 요청/제공했거나 대화에서 명확히 확인된 경우에만 추가하고, 항목이 없다는 이유로 입력을 요구하지 마세요.
+사용자가 메시지를 바탕으로 플랜이나 제안을 정리해 달라고 하면, 대화를 읽고 확정된 것은 plan, 미확정 의견은 suggestion으로 나누어 추가하세요.
+id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
+""")]
+    public async Task<string> AddAppointmentItemsAsync(
+        [ToolParameterInfo(Description = "항목을 추가할 약속 ID. find_appointments 또는 list_appointments 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "항목 종류. plan 또는 suggestion.")]
+        string item_type,
+        [ToolParameterInfo(Description = "추가할 항목 목록. 줄바꿈으로 여러 항목을 나열하세요.")]
+        string items,
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "항목을 추가할 약속 ID가 필요합니다. 먼저 약속을 조회해서 ID를 확인해 주세요.";
+        }
+
+        var normalizedItemType = NormalizeAppointmentItemType(item_type);
+        if (normalizedItemType is null or "all")
+        {
+            return "item_type은 plan 또는 suggestion이어야 합니다.";
+        }
+
+        var itemContents = SplitAppointmentItemContents(items);
+        if (itemContents.Count == 0)
+        {
+            return "플랜/제안을 추가하려면 추가할 항목이 필요합니다. 약속 자체에는 플랜/제안이 없어도 됩니다.";
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var appointment = await GetCurrentChannelActiveAppointmentAsync(id, nowUtc, cancellationToken);
+        if (appointment == null)
+        {
+            return "해당 ID의 활성 약속을 찾지 못했습니다.";
+        }
+
+        List<AppointmentItemData> addedItems = [];
+        foreach (var itemContent in itemContents.Take(MaxAppointmentItemsPerCall))
+        {
+            var input = new AppointmentItemInput(
+                appointment.Id,
+                normalizedItemType,
+                message.Author.Id.ToString(),
+                itemContent);
+            var itemId = await appointmentRepository.AddItemAsync(input, cancellationToken);
+            addedItems.Add(new AppointmentItemData(
+                itemId,
+                appointment.Id,
+                normalizedItemType,
+                message.Author.Id.ToString(),
+                itemContent,
+                "active",
+                addedItems.Count + 1,
+                DateTime.UtcNow,
+                null));
+        }
+
+        return $"""
+약속 항목을 추가했습니다.
+ID: {appointment.Id}
+제목: {appointment.Title}
+종류: {FormatAppointmentItemType(normalizedItemType)}
+{BuildAppointmentItemSection("추가된 항목", addedItems)}
+응답 규칙: 사용자에게 플랜/제안 중 어느 목록에 몇 개를 추가했는지 짧게 알려주세요.
+""";
+    }
+
+    [ToolFunction(
+        Name = "remove_appointment_items",
+        Description = """
+현재 채널에 저장된 공유 약속의 플랜 또는 제안 항목을 삭제합니다.
+item_ids는 get_appointment_details 결과에 표시되는 ItemId를 사용하세요. 삭제할 항목이 불분명하면 먼저 get_appointment_details로 항목을 조회하거나 사용자에게 확인하세요.
+""")]
+    public async Task<string> RemoveAppointmentItemsAsync(
+        [ToolParameterInfo(Description = "항목을 삭제할 약속 ID. find_appointments 또는 list_appointments 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "항목 종류. plan, suggestion, all 중 하나. 모르면 all.")]
+        string item_type,
+        [ToolParameterInfo(Description = "삭제할 ItemId 목록. 콤마/공백/줄바꿈으로 구분할 수 있습니다.")]
+        string item_ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "항목을 삭제할 약속 ID가 필요합니다. 먼저 약속을 조회해서 ID를 확인해 주세요.";
+        }
+
+        var normalizedItemType = NormalizeAppointmentItemType(item_type);
+        if (normalizedItemType == null)
+        {
+            return "item_type은 plan, suggestion, all 중 하나여야 합니다.";
+        }
+
+        var itemIds = ParseAppointmentItemIds(item_ids);
+        if (itemIds.Count == 0)
+        {
+            return "삭제할 ItemId가 필요합니다. 먼저 get_appointment_details로 항목 ID를 확인해 주세요.";
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        await appointmentRepository.ExpireOldAsync(nowUtc, cancellationToken);
+        var appointment = await GetCurrentChannelActiveAppointmentAsync(id, nowUtc, cancellationToken);
+        if (appointment == null)
+        {
+            return "해당 ID의 활성 약속을 찾지 못했습니다.";
+        }
+
+        var deletedCount = 0;
+        foreach (var itemId in itemIds.Take(MaxAppointmentItemsPerCall))
+        {
+            var deleted = await appointmentRepository.DeleteItemAsync(
+                appointment.Id,
+                itemId,
+                normalizedItemType == "all" ? null : normalizedItemType,
+                cancellationToken);
+            if (deleted)
+            {
+                deletedCount++;
+            }
+        }
+
+        return $"""
+약속 항목을 삭제했습니다.
+ID: {appointment.Id}
+제목: {appointment.Title}
+요청 항목 수: {itemIds.Count}
+삭제 항목 수: {deletedCount}
+응답 규칙: 사용자에게 삭제된 항목 수를 짧게 알려주세요. 삭제 수가 요청보다 적으면 이미 삭제되었거나 찾지 못한 항목이 있을 수 있다고 안내하세요.
+""";
+    }
+
+    [ToolFunction(
+        Name = "remember_channel_note",
+        Description = """
+현재 채널의 공유 메모를 저장합니다. 사용자가 '이 채널에 기억해줘', '이 내용 메모해줘', '앞으로 이 채널에서는 이 정보를 참고해'처럼 채널 단위 참고사항을 남기려 할 때 사용하세요.
+
+[중요]
+- 이 도구는 개인 지침이나 개인 기억을 저장하지 않습니다. 저장 범위는 현재 Discord 채널입니다.
+- 같은 채널의 사용자는 이 메모를 조회하거나 삭제할 수 있습니다. 다른 채널에서는 보이지 않습니다.
+- source_chat_log_id는 메모의 근거가 된 과거 메시지를 search_chat_history/get_chat_context로 찾은 경우에만 지정하세요. 없으면 0으로 두세요.
+- 원본 메시지 참조는 본문 복사가 아니라 Discord 메시지 식별자만 저장됩니다.
+""")]
+    public async Task<string> RememberChannelNoteAsync(
+        [ToolParameterInfo(Description = "채널 메모 제목. 짧고 구체적으로 작성하세요.")]
+        string title,
+        [ToolParameterInfo(Description = "저장할 채널 메모 내용.")]
+        string content,
+        [ToolParameterInfo(Description = "검색에 도움이 되는 태그. 쉼표로 구분하고, 없으면 빈 문자열.")]
+        string tags = "",
+        [ToolParameterInfo(Description = "메모 근거가 된 과거 메시지의 ChatLogId. search_chat_history/get_chat_context로 찾은 경우에만 지정하고, 없으면 0.")]
+        int source_chat_log_id = 0,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedTitle = NormalizeChannelNoteTitle(title);
+        if (string.IsNullOrWhiteSpace(normalizedTitle))
+        {
+            return "채널 메모 제목이 필요합니다.";
+        }
+
+        var normalizedContent = NormalizeChannelNoteContent(content);
+        if (string.IsNullOrWhiteSpace(normalizedContent))
+        {
+            return "채널 메모 내용이 필요합니다.";
+        }
+
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+        var sourceMessageId = message.Id.ToString();
+        if (source_chat_log_id > 0)
+        {
+            var sourceLogs = await chatLogRepository.GetContextAsync(
+                channelId,
+                source_chat_log_id,
+                0,
+                0,
+                cancellationToken);
+            var sourceLog = sourceLogs.FirstOrDefault(log => log.Id == source_chat_log_id);
+            if (sourceLog == null)
+            {
+                return "source_chat_log_id에 해당하는 현재 채널 메시지를 찾지 못했습니다.";
+            }
+
+            sourceMessageId = sourceLog.MessageId;
+        }
+
+        var input = new ChannelNoteInput(
+            guildId,
+            channelId,
+            message.Author.Id.ToString(),
+            normalizedTitle,
+            normalizedContent,
+            NormalizeChannelNoteTags(tags),
+            sourceMessageId);
+
+        var id = await channelNoteRepository.AddAsync(input, cancellationToken);
+        var reference = BuildChannelNoteReference(guildId, channelId, sourceMessageId);
+        return $"""
+채널 메모를 저장했습니다.
+ID: {id}
+제목: {normalizedTitle}
+태그: {input.Tags ?? "없음"}
+원본: {reference}
+응답 규칙: 사용자에게 현재 채널의 공유 메모로 저장했다고 짧게 알려주세요. 개인 지침이나 개인 기억으로 표현하지 마세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요.
+""";
+    }
+
+    [ToolFunction(
+        Name = "list_channel_notes",
+        Description = """
+현재 채널에 저장된 공유 메모를 조회합니다. 사용자가 '기억한 내용 알려줘', '채널 메모 찾아줘', '이 채널 규칙 뭐였지?'처럼 채널 단위 참고사항을 물으면 호출하세요.
+
+조회 범위는 현재 Discord 채널로 제한됩니다. 다른 채널이나 다른 서버의 메모는 조회할 수 없습니다.
+query가 있으면 제목, 내용, 태그에서 검색합니다.
+""")]
+    public async Task<string> ListChannelNotesAsync(
+        [ToolParameterInfo(Description = "제목/내용/태그에서 찾을 검색어. 없으면 빈 문자열.")]
+        string query = "",
+        [ToolParameterInfo(Description = "최대 조회 수. 1~20, 기본 10.")]
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 1, 20);
+
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+        var notes = await channelNoteRepository.GetActiveAsync(
+            channelId,
+            guildId,
+            limit,
+            query,
+            cancellationToken);
+        if (notes.Count == 0)
+        {
+            return "조회된 채널 메모가 없습니다.";
+        }
+
+        return BuildChannelNoteList(notes);
+    }
+
+    [ToolFunction(
+        Name = "forget_channel_note",
+        Description = """
+현재 채널에 저장된 공유 메모를 삭제합니다.
+id는 list_channel_notes 결과의 ID를 사용하세요. 사용자가 자연어로만 특정 메모를 말해 ID가 불분명하면 먼저 list_channel_notes로 후보를 조회하거나 사용자에게 확인하세요.
+""")]
+    public async Task<string> ForgetChannelNoteAsync(
+        [ToolParameterInfo(Description = "삭제할 채널 메모 ID. list_channel_notes 결과의 ID.")]
+        int id,
+        [ToolParameterInfo(Description = "삭제 이유. 없으면 빈 문자열.")]
+        string reason = "",
+        CancellationToken cancellationToken = default)
+    {
+        if (id <= 0)
+        {
+            return "삭제할 채널 메모 ID가 필요합니다. 먼저 채널 메모를 조회해서 ID를 확인해 주세요.";
+        }
+
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+        var note = await channelNoteRepository.GetActiveByIdAsync(
+            id,
+            channelId,
+            guildId,
+            cancellationToken);
+        if (note == null)
+        {
+            return "해당 ID의 활성 채널 메모를 찾지 못했습니다.";
+        }
+
+        var deleted = await channelNoteRepository.DeleteAsync(
+            id,
+            channelId,
+            guildId,
+            cancellationToken);
+        if (!deleted)
+        {
+            return "채널 메모 삭제에 실패했습니다. 이미 삭제되었거나 찾을 수 없습니다.";
+        }
+
+        return $"""
+채널 메모를 삭제했습니다.
+ID: {note.Id}
+제목: {note.Title}
+삭제 이유: {(string.IsNullOrWhiteSpace(reason) ? "미지정" : reason)}
+응답 규칙: 사용자에게 현재 채널의 공유 메모 삭제 완료를 짧게 알려주세요.
+""";
+    }
+
+    [ToolFunction(
         Name = "get_current_date",
         Description = "현재 날짜와 시간을 가져옵니다. 사용자의 언어에 맞는 timezone을 지정하세요 (한국어: Asia/Seoul, 영어(미국): America/New_York 등). 기본값은 UTC입니다.")]
     public Task<string> GetCurrentDateAsync(
@@ -568,6 +1711,399 @@ ID: {appointment.Id}
         var tz = ResolveTimeZone(timezone);
         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
         return Task.FromResult($"{now:yyyy-MM-dd HH:mm:ss} ({tz.Id})");
+    }
+
+    private async ValueTask<AppointmentData?> GetCurrentChannelActiveAppointmentAsync(
+        int id,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
+        var channelId = message.Channel.Id.ToString();
+        return await appointmentRepository.GetActiveByIdAsync(
+            id,
+            channelId,
+            guildId,
+            nowUtc,
+            cancellationToken);
+    }
+
+    internal static string BuildAppointmentDetails(
+        AppointmentData appointment,
+        IReadOnlyList<AppointmentItemData> items,
+        TimeZoneInfo timezone)
+    {
+        var startText = FormatAppointmentStart(EnsureUtc(appointment.StartsAtUtc), appointment.HasTime, timezone);
+        var reference = BuildAppointmentReference(appointment);
+        var planItems = items
+            .Where(item => string.Equals(item.ItemType, AppointmentItemTypePlan, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var suggestionItems = items
+            .Where(item => string.Equals(item.ItemType, AppointmentItemTypeSuggestion, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        List<string> lines =
+        [
+            "약속 상세 조회 결과:",
+            $"ID: {appointment.Id}",
+            $"제목: {appointment.Title}",
+            $"일시: {startText}",
+            $"원본: {reference}",
+            "",
+            "상세:",
+            string.IsNullOrWhiteSpace(appointment.Description) ? "(저장된 상세 내용이 없습니다.)" : appointment.Description.Trim(),
+            "",
+            BuildAppointmentItemSection("플랜", planItems),
+            "",
+            BuildAppointmentItemSection("제안", suggestionItems),
+            "",
+            "응답 규칙: 상세 내용, 플랜, 제안을 구분해서 사용자에게 필요한 부분만 간결하게 답하세요. 플랜은 확정된 항목, 제안은 미확정 의견입니다. 비어 있는 상세/플랜/제안은 없는 것으로 간단히 안내하고, 사용자가 원하지 않는 한 입력을 요구하지 마세요. 원본 URL이 필요하면 그대로 적으세요."
+        ];
+
+        return string.Join("\n", lines);
+    }
+
+    internal static string BuildAppointmentItemSection(
+        string heading,
+        IReadOnlyList<AppointmentItemData> items)
+    {
+        List<string> lines = [$"{heading}:"];
+        if (items.Count == 0)
+        {
+            lines.Add("(없음)");
+            return string.Join("\n", lines);
+        }
+
+        foreach (var item in items.OrderBy(item => item.SortOrder).ThenBy(item => item.Id))
+        {
+            lines.Add($"- ItemId {item.Id}: {item.Content}");
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    internal static string? NormalizeAppointmentItemType(string? itemType)
+    {
+        var normalized = (itemType ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "plan" or "plans" or "플랜" or "계획" or "일정" => AppointmentItemTypePlan,
+            "suggestion" or "suggestions" or "suggest" or "제안" or "의견" or "후보" => AppointmentItemTypeSuggestion,
+            "all" or "전체" or "모두" => "all",
+            _ => null
+        };
+    }
+
+    internal static string FormatAppointmentItemType(string itemType)
+    {
+        return itemType switch
+        {
+            AppointmentItemTypePlan => "플랜",
+            AppointmentItemTypeSuggestion => "제안",
+            _ => itemType
+        };
+    }
+
+    internal static IReadOnlyList<string> SplitAppointmentItemContents(string? items)
+    {
+        if (string.IsNullOrWhiteSpace(items))
+        {
+            return [];
+        }
+
+        return items
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => item.TrimStart('-', '*', ' ', '\t').Trim())
+            .Where(item => item.Length > 0)
+            .Select(item => item.Length <= MaxAppointmentItemLength ? item : item[..MaxAppointmentItemLength])
+            .Distinct(StringComparer.Ordinal)
+            .Take(MaxAppointmentItemsPerCall)
+            .ToList();
+    }
+
+    internal static IReadOnlyList<long> ParseAppointmentItemIds(string? itemIds)
+    {
+        if (string.IsNullOrWhiteSpace(itemIds))
+        {
+            return [];
+        }
+
+        return itemIds
+            .Split([',', ' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => long.TryParse(item, out var id) ? id : 0)
+            .Where(id => id > 0)
+            .Distinct()
+            .Take(MaxAppointmentItemsPerCall)
+            .ToList();
+    }
+
+    internal static IReadOnlyList<string> NormalizeChatSearchKeywords(string? keywords)
+    {
+        List<string> normalized = [];
+
+        void AddKeyword(string? keyword)
+        {
+            var value = (keyword ?? string.Empty).Trim();
+            if (value.Length < 2)
+            {
+                return;
+            }
+
+            if (!normalized.Contains(value, StringComparer.OrdinalIgnoreCase))
+            {
+                normalized.Add(value);
+            }
+        }
+
+        foreach (var rawKeyword in (keywords ?? string.Empty)
+            .Split([',', '，', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            AddKeyword(rawKeyword);
+            foreach (var token in rawKeyword.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                AddKeyword(token);
+            }
+        }
+
+        for (var i = 0; i < normalized.Count; i++)
+        {
+            var keyword = normalized[i];
+            var compactKeyword = RemoveSearchKeywordSpaces(keyword);
+            foreach (var (source, expansions) in ChatSearchKeywordExpansions)
+            {
+                if (!string.Equals(keyword, source, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(compactKeyword, RemoveSearchKeywordSpaces(source), StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                foreach (var expansion in expansions)
+                {
+                    AddKeyword(expansion);
+                }
+            }
+        }
+
+        return normalized;
+    }
+
+    internal static string? NormalizeDiscordUserId(string? userIdOrMention)
+    {
+        if (string.IsNullOrWhiteSpace(userIdOrMention))
+        {
+            return null;
+        }
+
+        var value = userIdOrMention.Trim();
+        if (value.StartsWith("<@", StringComparison.Ordinal) && value.EndsWith('>'))
+        {
+            value = value[2..^1];
+            if (value.StartsWith('!'))
+            {
+                value = value[1..];
+            }
+        }
+
+        return value.All(char.IsDigit) ? value : null;
+    }
+
+    internal static string NormalizeChatSearchTimePreset(string? preset)
+    {
+        var value = (preset ?? string.Empty)
+            .Trim()
+            .ToLowerInvariant()
+            .Replace("-", "_", StringComparison.Ordinal)
+            .Replace(" ", string.Empty, StringComparison.Ordinal)
+            .Replace("\t", string.Empty, StringComparison.Ordinal);
+        return value switch
+        {
+            "" or "none" or "off" or "없음" => "none",
+            "today" or "오늘" => "today",
+            "yesterday" or "어제" => "yesterday",
+            "last7days" or "last_7_days" or "최근7일" or "최근_7일" or "최근일주일" => "last_7_days",
+            "thisweek" or "this_week" or "이번주" => "this_week",
+            "lastweek" or "last_week" or "지난주" => "last_week",
+            "thismonth" or "this_month" or "이번달" or "이번_달" => "this_month",
+            _ => value
+        };
+    }
+
+    internal static bool TryApplyChatSearchTimePreset(
+        string? preset,
+        TimeZoneInfo timezone,
+        DateTime nowUtc,
+        ref DateTimeOffset? from,
+        ref DateTimeOffset? to,
+        out string error)
+    {
+        error = string.Empty;
+        var normalizedPreset = NormalizeChatSearchTimePreset(preset);
+        if (normalizedPreset == "none")
+        {
+            return true;
+        }
+
+        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(EnsureUtc(nowUtc), timezone);
+        var todayStart = nowLocal.Date;
+        DateTime fromLocal;
+        DateTime toLocal;
+        switch (normalizedPreset)
+        {
+            case "today":
+                fromLocal = todayStart;
+                toLocal = nowLocal;
+                break;
+            case "yesterday":
+                fromLocal = todayStart.AddDays(-1);
+                toLocal = todayStart.AddTicks(-1);
+                break;
+            case "last_7_days":
+                fromLocal = nowLocal.AddDays(-7);
+                toLocal = nowLocal;
+                break;
+            case "this_week":
+                fromLocal = todayStart.AddDays(-GetDaysSinceMonday(nowLocal.DayOfWeek));
+                toLocal = nowLocal;
+                break;
+            case "last_week":
+                var thisWeekStart = todayStart.AddDays(-GetDaysSinceMonday(nowLocal.DayOfWeek));
+                fromLocal = thisWeekStart.AddDays(-7);
+                toLocal = thisWeekStart.AddTicks(-1);
+                break;
+            case "this_month":
+                fromLocal = new DateTime(nowLocal.Year, nowLocal.Month, 1);
+                toLocal = nowLocal;
+                break;
+            default:
+                error = "time_preset은 none, today, yesterday, last_7_days, this_week, last_week, this_month 중 하나여야 합니다.";
+                return false;
+        }
+
+        from ??= ToDateTimeOffsetInTimeZone(fromLocal, timezone);
+        to ??= ToDateTimeOffsetInTimeZone(toLocal, timezone);
+        return true;
+    }
+
+    private static string RemoveSearchKeywordSpaces(string value)
+    {
+        return value.Replace(" ", string.Empty, StringComparison.Ordinal)
+            .Replace("\t", string.Empty, StringComparison.Ordinal);
+    }
+
+    private static int GetDaysSinceMonday(DayOfWeek dayOfWeek)
+    {
+        return ((int)dayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+    }
+
+    private static DateTimeOffset ToDateTimeOffsetInTimeZone(DateTime localDateTime, TimeZoneInfo timezone)
+    {
+        var unspecified = DateTime.SpecifyKind(localDateTime, DateTimeKind.Unspecified);
+        return new DateTimeOffset(unspecified, timezone.GetUtcOffset(unspecified));
+    }
+
+    internal static IReadOnlyList<AppointmentData> FilterAppointmentsByQuery(
+        IEnumerable<AppointmentData> appointments,
+        string? query)
+    {
+        var keywords = SplitSearchKeywords(query);
+        if (keywords.Length == 0)
+        {
+            return appointments.ToList();
+        }
+
+        return appointments
+            .Where(appointment =>
+            {
+                var target = $"{appointment.Title} {appointment.Description}";
+                return keywords.All(keyword => target.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+            })
+            .ToList();
+    }
+
+    internal static string BuildAppointmentCandidateList(IReadOnlyList<AppointmentData> appointments)
+    {
+        List<string> lines = [$"약속 후보 {appointments.Count}건:"];
+        foreach (var appointment in appointments)
+        {
+            var appointmentTz = ResolveTimeZone(appointment.Timezone);
+            var startText = FormatAppointmentStart(EnsureUtc(appointment.StartsAtUtc), appointment.HasTime, appointmentTz);
+            var reference = BuildAppointmentReference(appointment);
+            lines.Add("");
+            lines.Add($"ID: {appointment.Id}");
+            lines.Add($"제목: {appointment.Title}");
+            lines.Add($"일시: {startText}");
+            if (!string.IsNullOrWhiteSpace(appointment.Description))
+            {
+                lines.Add($"상세: {appointment.Description}");
+            }
+            lines.Add($"원본: {reference}");
+        }
+
+        lines.Add("");
+        lines.Add("응답 규칙: 후보가 하나이고 사용자 요청과 명확히 일치하면 해당 ID로 update_appointment, forget_appointment, get_appointment_details 중 필요한 도구를 호출하세요. get_appointment_details는 사용자가 상세/플랜/제안을 물었을 때만 사용하세요. 후보가 여러 개이거나 확신이 낮으면 사용자에게 어떤 약속인지 확인하세요. 원본 URL은 사용자 응답에 그대로 적어 Discord 인용 카드가 뜨게 하세요.");
+        return string.Join("\n", lines);
+    }
+
+    internal static string BuildChannelNoteList(IReadOnlyList<ChannelNoteData> notes)
+    {
+        List<string> lines = [$"채널 메모 {notes.Count}건:"];
+        foreach (var note in notes)
+        {
+            var reference = BuildChannelNoteReference(note);
+            lines.Add("");
+            lines.Add($"ID: {note.Id}");
+            lines.Add($"제목: {note.Title}");
+            if (!string.IsNullOrWhiteSpace(note.Tags))
+            {
+                lines.Add($"태그: {note.Tags}");
+            }
+            lines.Add($"내용: {FormatChannelNoteContent(note.Content)}");
+            lines.Add($"원본: {reference}");
+        }
+
+        lines.Add("");
+        lines.Add("응답 규칙: 현재 채널의 공유 메모만 바탕으로 답하세요. 개인 지침이나 개인 기억으로 표현하지 말고 채널 메모라고 표현하세요. 삭제가 필요하면 ID를 기준으로 forget_channel_note를 사용할 수 있습니다. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요.");
+        return string.Join("\n", lines);
+    }
+
+    internal static string NormalizeChannelNoteTitle(string title)
+    {
+        var normalized = (title ?? string.Empty).Trim();
+        return normalized.Length <= MaxChannelNoteTitleLength ? normalized : normalized[..MaxChannelNoteTitleLength];
+    }
+
+    internal static string NormalizeChannelNoteContent(string content)
+    {
+        var normalized = (content ?? string.Empty).Trim();
+        return normalized.Length <= MaxChannelNoteContentLength ? normalized : normalized[..MaxChannelNoteContentLength];
+    }
+
+    internal static string? NormalizeChannelNoteTags(string tags)
+    {
+        return NormalizeNullable(tags, MaxChannelNoteTagsLength);
+    }
+
+    private static string[] SplitSearchKeywords(string? query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
+
+        return query
+            .Split([' ', ',', '，', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(keyword => keyword.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string FormatChannelNoteContent(string content)
+    {
+        const int MAX_DISPLAY_LENGTH = 1200;
+        var normalized = content.Trim();
+        return normalized.Length <= MAX_DISPLAY_LENGTH
+            ? normalized
+            : $"{normalized[..MAX_DISPLAY_LENGTH]}...";
     }
 
     private static TimeZoneInfo ResolveTimeZone(string? timezone)
@@ -998,6 +2534,22 @@ ID: {appointment.Id}
     }
 
     private static string BuildAppointmentReference(string? guildId, string channelId, string? messageId)
+    {
+        if (string.IsNullOrWhiteSpace(messageId))
+        {
+            return "(원본 메시지를 참조할 수 없어요)";
+        }
+
+        var guildPart = string.IsNullOrWhiteSpace(guildId) ? "@me" : guildId;
+        return $"https://discord.com/channels/{guildPart}/{channelId}/{messageId}";
+    }
+
+    private static string BuildChannelNoteReference(ChannelNoteData note)
+    {
+        return BuildChannelNoteReference(note.GuildId, note.ChannelId, note.SourceMessageId);
+    }
+
+    private static string BuildChannelNoteReference(string? guildId, string channelId, string? messageId)
     {
         if (string.IsNullOrWhiteSpace(messageId))
         {

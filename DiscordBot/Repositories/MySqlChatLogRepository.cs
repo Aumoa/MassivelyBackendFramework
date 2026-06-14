@@ -7,6 +7,18 @@ namespace DiscordBot.Repositories;
 internal class MySqlChatLogRepository(IOptions<MySqlOptions> options)
     : MySqlDbContext(options.Value), IChatLogRepository
 {
+    private const string SELECT_CHAT_LOG_COLUMNS = @"
+`id` AS Id,
+`message_id` AS MessageId,
+`guild_id` AS GuildId,
+`channel_id` AS ChannelId,
+`user_id` AS UserId,
+`content` AS Content,
+`created_at` AS CreatedAt,
+`referenced_message_id` AS ReferencedMessageId,
+`referenced_channel_id` AS ReferencedChannelId,
+`referenced_guild_id` AS ReferencedGuildId";
+
     public async ValueTask AddAsync(
         string? messageId,
         string? guildId,
@@ -15,6 +27,9 @@ internal class MySqlChatLogRepository(IOptions<MySqlOptions> options)
         string content,
         IReadOnlyList<ChatLogImageInput>? images = null,
         IReadOnlyList<ChatLogAttachmentInput>? attachments = null,
+        string? referencedMessageId = null,
+        string? referencedChannelId = null,
+        string? referencedGuildId = null,
         CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
@@ -22,12 +37,24 @@ internal class MySqlChatLogRepository(IOptions<MySqlOptions> options)
         using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         const string INSERT_CHAT_LOG_QUERY = @"
-INSERT INTO `chat_log` (`message_id`, `guild_id`, `channel_id`, `user_id`, `content`)
-VALUES(@messageId, @guildId, @channelId, @userId, @content)";
+INSERT INTO `chat_log`
+    (`message_id`, `guild_id`, `channel_id`, `user_id`, `content`, `referenced_message_id`, `referenced_channel_id`, `referenced_guild_id`)
+VALUES
+    (@messageId, @guildId, @channelId, @userId, @content, @referencedMessageId, @referencedChannelId, @referencedGuildId)";
 
         var chatLogCommand = new CommandDefinition(
             INSERT_CHAT_LOG_QUERY,
-            new { messageId, guildId, channelId, userId, content },
+            new
+            {
+                messageId,
+                guildId,
+                channelId,
+                userId,
+                content,
+                referencedMessageId,
+                referencedChannelId,
+                referencedGuildId
+            },
             transaction,
             cancellationToken: cancellationToken);
         await connection.ExecuteAsync(chatLogCommand);
@@ -105,7 +132,7 @@ VALUES
         using var connection = GetConnection();
 
         var queryBuilder = new System.Text.StringBuilder(@"
-SELECT `id` AS Id, `message_id` AS MessageId, `guild_id` AS GuildId, `channel_id` AS ChannelId, `user_id` AS UserId, `content` AS Content, `created_at` AS CreatedAt
+SELECT " + SELECT_CHAT_LOG_COLUMNS + @"
 FROM `chat_log`
 WHERE `channel_id` = @channelId");
 
@@ -132,8 +159,14 @@ WHERE `channel_id` = @channelId");
         return results.Reverse().ToList();
     }
 
-    public async ValueTask<IReadOnlyList<ChatLogData>> SearchAsync(string channelId, IReadOnlyList<string> keywords, int limit,
-        DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken cancellationToken = default)
+    public async ValueTask<IReadOnlyList<ChatLogData>> SearchAsync(
+        string channelId,
+        IReadOnlyList<string> keywords,
+        int limit,
+        DateTimeOffset? from = null,
+        DateTimeOffset? to = null,
+        string? authorUserId = null,
+        CancellationToken cancellationToken = default)
     {
         if (keywords.Count == 0)
             return [];
@@ -149,7 +182,7 @@ WHERE `channel_id` = @channelId");
             return [];
 
         var queryBuilder = new System.Text.StringBuilder(@"
-SELECT `id` AS Id, `message_id` AS MessageId, `guild_id` AS GuildId, `channel_id` AS ChannelId, `user_id` AS UserId, `content` AS Content, `created_at` AS CreatedAt
+SELECT " + SELECT_CHAT_LOG_COLUMNS + @"
 FROM `chat_log`
 WHERE `channel_id` = @channelId
   AND MATCH(`content`) AGAINST(@searchQuery IN BOOLEAN MODE)");
@@ -158,6 +191,8 @@ WHERE `channel_id` = @channelId
             queryBuilder.Append(" AND `created_at` >= @from");
         if (to.HasValue)
             queryBuilder.Append(" AND `created_at` <= @to");
+        if (!string.IsNullOrWhiteSpace(authorUserId))
+            queryBuilder.Append(" AND `user_id` = CONVERT(@authorUserId USING utf8mb4) COLLATE utf8mb4_unicode_ci");
 
         queryBuilder.Append(" ORDER BY MATCH(`content`) AGAINST(@searchQuery IN BOOLEAN MODE) DESC, `created_at` DESC LIMIT @limit");
 
@@ -169,7 +204,8 @@ WHERE `channel_id` = @channelId
                 searchQuery,
                 limit,
                 from = from?.UtcDateTime,
-                to = to?.UtcDateTime
+                to = to?.UtcDateTime,
+                authorUserId
             },
             cancellationToken: cancellationToken);
 
@@ -187,7 +223,7 @@ WHERE `channel_id` = @channelId
         using var connection = GetConnection();
 
         const string TARGET_QUERY = @"
-SELECT `id` AS Id, `message_id` AS MessageId, `guild_id` AS GuildId, `channel_id` AS ChannelId, `user_id` AS UserId, `content` AS Content, `created_at` AS CreatedAt
+SELECT " + SELECT_CHAT_LOG_COLUMNS + @"
 FROM `chat_log`
 WHERE `channel_id` = @channelId
   AND `id` = @chatLogId
@@ -204,7 +240,7 @@ LIMIT 1";
         }
 
         const string BEFORE_QUERY = @"
-SELECT `id` AS Id, `message_id` AS MessageId, `guild_id` AS GuildId, `channel_id` AS ChannelId, `user_id` AS UserId, `content` AS Content, `created_at` AS CreatedAt
+SELECT " + SELECT_CHAT_LOG_COLUMNS + @"
 FROM `chat_log`
 WHERE `channel_id` = @channelId
   AND (`created_at` < @createdAt OR (`created_at` = @createdAt AND `id` < @chatLogId))
@@ -212,7 +248,7 @@ ORDER BY `created_at` DESC, `id` DESC
 LIMIT @before";
 
         const string AFTER_QUERY = @"
-SELECT `id` AS Id, `message_id` AS MessageId, `guild_id` AS GuildId, `channel_id` AS ChannelId, `user_id` AS UserId, `content` AS Content, `created_at` AS CreatedAt
+SELECT " + SELECT_CHAT_LOG_COLUMNS + @"
 FROM `chat_log`
 WHERE `channel_id` = @channelId
   AND (`created_at` > @createdAt OR (`created_at` = @createdAt AND `id` > @chatLogId))
@@ -237,5 +273,58 @@ LIMIT @after";
             .Concat([target])
             .Concat(afterItems)
             .ToList();
+    }
+
+    public async ValueTask<ChatLogData?> GetByMessageIdAsync(
+        string channelId,
+        string messageId,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = @"
+SELECT " + SELECT_CHAT_LOG_COLUMNS + @"
+FROM `chat_log`
+WHERE `channel_id` = @channelId
+  AND `message_id` = @messageId
+LIMIT 1";
+
+        var command = new CommandDefinition(
+            QUERY,
+            new { channelId, messageId },
+            cancellationToken: cancellationToken);
+
+        return await connection.QueryFirstOrDefaultAsync<ChatLogData>(command);
+    }
+
+    public async ValueTask<IReadOnlyList<ChatLogData>> GetRepliesAsync(
+        string channelId,
+        string referencedMessageId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = @"
+SELECT " + SELECT_CHAT_LOG_COLUMNS + @"
+FROM `chat_log`
+WHERE `channel_id` = @channelId
+  AND `referenced_channel_id` = @channelId
+  AND `referenced_message_id` = @referencedMessageId
+ORDER BY `created_at` ASC, `id` ASC
+LIMIT @limit";
+
+        var command = new CommandDefinition(
+            QUERY,
+            new
+            {
+                channelId,
+                referencedMessageId,
+                limit
+            },
+            cancellationToken: cancellationToken);
+
+        var results = await connection.QueryAsync<ChatLogData>(command);
+        return results.ToList();
     }
 }
