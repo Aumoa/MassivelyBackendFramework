@@ -900,6 +900,8 @@ message_id_or_url에는 Discord 메시지 ID, 메시지 URL, 또는 사용자가
 - 약속 저장은 현재 채널 공유용입니다. 같은 채널의 사용자는 이 약속을 조회, 수정, 삭제할 수 있습니다. 다른 채널에서는 보이지 않습니다.
 - user_id는 만든 사람 기록으로만 저장됩니다. guild_id, channel_id, user_id는 프로그램이 현재 메시지에서 자동으로 고정합니다.
 - 저장된 약속에는 원본 Discord 메시지 링크가 함께 보존됩니다. 조회 응답에는 해당 링크를 그대로 보여주세요.
+- 상세 내용, 플랜, 제안은 모두 선택 사항입니다. 사용자가 말했거나 대화에서 충분히 확인된 경우에만 저장하고, 없다고 해서 사용자에게 입력을 요구하지 마세요.
+- 플랜/제안은 약속 저장 후 add_appointment_items로 별도 저장할 수 있습니다. 약속 저장 자체에는 필요하지 않습니다.
 - 지난 약속은 기본적으로 약속 시간 30일 뒤 자동으로 잊어버립니다.
 """)]
     public async Task<string> RememberAppointmentAsync(
@@ -913,7 +915,7 @@ message_id_or_url에는 Discord 메시지 ID, 메시지 URL, 또는 사용자가
         bool has_time = true,
         [ToolParameterInfo(Description = "IANA 타임존 ID. 한국어 사용자의 기본값은 Asia/Seoul입니다.")]
         string timezone = "Asia/Seoul",
-        [ToolParameterInfo(Description = "약속에 대한 상세 내용. 커밋 메시지 본문처럼 디테일을 정리합니다. 없으면 빈 문자열.")]
+        [ToolParameterInfo(Description = "약속에 대한 선택 상세 내용. 커밋 메시지 본문처럼 디테일을 정리합니다. 없으면 빈 문자열. 상세가 없다는 이유로 사용자에게 추가 입력을 요구하지 마세요.")]
         string description = "",
         [ToolParameterInfo(Description = "약속 근거가 된 과거 메시지의 ChatLogId. search_chat_history/get_chat_context로 찾은 경우에만 지정하고, 없으면 0.")]
         int source_chat_log_id = 0,
@@ -1069,7 +1071,7 @@ ID: {id}
         }
 
         lines.Add("");
-        lines.Add("응답 규칙: 현재 채널의 공유 약속 중 사용자에게 필요한 약속만 간결하게 정리하세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요. 상세/플랜/제안이 필요하면 get_appointment_details를 사용하세요. 수정/삭제할 약속 ID가 불분명하면 find_appointments로 후보를 먼저 좁히세요.");
+        lines.Add("응답 규칙: 현재 채널의 공유 약속 중 사용자에게 필요한 약속만 간결하게 정리하세요. 원본 URL은 Discord 인용 카드가 뜨도록 그대로 적으세요. 상세/플랜/제안은 선택 사항이므로, 사용자가 요청하거나 답변에 필요할 때만 get_appointment_details를 사용하세요. 수정/삭제할 약속 ID가 불분명하면 find_appointments로 후보를 먼저 좁히세요.");
         return string.Join("\n", lines);
     }
 
@@ -1201,6 +1203,7 @@ id는 find_appointments 또는 list_appointments 결과의 ID를 사용하세요
 시간만 나중에 정해진 경우 time에 HH:mm 값을 넣으세요. 예: '방탈출 약속은 오후 3시로 정해졌어' -> 기존 날짜 유지, time='15:00'.
 시간이 다시 미정이 된 경우 time_unspecified=true로 호출하세요. 임의의 시간을 만들지 마세요.
 date가 비어 있으면 기존 날짜를 유지하고, time이 비어 있으면 기존 시간 상태를 유지합니다.
+상세 내용은 선택 사항입니다. 사용자가 새 상세를 제공하지 않으면 기존 상세를 유지하고, 입력을 요구하지 마세요.
 """)]
     public async Task<string> UpdateAppointmentAsync(
         [ToolParameterInfo(Description = "수정할 약속 ID. list_appointments 결과의 ID.")]
@@ -1213,7 +1216,7 @@ date가 비어 있으면 기존 날짜를 유지하고, time이 비어 있으면
         string time = "",
         [ToolParameterInfo(Description = "시간을 미정으로 바꿀지 여부.")]
         bool time_unspecified = false,
-        [ToolParameterInfo(Description = "새 상세 내용. 변경하지 않으려면 빈 문자열. 플랜/제안 목록은 add_appointment_items/remove_appointment_items를 사용하세요.")]
+        [ToolParameterInfo(Description = "새 선택 상세 내용. 변경하지 않으려면 빈 문자열. 플랜/제안 목록은 add_appointment_items/remove_appointment_items를 사용하세요.")]
         string description = "",
         [ToolParameterInfo(Description = "IANA 타임존 ID. 비워두면 기존 약속의 timezone을 유지합니다.")]
         string timezone = "",
@@ -1307,6 +1310,7 @@ ID: {appointment.Id}
         Description = """
 현재 채널에 저장된 공유 약속 하나의 상세 내용, 플랜, 제안 목록을 조회합니다.
 사용자가 특정 약속의 디테일, 준비할 일, 확정된 플랜, 아직 확정되지 않은 의견/제안을 물으면 호출하세요.
+상세/플랜/제안은 선택 사항이므로 비어 있어도 정상입니다. 비어 있다는 이유만으로 사용자에게 입력을 요구하지 마세요.
 id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
 """)]
     public async Task<string> GetAppointmentDetailsAsync(
@@ -1339,6 +1343,7 @@ id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
         Description = """
 현재 채널에 저장된 공유 약속의 상세 내용을 설정하거나 덧붙입니다.
 상세 내용은 커밋 메시지 본문처럼 약속의 배경, 장소 후보, 준비물, 관련 맥락 등을 자유 텍스트로 정리하는 용도입니다.
+사용자가 상세를 제공했거나 대화에서 충분히 확인된 경우에만 호출하세요. 약속 저장/조회 흐름에서 상세 입력을 강제하지 마세요.
 플랜/제안 목록은 이 도구가 아니라 add_appointment_items/remove_appointment_items를 사용하세요.
 id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
 """)]
@@ -1359,7 +1364,7 @@ id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
         var normalizedDetails = NormalizeNullable(details, MaxAppointmentDetailsLength);
         if (string.IsNullOrWhiteSpace(normalizedDetails))
         {
-            return "저장할 상세 내용이 필요합니다.";
+            return "상세 내용을 저장하려면 저장할 내용이 필요합니다. 약속 자체에는 상세 내용이 없어도 됩니다.";
         }
 
         var nowUtc = DateTime.UtcNow;
@@ -1407,6 +1412,7 @@ ID: {appointment.Id}
         Description = """
 현재 채널에 저장된 공유 약속에 플랜 또는 제안 항목을 추가합니다.
 item_type='plan'은 확정된 일정/준비/진행 플랜이고, item_type='suggestion'은 아직 확정되지 않은 의견이나 후보입니다.
+플랜/제안은 선택 사항입니다. 사용자가 요청/제공했거나 대화에서 명확히 확인된 경우에만 추가하고, 항목이 없다는 이유로 입력을 요구하지 마세요.
 사용자가 메시지를 바탕으로 플랜이나 제안을 정리해 달라고 하면, 대화를 읽고 확정된 것은 plan, 미확정 의견은 suggestion으로 나누어 추가하세요.
 id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
 """)]
@@ -1433,7 +1439,7 @@ id가 불분명하면 먼저 find_appointments로 후보를 좁히세요.
         var itemContents = SplitAppointmentItemContents(items);
         if (itemContents.Count == 0)
         {
-            return "추가할 항목이 필요합니다. 줄바꿈으로 플랜 또는 제안을 적어 주세요.";
+            return "플랜/제안을 추가하려면 추가할 항목이 필요합니다. 약속 자체에는 플랜/제안이 없어도 됩니다.";
         }
 
         var nowUtc = DateTime.UtcNow;
@@ -1753,7 +1759,7 @@ ID: {note.Id}
             "",
             BuildAppointmentItemSection("제안", suggestionItems),
             "",
-            "응답 규칙: 상세 내용, 플랜, 제안을 구분해서 사용자에게 필요한 부분만 간결하게 답하세요. 플랜은 확정된 항목, 제안은 미확정 의견입니다. 원본 URL이 필요하면 그대로 적으세요."
+            "응답 규칙: 상세 내용, 플랜, 제안을 구분해서 사용자에게 필요한 부분만 간결하게 답하세요. 플랜은 확정된 항목, 제안은 미확정 의견입니다. 비어 있는 상세/플랜/제안은 없는 것으로 간단히 안내하고, 사용자가 원하지 않는 한 입력을 요구하지 마세요. 원본 URL이 필요하면 그대로 적으세요."
         ];
 
         return string.Join("\n", lines);
@@ -2036,7 +2042,7 @@ ID: {note.Id}
         }
 
         lines.Add("");
-        lines.Add("응답 규칙: 후보가 하나이고 사용자 요청과 명확히 일치하면 해당 ID로 update_appointment, forget_appointment, get_appointment_details 중 필요한 도구를 호출하세요. 후보가 여러 개이거나 확신이 낮으면 사용자에게 어떤 약속인지 확인하세요. 원본 URL은 사용자 응답에 그대로 적어 Discord 인용 카드가 뜨게 하세요.");
+        lines.Add("응답 규칙: 후보가 하나이고 사용자 요청과 명확히 일치하면 해당 ID로 update_appointment, forget_appointment, get_appointment_details 중 필요한 도구를 호출하세요. get_appointment_details는 사용자가 상세/플랜/제안을 물었을 때만 사용하세요. 후보가 여러 개이거나 확신이 낮으면 사용자에게 어떤 약속인지 확인하세요. 원본 URL은 사용자 응답에 그대로 적어 Discord 인용 카드가 뜨게 하세요.");
         return string.Join("\n", lines);
     }
 
