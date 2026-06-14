@@ -1,4 +1,5 @@
 using DiscordBot.Services;
+using DiscordBot.Repositories;
 
 namespace DiscordBot.Tests.Services;
 
@@ -82,5 +83,68 @@ public sealed class DiscordServiceTests
 
         Assert.Equal("먼저 찾아볼게요.\n\n내용을 파악했어요.", content);
         Assert.False(shouldSeparateBeforeContent);
+    }
+
+    [Fact]
+    public void BuildPromptContentWithReferencedMessage_AddsReferencedMessageContext()
+    {
+        var referenced = new ChatLogData(
+            1,
+            "111",
+            "guild",
+            "channel",
+            "user-1",
+            "나는 A보다 B가 맞는 것 같아",
+            new DateTime(2026, 6, 14, 1, 2, 3, DateTimeKind.Utc));
+
+        var prompt = DiscordService.BuildPromptContentWithReferencedMessage(
+            "어떻게 생각해?",
+            referenced,
+            "bot");
+
+        Assert.Equal(
+            """
+[사용자가 답장으로 참조한 메시지]
+작성자: 사용자 user-1의 메시지
+MessageId: 111
+내용:
+나는 A보다 B가 맞는 것 같아
+
+[사용자 메시지]
+어떻게 생각해?
+""",
+            prompt);
+    }
+
+    [Fact]
+    public void BuildPromptContentWithReferencedMessage_LabelsBotResponses()
+    {
+        var referenced = new ChatLogData(
+            1,
+            "111",
+            "guild",
+            "channel",
+            "bot",
+            "이전 답변입니다.",
+            new DateTime(2026, 6, 14, 1, 2, 3, DateTimeKind.Utc));
+
+        var prompt = DiscordService.BuildPromptContentWithReferencedMessage(
+            "이거 다시 설명해줘.",
+            referenced,
+            "bot");
+
+        Assert.Contains("작성자: 봇의 이전 응답", prompt);
+        Assert.Contains("이전 답변입니다.", prompt);
+    }
+
+    [Fact]
+    public void BuildPromptContentWithReferencedMessage_ReturnsPromptWithoutReference()
+    {
+        var prompt = DiscordService.BuildPromptContentWithReferencedMessage(
+            "그냥 질문입니다.",
+            null,
+            "bot");
+
+        Assert.Equal("그냥 질문입니다.", prompt);
     }
 }

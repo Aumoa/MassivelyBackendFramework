@@ -1,6 +1,16 @@
 namespace DiscordBot.Repositories;
 
-public record ChatLogData(long Id, string? MessageId, string? GuildId, string ChannelId, string UserId, string Content, DateTime CreatedAt);
+public record ChatLogData(
+    long Id,
+    string? MessageId,
+    string? GuildId,
+    string ChannelId,
+    string UserId,
+    string Content,
+    DateTime CreatedAt,
+    string? ReferencedMessageId = null,
+    string? ReferencedChannelId = null,
+    string? ReferencedGuildId = null);
 
 public record ChatLogImageInput(
     string? FileName,
@@ -30,6 +40,9 @@ public interface IChatLogRepository
         string content,
         IReadOnlyList<ChatLogImageInput>? images = null,
         IReadOnlyList<ChatLogAttachmentInput>? attachments = null,
+        string? referencedMessageId = null,
+        string? referencedChannelId = null,
+        string? referencedGuildId = null,
         CancellationToken cancellationToken = default);
 
     ValueTask<IReadOnlyList<ChatLogData>> GetAsync(string channelId, int limit, int offset = 0,
@@ -43,5 +56,10 @@ public interface IChatLogRepository
         long chatLogId,
         int before,
         int after,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<ChatLogData?> GetByMessageIdAsync(
+        string channelId,
+        string messageId,
         CancellationToken cancellationToken = default);
 }
