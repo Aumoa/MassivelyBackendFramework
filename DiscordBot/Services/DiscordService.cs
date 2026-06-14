@@ -170,7 +170,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
         IDisposable? typingState = message.Channel.EnterTypingState();
         string thinkingTicker = "";
-        List<string> toolNames = [];
+        var pendingToolUseCount = 0;
         bool shouldSeparateNextAssistantContent = false;
         try
         {
@@ -193,6 +193,15 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             await foreach (var responseMessage in channel.AddAsync(message.Author, prompt, toolsProvider, imageData))
             {
                 totalReasoning += responseMessage.Thinking;
+                if (!string.IsNullOrEmpty(responseMessage.Content) && pendingToolUseCount > 0)
+                {
+                    totalMessage = AppendToolUseNotice(
+                        totalMessage,
+                        pendingToolUseCount,
+                        ref shouldSeparateNextAssistantContent);
+                    pendingToolUseCount = 0;
+                }
+
                 totalMessage = AppendResponseContent(
                     totalMessage,
                     responseMessage.Content,
@@ -200,7 +209,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
                 if (!string.IsNullOrEmpty(responseMessage.ToolName))
                 {
-                    toolNames.Add(responseMessage.ToolName);
+                    pendingToolUseCount++;
                     shouldSeparateNextAssistantContent = !string.IsNullOrWhiteSpace(totalMessage);
                 }
 
@@ -226,14 +235,14 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                     currentMessage = $"*Thinking{thinkingTicker}*";
                     thinkingTicker += "\\*";
 
-                    if (toolNames.Count > 0)
+                    if (pendingToolUseCount > 0)
                     {
-                        currentMessage += "\n" + string.Join("\n", toolNames.Select(t => $"🔧 *{t}*"));
+                        currentMessage += "\n" + BuildToolUseNotice(pendingToolUseCount);
                     }
                 }
                 else
                 {
-                    currentMessage = BuildDiscordPreview(totalMessage);
+                    currentMessage = BuildDiscordPreview(BuildResponsePreview(totalMessage, pendingToolUseCount));
                 }
 
                 currentMessage = BuildDiscordPreview(currentMessage);
@@ -341,6 +350,46 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
         shouldSeparateBeforeContent = false;
         return currentMessage + content;
+    }
+
+    internal static string AppendToolUseNotice(
+        string currentMessage,
+        int toolUseCount,
+        ref bool shouldSeparateBeforeContent)
+    {
+        if (toolUseCount <= 0)
+        {
+            return currentMessage;
+        }
+
+        shouldSeparateBeforeContent = true;
+        var notice = BuildToolUseNotice(toolUseCount);
+        if (string.IsNullOrWhiteSpace(currentMessage))
+        {
+            return notice;
+        }
+
+        return currentMessage.TrimEnd('\r', '\n') + "\n\n" + notice;
+    }
+
+    internal static string BuildToolUseNotice(int toolUseCount)
+    {
+        return $"{toolUseCount}개 도구 사용됨";
+    }
+
+    private static string BuildResponsePreview(string totalMessage, int pendingToolUseCount)
+    {
+        if (pendingToolUseCount <= 0)
+        {
+            return totalMessage;
+        }
+
+        if (string.IsNullOrWhiteSpace(totalMessage))
+        {
+            return BuildToolUseNotice(pendingToolUseCount);
+        }
+
+        return totalMessage.TrimEnd('\r', '\n') + "\n\n" + BuildToolUseNotice(pendingToolUseCount);
     }
 
     internal static string BuildPromptContentWithReferencedMessage(
