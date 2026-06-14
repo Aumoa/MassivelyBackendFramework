@@ -27,6 +27,10 @@
 
 - When reviewing pull requests, branch diffs, CI failures, architecture changes, or merge readiness, read and follow `.codex/skills/massivelybackend-pr-review/SKILL.md`.
 
+## DiscordBot Channel Chat Scope Skill
+
+- When working on DiscordBot chat persistence, chat history lookup, search, context loading, message inspection, or chat-related attachment/image retrieval, read and follow `.codex/skills/discordbot-channel-chat-scope/SKILL.md`.
+
 ## Coding Style Policy
 
 - Follow Microsoft's standard C# coding conventions by default.
@@ -64,6 +68,7 @@
 - When reviewing pull requests, verify that relevant test results are reported; treat missing tests as a blocker when the changed behavior is practical to cover with focused tests.
 - When reviewing pull requests, do not accept build, test, analyzer, or runtime warnings unless there is a clearly documented exceptional reason and the warning is not practical to eliminate.
 - When reviewing dependency changes, verify that external libraries are trustworthy and that available vulnerability information, especially NuGet advisories, was checked.
+- When reviewing DiscordBot chat persistence or chat retrieval changes, verify that chat operations are scoped to the current Discord channel and that channel identity is saved with chat-related records.
 - When reviewing pull requests, prioritize issues that could let a client gain, request, or exercise privileges beyond what the server explicitly authorizes.
 - Treat client-to-server capability negotiation as security-sensitive. Clients may request capabilities, but the server must make the final authorization decision with least privilege and default-deny behavior.
 - Flag risky defaults where client SDKs request powerful capabilities by default, especially remote control, file transfer, admin operations, payment, session, group, authorization, or data export capabilities.

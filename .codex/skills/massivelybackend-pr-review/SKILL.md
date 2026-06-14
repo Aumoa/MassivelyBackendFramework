@@ -20,6 +20,7 @@ MassivelyBackendFramework PR reviews should protect correctness, build health, s
 - Treat unresolved intent uncertainty as a merge-readiness blocker. Do not approve until the author explains the intent or the code is clarified enough to review its behavior.
 - When a PR touches web-based services, ASP.NET services, Blazor UI, OAuth/OIDC work, API services, or frontend-related changes, also follow `WEBAGENTS.md`.
 - When a PR touches high-performance socket server work, including Master, Gateway, Dedicated, channel execution, game networking, packet routing, or MMORPG server logic, also follow `SOCKETAGENTS.md`.
+- When a PR touches DiscordBot chat persistence, chat history lookup, search, context loading, message inspection, or chat-related attachment/image retrieval, also follow `.codex/skills/discordbot-channel-chat-scope/SKILL.md`.
 
 ## API Surface
 
@@ -68,6 +69,13 @@ MassivelyBackendFramework PR reviews should protect correctness, build health, s
 - Do not approve a pull request while warning-producing validation remains, even if the warning is outside the changed files, when the pull request reports or depends on that validation command.
 - Accept warnings only when there is a clearly documented exceptional reason, the warning is not practical to eliminate in the pull request, and the remaining risk is understood.
 - Require the author to either eliminate the warning or document the exceptional reason and provide clean validation for the commands that are expected to be warning-free.
+
+## DiscordBot Chat Scope Review
+
+- For DiscordBot chat persistence and retrieval changes, verify that chat history, search, context lookup, message inspection, and chat-related attachment/image lookup are restricted to the current Discord channel.
+- Verify chat-related records store channel identity when they can later be queried, searched, linked, inspected, or used as context.
+- Treat missing channel id persistence or missing channel filtering as a merge-readiness blocker unless the pull request explicitly defines and authorizes cross-channel behavior.
+- Require focused tests for channel isolation when the changed behavior is practical to test.
 
 ## Dependency Review
 
