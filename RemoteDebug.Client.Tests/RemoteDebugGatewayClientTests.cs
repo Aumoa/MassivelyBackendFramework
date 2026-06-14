@@ -79,6 +79,41 @@ public sealed class RemoteDebugGatewayClientTests
         Assert.Equal("registration rejected", error.Message);
     }
 
+    [Fact]
+    public async Task Runner_SendsHeartbeatAndDisconnectsWhenStopped()
+    {
+        await using var server = FakeGatewayRouteServer.Start();
+        server.HeartbeatIntervalMilliseconds = 25;
+
+        var runner = await RemoteDebugGatewayClientRunner.StartAsync(new RemoteDebugGatewayClientOptions
+        {
+            Host = "127.0.0.1",
+            Port = server.Port,
+            UseTls = false,
+            BackendKind = "UnityRemoteDebug",
+            ClientId = "client-a",
+            DisplayName = "Unity Editor",
+            ClientVersion = "1.2.3",
+            UnityVersion = "6000.0.1f1",
+            Capabilities = RemoteDebugCapabilities.LogStreaming
+        });
+
+        await using (runner)
+        {
+            var heartbeat = await server.HeartbeatRequest.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("client-a", heartbeat.ClientId);
+            Assert.Equal("session-a", heartbeat.SessionId);
+
+            await runner.StopAsync("editor shutdown");
+        }
+
+        var disconnect = await server.DisconnectNotify.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("client-a", disconnect.ClientId);
+        Assert.Equal("session-a", disconnect.SessionId);
+        Assert.Equal("editor shutdown", disconnect.Reason);
+        Assert.True(runner.Completion.IsCompletedSuccessfully);
+    }
+
     private sealed class FakeGatewayRouteServer : IAsyncDisposable
     {
         private readonly TcpListener m_Listener;
@@ -95,6 +130,8 @@ public sealed class RemoteDebugGatewayClientTests
         public int Port { get; }
 
         public string? RegisterErrorMessage { get; set; }
+
+        public int HeartbeatIntervalMilliseconds { get; set; } = 15000;
 
         public TaskCompletionSource<RemoteDebugBackendClientRegisterRequest> RegisterRequest { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -211,7 +248,7 @@ public sealed class RemoteDebugGatewayClientTests
                     request.ClientId,
                     "session-a",
                     RemoteDebugCapabilities.LogStreaming,
-                    heartbeatIntervalMilliseconds: 15000,
+                    HeartbeatIntervalMilliseconds,
                     registeredAtUnixTimeMilliseconds: 1000),
                 RemoteDebugBackendClientRegisterResponse.Codec,
                 cancellationToken);
