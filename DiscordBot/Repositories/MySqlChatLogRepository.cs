@@ -287,4 +287,35 @@ LIMIT 1";
 
         return await connection.QueryFirstOrDefaultAsync<ChatLogData>(command);
     }
+
+    public async ValueTask<IReadOnlyList<ChatLogData>> GetRepliesAsync(
+        string channelId,
+        string referencedMessageId,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = @"
+SELECT " + SELECT_CHAT_LOG_COLUMNS + @"
+FROM `chat_log`
+WHERE `channel_id` = @channelId
+  AND `referenced_channel_id` = @channelId
+  AND `referenced_message_id` = @referencedMessageId
+ORDER BY `created_at` ASC, `id` ASC
+LIMIT @limit";
+
+        var command = new CommandDefinition(
+            QUERY,
+            new
+            {
+                channelId,
+                referencedMessageId,
+                limit
+            },
+            cancellationToken: cancellationToken);
+
+        var results = await connection.QueryAsync<ChatLogData>(command);
+        return results.ToList();
+    }
 }

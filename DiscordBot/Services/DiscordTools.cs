@@ -10,6 +10,7 @@ internal class DiscordTools(SocketSelfUser selfUser, SocketMessage message, ICha
 {
     private const int DefaultAppointmentRetentionDays = 30;
     private const int MaxAppointmentRetentionDays = 365;
+    private const int MaxReplyContextReplies = 50;
     private static readonly (DayOfWeek Day, string[] Aliases)[] KoreanDayOfWeekAliases =
     [
         (DayOfWeek.Sunday, ["일요일", "일욜"]),
@@ -141,6 +142,102 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
     }
 
     [ToolFunction(
+        Name = "get_chat_by_message_id",
+        Description = """
+현재 채팅방에서 Discord 메시지 ID 또는 메시지 URL로 저장된 채팅 로그 하나를 직접 조회합니다.
+사용자가 Discord 메시지 링크를 붙여넣거나, 특정 메시지 ID를 말하며 그 내용을 확인/분석/참조해 달라고 할 때 사용하세요.
+이 도구는 현재 채팅방의 메시지만 조회합니다. 다른 채널 URL은 거부됩니다.
+""")]
+    public async Task<string> GetChatByMessageIdAsync(
+        [ToolParameterInfo(Description = "조회할 Discord 메시지 ID 또는 메시지 URL입니다.")]
+        string message_id_or_url,
+        [ToolParameterInfo(Description = "IANA 타임존 ID (예: Asia/Seoul, America/New_York). 기본값은 UTC입니다.")]
+        string? timezone = null,
+        CancellationToken cancellationToken = default)
+    {
+        var target = ResolveMessageReferenceTarget(message_id_or_url);
+        if (target == null)
+        {
+            return "조회할 Discord 메시지 ID 또는 메시지 URL이 필요합니다.";
+        }
+
+        var currentChannelId = message.Channel.Id.ToString();
+        if (!IsCurrentChannelTarget(target, currentChannelId))
+        {
+            return "현재 채팅방의 메시지만 조회할 수 있습니다.";
+        }
+
+        var log = await chatLogRepository.GetByMessageIdAsync(currentChannelId, target.MessageId, cancellationToken);
+        if (log == null)
+        {
+            return "해당 메시지를 현재 채팅방의 저장된 채팅 기록에서 찾지 못했습니다.";
+        }
+
+        var tz = ResolveTimeZone(timezone);
+        var details = BuildChatLogDetails(log, tz, selfUser.Id.ToString(), "메시지 조회 결과:");
+        return details + "\n\n응답 규칙: 사용자의 질문에 필요한 내용만 간결하게 답하고, 원본 URL이 필요하면 Link 값을 그대로 적으세요.";
+    }
+
+    [ToolFunction(
+        Name = "get_reply_thread_context",
+        Description = """
+현재 채팅방에서 특정 메시지의 답장 흐름을 조회합니다. 메시지가 답장한 부모 메시지와, 해당 메시지에 직접 달린 답장들을 함께 보여줍니다.
+사용자가 Discord 답장 흐름, 의견에 대한 후속 반응, 특정 메시지의 전후 논의 맥락을 묻거나 메시지 URL을 주며 '이 흐름을 봐줘'라고 할 때 사용하세요.
+message_id_or_url에는 Discord 메시지 ID, 메시지 URL, 또는 사용자가 현재 답장으로 참조한 메시지를 뜻하는 replied를 넣을 수 있습니다.
+이 도구는 현재 채팅방의 메시지만 조회합니다.
+""")]
+    public async Task<string> GetReplyThreadContextAsync(
+        [ToolParameterInfo(Description = "조회할 Discord 메시지 ID, 메시지 URL, 또는 현재 사용자 메시지가 답장으로 참조한 메시지를 뜻하는 replied입니다.")]
+        string message_id_or_url = "replied",
+        [ToolParameterInfo(Description = "가져올 직접 답장 수입니다. 0~50, 기본 20입니다.")]
+        int reply_limit = 20,
+        [ToolParameterInfo(Description = "IANA 타임존 ID (예: Asia/Seoul, America/New_York). 기본값은 UTC입니다.")]
+        string? timezone = null,
+        CancellationToken cancellationToken = default)
+    {
+        var target = ResolveMessageReferenceTarget(message_id_or_url);
+        if (target == null)
+        {
+            return "조회할 Discord 메시지 ID, 메시지 URL, 또는 현재 답장 참조가 필요합니다.";
+        }
+
+        var currentChannelId = message.Channel.Id.ToString();
+        if (!IsCurrentChannelTarget(target, currentChannelId))
+        {
+            return "현재 채팅방의 메시지만 조회할 수 있습니다.";
+        }
+
+        var targetLog = await chatLogRepository.GetByMessageIdAsync(currentChannelId, target.MessageId, cancellationToken);
+        if (targetLog == null)
+        {
+            return "해당 메시지를 현재 채팅방의 저장된 채팅 기록에서 찾지 못했습니다.";
+        }
+
+        ChatLogData? parentLog = null;
+        if (!string.IsNullOrWhiteSpace(targetLog.ReferencedMessageId)
+            && (string.IsNullOrWhiteSpace(targetLog.ReferencedChannelId)
+                || string.Equals(targetLog.ReferencedChannelId, currentChannelId, StringComparison.Ordinal)))
+        {
+            parentLog = await chatLogRepository.GetByMessageIdAsync(
+                currentChannelId,
+                targetLog.ReferencedMessageId,
+                cancellationToken);
+        }
+
+        var replyLimit = Math.Clamp(reply_limit, 0, MaxReplyContextReplies);
+        var replies = targetLog.MessageId == null || replyLimit == 0
+            ? []
+            : await chatLogRepository.GetRepliesAsync(
+                currentChannelId,
+                targetLog.MessageId,
+                replyLimit,
+                cancellationToken);
+
+        var tz = ResolveTimeZone(timezone);
+        return BuildReplyThreadContext(targetLog, parentLog, replies, tz, selfUser.Id.ToString());
+    }
+
+    [ToolFunction(
         Name = "get_chat_context",
         Description = """
 현재 채팅방에서 특정 채팅 로그 주변 대화를 조회합니다. search_chat_history 결과의 ChatLogId를 chat_log_id로 넣으면, 그 메시지 앞뒤 대화를 함께 볼 수 있습니다.
@@ -199,9 +296,163 @@ Link 값이 '(메시지가 오래되어 참조할 수 없어요)'로 표시되�
         if (string.IsNullOrEmpty(log.MessageId))
             return "(메시지가 오래되어 참조할 수 없어요)";
 
-        var guildPart = string.IsNullOrEmpty(log.GuildId) ? "@me" : log.GuildId;
-        return $"https://discord.com/channels/{guildPart}/{log.ChannelId}/{log.MessageId}";
+        return BuildMessageReference(log.GuildId, log.ChannelId, log.MessageId);
     }
+
+    internal static string BuildMessageReference(string? guildId, string channelId, string messageId)
+    {
+        var guildPart = string.IsNullOrEmpty(guildId) ? "@me" : guildId;
+        return $"https://discord.com/channels/{guildPart}/{channelId}/{messageId}";
+    }
+
+    internal static DiscordMessageReferenceTarget? ParseMessageReferenceTarget(string? messageIdOrUrl)
+    {
+        if (string.IsNullOrWhiteSpace(messageIdOrUrl))
+        {
+            return null;
+        }
+
+        var trimmed = messageIdOrUrl.Trim();
+        if (trimmed.All(char.IsDigit))
+        {
+            return new DiscordMessageReferenceTarget(trimmed, null, null);
+        }
+
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri)
+            || !IsDiscordHost(uri.Host))
+        {
+            return null;
+        }
+
+        var segments = uri.AbsolutePath
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(Uri.UnescapeDataString)
+            .ToArray();
+
+        if (segments.Length < 4
+            || !string.Equals(segments[0], "channels", StringComparison.OrdinalIgnoreCase)
+            || (!string.Equals(segments[1], "@me", StringComparison.OrdinalIgnoreCase) && !segments[1].All(char.IsDigit))
+            || !segments[2].All(char.IsDigit)
+            || !segments[3].All(char.IsDigit))
+        {
+            return null;
+        }
+
+        var guildId = string.Equals(segments[1], "@me", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : segments[1];
+        return new DiscordMessageReferenceTarget(segments[3], segments[2], guildId);
+    }
+
+    internal static string BuildChatLogDetails(
+        ChatLogData log,
+        TimeZoneInfo timezone,
+        string selfUserId,
+        string? heading = null)
+    {
+        var localTime = TimeZoneInfo.ConvertTimeFromUtc(log.CreatedAt, timezone);
+        List<string> lines = [];
+        if (!string.IsNullOrWhiteSpace(heading))
+        {
+            lines.Add(heading);
+        }
+
+        lines.Add($"ChatLogId: {log.Id}");
+        lines.Add($"Time: {localTime:yyyy-MM-dd HH:mm:ss}");
+        lines.Add($"Author: {FormatAuthor(log, selfUserId)}");
+        lines.Add($"Link: {BuildMessageReference(log)}");
+        if (!string.IsNullOrWhiteSpace(log.ReferencedMessageId))
+        {
+            var referencedChannelId = string.IsNullOrWhiteSpace(log.ReferencedChannelId)
+                ? log.ChannelId
+                : log.ReferencedChannelId;
+            lines.Add($"ReplyTo: {BuildMessageReference(log.ReferencedGuildId, referencedChannelId, log.ReferencedMessageId)}");
+        }
+
+        lines.Add($"Content: {log.Content}");
+        return string.Join("\n", lines);
+    }
+
+    internal static string BuildReplyThreadContext(
+        ChatLogData target,
+        ChatLogData? parent,
+        IReadOnlyList<ChatLogData> replies,
+        TimeZoneInfo timezone,
+        string selfUserId)
+    {
+        List<string> lines = ["답장 흐름 조회 결과:"];
+
+        lines.Add("");
+        lines.Add(parent == null
+            ? "상위 참조 메시지: 저장된 현재 채팅방 로그에서 찾지 못했습니다."
+            : BuildChatLogDetails(parent, timezone, selfUserId, "상위 참조 메시지:"));
+
+        lines.Add("");
+        lines.Add(BuildChatLogDetails(target, timezone, selfUserId, "대상 메시지:"));
+
+        lines.Add("");
+        lines.Add($"직접 답장 {replies.Count}건:");
+        foreach (var reply in replies)
+        {
+            lines.Add("");
+            lines.Add(BuildChatLogDetails(reply, timezone, selfUserId));
+        }
+
+        lines.Add("");
+        lines.Add("응답 규칙: 답장 흐름을 바탕으로 사용자의 질문에 필요한 맥락만 간결하게 정리하세요. 원본 URL이 필요하면 Link 값을 그대로 적으세요.");
+        return string.Join("\n", lines);
+    }
+
+    private DiscordMessageReferenceTarget? ResolveMessageReferenceTarget(string? messageIdOrUrl)
+    {
+        if (string.IsNullOrWhiteSpace(messageIdOrUrl)
+            || string.Equals(messageIdOrUrl.Trim(), "replied", StringComparison.OrdinalIgnoreCase))
+        {
+            return ResolveCurrentReplyTarget();
+        }
+
+        return ParseMessageReferenceTarget(messageIdOrUrl);
+    }
+
+    private DiscordMessageReferenceTarget? ResolveCurrentReplyTarget()
+    {
+        var messageId = message.Reference?.MessageId.IsSpecified == true
+            ? message.Reference.MessageId.Value.ToString()
+            : null;
+        if (string.IsNullOrWhiteSpace(messageId))
+        {
+            return null;
+        }
+
+        var channelId = message.Reference?.ChannelId.ToString();
+        var guildId = message.Reference?.GuildId.IsSpecified == true
+            ? message.Reference.GuildId.Value.ToString()
+            : null;
+        return new DiscordMessageReferenceTarget(messageId, channelId, guildId);
+    }
+
+    private static bool IsCurrentChannelTarget(DiscordMessageReferenceTarget target, string currentChannelId)
+    {
+        return string.IsNullOrWhiteSpace(target.ChannelId)
+            || string.Equals(target.ChannelId, currentChannelId, StringComparison.Ordinal);
+    }
+
+    private static string FormatAuthor(ChatLogData log, string selfUserId)
+    {
+        return log.UserId == selfUserId
+            ? "나의 응답"
+            : $"사용자 {log.UserId}의 메시지";
+    }
+
+    private static bool IsDiscordHost(string host)
+    {
+        return string.Equals(host, "discord.com", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "www.discord.com", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "discordapp.com", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "www.discordapp.com", StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal sealed record DiscordMessageReferenceTarget(string MessageId, string? ChannelId, string? GuildId);
 
     [ToolFunction(
         Name = "remember_appointment",

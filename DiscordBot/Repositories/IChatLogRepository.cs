@@ -62,4 +62,10 @@ public interface IChatLogRepository
         string channelId,
         string messageId,
         CancellationToken cancellationToken = default);
+
+    ValueTask<IReadOnlyList<ChatLogData>> GetRepliesAsync(
+        string channelId,
+        string referencedMessageId,
+        int limit,
+        CancellationToken cancellationToken = default);
 }
