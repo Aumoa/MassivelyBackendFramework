@@ -22,8 +22,20 @@ public interface IChatImageRepository
         DateTimeOffset before,
         CancellationToken cancellationToken = default);
 
+    ValueTask<IReadOnlyList<ChatImageData>> GetLatestAsync(
+        string channelId,
+        DateTimeOffset before,
+        int limit,
+        CancellationToken cancellationToken = default);
+
     ValueTask<ChatImageData?> GetByMessageIdAsync(
         string channelId,
         string messageId,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<IReadOnlyList<ChatImageData>> GetByMessageIdsAsync(
+        string channelId,
+        IReadOnlyList<string> messageIds,
+        int limit,
         CancellationToken cancellationToken = default);
 }

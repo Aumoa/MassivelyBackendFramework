@@ -33,6 +33,16 @@ JOIN `chat_log` l ON l.`id` = a.`chat_log_id`";
         DateTimeOffset before,
         CancellationToken cancellationToken = default)
     {
+        var attachments = await GetLatestAsync(channelId, before, 1, cancellationToken);
+        return attachments.FirstOrDefault();
+    }
+
+    public async ValueTask<IReadOnlyList<ChatAttachmentData>> GetLatestAsync(
+        string channelId,
+        DateTimeOffset before,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
         using var connection = GetConnection();
 
         var command = new CommandDefinition(
@@ -40,15 +50,17 @@ JOIN `chat_log` l ON l.`id` = a.`chat_log_id`";
 WHERE l.`channel_id` = @channelId
   AND l.`created_at` < @before
 ORDER BY l.`created_at` DESC, a.`id`
-LIMIT 1",
+LIMIT @limit",
             new
             {
                 channelId,
-                before = before.UtcDateTime
+                before = before.UtcDateTime,
+                limit
             },
             cancellationToken: cancellationToken);
 
-        return await connection.QueryFirstOrDefaultAsync<ChatAttachmentData>(command);
+        var results = await connection.QueryAsync<ChatAttachmentData>(command);
+        return results.ToList();
     }
 
     public async ValueTask<IReadOnlyList<ChatAttachmentData>> GetByMessageIdAsync(
@@ -67,6 +79,39 @@ ORDER BY a.`id`",
             {
                 channelId,
                 messageId
+            },
+            cancellationToken: cancellationToken);
+
+        var results = await connection.QueryAsync<ChatAttachmentData>(command);
+        return results.ToList();
+    }
+
+    public async ValueTask<IReadOnlyList<ChatAttachmentData>> GetByMessageIdsAsync(
+        string channelId,
+        IReadOnlyList<string> messageIds,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        if (messageIds.Count == 0)
+        {
+            return [];
+        }
+
+        using var connection = GetConnection();
+        var messageIdOrder = string.Join(',', messageIds);
+
+        var command = new CommandDefinition(
+            SelectColumns + @"
+WHERE l.`channel_id` = @channelId
+  AND l.`message_id` IN @messageIds
+ORDER BY FIND_IN_SET(l.`message_id`, @messageIdOrder), a.`id`
+LIMIT @limit",
+            new
+            {
+                channelId,
+                messageIds,
+                messageIdOrder,
+                limit
             },
             cancellationToken: cancellationToken);
 

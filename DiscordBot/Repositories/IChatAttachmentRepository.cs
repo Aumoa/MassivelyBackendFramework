@@ -25,9 +25,21 @@ public interface IChatAttachmentRepository
         DateTimeOffset before,
         CancellationToken cancellationToken = default);
 
+    ValueTask<IReadOnlyList<ChatAttachmentData>> GetLatestAsync(
+        string channelId,
+        DateTimeOffset before,
+        int limit,
+        CancellationToken cancellationToken = default);
+
     ValueTask<IReadOnlyList<ChatAttachmentData>> GetByMessageIdAsync(
         string channelId,
         string messageId,
+        CancellationToken cancellationToken = default);
+
+    ValueTask<IReadOnlyList<ChatAttachmentData>> GetByMessageIdsAsync(
+        string channelId,
+        IReadOnlyList<string> messageIds,
+        int limit,
         CancellationToken cancellationToken = default);
 
     ValueTask<IReadOnlyList<ChatAttachmentData>> SearchAsync(
