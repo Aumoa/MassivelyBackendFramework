@@ -1,0 +1,195 @@
+:root {
+    color-scheme: light;
+    --app-bg: #f6f7f8;
+    --app-surface: #ffffff;
+    --app-surface-muted: #eef3f1;
+    --app-surface-strong: #e4ebe8;
+    --app-border: #d5ded9;
+    --app-border-strong: #aebeb7;
+    --app-text: #1f2724;
+    --app-text-muted: #61716a;
+    --app-accent: #2f7667;
+    --app-accent-soft: #dcefeb;
+    --app-warm: #a96035;
+    --app-danger-bg: #fff3df;
+    --app-focus-ring: rgba(47, 118, 103, 0.28);
+    --app-shadow-sm: 0 1px 2px rgba(25, 34, 31, 0.08);
+    --app-shadow-md: 0 18px 38px rgba(25, 34, 31, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+        --app-bg: #121615;
+        --app-surface: #1a201e;
+        --app-surface-muted: #222b28;
+        --app-surface-strong: #2b3632;
+        --app-border: #33423d;
+        --app-border-strong: #53645f;
+        --app-text: #eef4f1;
+        --app-text-muted: #a8b7b1;
+        --app-accent: #86d6c4;
+        --app-accent-soft: #223f39;
+        --app-warm: #efad7d;
+        --app-danger-bg: #352714;
+        --app-focus-ring: rgba(134, 214, 196, 0.32);
+        --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.34);
+        --app-shadow-md: 0 18px 38px rgba(0, 0, 0, 0.42);
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    min-height: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--app-bg);
+    color: var(--app-text);
+    font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.5;
+}
+
+a {
+    color: var(--app-accent);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+    outline: 3px solid var(--app-focus-ring);
+    outline-offset: 2px;
+}
+
+h1,
+h2,
+p {
+    margin-top: 0;
+}
+
+h1 {
+    margin-bottom: 12px;
+    font-size: 2rem;
+    line-height: 1.12;
+}
+
+h2 {
+    margin-bottom: 8px;
+    font-size: 1rem;
+    line-height: 1.25;
+}
+
+button,
+input,
+textarea {
+    font: inherit;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 0 14px;
+    border: 1px solid var(--app-accent);
+    border-radius: 8px;
+    background: var(--app-accent);
+    color: var(--app-bg);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    filter: brightness(0.96);
+}
+
+.eyebrow {
+    margin: 0 0 10px;
+    color: var(--app-warm);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.summary {
+    margin-bottom: 0;
+    color: var(--app-text-muted);
+    font-size: 1rem;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border: 1px solid color-mix(in srgb, var(--app-accent) 50%, var(--app-border));
+    border-radius: 999px;
+    background: var(--app-accent-soft);
+    color: var(--app-accent);
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.status-pill.muted {
+    border-color: var(--app-border);
+    background: var(--app-surface-muted);
+    color: var(--app-text-muted);
+}
+
+.empty-page {
+    display: grid;
+    gap: 10px;
+    max-width: 720px;
+    padding: 32px;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow-sm);
+}
+
+.empty-page p {
+    margin-bottom: 0;
+    color: var(--app-text-muted);
+}
+
+.request-id {
+    padding: 12px;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface-muted);
+}
+
+#blazor-error-ui {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    display: none;
+    max-width: min(420px, calc(100% - 32px));
+    padding: 14px 42px 14px 16px;
+    border: 1px solid var(--app-border-strong);
+    border-radius: 8px;
+    background: var(--app-danger-bg);
+    box-shadow: var(--app-shadow-md);
+    color: var(--app-text);
+}
+
+#blazor-error-ui .reload {
+    margin-left: 10px;
+}
+
+#blazor-error-ui .dismiss {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    color: var(--app-text-muted);
+    text-decoration: none;
+}

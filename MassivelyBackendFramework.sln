@@ -107,6 +107,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenAI.Controllers.Tests", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OAuth2.Controllers.Tests", "OAuth2.Controllers.Tests\OAuth2.Controllers.Tests.csproj", "{2E86357A-FA05-46BD-847B-E7000346A493}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutomatedWiki", "AutomatedWiki\AutomatedWiki.csproj", "{10CDD71D-F60B-4E55-9754-213156023C66}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -681,6 +683,18 @@ Global
 		{2E86357A-FA05-46BD-847B-E7000346A493}.Release|x64.Build.0 = Release|Any CPU
 		{2E86357A-FA05-46BD-847B-E7000346A493}.Release|x86.ActiveCfg = Release|Any CPU
 		{2E86357A-FA05-46BD-847B-E7000346A493}.Release|x86.Build.0 = Release|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Debug|x64.Build.0 = Debug|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Debug|x86.Build.0 = Debug|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Release|Any CPU.Build.0 = Release|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Release|x64.ActiveCfg = Release|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Release|x64.Build.0 = Release|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Release|x86.ActiveCfg = Release|Any CPU
+		{10CDD71D-F60B-4E55-9754-213156023C66}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -733,6 +747,7 @@ Global
 		{4A6FBE8A-2FAE-4E9A-93D9-EADBEC0DB161} = {8F8C5032-CF89-4C9E-9C9B-52E2F4C57114}
 		{6295B7F0-14D9-4A3E-875F-52B3FE817D35} = {8F8C5032-CF89-4C9E-9C9B-52E2F4C57114}
 		{2E86357A-FA05-46BD-847B-E7000346A493} = {8F8C5032-CF89-4C9E-9C9B-52E2F4C57114}
+		{10CDD71D-F60B-4E55-9754-213156023C66} = {E90F7EFD-FAD3-4219-8CA7-4D115A9E288B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AA50FDB1-B30B-44CD-90FC-E31B5B3C7AAA}

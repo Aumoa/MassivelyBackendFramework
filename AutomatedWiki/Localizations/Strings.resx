@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ANSWER_DEFAULT" xml:space="preserve">
+    <value>Ask about the selected page and the sample assistant will answer from the current wiki context.</value>
+  </data>
+  <data name="ANSWER_FORMAT" xml:space="preserve">
+    <value>Based on "{0}", the current documentation says: {1}</value>
+  </data>
+  <data name="ANSWER_LABEL" xml:space="preserve">
+    <value>Answer</value>
+  </data>
+  <data name="APP_TITLE" xml:space="preserve">
+    <value>Automated Wiki</value>
+  </data>
+  <data name="ASSISTANT_PANEL_ARIA" xml:space="preserve">
+    <value>Wiki assistant</value>
+  </data>
+  <data name="ASSISTANT_SUMMARY" xml:space="preserve">
+    <value>Questions are scoped to the selected document and its accumulated commit notes.</value>
+  </data>
+  <data name="ASSISTANT_TITLE" xml:space="preserve">
+    <value>Ask the wiki</value>
+  </data>
+  <data name="AUTH_EYEBROW" xml:space="preserve">
+    <value>SSO</value>
+  </data>
+  <data name="AUTH_LOGIN" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="AUTH_LOGIN_BUTTON" xml:space="preserve">
+    <value>Continue with SSO</value>
+  </data>
+  <data name="AUTH_REQUIRED_DESCRIPTION" xml:space="preserve">
+    <value>Every authenticated account can read this wiki without a separate role or group grant.</value>
+  </data>
+  <data name="AUTH_REQUIRED_TITLE" xml:space="preserve">
+    <value>Sign in with Ayla Accounts</value>
+  </data>
+  <data name="CHANGE_PANEL_ARIA" xml:space="preserve">
+    <value>Commit change notes</value>
+  </data>
+  <data name="CHANGE_PANEL_TITLE" xml:space="preserve">
+    <value>Recent source signals</value>
+  </data>
+  <data name="DOCUMENT_BODY_ARIA" xml:space="preserve">
+    <value>Selected wiki document</value>
+  </data>
+  <data name="ERROR_PAGE_MESSAGE" xml:space="preserve">
+    <value>An error occurred while processing your request.</value>
+  </data>
+  <data name="ERROR_PAGE_TITLE" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="ERROR_RELOAD" xml:space="preserve">
+    <value>Reload</value>
+  </data>
+  <data name="ERROR_REQUEST_ID" xml:space="preserve">
+    <value>Request ID</value>
+  </data>
+  <data name="ERROR_UNHANDLED" xml:space="preserve">
+    <value>An unhandled error has occurred.</value>
+  </data>
+  <data name="HOME_WORKSPACE_ARIA" xml:space="preserve">
+    <value>Automated wiki workspace</value>
+  </data>
+  <data name="NOTFOUND_DESCRIPTION" xml:space="preserve">
+    <value>The requested wiki page does not exist.</value>
+  </data>
+  <data name="NOTFOUND_TITLE" xml:space="preserve">
+    <value>Not Found</value>
+  </data>
+  <data name="PAGE_ASK_BODY_1" xml:space="preserve">
+    <value>The assistant answers from the current page, related commit summaries, and the indexed repository map instead of treating the wiki as a flat pile of markdown.</value>
+  </data>
+  <data name="PAGE_ASK_BODY_2" xml:space="preserve">
+    <value>Later iterations can attach citations to code paths, commits, and generated wiki sections so readers can move from an answer back into the source trail.</value>
+  </data>
+  <data name="PAGE_ASK_CHANGE_1" xml:space="preserve">
+    <value>Added question routing that prefers page-local context before widening search.</value>
+  </data>
+  <data name="PAGE_ASK_CHANGE_2" xml:space="preserve">
+    <value>Stored generated answers with document references for replay and review.</value>
+  </data>
+  <data name="PAGE_ASK_SECTION" xml:space="preserve">
+    <value>AI Q&amp;A</value>
+  </data>
+  <data name="PAGE_ASK_SUMMARY" xml:space="preserve">
+    <value>Readers can question the wiki while staying anchored to repository-backed documentation.</value>
+  </data>
+  <data name="PAGE_ASK_TITLE" xml:space="preserve">
+    <value>Question answering layer</value>
+  </data>
+  <data name="PAGE_COUNT_FORMAT" xml:space="preserve">
+    <value>{0} of {1} pages</value>
+  </data>
+  <data name="PAGE_INTAKE_BODY_1" xml:space="preserve">
+    <value>The watcher groups incoming commits by affected services, changed public surface, and likely documentation ownership.</value>
+  </data>
+  <data name="PAGE_INTAKE_BODY_2" xml:space="preserve">
+    <value>Each accepted commit adds a small source signal. The wiki update job later consolidates those signals into readable pages.</value>
+  </data>
+  <data name="PAGE_INTAKE_CHANGE_1" xml:space="preserve">
+    <value>Queued commit summaries now include changed project names and touched routes.</value>
+  </data>
+  <data name="PAGE_INTAKE_CHANGE_2" xml:space="preserve">
+    <value>Introduced a draft update bucket for changes that need human review.</value>
+  </data>
+  <data name="PAGE_INTAKE_SECTION" xml:space="preserve">
+    <value>Repository Watcher</value>
+  </data>
+  <data name="PAGE_INTAKE_SUMMARY" xml:space="preserve">
+    <value>Commit surveillance turns raw diffs into small documentation signals before the wiki is rewritten.</value>
+  </data>
+  <data name="PAGE_INTAKE_TITLE" xml:space="preserve">
+    <value>Commit intake pipeline</value>
+  </data>
+  <data name="PAGE_LIST_ARIA" xml:space="preserve">
+    <value>Wiki pages</value>
+  </data>
+  <data name="PAGE_MAP_BODY_1" xml:space="preserve">
+    <value>The repository map keeps track of projects, service boundaries, shared libraries, and pages that mention each area.</value>
+  </data>
+  <data name="PAGE_MAP_BODY_2" xml:space="preserve">
+    <value>Large projects stay navigable because search results can rank pages by code ownership, commit recency, and documented dependency edges.</value>
+  </data>
+  <data name="PAGE_MAP_CHANGE_1" xml:space="preserve">
+    <value>Marked web entrypoints as frontend nodes in the sample graph.</value>
+  </data>
+  <data name="PAGE_MAP_CHANGE_2" xml:space="preserve">
+    <value>Linked generated pages to project references discovered from the solution.</value>
+  </data>
+  <data name="PAGE_MAP_SECTION" xml:space="preserve">
+    <value>Knowledge Graph</value>
+  </data>
+  <data name="PAGE_MAP_SUMMARY" xml:space="preserve">
+    <value>Generated pages are connected through repository structure, ownership, and code relationships.</value>
+  </data>
+  <data name="PAGE_MAP_TITLE" xml:space="preserve">
+    <value>Repository map</value>
+  </data>
+  <data name="PAGE_OVERVIEW_BODY_1" xml:space="preserve">
+    <value>This wiki is designed for repositories where documentation needs to follow code without waiting for manual page maintenance.</value>
+  </data>
+  <data name="PAGE_OVERVIEW_BODY_2" xml:space="preserve">
+    <value>Pages are managed by AI, updated from commit history, and browsed like a living technical reference for the target repository.</value>
+  </data>
+  <data name="PAGE_OVERVIEW_CHANGE_1" xml:space="preserve">
+    <value>Created the first authenticated wiki shell and sample page inventory.</value>
+  </data>
+  <data name="PAGE_OVERVIEW_CHANGE_2" xml:space="preserve">
+    <value>Connected the browser experience to the Ayla Accounts SSO flow.</value>
+  </data>
+  <data name="PAGE_OVERVIEW_SECTION" xml:space="preserve">
+    <value>Product Shape</value>
+  </data>
+  <data name="PAGE_OVERVIEW_SUMMARY" xml:space="preserve">
+    <value>An AI-managed documentation surface that follows a repository as commits land.</value>
+  </data>
+  <data name="PAGE_OVERVIEW_TITLE" xml:space="preserve">
+    <value>AI-managed wiki overview</value>
+  </data>
+  <data name="QUESTION_BUTTON" xml:space="preserve">
+    <value>Ask</value>
+  </data>
+  <data name="QUESTION_LABEL" xml:space="preserve">
+    <value>Question</value>
+  </data>
+  <data name="QUESTION_PLACEHOLDER" xml:space="preserve">
+    <value>What changed in the commit intake flow?</value>
+  </data>
+  <data name="SEARCH_LABEL" xml:space="preserve">
+    <value>Search pages</value>
+  </data>
+  <data name="SEARCH_PLACEHOLDER" xml:space="preserve">
+    <value>Search by page, subsystem, or commit note</value>
+  </data>
+  <data name="STATUS_SYNCED" xml:space="preserve">
+    <value>Sample content synced</value>
+  </data>
+  <data name="STATUS_WATCHING" xml:space="preserve">
+    <value>Watching target repository</value>
+  </data>
+  <data name="TOPBAR_SECTION" xml:space="preserve">
+    <value>Repository Knowledge</value>
+  </data>
+</root>

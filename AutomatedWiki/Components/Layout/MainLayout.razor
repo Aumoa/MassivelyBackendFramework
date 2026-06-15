@@ -1,0 +1,52 @@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject OpenIDConnect.IAuthenticationStateProvider OidcAuth
+
+<div class="app-shell">
+    <header class="topbar">
+        <a class="brand" href="" aria-label="@Strings.APP_TITLE">
+            <span class="brand-mark" aria-hidden="true">W</span>
+            <span>@Strings.APP_TITLE</span>
+        </a>
+        <span class="topbar-section">@Strings.TOPBAR_SECTION</span>
+        <AuthorizeView>
+            <Authorized>
+                <BlazorSharedComponent.ProfileCard />
+            </Authorized>
+            <NotAuthorized>
+                <button type="button" class="auth-action" @onclick="StartLogin">@Strings.AUTH_LOGIN</button>
+            </NotAuthorized>
+        </AuthorizeView>
+    </header>
+
+    <AuthorizeView>
+        <Authorized>
+            <main class="content">
+                @Body
+            </main>
+        </Authorized>
+        <NotAuthorized>
+            <main class="content login-content">
+                <section class="login-panel" aria-label="@Strings.AUTH_REQUIRED_TITLE">
+                    <p class="eyebrow">@Strings.AUTH_EYEBROW</p>
+                    <h1>@Strings.AUTH_REQUIRED_TITLE</h1>
+                    <p>@Strings.AUTH_REQUIRED_DESCRIPTION</p>
+                    <button type="button" class="btn-primary" @onclick="StartLogin">@Strings.AUTH_LOGIN_BUTTON</button>
+                </section>
+            </main>
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+<div id="blazor-error-ui">
+    @Strings.ERROR_UNHANDLED
+    <a href="" class="reload">@Strings.ERROR_RELOAD</a>
+    <a class="dismiss">x</a>
+</div>
+
+@code {
+    private void StartLogin()
+    {
+        OidcAuth.NavigateToLogin(Nav, "auth/redirect", "openid profile email");
+    }
+}

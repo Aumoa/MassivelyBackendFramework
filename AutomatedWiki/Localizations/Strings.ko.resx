@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ANSWER_DEFAULT" xml:space="preserve">
+    <value>선택한 페이지에 대해 질문하면 현재 위키 문맥에서 샘플 답변을 만듭니다.</value>
+  </data>
+  <data name="ANSWER_FORMAT" xml:space="preserve">
+    <value>"{0}" 기준으로 현재 문서는 이렇게 설명합니다: {1}</value>
+  </data>
+  <data name="ANSWER_LABEL" xml:space="preserve">
+    <value>답변</value>
+  </data>
+  <data name="APP_TITLE" xml:space="preserve">
+    <value>Automated Wiki</value>
+  </data>
+  <data name="ASSISTANT_PANEL_ARIA" xml:space="preserve">
+    <value>위키 어시스턴트</value>
+  </data>
+  <data name="ASSISTANT_SUMMARY" xml:space="preserve">
+    <value>질문은 선택된 문서와 누적된 커밋 노트 범위에서 다룹니다.</value>
+  </data>
+  <data name="ASSISTANT_TITLE" xml:space="preserve">
+    <value>위키에 질문</value>
+  </data>
+  <data name="AUTH_EYEBROW" xml:space="preserve">
+    <value>SSO</value>
+  </data>
+  <data name="AUTH_LOGIN" xml:space="preserve">
+    <value>로그인</value>
+  </data>
+  <data name="AUTH_LOGIN_BUTTON" xml:space="preserve">
+    <value>SSO로 계속</value>
+  </data>
+  <data name="AUTH_REQUIRED_DESCRIPTION" xml:space="preserve">
+    <value>인증된 모든 계정은 별도의 역할이나 그룹 권한 없이 이 위키를 열람할 수 있습니다.</value>
+  </data>
+  <data name="AUTH_REQUIRED_TITLE" xml:space="preserve">
+    <value>Ayla Accounts로 로그인</value>
+  </data>
+  <data name="CHANGE_PANEL_ARIA" xml:space="preserve">
+    <value>커밋 변경 노트</value>
+  </data>
+  <data name="CHANGE_PANEL_TITLE" xml:space="preserve">
+    <value>최근 소스 신호</value>
+  </data>
+  <data name="DOCUMENT_BODY_ARIA" xml:space="preserve">
+    <value>선택된 위키 문서</value>
+  </data>
+  <data name="ERROR_PAGE_MESSAGE" xml:space="preserve">
+    <value>요청을 처리하는 동안 오류가 발생했습니다.</value>
+  </data>
+  <data name="ERROR_PAGE_TITLE" xml:space="preserve">
+    <value>오류</value>
+  </data>
+  <data name="ERROR_RELOAD" xml:space="preserve">
+    <value>새로고침</value>
+  </data>
+  <data name="ERROR_REQUEST_ID" xml:space="preserve">
+    <value>요청 ID</value>
+  </data>
+  <data name="ERROR_UNHANDLED" xml:space="preserve">
+    <value>처리되지 않은 오류가 발생했습니다.</value>
+  </data>
+  <data name="HOME_WORKSPACE_ARIA" xml:space="preserve">
+    <value>자동화 위키 작업 영역</value>
+  </data>
+  <data name="NOTFOUND_DESCRIPTION" xml:space="preserve">
+    <value>요청한 위키 페이지가 없습니다.</value>
+  </data>
+  <data name="NOTFOUND_TITLE" xml:space="preserve">
+    <value>페이지 없음</value>
+  </data>
+  <data name="PAGE_ASK_BODY_1" xml:space="preserve">
+    <value>어시스턴트는 위키를 평평한 마크다운 더미로 보지 않고 현재 페이지, 관련 커밋 요약, 인덱싱된 저장소 지도를 함께 사용해 답합니다.</value>
+  </data>
+  <data name="PAGE_ASK_BODY_2" xml:space="preserve">
+    <value>다음 단계에서는 답변마다 코드 경로, 커밋, 생성된 위키 섹션을 인용으로 붙여 독자가 소스 흐름으로 이동할 수 있게 합니다.</value>
+  </data>
+  <data name="PAGE_ASK_CHANGE_1" xml:space="preserve">
+    <value>페이지 로컬 문맥을 먼저 사용한 뒤 검색 범위를 넓히는 질문 라우팅을 추가했습니다.</value>
+  </data>
+  <data name="PAGE_ASK_CHANGE_2" xml:space="preserve">
+    <value>생성된 답변을 문서 참조와 함께 저장하도록 했습니다.</value>
+  </data>
+  <data name="PAGE_ASK_SECTION" xml:space="preserve">
+    <value>AI 질의응답</value>
+  </data>
+  <data name="PAGE_ASK_SUMMARY" xml:space="preserve">
+    <value>독자는 저장소 기반 문서 문맥을 유지한 채 위키에 질문할 수 있습니다.</value>
+  </data>
+  <data name="PAGE_ASK_TITLE" xml:space="preserve">
+    <value>질문 답변 계층</value>
+  </data>
+  <data name="PAGE_COUNT_FORMAT" xml:space="preserve">
+    <value>{1}개 중 {0}개 페이지</value>
+  </data>
+  <data name="PAGE_INTAKE_BODY_1" xml:space="preserve">
+    <value>감시기는 들어오는 커밋을 영향받은 서비스, 변경된 공개 표면, 문서 소유권 후보 기준으로 묶습니다.</value>
+  </data>
+  <data name="PAGE_INTAKE_BODY_2" xml:space="preserve">
+    <value>수용된 커밋은 작은 소스 신호를 하나씩 추가하고, 위키 갱신 작업은 그 신호들을 읽기 좋은 페이지로 합칩니다.</value>
+  </data>
+  <data name="PAGE_INTAKE_CHANGE_1" xml:space="preserve">
+    <value>커밋 요약 큐에 변경된 프로젝트 이름과 건드린 라우트를 포함했습니다.</value>
+  </data>
+  <data name="PAGE_INTAKE_CHANGE_2" xml:space="preserve">
+    <value>사람 검토가 필요한 변경을 위한 초안 갱신 버킷을 도입했습니다.</value>
+  </data>
+  <data name="PAGE_INTAKE_SECTION" xml:space="preserve">
+    <value>저장소 감시기</value>
+  </data>
+  <data name="PAGE_INTAKE_SUMMARY" xml:space="preserve">
+    <value>커밋 감시는 원시 diff를 위키 재작성 전의 작은 문서 신호로 바꿉니다.</value>
+  </data>
+  <data name="PAGE_INTAKE_TITLE" xml:space="preserve">
+    <value>커밋 수집 파이프라인</value>
+  </data>
+  <data name="PAGE_LIST_ARIA" xml:space="preserve">
+    <value>위키 페이지</value>
+  </data>
+  <data name="PAGE_MAP_BODY_1" xml:space="preserve">
+    <value>저장소 지도는 프로젝트, 서비스 경계, 공유 라이브러리, 각 영역을 언급하는 페이지를 추적합니다.</value>
+  </data>
+  <data name="PAGE_MAP_BODY_2" xml:space="preserve">
+    <value>대형 프로젝트에서도 코드 소유권, 커밋 최신성, 문서화된 의존 관계로 검색 결과의 우선순위를 매길 수 있어 탐색성이 유지됩니다.</value>
+  </data>
+  <data name="PAGE_MAP_CHANGE_1" xml:space="preserve">
+    <value>샘플 그래프에서 웹 진입점을 Frontend 노드로 표시했습니다.</value>
+  </data>
+  <data name="PAGE_MAP_CHANGE_2" xml:space="preserve">
+    <value>솔루션에서 발견한 프로젝트 참조와 생성 페이지를 연결했습니다.</value>
+  </data>
+  <data name="PAGE_MAP_SECTION" xml:space="preserve">
+    <value>지식 그래프</value>
+  </data>
+  <data name="PAGE_MAP_SUMMARY" xml:space="preserve">
+    <value>생성된 페이지는 저장소 구조, 소유권, 코드 관계를 통해 서로 연결됩니다.</value>
+  </data>
+  <data name="PAGE_MAP_TITLE" xml:space="preserve">
+    <value>저장소 지도</value>
+  </data>
+  <data name="PAGE_OVERVIEW_BODY_1" xml:space="preserve">
+    <value>이 위키는 수동 문서 유지에 기대지 않고도 코드 변화에 맞춰 문서가 따라가야 하는 저장소를 위해 설계됩니다.</value>
+  </data>
+  <data name="PAGE_OVERVIEW_BODY_2" xml:space="preserve">
+    <value>페이지는 AI가 관리하고 커밋 이력에서 갱신되며, 대상 저장소를 위한 살아 있는 기술 레퍼런스처럼 탐색됩니다.</value>
+  </data>
+  <data name="PAGE_OVERVIEW_CHANGE_1" xml:space="preserve">
+    <value>첫 인증 위키 셸과 샘플 페이지 목록을 만들었습니다.</value>
+  </data>
+  <data name="PAGE_OVERVIEW_CHANGE_2" xml:space="preserve">
+    <value>브라우저 경험을 Ayla Accounts SSO 흐름에 연결했습니다.</value>
+  </data>
+  <data name="PAGE_OVERVIEW_SECTION" xml:space="preserve">
+    <value>제품 형태</value>
+  </data>
+  <data name="PAGE_OVERVIEW_SUMMARY" xml:space="preserve">
+    <value>커밋이 올라올 때마다 저장소를 따라가는 AI 관리 문서 표면입니다.</value>
+  </data>
+  <data name="PAGE_OVERVIEW_TITLE" xml:space="preserve">
+    <value>AI 관리 위키 개요</value>
+  </data>
+  <data name="QUESTION_BUTTON" xml:space="preserve">
+    <value>질문</value>
+  </data>
+  <data name="QUESTION_LABEL" xml:space="preserve">
+    <value>질문</value>
+  </data>
+  <data name="QUESTION_PLACEHOLDER" xml:space="preserve">
+    <value>커밋 수집 흐름에서 무엇이 바뀌었어?</value>
+  </data>
+  <data name="SEARCH_LABEL" xml:space="preserve">
+    <value>페이지 검색</value>
+  </data>
+  <data name="SEARCH_PLACEHOLDER" xml:space="preserve">
+    <value>페이지, 서브시스템, 커밋 노트로 검색</value>
+  </data>
+  <data name="STATUS_SYNCED" xml:space="preserve">
+    <value>샘플 내용 동기화됨</value>
+  </data>
+  <data name="STATUS_WATCHING" xml:space="preserve">
+    <value>대상 저장소 감시 중</value>
+  </data>
+  <data name="TOPBAR_SECTION" xml:space="preserve">
+    <value>저장소 지식</value>
+  </data>
+</root>

@@ -1,0 +1,29 @@
+@page "/error"
+@using System.Diagnostics
+
+<PageTitle>@Strings.ERROR_PAGE_TITLE</PageTitle>
+
+<section class="empty-page">
+    <h1>@Strings.ERROR_PAGE_TITLE</h1>
+    <p>@Strings.ERROR_PAGE_MESSAGE</p>
+
+    @if (ShowRequestId)
+    {
+        <p class="request-id">
+            <strong>@Strings.ERROR_REQUEST_ID:</strong> <code>@RequestId</code>
+        </p>
+    }
+</section>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+    private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+
+    protected override void OnInitialized()
+    {
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    }
+}

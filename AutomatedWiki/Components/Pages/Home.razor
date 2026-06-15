@@ -1,0 +1,201 @@
+@page "/"
+
+<PageTitle>@Strings.APP_TITLE</PageTitle>
+
+<section class="wiki-workspace" aria-label="@Strings.HOME_WORKSPACE_ARIA">
+    <aside class="wiki-sidebar">
+        <label class="search-field">
+            <span>@Strings.SEARCH_LABEL</span>
+            <input type="search" placeholder="@Strings.SEARCH_PLACEHOLDER" @bind="m_SearchText" @bind:event="oninput" />
+        </label>
+
+        <div class="page-count">@string.Format(Strings.PAGE_COUNT_FORMAT, FilteredPages.Count, Pages.Count)</div>
+
+        <nav class="page-list" aria-label="@Strings.PAGE_LIST_ARIA">
+            @foreach (var wikiPage in FilteredPages)
+            {
+                <button type="button"
+                        class="@GetPageButtonClass(wikiPage)"
+                        @onclick="() => SelectPage(wikiPage.Id)">
+                    <span>@wikiPage.Title</span>
+                    <small>@wikiPage.Section</small>
+                </button>
+            }
+        </nav>
+    </aside>
+
+    <section class="document-surface">
+        <div class="document-toolbar">
+            <span class="status-pill">@Strings.STATUS_WATCHING</span>
+            <span class="status-pill muted">@Strings.STATUS_SYNCED</span>
+        </div>
+
+        <article class="wiki-document">
+            <header class="document-header">
+                <p class="eyebrow">@SelectedPage.Section</p>
+                <h1>@SelectedPage.Title</h1>
+                <p class="summary">@SelectedPage.Summary</p>
+            </header>
+
+            <div class="document-grid">
+                <section class="document-body" aria-label="@Strings.DOCUMENT_BODY_ARIA">
+                    @foreach (var paragraph in SelectedPage.Paragraphs)
+                    {
+                        <p>@paragraph</p>
+                    }
+                </section>
+
+                <aside class="change-panel" aria-label="@Strings.CHANGE_PANEL_ARIA">
+                    <h2>@Strings.CHANGE_PANEL_TITLE</h2>
+                    <ol class="change-list">
+                        @foreach (var change in SelectedPage.CommitChanges)
+                        {
+                            <li>
+                                <span>@change.Commit</span>
+                                <p>@change.Summary</p>
+                            </li>
+                        }
+                    </ol>
+                </aside>
+            </div>
+        </article>
+    </section>
+
+    <aside class="assistant-panel" aria-label="@Strings.ASSISTANT_PANEL_ARIA">
+        <h2>@Strings.ASSISTANT_TITLE</h2>
+        <p>@Strings.ASSISTANT_SUMMARY</p>
+
+        <label class="question-field">
+            <span>@Strings.QUESTION_LABEL</span>
+            <textarea rows="5" placeholder="@Strings.QUESTION_PLACEHOLDER" @bind="m_Question"></textarea>
+        </label>
+
+        <button type="button" class="btn-primary" @onclick="AskQuestion">@Strings.QUESTION_BUTTON</button>
+
+        <div class="answer-box">
+            <span>@Strings.ANSWER_LABEL</span>
+            <p>@m_Answer</p>
+        </div>
+    </aside>
+</section>
+
+@code {
+    private string m_SearchText = string.Empty;
+    private string? m_SelectedPageId;
+    private string m_Question = string.Empty;
+    private string m_Answer = Strings.ANSWER_DEFAULT;
+
+    private IReadOnlyList<WikiPage> Pages =>
+    [
+        new(
+            "overview",
+            Strings.PAGE_OVERVIEW_TITLE,
+            Strings.PAGE_OVERVIEW_SECTION,
+            Strings.PAGE_OVERVIEW_SUMMARY,
+            [Strings.PAGE_OVERVIEW_BODY_1, Strings.PAGE_OVERVIEW_BODY_2],
+            [
+                new("a31d2f4", Strings.PAGE_OVERVIEW_CHANGE_1),
+                new("c8b9910", Strings.PAGE_OVERVIEW_CHANGE_2)
+            ]),
+        new(
+            "commit-intake",
+            Strings.PAGE_INTAKE_TITLE,
+            Strings.PAGE_INTAKE_SECTION,
+            Strings.PAGE_INTAKE_SUMMARY,
+            [Strings.PAGE_INTAKE_BODY_1, Strings.PAGE_INTAKE_BODY_2],
+            [
+                new("f4306aa", Strings.PAGE_INTAKE_CHANGE_1),
+                new("19b73ce", Strings.PAGE_INTAKE_CHANGE_2)
+            ]),
+        new(
+            "repository-map",
+            Strings.PAGE_MAP_TITLE,
+            Strings.PAGE_MAP_SECTION,
+            Strings.PAGE_MAP_SUMMARY,
+            [Strings.PAGE_MAP_BODY_1, Strings.PAGE_MAP_BODY_2],
+            [
+                new("86d0e29", Strings.PAGE_MAP_CHANGE_1),
+                new("4b8ab12", Strings.PAGE_MAP_CHANGE_2)
+            ]),
+        new(
+            "ask-ai",
+            Strings.PAGE_ASK_TITLE,
+            Strings.PAGE_ASK_SECTION,
+            Strings.PAGE_ASK_SUMMARY,
+            [Strings.PAGE_ASK_BODY_1, Strings.PAGE_ASK_BODY_2],
+            [
+                new("0db91af", Strings.PAGE_ASK_CHANGE_1),
+                new("72c13ae", Strings.PAGE_ASK_CHANGE_2)
+            ])
+    ];
+
+    private IReadOnlyList<WikiPage> FilteredPages
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(m_SearchText))
+            {
+                return Pages;
+            }
+
+            return Pages
+                .Where(page => page.Matches(m_SearchText))
+                .ToArray();
+        }
+    }
+
+    private WikiPage SelectedPage
+    {
+        get
+        {
+            return Pages.FirstOrDefault(page => page.Id == m_SelectedPageId)
+                ?? FilteredPages.FirstOrDefault()
+                ?? Pages[0];
+        }
+    }
+
+    private string GetPageButtonClass(WikiPage page)
+    {
+        return page.Id == SelectedPage.Id ? "page-button selected" : "page-button";
+    }
+
+    private void SelectPage(string pageId)
+    {
+        m_SelectedPageId = pageId;
+    }
+
+    private void AskQuestion()
+    {
+        if (string.IsNullOrWhiteSpace(m_Question))
+        {
+            m_Answer = Strings.ANSWER_DEFAULT;
+            return;
+        }
+
+        m_Answer = string.Format(Strings.ANSWER_FORMAT, SelectedPage.Title, SelectedPage.Summary);
+    }
+
+    private sealed record WikiPage(
+        string Id,
+        string Title,
+        string Section,
+        string Summary,
+        IReadOnlyList<string> Paragraphs,
+        IReadOnlyList<CommitChange> CommitChanges)
+    {
+        public bool Matches(string searchText)
+        {
+            return Contains(Title, searchText) ||
+                Contains(Section, searchText) ||
+                Contains(Summary, searchText) ||
+                Paragraphs.Any(paragraph => Contains(paragraph, searchText));
+        }
+
+        private static bool Contains(string value, string searchText)
+        {
+            return value.Contains(searchText, StringComparison.CurrentCultureIgnoreCase);
+        }
+    }
+
+    private sealed record CommitChange(string Commit, string Summary);
+}

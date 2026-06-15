@@ -1,0 +1,231 @@
+.wiki-workspace {
+    display: grid;
+    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(260px, 340px);
+    gap: 16px;
+    align-items: start;
+}
+
+.wiki-sidebar,
+.document-surface,
+.assistant-panel {
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface);
+    box-shadow: var(--app-shadow-sm);
+}
+
+.wiki-sidebar,
+.assistant-panel {
+    position: sticky;
+    top: 84px;
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+}
+
+.search-field,
+.question-field {
+    display: grid;
+    gap: 8px;
+    color: var(--app-text);
+    font-size: 0.84rem;
+    font-weight: 800;
+}
+
+.search-field input,
+.question-field textarea {
+    width: 100%;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface);
+    color: var(--app-text);
+}
+
+.search-field input {
+    min-height: 40px;
+    padding: 0 12px;
+}
+
+.question-field textarea {
+    min-height: 132px;
+    resize: vertical;
+    padding: 10px 12px;
+}
+
+.page-count {
+    color: var(--app-text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.page-list {
+    display: grid;
+    gap: 8px;
+}
+
+.page-button {
+    display: grid;
+    gap: 3px;
+    width: 100%;
+    min-height: 62px;
+    padding: 10px 12px;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface);
+    color: var(--app-text);
+    text-align: left;
+    cursor: pointer;
+}
+
+.page-button:hover {
+    border-color: var(--app-border-strong);
+}
+
+.page-button.selected {
+    border-color: color-mix(in srgb, var(--app-accent) 60%, var(--app-border));
+    background: var(--app-accent-soft);
+}
+
+.page-button span {
+    font-size: 0.92rem;
+    font-weight: 800;
+}
+
+.page-button small {
+    color: var(--app-text-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.document-surface {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.document-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--app-border);
+    background: color-mix(in srgb, var(--app-surface-muted) 44%, var(--app-surface));
+}
+
+.wiki-document {
+    display: grid;
+    gap: 24px;
+    padding: 28px;
+}
+
+.document-header {
+    max-width: 780px;
+}
+
+.document-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(230px, 280px);
+    gap: 22px;
+}
+
+.document-body {
+    min-width: 0;
+    color: var(--app-text);
+    font-size: 1rem;
+}
+
+.document-body p {
+    margin-bottom: 18px;
+}
+
+.change-panel {
+    align-self: start;
+    padding: 16px;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface-muted);
+}
+
+.change-list {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding-left: 20px;
+}
+
+.change-list li::marker {
+    color: var(--app-accent);
+    font-weight: 800;
+}
+
+.change-list span {
+    display: inline-flex;
+    margin-bottom: 4px;
+    color: var(--app-accent);
+    font-family: Consolas, "Liberation Mono", monospace;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.change-list p {
+    margin: 0;
+    color: var(--app-text-muted);
+    font-size: 0.86rem;
+}
+
+.assistant-panel h2,
+.assistant-panel p {
+    margin-bottom: 0;
+}
+
+.assistant-panel > p {
+    color: var(--app-text-muted);
+    font-size: 0.92rem;
+}
+
+.answer-box {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid var(--app-border);
+    border-radius: 8px;
+    background: var(--app-surface-muted);
+}
+
+.answer-box span {
+    color: var(--app-text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.answer-box p {
+    margin: 0;
+    color: var(--app-text);
+    font-size: 0.92rem;
+}
+
+@media (max-width: 1180px) {
+    .wiki-workspace {
+        grid-template-columns: 260px minmax(0, 1fr);
+    }
+
+    .assistant-panel {
+        position: static;
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 840px) {
+    .wiki-workspace,
+    .document-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .wiki-sidebar {
+        position: static;
+    }
+
+    .wiki-document {
+        padding: 20px;
+    }
+}
