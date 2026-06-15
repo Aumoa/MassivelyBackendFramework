@@ -2,6 +2,7 @@ using AutomatedWiki.Components;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using OpenIDConnect.Extensions;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 ValidateProductionAllowedHosts(builder);
@@ -72,22 +73,14 @@ static void ValidateProductionAllowedHosts(WebApplicationBuilder builder)
 
 static void ConfigureDataProtection(WebApplicationBuilder builder)
 {
-    var dataProtection = builder.Configuration.GetSection("DataProtection");
-    var keyPath = dataProtection.GetValue<string>("KeyPath");
-    if (string.IsNullOrWhiteSpace(keyPath))
+    var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");
+    var redisConnectionString = dataProtection.GetValue<string>("RedisConnectionString");
+    if (string.IsNullOrWhiteSpace(redisConnectionString))
     {
-        if (!builder.Environment.IsDevelopment())
-        {
-            throw new InvalidOperationException("DataProtection:KeyPath must be configured outside Development.");
-        }
-
-        builder.Services.AddDataProtection()
-            .UseEphemeralDataProtectionProvider()
-            .SetApplicationName("AutomatedWiki");
-        return;
+        throw new InvalidOperationException("DataProtection:RedisConnectionString is not configured.");
     }
 
     builder.Services.AddDataProtection()
-        .PersistKeysToFileSystem(new DirectoryInfo(keyPath))
+        .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
         .SetApplicationName("AutomatedWiki");
 }
