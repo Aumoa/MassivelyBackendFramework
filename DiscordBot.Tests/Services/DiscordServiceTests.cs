@@ -87,6 +87,21 @@ public sealed class DiscordServiceTests
         Assert.True(shouldSeparateBeforeContent);
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    public void ShouldRespondToMessage_RespondsToMentionsOrDirectMessages(
+        bool isMentioned,
+        bool isDirectMessage,
+        bool expected)
+    {
+        var result = DiscordService.ShouldRespondToMessage(isMentioned, isDirectMessage);
+
+        Assert.Equal(expected, result);
+    }
+
     [Fact]
     public void AppendResponseContent_DoesNotAddLeadingSeparatorWithoutPriorContent()
     {

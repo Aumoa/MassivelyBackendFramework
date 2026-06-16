@@ -66,6 +66,8 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         }
 
         bool isMentioned = message.MentionedUsers.Any(u => u.Id == m_Socket.CurrentUser.Id);
+        bool isDirectMessage = message.Channel is IDMChannel;
+        bool shouldRespond = ShouldRespondToMessage(isMentioned, isDirectMessage);
         var guildId = (message.Channel as SocketGuildChannel)?.Guild.Id.ToString();
         var channelId = message.Channel.Id.ToString();
 
@@ -73,7 +75,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         var channelAccess = scope.ServiceProvider.GetRequiredService<IAllowedChannelService>();
         if (!await channelAccess.IsAllowedAsync(channelId))
         {
-            if (isMentioned)
+            if (shouldRespond)
             {
                 var requestService = scope.ServiceProvider.GetRequiredService<IAllowedChannelRequestService>();
                 var guildChannel = message.Channel as SocketGuildChannel;
@@ -111,7 +113,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             referencedChannelId,
             referencedGuildId);
 
-        if (!isMentioned)
+        if (!shouldRespond)
         {
             return;
         }
@@ -375,6 +377,11 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
     internal static string BuildToolUseNotice(int toolUseCount)
     {
         return $"{toolUseCount}개 도구 사용됨";
+    }
+
+    internal static bool ShouldRespondToMessage(bool isMentioned, bool isDirectMessage)
+    {
+        return isMentioned || isDirectMessage;
     }
 
     private static string BuildResponsePreview(string totalMessage, int pendingToolUseCount)
