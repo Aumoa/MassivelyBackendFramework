@@ -47,7 +47,10 @@ public sealed class PersistentBackendRouteRegistryTests
             AllowedBackendKinds = ["beta", "alpha"],
             MaxOpenRoutes = 4,
             MaxOpenRoutesPerClient = 2,
-            RouteLifetimeMilliseconds = 10000
+            RouteLifetimeMilliseconds = 10000,
+            ExchangeTimeoutMilliseconds = 7000,
+            MaxPendingExchangesPerRoute = 8,
+            MaxPendingExchangesPerRoutePerDirection = 4
         });
         var firstOwner = new object();
         var secondOwner = new object();
@@ -74,6 +77,18 @@ public sealed class PersistentBackendRouteRegistryTests
                 item.Group == "Persistent Backend routes" &&
                 item.Name == "Route lifetime" &&
                 item.Value == "10000 ms");
+            Assert.Contains(status, item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Exchange timeout" &&
+                item.Value == "7000 ms");
+            Assert.Contains(status, item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Max pending exchanges per route" &&
+                item.Value == "8");
+            Assert.Contains(status, item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Max pending exchanges per route direction" &&
+                item.Value == "4");
             Assert.Contains(status, item =>
                 item.Group == "Persistent Backend route alpha" &&
                 item.Name == "Open routes" &&
@@ -229,6 +244,120 @@ public sealed class PersistentBackendRouteRegistryTests
         Assert.False(registry.TryGet(route.RouteToken, out _));
         Assert.Equal(PersistentBackendRouteState.Closed, route.State);
         Assert.Equal("expired", route.CloseReason);
+    }
+
+    [Fact]
+    public async Task Route_EnforcesPendingExchangeCapacity()
+    {
+        using var shutdown = new CancellationTokenSource();
+        var registry = CreateRegistry(new BackendRouteOptions
+        {
+            AllowedBackendKinds = ["alpha"],
+            RouteLifetimeMilliseconds = 10000,
+            MaxPendingExchangesPerRoute = 1,
+            MaxPendingExchangesPerRoutePerDirection = 0
+        });
+        var route = registry.Open("alpha", new object(), shutdown.Token);
+
+        try
+        {
+            var exchangeId = new GatewayBackendExchangeId(Guid.NewGuid());
+            route.RegisterClientOriginExchange(exchangeId, requestPacketId: 401, requestVersion: 3);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                route.RegisterBackendOriginExchange(
+                    new GatewayBackendExchangeId(Guid.NewGuid()),
+                    requestPacketId: 601,
+                    requestVersion: 4));
+            Assert.Equal(1, route.PendingClientExchangeCount);
+            Assert.Equal(0, route.PendingBackendExchangeCount);
+        }
+        finally
+        {
+            registry.CancelAll();
+            await WaitForRouteTasksAsync(route);
+        }
+    }
+
+    [Fact]
+    public async Task Route_EnforcesPendingExchangeCapacityPerDirection()
+    {
+        using var shutdown = new CancellationTokenSource();
+        var registry = CreateRegistry(new BackendRouteOptions
+        {
+            AllowedBackendKinds = ["alpha"],
+            RouteLifetimeMilliseconds = 10000,
+            MaxPendingExchangesPerRoute = 0,
+            MaxPendingExchangesPerRoutePerDirection = 1
+        });
+        var route = registry.Open("alpha", new object(), shutdown.Token);
+
+        try
+        {
+            route.RegisterClientOriginExchange(
+                new GatewayBackendExchangeId(Guid.NewGuid()),
+                requestPacketId: 401,
+                requestVersion: 3);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                route.RegisterClientOriginExchange(
+                    new GatewayBackendExchangeId(Guid.NewGuid()),
+                    requestPacketId: 402,
+                    requestVersion: 3));
+
+            route.RegisterBackendOriginExchange(
+                new GatewayBackendExchangeId(Guid.NewGuid()),
+                requestPacketId: 601,
+                requestVersion: 4);
+            Assert.Equal(1, route.PendingClientExchangeCount);
+            Assert.Equal(1, route.PendingBackendExchangeCount);
+        }
+        finally
+        {
+            registry.CancelAll();
+            await WaitForRouteTasksAsync(route);
+        }
+    }
+
+    [Fact]
+    public async Task Route_ExpiresPendingExchangesWithoutClosingRoute()
+    {
+        using var shutdown = new CancellationTokenSource();
+        var registry = CreateRegistry(new BackendRouteOptions
+        {
+            AllowedBackendKinds = ["alpha"],
+            RouteLifetimeMilliseconds = 10000,
+            ExchangeTimeoutMilliseconds = 25,
+            MaxPendingExchangesPerRoute = 1,
+            MaxPendingExchangesPerRoutePerDirection = 1
+        });
+        var route = registry.Open("alpha", new object(), shutdown.Token);
+
+        try
+        {
+            var clientExchangeId = new GatewayBackendExchangeId(Guid.NewGuid());
+            var backendExchangeId = new GatewayBackendExchangeId(Guid.NewGuid());
+            route.RegisterClientOriginExchange(clientExchangeId, requestPacketId: 401, requestVersion: 3);
+            await Task.Delay(TimeSpan.FromMilliseconds(75));
+
+            Assert.False(route.ContainsClientOriginExchange(clientExchangeId));
+            Assert.Equal(0, route.PendingClientExchangeCount);
+            Assert.Equal(PersistentBackendRouteState.Open, route.State);
+            Assert.True(registry.TryGet(route.RouteToken, out _));
+
+            route.RegisterBackendOriginExchange(backendExchangeId, requestPacketId: 601, requestVersion: 4);
+            await Task.Delay(TimeSpan.FromMilliseconds(75));
+
+            Assert.False(route.ContainsBackendOriginExchange(backendExchangeId));
+            Assert.Equal(0, route.PendingBackendExchangeCount);
+            Assert.Equal(PersistentBackendRouteState.Open, route.State);
+            Assert.True(registry.TryGet(route.RouteToken, out _));
+        }
+        finally
+        {
+            registry.CancelAll();
+            await WaitForRouteTasksAsync(route);
+        }
     }
 
     private static PersistentBackendRouteRegistry<object> CreateRegistry(BackendRouteOptions options)

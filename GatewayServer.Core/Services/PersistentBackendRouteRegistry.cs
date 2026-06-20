@@ -61,6 +61,9 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
                     owner,
                     now,
                     now.AddMilliseconds(GetRouteLifetimeMilliseconds()),
+                    GetExchangeTimeoutMilliseconds(),
+                    options.MaxPendingExchangesPerRoute,
+                    options.MaxPendingExchangesPerRoutePerDirection,
                     CancellationTokenSource.CreateLinkedTokenSource(cancellationToken));
 
                 if (m_Routes.TryAdd(route.RouteToken.Value, route))
@@ -161,8 +164,11 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
             new("Persistent Backend routes", "Pending client exchanges", routes.Sum(static route => route.PendingClientExchangeCount).ToString()),
             new("Persistent Backend routes", "Pending backend exchanges", routes.Sum(static route => route.PendingBackendExchangeCount).ToString()),
             new("Persistent Backend routes", "Route lifetime", $"{GetRouteLifetimeMilliseconds()} ms"),
+            new("Persistent Backend routes", "Exchange timeout", $"{GetExchangeTimeoutMilliseconds()} ms"),
             new("Persistent Backend routes", "Max open routes", FormatLimit(options.MaxOpenRoutes)),
-            new("Persistent Backend routes", "Max open routes per client", FormatLimit(options.MaxOpenRoutesPerClient))
+            new("Persistent Backend routes", "Max open routes per client", FormatLimit(options.MaxOpenRoutesPerClient)),
+            new("Persistent Backend routes", "Max pending exchanges per route", FormatLimit(options.MaxPendingExchangesPerRoute)),
+            new("Persistent Backend routes", "Max pending exchanges per route direction", FormatLimit(options.MaxPendingExchangesPerRoutePerDirection))
         };
 
         foreach (var group in routes
@@ -246,6 +252,11 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
         return Math.Max(1, options.RouteLifetimeMilliseconds);
     }
 
+    private int GetExchangeTimeoutMilliseconds()
+    {
+        return Math.Max(1, options.ExchangeTimeoutMilliseconds);
+    }
+
     private static string FormatLimit(int limit)
     {
         return limit <= 0 ? "Unlimited" : limit.ToString();
@@ -264,6 +275,9 @@ internal sealed class PersistentBackendRoute<TOwner>(
     TOwner owner,
     DateTimeOffset createdAt,
     DateTimeOffset expiresAt,
+    int exchangeTimeoutMilliseconds,
+    int maxPendingExchanges,
+    int maxPendingExchangesPerDirection,
     CancellationTokenSource timeoutCancellation)
     where TOwner : class
 {
@@ -287,9 +301,23 @@ internal sealed class PersistentBackendRoute<TOwner>(
 
     public string CloseReason { get; private set; } = string.Empty;
 
-    public int PendingClientExchangeCount => m_ClientOriginExchanges.Count;
+    public int PendingClientExchangeCount
+    {
+        get
+        {
+            PruneExpiredExchanges(DateTimeOffset.UtcNow);
+            return m_ClientOriginExchanges.Count;
+        }
+    }
 
-    public int PendingBackendExchangeCount => m_BackendOriginExchanges.Count;
+    public int PendingBackendExchangeCount
+    {
+        get
+        {
+            PruneExpiredExchanges(DateTimeOffset.UtcNow);
+            return m_BackendOriginExchanges.Count;
+        }
+    }
 
     public PersistentBackendRouteState State => Volatile.Read(ref m_Closed) == 0
         ? PersistentBackendRouteState.Open
@@ -300,17 +328,21 @@ internal sealed class PersistentBackendRoute<TOwner>(
         ushort requestPacketId,
         ushort requestVersion)
     {
+        var now = DateTimeOffset.UtcNow;
+        PruneExpiredExchanges(now);
         if (State != PersistentBackendRouteState.Open)
         {
             throw new InvalidOperationException("Persistent Backend route is not open.");
         }
 
+        EnsureExchangeCapacity(m_ClientOriginExchanges, "client-origin");
         var exchange = new PersistentBackendRouteExchange(
             exchangeId,
             GatewayBackendRouteDirection.ClientToBackend,
             requestPacketId,
             requestVersion,
-            DateTimeOffset.UtcNow);
+            now,
+            now.AddMilliseconds(exchangeTimeoutMilliseconds));
         if (!m_ClientOriginExchanges.TryAdd(exchangeId, exchange))
         {
             throw new InvalidOperationException("Client-origin Backend route exchange id is already active.");
@@ -332,7 +364,7 @@ internal sealed class PersistentBackendRoute<TOwner>(
 
     public bool ContainsClientOriginExchange(GatewayBackendExchangeId exchangeId)
     {
-        return m_ClientOriginExchanges.ContainsKey(exchangeId);
+        return ContainsActiveExchange(m_ClientOriginExchanges, exchangeId, DateTimeOffset.UtcNow);
     }
 
     public PersistentBackendRouteExchange RegisterBackendOriginExchange(
@@ -340,17 +372,21 @@ internal sealed class PersistentBackendRoute<TOwner>(
         ushort requestPacketId,
         ushort requestVersion)
     {
+        var now = DateTimeOffset.UtcNow;
+        PruneExpiredExchanges(now);
         if (State != PersistentBackendRouteState.Open)
         {
             throw new InvalidOperationException("Persistent Backend route is not open.");
         }
 
+        EnsureExchangeCapacity(m_BackendOriginExchanges, "backend-origin");
         var exchange = new PersistentBackendRouteExchange(
             exchangeId,
             GatewayBackendRouteDirection.BackendToClient,
             requestPacketId,
             requestVersion,
-            DateTimeOffset.UtcNow);
+            now,
+            now.AddMilliseconds(exchangeTimeoutMilliseconds));
         if (!m_BackendOriginExchanges.TryAdd(exchangeId, exchange))
         {
             throw new InvalidOperationException("Backend-origin Backend route exchange id is already active.");
@@ -372,7 +408,7 @@ internal sealed class PersistentBackendRoute<TOwner>(
 
     public bool ContainsBackendOriginExchange(GatewayBackendExchangeId exchangeId)
     {
-        return m_BackendOriginExchanges.ContainsKey(exchangeId);
+        return ContainsActiveExchange(m_BackendOriginExchanges, exchangeId, DateTimeOffset.UtcNow);
     }
 
     public bool Close(string reason)
@@ -393,6 +429,61 @@ internal sealed class PersistentBackendRoute<TOwner>(
         TimeoutCancellation.Cancel();
         return true;
     }
+
+    private void EnsureExchangeCapacity(
+        ConcurrentDictionary<GatewayBackendExchangeId, PersistentBackendRouteExchange> directionExchanges,
+        string directionName)
+    {
+        if (maxPendingExchanges > 0 &&
+            m_ClientOriginExchanges.Count + m_BackendOriginExchanges.Count >= maxPendingExchanges)
+        {
+            throw new InvalidOperationException("Persistent Backend route pending exchange capacity is exhausted.");
+        }
+
+        if (maxPendingExchangesPerDirection > 0 &&
+            directionExchanges.Count >= maxPendingExchangesPerDirection)
+        {
+            throw new InvalidOperationException($"Persistent Backend route {directionName} pending exchange capacity is exhausted.");
+        }
+    }
+
+    private static bool ContainsActiveExchange(
+        ConcurrentDictionary<GatewayBackendExchangeId, PersistentBackendRouteExchange> exchanges,
+        GatewayBackendExchangeId exchangeId,
+        DateTimeOffset now)
+    {
+        if (!exchanges.TryGetValue(exchangeId, out var exchange))
+        {
+            return false;
+        }
+
+        if (exchange.ExpiresAt > now)
+        {
+            return true;
+        }
+
+        exchanges.TryRemove(exchangeId, out _);
+        return false;
+    }
+
+    private void PruneExpiredExchanges(DateTimeOffset now)
+    {
+        PruneExpiredExchanges(m_ClientOriginExchanges, now);
+        PruneExpiredExchanges(m_BackendOriginExchanges, now);
+    }
+
+    private static void PruneExpiredExchanges(
+        ConcurrentDictionary<GatewayBackendExchangeId, PersistentBackendRouteExchange> exchanges,
+        DateTimeOffset now)
+    {
+        foreach (var pair in exchanges.ToArray())
+        {
+            if (pair.Value.ExpiresAt <= now)
+            {
+                exchanges.TryRemove(pair.Key, out _);
+            }
+        }
+    }
 }
 
 internal sealed record PersistentBackendRouteExchange(
@@ -400,4 +491,5 @@ internal sealed record PersistentBackendRouteExchange(
     GatewayBackendRouteDirection Direction,
     ushort RequestPacketId,
     ushort RequestVersion,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset ExpiresAt);
