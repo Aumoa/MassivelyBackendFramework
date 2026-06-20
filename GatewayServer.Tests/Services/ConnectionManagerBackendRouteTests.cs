@@ -320,6 +320,69 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
+    public async Task RouteOpenRequest_RateLimitsBeforeBackendConnect()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                MaxOpenRoutesPerClient = 8,
+                RouteLifetimeMilliseconds = 5000,
+                RouteOpenRateLimitWindowMilliseconds = 10000,
+                MaxRouteOpenAttemptsPerClientPerWindow = 1
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteBackendRouteOpenRequestAsync(stream, new GatewayBackendRouteOpenRequest("alpha"));
+            using (var acceptedFrame = await ReadRequiredFrameAsync(stream))
+            {
+                var accepted = PacketCodec.Decode(acceptedFrame, GatewayBackendRouteOpenResponse.Codec);
+                Assert.True(accepted.Success);
+            }
+
+            Assert.Equal(1, routeManager.ConnectCount);
+
+            await WriteBackendRouteOpenRequestAsync(stream, new GatewayBackendRouteOpenRequest("alpha"));
+            using (var rejectedFrame = await ReadRequiredFrameAsync(stream))
+            {
+                Assert.Equal(PacketKind.Response, rejectedFrame.Header.Kind);
+                Assert.Equal(Pid.GATE_BACKEND_ROUTE_OPEN, rejectedFrame.Header.PacketId);
+
+                var rejected = PacketCodec.Decode(rejectedFrame, GatewayBackendRouteOpenResponse.Codec);
+                Assert.False(rejected.Success);
+                Assert.Equal("alpha", rejected.BackendKind);
+                Assert.Null(rejected.RouteToken);
+                Assert.Equal("Backend route open was rejected.", rejected.ErrorMessage);
+            }
+
+            Assert.Equal(1, routeManager.ConnectCount);
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Open routes" &&
+                item.Value == "1");
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task RouteOpenRequest_RejectsBackendKindWhenNotAllowlisted()
     {
         var routeManager = new RecordingBackendRouteManager();
@@ -2302,6 +2365,7 @@ public sealed class ConnectionManagerBackendRouteTests
             "backend-a",
             "master-a",
             "backend-direct-a");
+        private int m_ConnectCount;
         private int m_RelayCount;
 
         public event BackendRouteFrameReceivedHandler? RouteFrameReceived;
@@ -2320,6 +2384,8 @@ public sealed class ConnectionManagerBackendRouteTests
 
         public BackendRouteBinding DefaultBinding => m_DefaultBinding;
 
+        public int ConnectCount => Volatile.Read(ref m_ConnectCount);
+
         public int RelayCount => Volatile.Read(ref m_RelayCount);
 
         public string[] GetDiscoveredBackendKinds()
@@ -2331,6 +2397,7 @@ public sealed class ConnectionManagerBackendRouteTests
             string backendKind,
             CancellationToken cancellationToken)
         {
+            Interlocked.Increment(ref m_ConnectCount);
             if (!string.Equals(backendKind, m_DefaultBinding.BackendKind, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("No recording Backend route session is available for the requested kind.");

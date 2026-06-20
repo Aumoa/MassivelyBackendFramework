@@ -439,6 +439,7 @@ internal class ConnectionManager(
 
             var request = PacketCodec.Decode(packet, GatewayBackendRouteOpenRequest.Codec);
             backendKind = request.BackendKind;
+            m_PersistentBackendRouteRegistry.RequireOpenAttemptAllowed(client);
             var normalizedBackendKind = m_PersistentBackendRouteRegistry.RequireAllowedBackendKind(request.BackendKind);
             var backendSession = await backendRouteManager
                 .ConnectAsync(normalizedBackendKind, cancellationToken)

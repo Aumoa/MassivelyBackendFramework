@@ -50,7 +50,12 @@ public sealed class PersistentBackendRouteRegistryTests
             RouteLifetimeMilliseconds = 10000,
             ExchangeTimeoutMilliseconds = 7000,
             MaxPendingExchangesPerRoute = 8,
-            MaxPendingExchangesPerRoutePerDirection = 4
+            MaxPendingExchangesPerRoutePerDirection = 4,
+            RouteOpenRateLimitWindowMilliseconds = 2000,
+            MaxRouteOpenAttemptsPerClientPerWindow = 3,
+            ExchangeRateLimitWindowMilliseconds = 3000,
+            MaxClientOriginExchangeCreatesPerRoutePerWindow = 5,
+            MaxBackendOriginExchangeCreatesPerRoutePerWindow = 6
         });
         var firstOwner = new object();
         var secondOwner = new object();
@@ -92,6 +97,18 @@ public sealed class PersistentBackendRouteRegistryTests
                 item.Group == "Persistent Backend routes" &&
                 item.Name == "Max pending exchanges per route direction" &&
                 item.Value == "4");
+            Assert.Contains(status, item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Route-open rate limit" &&
+                item.Value == "3 per 2000 ms");
+            Assert.Contains(status, item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Client-origin exchange rate limit" &&
+                item.Value == "5 per 3000 ms");
+            Assert.Contains(status, item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Backend-origin exchange rate limit" &&
+                item.Value == "6 per 3000 ms");
             Assert.Contains(status, item =>
                 item.Group == "Persistent Backend route alpha" &&
                 item.Name == "Open routes" &&
@@ -175,6 +192,29 @@ public sealed class PersistentBackendRouteRegistryTests
             registry.CancelAll();
             await WaitForRouteTasksAsync(firstRoute, otherRoute);
         }
+    }
+
+    [Fact]
+    public void RequireOpenAttemptAllowed_EnforcesPerOwnerRateLimit()
+    {
+        var registry = CreateRegistry(new BackendRouteOptions
+        {
+            AllowedBackendKinds = ["alpha"],
+            RouteOpenRateLimitWindowMilliseconds = 10000,
+            MaxRouteOpenAttemptsPerClientPerWindow = 2
+        });
+        var owner = new object();
+        var otherOwner = new object();
+
+        registry.RequireOpenAttemptAllowed(owner);
+        registry.RequireOpenAttemptAllowed(owner);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            registry.RequireOpenAttemptAllowed(owner));
+
+        registry.RequireOpenAttemptAllowed(otherOwner);
+        Assert.Equal(0, registry.RemoveOwnerRoutes(owner, "client disconnected"));
+        registry.RequireOpenAttemptAllowed(owner);
     }
 
     [Fact]
@@ -356,6 +396,49 @@ public sealed class PersistentBackendRouteRegistryTests
                 requestVersion: 4);
             Assert.Equal(1, route.PendingClientExchangeCount);
             Assert.Equal(1, route.PendingBackendExchangeCount);
+        }
+        finally
+        {
+            registry.CancelAll();
+            await WaitForRouteTasksAsync(route);
+        }
+    }
+
+    [Fact]
+    public async Task Route_EnforcesExchangeCreationRateLimitsPerDirection()
+    {
+        using var shutdown = new CancellationTokenSource();
+        var registry = CreateRegistry(new BackendRouteOptions
+        {
+            AllowedBackendKinds = ["alpha"],
+            RouteLifetimeMilliseconds = 10000,
+            ExchangeRateLimitWindowMilliseconds = 10000,
+            MaxClientOriginExchangeCreatesPerRoutePerWindow = 1,
+            MaxBackendOriginExchangeCreatesPerRoutePerWindow = 1
+        });
+        var route = registry.Open(CreateBinding("alpha"), new object(), shutdown.Token);
+
+        try
+        {
+            route.RegisterClientOriginExchange(
+                new GatewayBackendExchangeId(Guid.NewGuid()),
+                requestPacketId: 401,
+                requestVersion: 3);
+            Assert.Throws<InvalidOperationException>(() =>
+                route.RegisterClientOriginExchange(
+                    new GatewayBackendExchangeId(Guid.NewGuid()),
+                    requestPacketId: 402,
+                    requestVersion: 3));
+
+            route.RegisterBackendOriginExchange(
+                new GatewayBackendExchangeId(Guid.NewGuid()),
+                requestPacketId: 601,
+                requestVersion: 4);
+            Assert.Throws<InvalidOperationException>(() =>
+                route.RegisterBackendOriginExchange(
+                    new GatewayBackendExchangeId(Guid.NewGuid()),
+                    requestPacketId: 602,
+                    requestVersion: 4));
         }
         finally
         {

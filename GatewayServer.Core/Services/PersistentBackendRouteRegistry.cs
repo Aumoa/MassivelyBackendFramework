@@ -13,6 +13,7 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
     where TOwner : class
 {
     private readonly object m_RegistrationSync = new();
+    private readonly ConcurrentDictionary<TOwner, FixedWindowRateCounter> m_OpenAttemptCounters = new();
     private readonly ConcurrentDictionary<string, PersistentBackendRoute<TOwner>> m_Routes = new(StringComparer.Ordinal);
 
     public string RequireAllowedBackendKind(string backendKind)
@@ -33,6 +34,29 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
         }
 
         throw new UnauthorizedAccessException($"Backend kind '{normalizedBackendKind}' is not enabled for persistent client routing.");
+    }
+
+    public void RequireOpenAttemptAllowed(TOwner owner)
+    {
+        if (owner == null)
+        {
+            throw new ArgumentNullException(nameof(owner));
+        }
+
+        var limit = options.MaxRouteOpenAttemptsPerClientPerWindow;
+        if (limit <= 0)
+        {
+            return;
+        }
+
+        var counter = m_OpenAttemptCounters.GetOrAdd(
+            owner,
+            static _ => new FixedWindowRateCounter());
+        counter.IncrementOrThrow(
+            limit,
+            options.RouteOpenRateLimitWindowMilliseconds,
+            DateTimeOffset.UtcNow,
+            "Gateway persistent Backend route open rate limit was exceeded.");
     }
 
     public PersistentBackendRoute<TOwner> Open(
@@ -79,6 +103,9 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
                     GetExchangeTimeoutMilliseconds(),
                     options.MaxPendingExchangesPerRoute,
                     options.MaxPendingExchangesPerRoutePerDirection,
+                    GetExchangeRateLimitWindowMilliseconds(),
+                    options.MaxClientOriginExchangeCreatesPerRoutePerWindow,
+                    options.MaxBackendOriginExchangeCreatesPerRoutePerWindow,
                     CancellationTokenSource.CreateLinkedTokenSource(cancellationToken));
 
                 if (m_Routes.TryAdd(route.RouteToken.Value, route))
@@ -183,6 +210,7 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
             }
         }
 
+        m_OpenAttemptCounters.TryRemove(owner, out _);
         return removed;
     }
 
@@ -210,8 +238,11 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
             new("Persistent Backend routes", "Exchange timeout", $"{GetExchangeTimeoutMilliseconds()} ms"),
             new("Persistent Backend routes", "Max open routes", FormatLimit(options.MaxOpenRoutes)),
             new("Persistent Backend routes", "Max open routes per client", FormatLimit(options.MaxOpenRoutesPerClient)),
+            new("Persistent Backend routes", "Route-open rate limit", FormatRateLimit(options.MaxRouteOpenAttemptsPerClientPerWindow, GetRouteOpenRateLimitWindowMilliseconds())),
             new("Persistent Backend routes", "Max pending exchanges per route", FormatLimit(options.MaxPendingExchangesPerRoute)),
-            new("Persistent Backend routes", "Max pending exchanges per route direction", FormatLimit(options.MaxPendingExchangesPerRoutePerDirection))
+            new("Persistent Backend routes", "Max pending exchanges per route direction", FormatLimit(options.MaxPendingExchangesPerRoutePerDirection)),
+            new("Persistent Backend routes", "Client-origin exchange rate limit", FormatRateLimit(options.MaxClientOriginExchangeCreatesPerRoutePerWindow, GetExchangeRateLimitWindowMilliseconds())),
+            new("Persistent Backend routes", "Backend-origin exchange rate limit", FormatRateLimit(options.MaxBackendOriginExchangeCreatesPerRoutePerWindow, GetExchangeRateLimitWindowMilliseconds()))
         };
 
         foreach (var group in routes
@@ -300,9 +331,28 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
         return Math.Max(1, options.ExchangeTimeoutMilliseconds);
     }
 
+    private int GetRouteOpenRateLimitWindowMilliseconds()
+    {
+        return Math.Max(1, options.RouteOpenRateLimitWindowMilliseconds);
+    }
+
+    private int GetExchangeRateLimitWindowMilliseconds()
+    {
+        return Math.Max(1, options.ExchangeRateLimitWindowMilliseconds);
+    }
+
     private static string FormatLimit(int limit)
     {
         return limit <= 0 ? "Unlimited" : limit.ToString();
+    }
+
+    private static string FormatRateLimit(
+        int limit,
+        int windowMilliseconds)
+    {
+        return limit <= 0
+            ? "Unlimited"
+            : $"{limit} per {windowMilliseconds} ms";
     }
 }
 
@@ -310,6 +360,43 @@ internal enum PersistentBackendRouteState
 {
     Open,
     Closed
+}
+
+internal sealed class FixedWindowRateCounter
+{
+    private readonly object m_Sync = new();
+    private DateTimeOffset m_WindowStartedAt;
+    private int m_Count;
+
+    public void IncrementOrThrow(
+        int limit,
+        int windowMilliseconds,
+        DateTimeOffset now,
+        string message)
+    {
+        if (limit <= 0)
+        {
+            return;
+        }
+
+        var window = TimeSpan.FromMilliseconds(Math.Max(1, windowMilliseconds));
+        lock (m_Sync)
+        {
+            if (m_WindowStartedAt == default ||
+                now - m_WindowStartedAt >= window)
+            {
+                m_WindowStartedAt = now;
+                m_Count = 0;
+            }
+
+            if (m_Count >= limit)
+            {
+                throw new InvalidOperationException(message);
+            }
+
+            m_Count++;
+        }
+    }
 }
 
 internal sealed class PersistentBackendRoute<TOwner>(
@@ -321,10 +408,15 @@ internal sealed class PersistentBackendRoute<TOwner>(
     int exchangeTimeoutMilliseconds,
     int maxPendingExchanges,
     int maxPendingExchangesPerDirection,
+    int exchangeRateLimitWindowMilliseconds,
+    int maxClientOriginExchangeCreatesPerWindow,
+    int maxBackendOriginExchangeCreatesPerWindow,
     CancellationTokenSource timeoutCancellation)
     where TOwner : class
 {
     private int m_Closed;
+    private readonly FixedWindowRateCounter m_ClientOriginExchangeRateCounter = new();
+    private readonly FixedWindowRateCounter m_BackendOriginExchangeRateCounter = new();
     private readonly ConcurrentDictionary<GatewayBackendExchangeId, PersistentBackendRouteExchange> m_ClientOriginExchanges = [];
     private readonly ConcurrentDictionary<GatewayBackendExchangeId, PersistentBackendRouteExchange> m_BackendOriginExchanges = [];
 
@@ -381,6 +473,11 @@ internal sealed class PersistentBackendRoute<TOwner>(
         }
 
         EnsureExchangeCapacity(m_ClientOriginExchanges, "client-origin");
+        m_ClientOriginExchangeRateCounter.IncrementOrThrow(
+            maxClientOriginExchangeCreatesPerWindow,
+            exchangeRateLimitWindowMilliseconds,
+            now,
+            "Persistent Backend route client-origin exchange creation rate limit was exceeded.");
         var exchange = new PersistentBackendRouteExchange(
             exchangeId,
             GatewayBackendRouteDirection.ClientToBackend,
@@ -425,6 +522,11 @@ internal sealed class PersistentBackendRoute<TOwner>(
         }
 
         EnsureExchangeCapacity(m_BackendOriginExchanges, "backend-origin");
+        m_BackendOriginExchangeRateCounter.IncrementOrThrow(
+            maxBackendOriginExchangeCreatesPerWindow,
+            exchangeRateLimitWindowMilliseconds,
+            now,
+            "Persistent Backend route Backend-origin exchange creation rate limit was exceeded.");
         var exchange = new PersistentBackendRouteExchange(
             exchangeId,
             GatewayBackendRouteDirection.BackendToClient,
