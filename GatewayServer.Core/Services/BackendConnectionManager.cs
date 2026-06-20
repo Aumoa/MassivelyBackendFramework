@@ -20,6 +20,8 @@ internal interface IBackendRouteManager
 
     event BackendRouteCloseFrameReceivedHandler? RouteCloseFrameReceived;
 
+    event BackendRouteSessionClosedHandler? RouteSessionClosed;
+
     string[] GetDiscoveredBackendKinds();
 
     ValueTask<IBackendRouteSession> ConnectAsync(
@@ -28,6 +30,11 @@ internal interface IBackendRouteManager
 
     ValueTask RelayFrameAsync(
         string backendKind,
+        PacketFrame frame,
+        CancellationToken cancellationToken);
+
+    ValueTask RelayFrameAsync(
+        BackendRouteBinding binding,
         PacketFrame frame,
         CancellationToken cancellationToken);
 }
@@ -41,6 +48,8 @@ internal interface IBackendRouteSession
     string MasterConnectionId { get; }
 
     string DirectConnectionId { get; }
+
+    BackendRouteBinding Binding { get; }
 
     ValueTask WriteAsync(PacketFrame frame, CancellationToken cancellationToken);
 }
@@ -57,10 +66,15 @@ internal delegate ValueTask BackendRouteCloseFrameReceivedHandler(
     BackendRouteCloseFrameReceived frame,
     CancellationToken cancellationToken);
 
+internal delegate ValueTask BackendRouteSessionClosedHandler(
+    BackendRouteSessionClosed frame,
+    CancellationToken cancellationToken);
+
 internal sealed class BackendRouteFrameReceived(
     string backendKind,
     string nodeId,
     string masterConnectionId,
+    string directConnectionId,
     GatewayBackendRouteEnvelope envelope)
 {
     public string BackendKind { get; } = backendKind;
@@ -69,6 +83,8 @@ internal sealed class BackendRouteFrameReceived(
 
     public string MasterConnectionId { get; } = masterConnectionId;
 
+    public string DirectConnectionId { get; } = directConnectionId;
+
     public GatewayBackendRouteEnvelope Envelope { get; } = envelope;
 }
 
@@ -76,6 +92,7 @@ internal sealed class BackendRouteDataFrameReceived(
     string backendKind,
     string nodeId,
     string masterConnectionId,
+    string directConnectionId,
     GatewayBackendRouteDataEnvelope envelope)
 {
     public string BackendKind { get; } = backendKind;
@@ -84,6 +101,8 @@ internal sealed class BackendRouteDataFrameReceived(
 
     public string MasterConnectionId { get; } = masterConnectionId;
 
+    public string DirectConnectionId { get; } = directConnectionId;
+
     public GatewayBackendRouteDataEnvelope Envelope { get; } = envelope;
 }
 
@@ -91,6 +110,7 @@ internal sealed class BackendRouteCloseFrameReceived(
     string backendKind,
     string nodeId,
     string masterConnectionId,
+    string directConnectionId,
     GatewayBackendRouteClose close)
 {
     public string BackendKind { get; } = backendKind;
@@ -99,7 +119,18 @@ internal sealed class BackendRouteCloseFrameReceived(
 
     public string MasterConnectionId { get; } = masterConnectionId;
 
+    public string DirectConnectionId { get; } = directConnectionId;
+
     public GatewayBackendRouteClose Close { get; } = close;
+}
+
+internal sealed class BackendRouteSessionClosed(
+    BackendRouteBinding binding,
+    string reason)
+{
+    public BackendRouteBinding Binding { get; } = binding;
+
+    public string Reason { get; } = reason;
 }
 
 internal interface IBackendConnectionStatusProvider
@@ -129,6 +160,8 @@ internal sealed class BackendConnectionManager(
     public event BackendRouteDataFrameReceivedHandler? RouteDataFrameReceived;
 
     public event BackendRouteCloseFrameReceivedHandler? RouteCloseFrameReceived;
+
+    public event BackendRouteSessionClosedHandler? RouteSessionClosed;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -160,7 +193,10 @@ internal sealed class BackendConnectionManager(
         foreach (var peer in peers)
         {
             await peer.Cancellation.CancelAsync().ConfigureAwait(false);
-            await peer.DisposeSessionAsync().ConfigureAwait(false);
+            await DisposePeerSessionAsync(
+                peer,
+                "Backend route session closed.",
+                raiseRouteSessionClosed: true).ConfigureAwait(false);
         }
 
         var peerTasks = peers
@@ -203,6 +239,25 @@ internal sealed class BackendConnectionManager(
         }
 
         var session = await ConnectAsync(backendKind, cancellationToken).ConfigureAwait(false);
+        await session.WriteAsync(frame, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask RelayFrameAsync(
+        BackendRouteBinding binding,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (binding == null)
+        {
+            throw new ArgumentNullException(nameof(binding));
+        }
+
+        if (frame == null)
+        {
+            throw new ArgumentNullException(nameof(frame));
+        }
+
+        var session = GetBoundSession(binding);
         await session.WriteAsync(frame, cancellationToken).ConfigureAwait(false);
     }
 
@@ -313,7 +368,10 @@ internal sealed class BackendConnectionManager(
         foreach (var peer in removed)
         {
             _ = peer.Cancellation.CancelAsync();
-            _ = peer.DisposeSessionAsync();
+            _ = DisposePeerSessionAsync(
+                peer,
+                "Backend route session closed.",
+                raiseRouteSessionClosed: true).AsTask();
         }
     }
 
@@ -351,6 +409,38 @@ internal sealed class BackendConnectionManager(
         }
     }
 
+    private BackendSession GetBoundSession(BackendRouteBinding binding)
+    {
+        BackendPeer peer;
+        lock (m_RoutesSync)
+        {
+            if (!m_Peers.TryGetValue(binding.MasterConnectionId, out peer!))
+            {
+                throw new InvalidOperationException("Bound Backend route session is no longer available.");
+            }
+        }
+
+        if (!string.Equals(peer.Node.BackendKind, binding.BackendKind, StringComparison.Ordinal) ||
+            !string.Equals(peer.Node.NodeId, binding.NodeId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Bound Backend route session no longer matches the selected Backend node.");
+        }
+
+        var session = peer.CurrentSession;
+        if (session == null ||
+            !session.IsConnected ||
+            !binding.Matches(
+                session.BackendKind,
+                session.NodeId,
+                session.MasterConnectionId,
+                session.DirectConnectionId))
+        {
+            throw new InvalidOperationException("Bound Backend route session is no longer active.");
+        }
+
+        return session;
+    }
+
     private async ValueTask<BackendSession> ConnectPeerAsync(
         BackendPeer peer,
         CancellationToken cancellationToken)
@@ -363,7 +453,10 @@ internal sealed class BackendConnectionManager(
                 return currentSession;
             }
 
-            await peer.DisposeSessionAsync().ConfigureAwait(false);
+            await DisposePeerSessionAsync(
+                peer,
+                "Backend route session reconnecting.",
+                raiseRouteSessionClosed: true).ConfigureAwait(false);
             m_PeerStates[peer.Node.MasterConnectionId] = "Connecting";
 
             using var connectCancellation = CancellationTokenSource.CreateLinkedTokenSource(
@@ -590,15 +683,15 @@ internal sealed class BackendConnectionManager(
                 {
                     if (frame.Header.PacketId == Pid.GATE_BACKEND_ROUTE)
                     {
-                        await HandleBackendRouteFrameAsync(peer, frame, cancellationToken).ConfigureAwait(false);
+                        await HandleBackendRouteFrameAsync(peer, session, frame, cancellationToken).ConfigureAwait(false);
                     }
                     else if (frame.Header.PacketId == Pid.GATE_BACKEND_ROUTE_DATA)
                     {
-                        await HandleBackendRouteDataFrameAsync(peer, frame, cancellationToken).ConfigureAwait(false);
+                        await HandleBackendRouteDataFrameAsync(peer, session, frame, cancellationToken).ConfigureAwait(false);
                     }
                     else if (frame.Header.PacketId == Pid.GATE_BACKEND_ROUTE_CLOSE)
                     {
-                        await HandleBackendRouteCloseFrameAsync(peer, frame, cancellationToken).ConfigureAwait(false);
+                        await HandleBackendRouteCloseFrameAsync(peer, session, frame, cancellationToken).ConfigureAwait(false);
                     }
                 }
             }
@@ -619,10 +712,12 @@ internal sealed class BackendConnectionManager(
         }
         finally
         {
-            if (ReferenceEquals(peer.CurrentSession, session))
+            if (peer.TryDetachSession(session))
             {
-                peer.CurrentSession = null;
                 m_PeerDirectConnectionIds.TryRemove(peer.Node.MasterConnectionId, out _);
+                await RaiseRouteSessionClosedAsync(
+                    session.Binding,
+                    "Backend route session closed.").ConfigureAwait(false);
             }
 
             await session.DisposeAsync().ConfigureAwait(false);
@@ -631,6 +726,7 @@ internal sealed class BackendConnectionManager(
 
     private async ValueTask HandleBackendRouteFrameAsync(
         BackendPeer peer,
+        BackendSession session,
         PacketFrame frame,
         CancellationToken cancellationToken)
     {
@@ -654,6 +750,7 @@ internal sealed class BackendConnectionManager(
             peer.Node.BackendKind,
             peer.Node.NodeId,
             peer.Node.MasterConnectionId,
+            session.DirectConnectionId,
             envelope);
         var handlers = RouteFrameReceived;
         if (handlers == null)
@@ -669,6 +766,7 @@ internal sealed class BackendConnectionManager(
 
     private async ValueTask HandleBackendRouteDataFrameAsync(
         BackendPeer peer,
+        BackendSession session,
         PacketFrame frame,
         CancellationToken cancellationToken)
     {
@@ -692,6 +790,7 @@ internal sealed class BackendConnectionManager(
             peer.Node.BackendKind,
             peer.Node.NodeId,
             peer.Node.MasterConnectionId,
+            session.DirectConnectionId,
             envelope);
         var handlers = RouteDataFrameReceived;
         if (handlers == null)
@@ -707,6 +806,7 @@ internal sealed class BackendConnectionManager(
 
     private async ValueTask HandleBackendRouteCloseFrameAsync(
         BackendPeer peer,
+        BackendSession session,
         PacketFrame frame,
         CancellationToken cancellationToken)
     {
@@ -730,6 +830,7 @@ internal sealed class BackendConnectionManager(
             peer.Node.BackendKind,
             peer.Node.NodeId,
             peer.Node.MasterConnectionId,
+            session.DirectConnectionId,
             close);
         var handlers = RouteCloseFrameReceived;
         if (handlers == null)
@@ -741,6 +842,43 @@ internal sealed class BackendConnectionManager(
         {
             await handler(received, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private async ValueTask RaiseRouteSessionClosedAsync(
+        BackendRouteBinding binding,
+        string reason)
+    {
+        var handlers = RouteSessionClosed;
+        if (handlers == null)
+        {
+            return;
+        }
+
+        var closed = new BackendRouteSessionClosed(binding, reason);
+        foreach (BackendRouteSessionClosedHandler handler in handlers.GetInvocationList())
+        {
+            await handler(closed, CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask DisposePeerSessionAsync(
+        BackendPeer peer,
+        string reason,
+        bool raiseRouteSessionClosed)
+    {
+        var session = peer.DetachSession();
+        if (session == null)
+        {
+            return;
+        }
+
+        m_PeerDirectConnectionIds.TryRemove(peer.Node.MasterConnectionId, out _);
+        if (raiseRouteSessionClosed)
+        {
+            await RaiseRouteSessionClosedAsync(session.Binding, reason).ConfigureAwait(false);
+        }
+
+        await session.DisposeAsync().ConfigureAwait(false);
     }
 
     private static async Task<PacketFrame> ReadRequiredHandshakeFrameAsync(
@@ -826,15 +964,22 @@ internal sealed class BackendConnectionManager(
 
         public Task? DrainTask { get; set; }
 
-        public async ValueTask DisposeSessionAsync()
+        public BackendSession? DetachSession()
         {
             var session = CurrentSession;
             CurrentSession = null;
+            return session;
+        }
 
-            if (session != null)
+        public bool TryDetachSession(BackendSession session)
+        {
+            if (!ReferenceEquals(CurrentSession, session))
             {
-                await session.DisposeAsync().ConfigureAwait(false);
+                return false;
             }
+
+            CurrentSession = null;
+            return true;
         }
     }
 
@@ -856,6 +1001,12 @@ internal sealed class BackendConnectionManager(
         public string MasterConnectionId { get; } = masterConnectionId;
 
         public string DirectConnectionId { get; } = directConnectionId;
+
+        public BackendRouteBinding Binding { get; } = new(
+            backendKind,
+            nodeId,
+            masterConnectionId,
+            directConnectionId);
 
         public Stream Stream { get; } = stream;
 

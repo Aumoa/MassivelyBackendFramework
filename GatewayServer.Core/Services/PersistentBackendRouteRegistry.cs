@@ -36,16 +36,31 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
     }
 
     public PersistentBackendRoute<TOwner> Open(
-        string backendKind,
+        BackendRouteBinding backendBinding,
         TOwner owner,
         CancellationToken cancellationToken)
     {
+        if (backendBinding == null)
+        {
+            throw new ArgumentNullException(nameof(backendBinding));
+        }
+
         if (owner == null)
         {
             throw new ArgumentNullException(nameof(owner));
         }
 
-        var normalizedBackendKind = RequireAllowedBackendKind(backendKind);
+        var normalizedBackendKind = RequireAllowedBackendKind(backendBinding.BackendKind);
+        var normalizedBackendBinding = string.Equals(
+            normalizedBackendKind,
+            backendBinding.BackendKind,
+            StringComparison.Ordinal)
+            ? backendBinding
+            : new BackendRouteBinding(
+                normalizedBackendKind,
+                backendBinding.NodeId,
+                backendBinding.MasterConnectionId,
+                backendBinding.DirectConnectionId);
         PersistentBackendRoute<TOwner>? route = null;
 
         lock (m_RegistrationSync)
@@ -57,7 +72,7 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
                 var now = DateTimeOffset.UtcNow;
                 route = new PersistentBackendRoute<TOwner>(
                     tokenGenerator.Generate(),
-                    normalizedBackendKind,
+                    normalizedBackendBinding,
                     owner,
                     now,
                     now.AddMilliseconds(GetRouteLifetimeMilliseconds()),
@@ -114,6 +129,34 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
 
         route.Close(reason);
         return true;
+    }
+
+    public PersistentBackendRoute<TOwner>[] RemoveBackendBindingRoutes(
+        BackendRouteBinding backendBinding,
+        string reason)
+    {
+        if (backendBinding == null)
+        {
+            throw new ArgumentNullException(nameof(backendBinding));
+        }
+
+        if (reason == null)
+        {
+            throw new ArgumentNullException(nameof(reason));
+        }
+
+        var removed = new List<PersistentBackendRoute<TOwner>>();
+        foreach (var pair in m_Routes.ToArray())
+        {
+            if (pair.Value.BackendBinding == backendBinding &&
+                m_Routes.TryRemove(pair.Key, out var route))
+            {
+                route.Close(reason);
+                removed.Add(route);
+            }
+        }
+
+        return [.. removed];
     }
 
     public int RemoveOwnerRoutes(
@@ -271,7 +314,7 @@ internal enum PersistentBackendRouteState
 
 internal sealed class PersistentBackendRoute<TOwner>(
     GatewayBackendRouteToken routeToken,
-    string backendKind,
+    BackendRouteBinding backendBinding,
     TOwner owner,
     DateTimeOffset createdAt,
     DateTimeOffset expiresAt,
@@ -287,7 +330,9 @@ internal sealed class PersistentBackendRoute<TOwner>(
 
     public GatewayBackendRouteToken RouteToken { get; } = routeToken;
 
-    public string BackendKind { get; } = backendKind;
+    public BackendRouteBinding BackendBinding { get; } = backendBinding;
+
+    public string BackendKind => BackendBinding.BackendKind;
 
     public TOwner Owner { get; } = owner;
 

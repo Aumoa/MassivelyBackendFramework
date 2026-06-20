@@ -82,6 +82,7 @@ internal class ConnectionManager(
         backendRouteManager.RouteFrameReceived += OnBackendRouteFrameReceivedAsync;
         backendRouteManager.RouteDataFrameReceived += OnBackendRouteDataFrameReceivedAsync;
         backendRouteManager.RouteCloseFrameReceived += OnBackendRouteCloseFrameReceivedAsync;
+        backendRouteManager.RouteSessionClosed += OnBackendRouteSessionClosedAsync;
         logger.LogInformation("Gateway client listener is running on {Address}:{Port} with TLS.", connectionOptions.IPAddress, connectionOptions.Port);
 
         m_AcceptTask = StartAcceptAsync(m_GracefulCancellation.Token);
@@ -92,6 +93,7 @@ internal class ConnectionManager(
         backendRouteManager.RouteFrameReceived -= OnBackendRouteFrameReceivedAsync;
         backendRouteManager.RouteDataFrameReceived -= OnBackendRouteDataFrameReceivedAsync;
         backendRouteManager.RouteCloseFrameReceived -= OnBackendRouteCloseFrameReceivedAsync;
+        backendRouteManager.RouteSessionClosed -= OnBackendRouteSessionClosedAsync;
         await m_GracefulCancellation.CancelAsync().ConfigureAwait(false);
         m_Socket?.Dispose();
         m_BackendRouteRegistry.CancelAll();
@@ -437,8 +439,17 @@ internal class ConnectionManager(
 
             var request = PacketCodec.Decode(packet, GatewayBackendRouteOpenRequest.Codec);
             backendKind = request.BackendKind;
+            var normalizedBackendKind = m_PersistentBackendRouteRegistry.RequireAllowedBackendKind(request.BackendKind);
+            var backendSession = await backendRouteManager
+                .ConnectAsync(normalizedBackendKind, cancellationToken)
+                .ConfigureAwait(false);
+            if (!string.Equals(backendSession.BackendKind, normalizedBackendKind, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Selected Backend session kind does not match the requested Backend kind.");
+            }
+
             var route = m_PersistentBackendRouteRegistry.Open(
-                backendKind,
+                backendSession.Binding,
                 client,
                 m_GracefulCancellation.Token);
 
@@ -609,7 +620,7 @@ internal class ConnectionManager(
                 envelope,
                 GatewayBackendRouteDataEnvelope.Codec);
             await backendRouteManager.RelayFrameAsync(
-                backendKind,
+                route.BackendBinding,
                 routedFrame,
                 cancellationToken).ConfigureAwait(false);
             if (matchedBackendOriginResponseExchangeId.HasValue)
@@ -747,9 +758,13 @@ internal class ConnectionManager(
                 return;
             }
 
-            if (!string.Equals(route.BackendKind, frame.BackendKind, StringComparison.Ordinal))
+            if (!route.BackendBinding.Matches(
+                    frame.BackendKind,
+                    frame.NodeId,
+                    frame.MasterConnectionId,
+                    frame.DirectConnectionId))
             {
-                throw new InvalidOperationException("Backend route data used a Backend kind that does not match the route binding.");
+                throw new InvalidOperationException("Backend route data used a Backend session that does not match the route binding.");
             }
 
             if (route.State != PersistentBackendRouteState.Open)
@@ -828,9 +843,13 @@ internal class ConnectionManager(
                 return;
             }
 
-            if (!string.Equals(route.BackendKind, frame.BackendKind, StringComparison.Ordinal))
+            if (!route.BackendBinding.Matches(
+                    frame.BackendKind,
+                    frame.NodeId,
+                    frame.MasterConnectionId,
+                    frame.DirectConnectionId))
             {
-                throw new InvalidOperationException("Backend route close used a Backend kind that does not match the route binding.");
+                throw new InvalidOperationException("Backend route close used a Backend session that does not match the route binding.");
             }
 
             if (route.State != PersistentBackendRouteState.Open)
@@ -843,13 +862,7 @@ internal class ConnectionManager(
                 throw new InvalidOperationException("Persistent Backend route could not be closed.");
             }
 
-            using var clientFrame = PacketCodec.Encode(
-                PacketKind.Notify,
-                Pid.GATE_BACKEND_ROUTE_CLOSE,
-                GatewayBackendRouteClose.ProtocolVersion,
-                close,
-                GatewayBackendRouteClose.Codec);
-            await route.Owner.WriteAsync(clientFrame, cancellationToken).ConfigureAwait(false);
+            await WriteBackendRouteCloseNotifyAsync(route.Owner, close, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -862,6 +875,37 @@ internal class ConnectionManager(
                 "Gateway rejected Backend route close frame. BackendKind={BackendKind}, NodeId={NodeId}.",
                 frame.BackendKind,
                 frame.NodeId);
+        }
+    }
+
+    private async ValueTask OnBackendRouteSessionClosedAsync(
+        BackendRouteSessionClosed frame,
+        CancellationToken cancellationToken)
+    {
+        var routes = m_PersistentBackendRouteRegistry.RemoveBackendBindingRoutes(
+            frame.Binding,
+            frame.Reason);
+        foreach (var route in routes)
+        {
+            try
+            {
+                await WriteBackendRouteCloseNotifyAsync(
+                    route.Owner,
+                    new GatewayBackendRouteClose(route.RouteToken, frame.Reason),
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(
+                    e,
+                    "Gateway could not notify client that a Backend route session closed. BackendKind={BackendKind}, NodeId={NodeId}.",
+                    frame.Binding.BackendKind,
+                    frame.Binding.NodeId);
+            }
         }
     }
 
@@ -929,6 +973,20 @@ internal class ConnectionManager(
             routeClose,
             GatewayBackendRouteClose.Codec);
         await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteBackendRouteCloseNotifyAsync(
+        Client client,
+        GatewayBackendRouteClose routeClose,
+        CancellationToken cancellationToken)
+    {
+        using var clientFrame = PacketCodec.Encode(
+            PacketKind.Notify,
+            Pid.GATE_BACKEND_ROUTE_CLOSE,
+            GatewayBackendRouteClose.ProtocolVersion,
+            routeClose,
+            GatewayBackendRouteClose.Codec);
+        await client.WriteAsync(clientFrame, cancellationToken).ConfigureAwait(false);
     }
 
     public ServiceAdminStatusItem[] GetStatusItems()

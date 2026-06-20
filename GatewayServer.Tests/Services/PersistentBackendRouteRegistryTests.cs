@@ -54,13 +54,16 @@ public sealed class PersistentBackendRouteRegistryTests
         });
         var firstOwner = new object();
         var secondOwner = new object();
-        var alphaRoute = registry.Open(" alpha ", firstOwner, shutdown.Token);
-        var betaRoute = registry.Open("beta", secondOwner, shutdown.Token);
+        var alphaRoute = registry.Open(CreateBinding(" alpha "), firstOwner, shutdown.Token);
+        var betaRoute = registry.Open(CreateBinding("beta", nodeId: "backend-b", masterConnectionId: "master-b", directConnectionId: "direct-b"), secondOwner, shutdown.Token);
 
         try
         {
             Assert.True(registry.TryGet(alphaRoute.RouteToken, out var persistentAlpha));
             Assert.Same(firstOwner, persistentAlpha.Owner);
+            Assert.Equal("backend-a", persistentAlpha.BackendBinding.NodeId);
+            Assert.Equal("master-a", persistentAlpha.BackendBinding.MasterConnectionId);
+            Assert.Equal("direct-a", persistentAlpha.BackendBinding.DirectConnectionId);
             Assert.Equal("alpha", persistentAlpha.BackendKind);
             Assert.Equal(PersistentBackendRouteState.Open, persistentAlpha.State);
 
@@ -115,7 +118,7 @@ public sealed class PersistentBackendRouteRegistryTests
 
         Assert.Equal("alpha", registry.RequireAllowedBackendKind(" alpha "));
         Assert.Throws<UnauthorizedAccessException>(() =>
-            registry.Open("beta", new object(), CancellationToken.None));
+            registry.Open(CreateBinding("beta"), new object(), CancellationToken.None));
     }
 
     [Fact]
@@ -129,12 +132,12 @@ public sealed class PersistentBackendRouteRegistryTests
             MaxOpenRoutesPerClient = 0,
             RouteLifetimeMilliseconds = 10000
         });
-        var route = registry.Open("alpha", new object(), shutdown.Token);
+        var route = registry.Open(CreateBinding("alpha"), new object(), shutdown.Token);
 
         try
         {
             Assert.Throws<InvalidOperationException>(() =>
-                registry.Open("alpha", new object(), shutdown.Token));
+                registry.Open(CreateBinding("alpha", nodeId: "backend-b", masterConnectionId: "master-b", directConnectionId: "direct-b"), new object(), shutdown.Token));
         }
         finally
         {
@@ -156,15 +159,15 @@ public sealed class PersistentBackendRouteRegistryTests
         });
         var owner = new object();
         var otherOwner = new object();
-        var firstRoute = registry.Open("alpha", owner, shutdown.Token);
+        var firstRoute = registry.Open(CreateBinding("alpha"), owner, shutdown.Token);
         PersistentBackendRoute<object>? otherRoute = null;
 
         try
         {
             Assert.Throws<InvalidOperationException>(() =>
-                registry.Open("alpha", owner, shutdown.Token));
+                registry.Open(CreateBinding("alpha", nodeId: "backend-b", masterConnectionId: "master-b", directConnectionId: "direct-b"), owner, shutdown.Token));
 
-            otherRoute = registry.Open("alpha", otherOwner, shutdown.Token);
+            otherRoute = registry.Open(CreateBinding("alpha", nodeId: "backend-b", masterConnectionId: "master-b", directConnectionId: "direct-b"), otherOwner, shutdown.Token);
             Assert.True(registry.TryGet(otherRoute.RouteToken, out _));
         }
         finally
@@ -183,7 +186,7 @@ public sealed class PersistentBackendRouteRegistryTests
             AllowedBackendKinds = ["alpha"],
             RouteLifetimeMilliseconds = 10000
         });
-        var route = registry.Open("alpha", new object(), shutdown.Token);
+        var route = registry.Open(CreateBinding("alpha"), new object(), shutdown.Token);
 
         Assert.True(registry.Close(route.RouteToken, "client closed"));
         Assert.False(registry.TryGet(route.RouteToken, out _));
@@ -207,9 +210,9 @@ public sealed class PersistentBackendRouteRegistryTests
         });
         var owner = new object();
         var otherOwner = new object();
-        var firstRoute = registry.Open("alpha", owner, shutdown.Token);
-        var secondRoute = registry.Open("alpha", owner, shutdown.Token);
-        var otherRoute = registry.Open("alpha", otherOwner, shutdown.Token);
+        var firstRoute = registry.Open(CreateBinding("alpha"), owner, shutdown.Token);
+        var secondRoute = registry.Open(CreateBinding("alpha", nodeId: "backend-b", masterConnectionId: "master-b", directConnectionId: "direct-b"), owner, shutdown.Token);
+        var otherRoute = registry.Open(CreateBinding("alpha", nodeId: "backend-c", masterConnectionId: "master-c", directConnectionId: "direct-c"), otherOwner, shutdown.Token);
 
         try
         {
@@ -229,6 +232,48 @@ public sealed class PersistentBackendRouteRegistryTests
     }
 
     [Fact]
+    public async Task RemoveBackendBindingRoutes_RemovesOnlyExactBackendSession()
+    {
+        using var shutdown = new CancellationTokenSource();
+        var registry = CreateRegistry(new BackendRouteOptions
+        {
+            AllowedBackendKinds = ["alpha"],
+            MaxOpenRoutes = 0,
+            MaxOpenRoutesPerClient = 0,
+            RouteLifetimeMilliseconds = 10000
+        });
+        var owner = new object();
+        var binding = CreateBinding("alpha");
+        var sameBindingRoute = registry.Open(binding, owner, shutdown.Token);
+        var equalBindingRoute = registry.Open(CreateBinding("alpha"), owner, shutdown.Token);
+        var otherSessionRoute = registry.Open(
+            CreateBinding("alpha", nodeId: "backend-b", masterConnectionId: "master-b", directConnectionId: "direct-b"),
+            owner,
+            shutdown.Token);
+
+        try
+        {
+            var removed = registry.RemoveBackendBindingRoutes(binding, "backend disconnected");
+
+            Assert.Equal(2, removed.Length);
+            Assert.Contains(sameBindingRoute, removed);
+            Assert.Contains(equalBindingRoute, removed);
+            Assert.DoesNotContain(otherSessionRoute, removed);
+            Assert.False(registry.TryGet(sameBindingRoute.RouteToken, out _));
+            Assert.False(registry.TryGet(equalBindingRoute.RouteToken, out _));
+            Assert.True(registry.TryGet(otherSessionRoute.RouteToken, out _));
+            Assert.Equal(PersistentBackendRouteState.Closed, sameBindingRoute.State);
+            Assert.Equal(PersistentBackendRouteState.Closed, equalBindingRoute.State);
+            Assert.Equal(PersistentBackendRouteState.Open, otherSessionRoute.State);
+        }
+        finally
+        {
+            registry.CancelAll();
+            await WaitForRouteTasksAsync(sameBindingRoute, equalBindingRoute, otherSessionRoute);
+        }
+    }
+
+    [Fact]
     public async Task Route_ExpiresAfterLifetime()
     {
         using var shutdown = new CancellationTokenSource();
@@ -237,7 +282,7 @@ public sealed class PersistentBackendRouteRegistryTests
             AllowedBackendKinds = ["alpha"],
             RouteLifetimeMilliseconds = 25
         });
-        var route = registry.Open("alpha", new object(), shutdown.Token);
+        var route = registry.Open(CreateBinding("alpha"), new object(), shutdown.Token);
 
         await WaitForRouteTasksAsync(route);
 
@@ -257,7 +302,7 @@ public sealed class PersistentBackendRouteRegistryTests
             MaxPendingExchangesPerRoute = 1,
             MaxPendingExchangesPerRoutePerDirection = 0
         });
-        var route = registry.Open("alpha", new object(), shutdown.Token);
+        var route = registry.Open(CreateBinding("alpha"), new object(), shutdown.Token);
 
         try
         {
@@ -290,7 +335,7 @@ public sealed class PersistentBackendRouteRegistryTests
             MaxPendingExchangesPerRoute = 0,
             MaxPendingExchangesPerRoutePerDirection = 1
         });
-        var route = registry.Open("alpha", new object(), shutdown.Token);
+        var route = registry.Open(CreateBinding("alpha"), new object(), shutdown.Token);
 
         try
         {
@@ -331,7 +376,7 @@ public sealed class PersistentBackendRouteRegistryTests
             MaxPendingExchangesPerRoute = 1,
             MaxPendingExchangesPerRoutePerDirection = 1
         });
-        var route = registry.Open("alpha", new object(), shutdown.Token);
+        var route = registry.Open(CreateBinding("alpha"), new object(), shutdown.Token);
 
         try
         {
@@ -366,6 +411,19 @@ public sealed class PersistentBackendRouteRegistryTests
             options,
             new GatewayBackendRouteTokenGenerator(),
             NullLogger.Instance);
+    }
+
+    private static BackendRouteBinding CreateBinding(
+        string backendKind,
+        string nodeId = "backend-a",
+        string masterConnectionId = "master-a",
+        string directConnectionId = "direct-a")
+    {
+        return new BackendRouteBinding(
+            backendKind,
+            nodeId,
+            masterConnectionId,
+            directConnectionId);
     }
 
     private static async Task WaitForRouteTasksAsync(params PersistentBackendRoute<object>?[] routes)

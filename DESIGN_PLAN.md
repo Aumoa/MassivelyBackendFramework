@@ -6,7 +6,7 @@ All plans in this file must be written in priority order, with the highest-prior
 
 ### Scope
 
-Persistent Backend routing now uses Gateway-issued `RouteToken` values and per-request `ExchangeId` values for route-data correlation. The remaining hardening work is to finish the parts that still depend on broader runtime ownership, Backend session lifetime, and migration away from the legacy one-shot `RouteId` flow.
+Persistent Backend routing now uses Gateway-issued `RouteToken` values, per-request `ExchangeId` values for route-data correlation, and Backend session binding for Backend-origin authority checks. The remaining hardening work is to finish broader abuse controls and migration away from the legacy one-shot `RouteId` flow.
 
 The target behavior remains:
 
@@ -18,36 +18,10 @@ The target behavior remains:
 
 ### Remaining Risks
 
-- Persistent routes are currently bound to an authenticated client connection and Backend kind, but not yet strongly pinned to a specific Backend node/session lifetime.
-- If a Backend session is replaced or lost, the Gateway still needs an explicit policy for closing, suspending, or rebinding affected persistent routes.
 - Abuse controls exist for open route counts and pending exchanges, but route-open/exchange creation rate limiting and bounded client input queues are still missing.
 - The legacy one-shot `GATE_BACKEND_ROUTE` flow still accepts client-provided `RouteId` values and must remain treated as a migration compatibility path, not an authoritative persistent route model.
 
-## P1: Backend Node And Session Binding
-
-### Plan
-
-1. Extend persistent route state beyond `BackendKind`.
-   - Track the selected Backend node id and master connection id, or an explicit Backend session identity.
-   - Decide whether route-open should immediately allocate/connect to a Backend session or lazily bind on first relay.
-
-2. Validate every Backend-origin frame against the route binding.
-   - Match Backend kind.
-   - Match Backend node/session identity once available.
-   - Reject frames from a replacement or unrelated Backend session unless a deliberate rebinding policy exists.
-
-3. Handle Backend session loss.
-   - Close or suspend routes bound to the lost session.
-   - Clear pending exchanges.
-   - Notify clients when the route is no longer usable.
-
-### Validation Plan
-
-- Backend frame from the wrong node/session is rejected.
-- Backend session loss closes or suspends affected routes.
-- Session replacement does not inherit old route authority by Backend kind alone.
-
-## P2: Abuse Controls
+## P1: Abuse Controls
 
 ### Plan
 
@@ -63,7 +37,7 @@ The target behavior remains:
 - Exchange creation bursts are limited without closing unrelated exchanges.
 - Backpressure does not create unobserved fire-and-forget failures during shutdown.
 
-## P3: Legacy RouteId Migration
+## P2: Legacy RouteId Migration
 
 ### Plan
 

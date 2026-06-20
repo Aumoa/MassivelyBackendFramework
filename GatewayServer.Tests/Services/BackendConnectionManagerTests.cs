@@ -135,6 +135,7 @@ public sealed class BackendConnectionManagerTests
             Assert.Equal("alpha", routedBack.BackendKind);
             Assert.Equal("backend-a", routedBack.NodeId);
             Assert.Equal("master-a", routedBack.MasterConnectionId);
+            Assert.Equal(FakeBackendServer.DirectConnectionId, routedBack.DirectConnectionId);
             Assert.Equal(responseRouteId, routedBack.Envelope.RouteId);
             Assert.Equal(PacketKind.Response, routedBack.Envelope.RoutedKind);
             Assert.Equal((ushort)205, routedBack.Envelope.RoutedPacketId);
@@ -209,6 +210,7 @@ public sealed class BackendConnectionManagerTests
             Assert.Equal("alpha", routedBack.BackendKind);
             Assert.Equal("backend-a", routedBack.NodeId);
             Assert.Equal("master-a", routedBack.MasterConnectionId);
+            Assert.Equal(FakeBackendServer.DirectConnectionId, routedBack.DirectConnectionId);
             Assert.Equal(routeToken, routedBack.Envelope.RouteToken);
             Assert.Equal(GatewayBackendRouteDirection.BackendToClient, routedBack.Envelope.Direction);
             Assert.Equal(PacketKind.Notify, routedBack.Envelope.RoutedKind);
@@ -263,8 +265,58 @@ public sealed class BackendConnectionManagerTests
             Assert.Equal("alpha", routedBack.BackendKind);
             Assert.Equal("backend-a", routedBack.NodeId);
             Assert.Equal("master-a", routedBack.MasterConnectionId);
+            Assert.Equal(FakeBackendServer.DirectConnectionId, routedBack.DirectConnectionId);
             Assert.Equal(routeToken, routedBack.Close.RouteToken);
             Assert.Equal("backend closed", routedBack.Close.Reason);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RelayFrameAsync_RaisesSessionClosedWhenBackendDisconnects()
+    {
+        await using var backend = new FakeBackendServer(
+            responseEnvelope: null,
+            closeAfterRelay: true);
+
+        var issuer = new RecordingDirectConnectCodeIssuer("direct-code");
+        var catalog = new FakeBackendNodeCatalog(CreateSnapshot(
+            CreateNode("alpha", "backend-a", "master-a", backend.Port)));
+        var manager = CreateManager(catalog, issuer);
+        manager.SetMasterConnectionId("gateway-master-a");
+        await manager.StartAsync(CancellationToken.None);
+
+        var sessionClosed = new TaskCompletionSource<BackendRouteSessionClosed>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.RouteSessionClosed += (frame, _) =>
+        {
+            sessionClosed.TrySetResult(frame);
+            return ValueTask.CompletedTask;
+        };
+
+        using var requestFrame = CreateBackendRouteFrame(
+            "alpha",
+            Guid.NewGuid(),
+            PacketKind.Notify,
+            routedPacketId: 101,
+            routedVersion: 2,
+            [1, 2, 3]);
+
+        try
+        {
+            await manager.RelayFrameAsync("alpha", requestFrame, CancellationToken.None);
+            await backend.RelayedEnvelope.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            var closed = await sessionClosed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(new BackendRouteBinding(
+                "alpha",
+                "backend-a",
+                "master-a",
+                FakeBackendServer.DirectConnectionId), closed.Binding);
+            Assert.Equal("Backend route session closed.", closed.Reason);
         }
         finally
         {
@@ -452,6 +504,7 @@ public sealed class BackendConnectionManagerTests
         private readonly GatewayBackendRouteClose? m_RouteClose;
         private readonly string? m_AcceptedNodeId;
         private readonly bool m_ExpectRelay;
+        private readonly bool m_CloseAfterRelay;
         private readonly Task m_RunTask;
 
         public FakeBackendServer(
@@ -459,13 +512,15 @@ public sealed class BackendConnectionManagerTests
             GatewayBackendRouteDataEnvelope? routeDataEnvelope = null,
             GatewayBackendRouteClose? routeClose = null,
             string? acceptedNodeId = null,
-            bool expectRelay = true)
+            bool expectRelay = true,
+            bool closeAfterRelay = false)
         {
             m_ResponseEnvelope = responseEnvelope;
             m_RouteDataEnvelope = routeDataEnvelope;
             m_RouteClose = routeClose;
             m_AcceptedNodeId = acceptedNodeId;
             m_ExpectRelay = expectRelay;
+            m_CloseAfterRelay = closeAfterRelay;
             m_Listener = new TcpListener(IPAddress.Loopback, 0);
             m_Listener.Start();
             Port = ((IPEndPoint)m_Listener.LocalEndpoint).Port;
@@ -553,6 +608,10 @@ public sealed class BackendConnectionManagerTests
 
                 var relayedEnvelope = PacketCodec.Decode(relayedFrame, GatewayBackendRouteEnvelope.Codec);
                 RelayedEnvelope.TrySetResult(relayedEnvelope);
+                if (m_CloseAfterRelay)
+                {
+                    return;
+                }
 
                 if (m_ResponseEnvelope != null)
                 {
