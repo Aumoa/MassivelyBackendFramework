@@ -56,7 +56,9 @@
 - Consider high-performance .NET primitives when appropriate, including `System.IO.Pipelines`, `SocketAsyncEventArgs`, `ArrayPool<T>`, `MemoryPool<T>`, `Span<T>`, `Memory<T>`, `ValueTask`, bounded queues, and custom schedulers.
 - Make a serious effort to improve throughput, latency, allocation behavior, and cache locality in performance-sensitive socket and Dedicated paths. When safe abstractions cannot reasonably deliver the needed result, `ref`, `in`, `readonly ref`, `ref struct`, `stackalloc`, custom memory layouts, or `unsafe` code may be appropriate.
 - Keep `unsafe` and ref-heavy code narrowly scoped, isolated behind clear APIs, and justified by a meaningful measured or clearly reasoned performance benefit. Do not introduce unsafe contexts or hard-to-maintain low-level code for speculative or cold-path wins.
+- When writing `unsafe` or ref-heavy code, keep its assumptions and failure modes bounded enough for the author to reason about completely. Input ranges, buffer lengths, pointer lifetimes, pinning, alignment, aliasing, ownership, and mutation concurrency should be explicit before entering the unsafe or low-level section.
 - During reviews, actively examine performance-sensitive changes for avoidable allocations, copies, bounds checks, synchronization, blocking, scheduler overhead, and data-layout issues. Be practical rather than dogmatic: prefer clear evidence or hot-path reasoning, and avoid nitpicking low-impact cold paths.
+- During reviews of `unsafe` or ref-heavy code, verify that the relevant failure modes are enumerable, testable where practical, and not dependent on unclear external input, lifetime, ownership, or concurrency behavior. Push back when the reviewer cannot reasonably predict memory-safety behavior from local invariants and documented preconditions.
 
 ## Async Work And SynchronizationContext
 
