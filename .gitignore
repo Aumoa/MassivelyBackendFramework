@@ -8,6 +8,7 @@
 # ASP.NET
 appsettings.*.json
 **/.data-protection-keys/
+AutomatedWiki/.data/
 
 # Claude Code
 .claude/*.local.json
