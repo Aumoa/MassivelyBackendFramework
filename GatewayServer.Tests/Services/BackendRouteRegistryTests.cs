@@ -28,6 +28,7 @@ public sealed class BackendRouteRegistryTests
         var registry = CreateRegistry(new BackendRouteOptions
         {
             AllowedBackendKinds = ["beta", "alpha"],
+            EnableLegacyOneShotRoutes = true,
             MaxPendingRoutes = 4,
             MaxPendingRoutesPerClient = 2,
             RequestTimeoutMilliseconds = 500
@@ -105,6 +106,20 @@ public sealed class BackendRouteRegistryTests
             item.Group == "Backend routes" &&
             item.Name == "Legacy one-shot notifies" &&
             item.Value == "1");
+    }
+
+    [Fact]
+    public void GetStatusItems_ReportsLegacyOneShotRoutesDisabledByDefault()
+    {
+        var registry = CreateRegistry(new BackendRouteOptions
+        {
+            AllowedBackendKinds = ["alpha"]
+        });
+
+        Assert.Contains(registry.GetStatusItems(), item =>
+            item.Group == "Backend routes" &&
+            item.Name == "Legacy one-shot routes" &&
+            item.Value == "Disabled");
     }
 
     [Fact]

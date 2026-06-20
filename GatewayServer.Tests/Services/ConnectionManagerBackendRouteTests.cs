@@ -25,6 +25,7 @@ public sealed class ConnectionManagerBackendRouteTests
             new BackendRouteOptions
             {
                 AllowedBackendKinds = ["alpha"],
+                EnableLegacyOneShotRoutes = true,
                 RequestTimeoutMilliseconds = 5000,
                 MaxPendingRoutes = 8,
                 MaxPendingRoutesPerClient = 2
@@ -131,6 +132,7 @@ public sealed class ConnectionManagerBackendRouteTests
             new BackendRouteOptions
             {
                 AllowedBackendKinds = [],
+                EnableLegacyOneShotRoutes = true,
                 RequestTimeoutMilliseconds = 5000
             },
             out var port);

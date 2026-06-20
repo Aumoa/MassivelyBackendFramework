@@ -20,13 +20,13 @@ The target behavior remains:
 
 ### Remaining Risks
 
-- The legacy one-shot `GATE_BACKEND_ROUTE` flow is explicitly configurable for migration compatibility, but it remains enabled by default until external callers move to persistent route-open/data/close.
+- The legacy one-shot `GATE_BACKEND_ROUTE` flow is disabled by default. Environments with unmigrated external callers must explicitly opt in with `EnableLegacyOneShotRoutes`.
 
 ### Plan
 
 1. Update any external clients to open persistent routes and use Gateway-issued `RouteToken` values.
 2. Monitor `Legacy one-shot packets` status until external legacy traffic is gone.
-3. Disable `EnableLegacyOneShotRoutes` in environments where all callers have migrated.
+3. Remove any temporary `EnableLegacyOneShotRoutes` opt-in once an environment has migrated.
 4. Keep compatibility tests while both paths exist.
 5. Remove the old pending `RouteId` flow once all callers use route-open/data/close.
 
