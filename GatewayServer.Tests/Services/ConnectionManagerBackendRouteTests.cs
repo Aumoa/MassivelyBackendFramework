@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using GatewayServer.Behaviors;
 using GatewayServer.Options;
 using GatewayServer.Protocols;
 using GatewayServer.Services;
@@ -165,6 +166,102 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
+    public async Task ClientRouteRequest_RejectsBeforeAuthentication()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                RequestTimeoutMilliseconds = 5000
+            },
+            out var port,
+            authenticateClients: false);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            var routeId = Guid.NewGuid();
+            var requestEnvelope = new GatewayBackendRouteEnvelope(
+                "alpha",
+                routeId,
+                PacketKind.Request,
+                routedPacketId: 101,
+                routedVersion: 2,
+                [1, 2, 3]);
+            await WriteBackendRouteEnvelopeAsync(stream, PacketKind.Request, requestEnvelope);
+
+            using var rejectedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, rejectedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_ROUTE, rejectedFrame.Header.PacketId);
+
+            var rejected = PacketCodec.Decode(rejectedFrame, GatewayBackendRouteResponse.Codec);
+            Assert.False(rejected.Success);
+            Assert.Equal("alpha", rejected.BackendKind);
+            Assert.Equal(routeId, rejected.RouteId);
+            Assert.Equal("Client is not authenticated.", rejected.ErrorMessage);
+            Assert.Equal(0, routeManager.RelayCount);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RouteOpenRequest_RejectsBeforeAuthentication()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                RequestTimeoutMilliseconds = 5000
+            },
+            out var port,
+            authenticateClients: false);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteBackendRouteOpenRequestAsync(stream, new GatewayBackendRouteOpenRequest("alpha"));
+
+            using var rejectedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, rejectedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_ROUTE_OPEN, rejectedFrame.Header.PacketId);
+
+            var rejected = PacketCodec.Decode(rejectedFrame, GatewayBackendRouteOpenResponse.Codec);
+            Assert.False(rejected.Success);
+            Assert.Equal("alpha", rejected.BackendKind);
+            Assert.Null(rejected.RouteToken);
+            Assert.Equal("Client is not authenticated.", rejected.ErrorMessage);
+            Assert.Equal(0, routeManager.RelayCount);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task StartAsync_RejectsPlaintextConfiguration()
     {
         var routeManager = new RecordingBackendRouteManager();
@@ -272,7 +369,8 @@ public sealed class ConnectionManagerBackendRouteTests
         ConnectionManagerOptions? connectionOptions = null,
         IHostEnvironment? hostEnvironment = null,
         IGatewayClientCertificateLoader? certificateLoader = null,
-        IGatewayClientStreamAuthenticator? streamAuthenticator = null)
+        IGatewayClientStreamAuthenticator? streamAuthenticator = null,
+        bool authenticateClients = true)
     {
         port = GetAvailableTcpPort();
         connectionOptions ??= new ConnectionManagerOptions
@@ -286,6 +384,7 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             certificateLoader ?? new StaticCertificateLoader(CreateServerCertificate()),
             streamAuthenticator ?? new PassThroughStreamAuthenticator(),
+            new StaticGatewayClientAuthenticationContextFactory(authenticateClients),
             NullLogger<ConnectionManager>.Instance,
             hostEnvironment ?? new TestHostEnvironment());
     }
@@ -326,6 +425,20 @@ public sealed class ConnectionManagerBackendRouteTests
             GatewayBackendRouteEnvelope.ProtocolVersion,
             envelope,
             GatewayBackendRouteEnvelope.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, timeout.Token);
+    }
+
+    private static async Task WriteBackendRouteOpenRequestAsync(
+        Stream stream,
+        GatewayBackendRouteOpenRequest request)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var frame = PacketCodec.Encode(
+            PacketKind.Request,
+            Pid.GATE_BACKEND_ROUTE_OPEN,
+            GatewayBackendRouteOpenRequest.ProtocolVersion,
+            request,
+            GatewayBackendRouteOpenRequest.Codec);
         await PacketFrameWriter.WriteAsync(stream, frame, timeout.Token);
     }
 
@@ -457,6 +570,21 @@ public sealed class ConnectionManagerBackendRouteTests
             CancellationToken cancellationToken)
         {
             return ValueTask.FromResult<Stream>(networkStream);
+        }
+    }
+
+    private sealed class StaticGatewayClientAuthenticationContextFactory(bool authenticateClients)
+        : IGatewayClientAuthenticationContextFactory
+    {
+        public GatewayClientAuthenticationContext Create(Client client)
+        {
+            var context = new GatewayClientAuthenticationContext();
+            if (authenticateClients)
+            {
+                context.MarkAuthenticated(new GatewayClientPrincipal("test-client"));
+            }
+
+            return context;
         }
     }
 

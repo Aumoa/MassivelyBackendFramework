@@ -25,6 +25,7 @@ internal class ConnectionManager(
     IBackendRouteManager backendRouteManager,
     IGatewayClientCertificateLoader certificateLoader,
     IGatewayClientStreamAuthenticator streamAuthenticator,
+    IGatewayClientAuthenticationContextFactory authenticationContextFactory,
     ILogger<ConnectionManager> logger,
     IHostEnvironment env) : IHostedService, IConnectionManager, IBackendRouteStatusProvider
 {
@@ -172,6 +173,17 @@ internal class ConnectionManager(
         }
 
         var client = new Client(networkStream, s, logger);
+        GatewayClientAuthenticationContext authenticationContext;
+        try
+        {
+            authenticationContext = authenticationContextFactory.Create(client);
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Gateway could not create authentication state for a client connection.");
+            await client.DisposeAsync().ConfigureAwait(false);
+            return;
+        }
 
         bool addedToClients = false;
         lock (m_Clients)
@@ -195,7 +207,7 @@ internal class ConnectionManager(
                 };
 
                 client.Start();
-                HandleClientPacketsAsync(client, cancellationToken);
+                HandleClientPacketsAsync(client, authenticationContext, cancellationToken);
             }
         }
 
@@ -207,15 +219,22 @@ internal class ConnectionManager(
         }
     }
 
-    private async void HandleClientPacketsAsync(Client client, CancellationToken cancellationToken)
+    private async void HandleClientPacketsAsync(
+        Client client,
+        GatewayClientAuthenticationContext authenticationContext,
+        CancellationToken cancellationToken)
     {
         try
         {
             await foreach (var packet in client.ReadPacketsAsync(cancellationToken))
             {
-                if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE)
+                if (IsBackendRoutePacket(packet))
                 {
-                    await HandleBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+                    await HandleBackendRouteClientPacketAsync(
+                        client,
+                        authenticationContext,
+                        packet,
+                        cancellationToken).ConfigureAwait(false);
                     continue;
                 }
 
@@ -246,6 +265,27 @@ internal class ConnectionManager(
                 logger.LogDebug(e, "Gateway client disposal completed with an error after echo loop.");
             }
         }
+    }
+
+    private async Task HandleBackendRouteClientPacketAsync(
+        Client client,
+        GatewayClientAuthenticationContext authenticationContext,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        if (!authenticationContext.IsAuthenticated)
+        {
+            await RejectUnauthenticatedBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE)
+        {
+            await HandleBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        await RejectUnsupportedPersistentBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task HandleBackendRoutePacketAsync(
@@ -339,6 +379,62 @@ internal class ConnectionManager(
         }
     }
 
+    private async Task RejectUnauthenticatedBackendRoutePacketAsync(
+        Client client,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        logger.LogWarning(
+            "Gateway rejected Backend route packet from an unauthenticated client. PacketKind={PacketKind}, PacketId={PacketId}.",
+            packet.Header.Kind,
+            packet.Header.PacketId);
+
+        if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE &&
+            packet.Header.Kind == PacketKind.Request)
+        {
+            var (routeId, backendKind) = GetBackendRouteResponseIdentity(packet);
+            await WriteBackendRouteResponseAsync(
+                client,
+                packet.Header.Version,
+                GatewayBackendRouteResponse.Rejected(routeId, backendKind, "Client is not authenticated."),
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE_OPEN &&
+            packet.Header.Kind == PacketKind.Request)
+        {
+            var backendKind = GetBackendRouteOpenResponseBackendKind(packet);
+            await WriteBackendRouteOpenResponseAsync(
+                client,
+                packet.Header.Version,
+                GatewayBackendRouteOpenResponse.Rejected(backendKind, "Client is not authenticated."),
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task RejectUnsupportedPersistentBackendRoutePacketAsync(
+        Client client,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        logger.LogWarning(
+            "Gateway rejected unsupported persistent Backend route packet. PacketKind={PacketKind}, PacketId={PacketId}.",
+            packet.Header.Kind,
+            packet.Header.PacketId);
+
+        if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE_OPEN &&
+            packet.Header.Kind == PacketKind.Request)
+        {
+            var backendKind = GetBackendRouteOpenResponseBackendKind(packet);
+            await WriteBackendRouteOpenResponseAsync(
+                client,
+                packet.Header.Version,
+                GatewayBackendRouteOpenResponse.Rejected(backendKind, "Persistent Backend route handling is not enabled."),
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private async ValueTask OnBackendRouteFrameReceivedAsync(
         BackendRouteFrameReceived frame,
         CancellationToken cancellationToken)
@@ -402,6 +498,21 @@ internal class ConnectionManager(
         await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task WriteBackendRouteOpenResponseAsync(
+        Client client,
+        ushort version,
+        GatewayBackendRouteOpenResponse routeResponse,
+        CancellationToken cancellationToken)
+    {
+        using var response = PacketCodec.Encode(
+            PacketKind.Response,
+            Pid.GATE_BACKEND_ROUTE_OPEN,
+            version,
+            routeResponse,
+            GatewayBackendRouteOpenResponse.Codec);
+        await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
     public ServiceAdminStatusItem[] GetStatusItems()
     {
         return m_BackendRouteRegistry.GetStatusItems();
@@ -415,6 +526,54 @@ internal class ConnectionManager(
     private static Guid GetResponseRouteId(Guid routeId)
     {
         return routeId == Guid.Empty ? Guid.NewGuid() : routeId;
+    }
+
+    private static bool IsBackendRoutePacket(PacketFrame packet)
+    {
+        return packet.Header.PacketId is
+            Pid.GATE_BACKEND_ROUTE or
+            Pid.GATE_BACKEND_ROUTE_OPEN or
+            Pid.GATE_BACKEND_ROUTE_DATA or
+            Pid.GATE_BACKEND_ROUTE_CLOSE;
+    }
+
+    private static (Guid RouteId, string BackendKind) GetBackendRouteResponseIdentity(PacketFrame packet)
+    {
+        try
+        {
+            if (packet.Header.Version == GatewayBackendRouteEnvelope.ProtocolVersion)
+            {
+                var envelope = PacketCodec.Decode(packet, GatewayBackendRouteEnvelope.Codec);
+                return (GetResponseRouteId(envelope.RouteId), GetResponseBackendKind(envelope.BackendKind));
+            }
+        }
+        catch
+        {
+        }
+
+        return (Guid.NewGuid(), "unknown");
+    }
+
+    private static string GetBackendRouteOpenResponseBackendKind(PacketFrame packet)
+    {
+        try
+        {
+            if (packet.Header.Version == GatewayBackendRouteOpenRequest.ProtocolVersion)
+            {
+                var request = PacketCodec.Decode(packet, GatewayBackendRouteOpenRequest.Codec);
+                return GetResponseBackendKind(request.BackendKind);
+            }
+        }
+        catch
+        {
+        }
+
+        return "unknown";
+    }
+
+    private static string GetResponseBackendKind(string backendKind)
+    {
+        return string.IsNullOrWhiteSpace(backendKind) ? "unknown" : backendKind.Trim();
     }
 
     private async Task DisposeClientsAsync()
