@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
@@ -32,6 +33,8 @@ internal class ConnectionManager(
 {
     private readonly CancellationTokenSource m_GracefulCancellation = new();
     private readonly BackendRouteOptions m_BackendRouteOptions = backendRouteOptions.Value;
+    private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_ClientOriginPrincipalExchangeCounters = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_BackendOriginPrincipalExchangeCounters = new(StringComparer.Ordinal);
     private readonly BackendRouteRegistry<Client> m_BackendRouteRegistry = new(backendRouteOptions.Value, logger);
     private readonly PersistentBackendRouteRegistry<Client> m_PersistentBackendRouteRegistry = new(
         backendRouteOptions.Value,
@@ -315,13 +318,13 @@ internal class ConnectionManager(
 
         if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE_OPEN)
         {
-            await HandleBackendRouteOpenPacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+            await HandleBackendRouteOpenPacketAsync(client, authenticationContext, packet, cancellationToken).ConfigureAwait(false);
             return;
         }
 
         if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE_DATA)
         {
-            await HandleBackendRouteDataPacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+            await HandleBackendRouteDataPacketAsync(client, authenticationContext, packet, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -427,6 +430,7 @@ internal class ConnectionManager(
 
     private async Task HandleBackendRouteOpenPacketAsync(
         Client client,
+        GatewayClientAuthenticationContext authenticationContext,
         PacketFrame packet,
         CancellationToken cancellationToken)
     {
@@ -446,7 +450,8 @@ internal class ConnectionManager(
 
             var request = PacketCodec.Decode(packet, GatewayBackendRouteOpenRequest.Codec);
             backendKind = request.BackendKind;
-            m_PersistentBackendRouteRegistry.RequireOpenAttemptAllowed(client);
+            var principalSubjectId = authenticationContext.Principal?.SubjectId;
+            m_PersistentBackendRouteRegistry.RequireOpenAttemptAllowed(client, principalSubjectId);
             var normalizedBackendKind = m_PersistentBackendRouteRegistry.RequireAllowedBackendKind(request.BackendKind);
             var backendSession = await backendRouteManager
                 .ConnectAsync(normalizedBackendKind, cancellationToken)
@@ -459,6 +464,7 @@ internal class ConnectionManager(
             var route = m_PersistentBackendRouteRegistry.Open(
                 backendSession.Binding,
                 client,
+                principalSubjectId,
                 m_GracefulCancellation.Token);
 
             await WriteBackendRouteOpenResponseAsync(
@@ -553,6 +559,7 @@ internal class ConnectionManager(
 
     private async Task HandleBackendRouteDataPacketAsync(
         Client client,
+        GatewayClientAuthenticationContext authenticationContext,
         PacketFrame packet,
         CancellationToken cancellationToken)
     {
@@ -604,6 +611,11 @@ internal class ConnectionManager(
             if (envelope.RoutedKind == PacketKind.Request)
             {
                 registeredExchangeId = envelope.ExchangeId ?? throw new InvalidOperationException("Client Backend route requests require an exchange id.");
+                RequirePrincipalExchangeCreationAllowed(
+                    route.PrincipalSubjectId ?? authenticationContext.Principal?.SubjectId,
+                    m_BackendRouteOptions.MaxClientOriginExchangeCreatesPerPrincipalPerWindow,
+                    m_ClientOriginPrincipalExchangeCounters,
+                    "client-origin");
                 route.RegisterClientOriginExchange(
                     registeredExchangeId.Value,
                     envelope.RoutedPacketId,
@@ -806,6 +818,11 @@ internal class ConnectionManager(
             if (envelope.RoutedKind == PacketKind.Request)
             {
                 registeredExchangeId = envelope.ExchangeId ?? throw new InvalidOperationException("Backend route requests require an exchange id.");
+                RequirePrincipalExchangeCreationAllowed(
+                    route.PrincipalSubjectId,
+                    m_BackendRouteOptions.MaxBackendOriginExchangeCreatesPerPrincipalPerWindow,
+                    m_BackendOriginPrincipalExchangeCounters,
+                    "Backend-origin");
                 route.RegisterBackendOriginExchange(
                     registeredExchangeId.Value,
                     envelope.RoutedPacketId,
@@ -938,6 +955,29 @@ internal class ConnectionManager(
                     frame.Binding.NodeId);
             }
         }
+    }
+
+    private void RequirePrincipalExchangeCreationAllowed(
+        string? principalSubjectId,
+        int limit,
+        ConcurrentDictionary<string, FixedWindowRateCounter> counters,
+        string directionName)
+    {
+        if (limit <= 0 ||
+            string.IsNullOrWhiteSpace(principalSubjectId))
+        {
+            return;
+        }
+
+        var normalizedPrincipalSubjectId = principalSubjectId.Trim();
+        var counter = counters.GetOrAdd(
+            normalizedPrincipalSubjectId,
+            static _ => new FixedWindowRateCounter());
+        counter.IncrementOrThrow(
+            limit,
+            m_BackendRouteOptions.ExchangeRateLimitWindowMilliseconds,
+            DateTimeOffset.UtcNow,
+            $"Gateway persistent Backend route principal {directionName} exchange creation rate limit was exceeded.");
     }
 
     private async Task EchoPacketAsync(

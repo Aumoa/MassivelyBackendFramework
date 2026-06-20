@@ -47,15 +47,19 @@ public sealed class PersistentBackendRouteRegistryTests
             AllowedBackendKinds = ["beta", "alpha"],
             MaxOpenRoutes = 4,
             MaxOpenRoutesPerClient = 2,
+            MaxOpenRoutesPerPrincipal = 7,
             RouteLifetimeMilliseconds = 10000,
             ExchangeTimeoutMilliseconds = 7000,
             MaxPendingExchangesPerRoute = 8,
             MaxPendingExchangesPerRoutePerDirection = 4,
             RouteOpenRateLimitWindowMilliseconds = 2000,
             MaxRouteOpenAttemptsPerClientPerWindow = 3,
+            MaxRouteOpenAttemptsPerPrincipalPerWindow = 9,
             ExchangeRateLimitWindowMilliseconds = 3000,
             MaxClientOriginExchangeCreatesPerRoutePerWindow = 5,
-            MaxBackendOriginExchangeCreatesPerRoutePerWindow = 6
+            MaxBackendOriginExchangeCreatesPerRoutePerWindow = 6,
+            MaxClientOriginExchangeCreatesPerPrincipalPerWindow = 10,
+            MaxBackendOriginExchangeCreatesPerPrincipalPerWindow = 11
         });
         var firstOwner = new object();
         var secondOwner = new object();
@@ -99,8 +103,16 @@ public sealed class PersistentBackendRouteRegistryTests
                 item.Value == "4");
             Assert.Contains(status, item =>
                 item.Group == "Persistent Backend routes" &&
+                item.Name == "Max open routes per principal" &&
+                item.Value == "7");
+            Assert.Contains(status, item =>
+                item.Group == "Persistent Backend routes" &&
                 item.Name == "Route-open rate limit" &&
                 item.Value == "3 per 2000 ms");
+            Assert.Contains(status, item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Principal route-open rate limit" &&
+                item.Value == "9 per 2000 ms");
             Assert.Contains(status, item =>
                 item.Group == "Persistent Backend routes" &&
                 item.Name == "Client-origin exchange rate limit" &&
@@ -109,6 +121,14 @@ public sealed class PersistentBackendRouteRegistryTests
                 item.Group == "Persistent Backend routes" &&
                 item.Name == "Backend-origin exchange rate limit" &&
                 item.Value == "6 per 3000 ms");
+            Assert.Contains(status, item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Principal client-origin exchange rate limit" &&
+                item.Value == "10 per 3000 ms");
+            Assert.Contains(status, item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Principal Backend-origin exchange rate limit" &&
+                item.Value == "11 per 3000 ms");
             Assert.Contains(status, item =>
                 item.Group == "Persistent Backend route alpha" &&
                 item.Name == "Open routes" &&
@@ -195,6 +215,48 @@ public sealed class PersistentBackendRouteRegistryTests
     }
 
     [Fact]
+    public async Task Open_EnforcesPrincipalCapacity()
+    {
+        using var shutdown = new CancellationTokenSource();
+        var registry = CreateRegistry(new BackendRouteOptions
+        {
+            AllowedBackendKinds = ["alpha"],
+            MaxOpenRoutes = 0,
+            MaxOpenRoutesPerClient = 0,
+            MaxOpenRoutesPerPrincipal = 1,
+            RouteLifetimeMilliseconds = 10000
+        });
+        var firstRoute = registry.Open(
+            CreateBinding("alpha"),
+            new object(),
+            "principal-a",
+            shutdown.Token);
+        PersistentBackendRoute<object>? otherPrincipalRoute = null;
+
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() =>
+                registry.Open(
+                    CreateBinding("alpha", nodeId: "backend-b", masterConnectionId: "master-b", directConnectionId: "direct-b"),
+                    new object(),
+                    "principal-a",
+                    shutdown.Token));
+
+            otherPrincipalRoute = registry.Open(
+                CreateBinding("alpha", nodeId: "backend-c", masterConnectionId: "master-c", directConnectionId: "direct-c"),
+                new object(),
+                "principal-b",
+                shutdown.Token);
+            Assert.True(registry.TryGet(otherPrincipalRoute.RouteToken, out _));
+        }
+        finally
+        {
+            registry.CancelAll();
+            await WaitForRouteTasksAsync(firstRoute, otherPrincipalRoute);
+        }
+    }
+
+    [Fact]
     public void RequireOpenAttemptAllowed_EnforcesPerOwnerRateLimit()
     {
         var registry = CreateRegistry(new BackendRouteOptions
@@ -215,6 +277,26 @@ public sealed class PersistentBackendRouteRegistryTests
         registry.RequireOpenAttemptAllowed(otherOwner);
         Assert.Equal(0, registry.RemoveOwnerRoutes(owner, "client disconnected"));
         registry.RequireOpenAttemptAllowed(owner);
+    }
+
+    [Fact]
+    public void RequireOpenAttemptAllowed_EnforcesPerPrincipalRateLimit()
+    {
+        var registry = CreateRegistry(new BackendRouteOptions
+        {
+            AllowedBackendKinds = ["alpha"],
+            RouteOpenRateLimitWindowMilliseconds = 10000,
+            MaxRouteOpenAttemptsPerClientPerWindow = 0,
+            MaxRouteOpenAttemptsPerPrincipalPerWindow = 2
+        });
+
+        registry.RequireOpenAttemptAllowed(new object(), "principal-a");
+        registry.RequireOpenAttemptAllowed(new object(), "principal-a");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            registry.RequireOpenAttemptAllowed(new object(), "principal-a"));
+
+        registry.RequireOpenAttemptAllowed(new object(), "principal-b");
     }
 
     [Fact]

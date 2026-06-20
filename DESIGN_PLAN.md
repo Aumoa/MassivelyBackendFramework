@@ -18,23 +18,21 @@ The target behavior remains:
 
 ### Remaining Risks
 
-- Abuse controls exist for open route counts, pending exchanges, connection-scoped route-open bursts, and per-route exchange creation bursts, but bounded client input queues, idle/authentication timeouts, and principal-scoped limits are still missing.
+- Abuse controls exist for open route counts, pending exchanges, connection/principal-scoped route-open bursts, principal-scoped open routes, and per-route/principal exchange creation bursts, but bounded client input queues and idle/authentication timeouts are still missing.
 - The legacy one-shot `GATE_BACKEND_ROUTE` flow is now explicitly configurable for migration compatibility, but it remains enabled by default until callers move to persistent route-open/data/close.
 
 ## P1: Abuse Controls
 
 ### Plan
 
-- Add bounded client input queues or equivalent backpressure for externally reachable client sockets.
-- Add principal-scoped route-open, open-route, and exchange creation limits once authenticated principal identity is modeled.
-- Consider per-connection exchange creation limits across all routes if route fan-out can bypass per-route limits.
 - Add idle/authentication timeouts where they are not already explicit.
+- Add bounded client input queues or equivalent backpressure for externally reachable client sockets.
+- Consider per-connection exchange creation limits across all routes if route fan-out can bypass per-route and principal limits.
 
 ### Validation Plan
 
-- Backpressure does not create unobserved fire-and-forget failures during shutdown.
-- Principal-scoped limits apply across reconnects or multiple simultaneous connections for the same authenticated actor.
 - Idle or unauthenticated clients are disconnected without affecting authenticated active clients.
+- Backpressure does not create unobserved fire-and-forget failures during shutdown.
 
 ## P2: Legacy RouteId Migration
 

@@ -441,6 +441,70 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
+    public async Task RouteOpenRequest_RateLimitsByPrincipalBeforeBackendConnect()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                MaxOpenRoutesPerClient = 8,
+                MaxOpenRoutesPerPrincipal = 8,
+                RouteLifetimeMilliseconds = 5000,
+                RouteOpenRateLimitWindowMilliseconds = 10000,
+                MaxRouteOpenAttemptsPerClientPerWindow = 0,
+                MaxRouteOpenAttemptsPerPrincipalPerWindow = 1
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var firstClient = new TcpClient();
+            await firstClient.ConnectAsync(IPAddress.Loopback, port);
+            await using var firstStream = firstClient.GetStream();
+            using (await ReadRequiredFrameAsync(firstStream))
+            {
+            }
+
+            await WriteBackendRouteOpenRequestAsync(firstStream, new GatewayBackendRouteOpenRequest("alpha"));
+            using (var acceptedFrame = await ReadRequiredFrameAsync(firstStream))
+            {
+                var accepted = PacketCodec.Decode(acceptedFrame, GatewayBackendRouteOpenResponse.Codec);
+                Assert.True(accepted.Success);
+            }
+
+            Assert.Equal(1, routeManager.ConnectCount);
+
+            using var secondClient = new TcpClient();
+            await secondClient.ConnectAsync(IPAddress.Loopback, port);
+            await using var secondStream = secondClient.GetStream();
+            using (await ReadRequiredFrameAsync(secondStream))
+            {
+            }
+
+            await WriteBackendRouteOpenRequestAsync(secondStream, new GatewayBackendRouteOpenRequest("alpha"));
+            using (var rejectedFrame = await ReadRequiredFrameAsync(secondStream))
+            {
+                var rejected = PacketCodec.Decode(rejectedFrame, GatewayBackendRouteOpenResponse.Codec);
+                Assert.False(rejected.Success);
+                Assert.Equal("alpha", rejected.BackendKind);
+                Assert.Equal("Backend route open was rejected.", rejected.ErrorMessage);
+            }
+
+            Assert.Equal(1, routeManager.ConnectCount);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task RouteOpenRequest_RejectsBackendKindWhenNotAllowlisted()
     {
         var routeManager = new RecordingBackendRouteManager();
@@ -647,6 +711,79 @@ public sealed class ConnectionManagerBackendRouteTests
                 item.Group == "Persistent Backend route alpha" &&
                 item.Name == "Pending client exchanges" &&
                 item.Value == "1");
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RouteDataRequest_RateLimitsClientOriginExchangeCreationByPrincipal()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                MaxOpenRoutesPerClient = 8,
+                MaxOpenRoutesPerPrincipal = 8,
+                RouteLifetimeMilliseconds = 5000,
+                ExchangeRateLimitWindowMilliseconds = 10000,
+                MaxClientOriginExchangeCreatesPerRoutePerWindow = 0,
+                MaxClientOriginExchangeCreatesPerPrincipalPerWindow = 1
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var firstClient = new TcpClient();
+            await firstClient.ConnectAsync(IPAddress.Loopback, port);
+            await using var firstStream = firstClient.GetStream();
+            using (await ReadRequiredFrameAsync(firstStream))
+            {
+            }
+
+            var firstRouteToken = await OpenPersistentBackendRouteAsync(firstStream);
+
+            using var secondClient = new TcpClient();
+            await secondClient.ConnectAsync(IPAddress.Loopback, port);
+            await using var secondStream = secondClient.GetStream();
+            using (await ReadRequiredFrameAsync(secondStream))
+            {
+            }
+
+            var secondRouteToken = await OpenPersistentBackendRouteAsync(secondStream);
+
+            var firstEnvelope = new GatewayBackendRouteDataEnvelope(
+                firstRouteToken,
+                GatewayBackendRouteDirection.ClientToBackend,
+                PacketKind.Request,
+                routedPacketId: 401,
+                routedVersion: 3,
+                new GatewayBackendExchangeId(Guid.NewGuid()),
+                [1, 2, 3]);
+            await WriteBackendRouteDataEnvelopeAsync(firstStream, PacketKind.Request, firstEnvelope);
+            await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(1, routeManager.RelayCount);
+
+            var secondEnvelope = new GatewayBackendRouteDataEnvelope(
+                secondRouteToken,
+                GatewayBackendRouteDirection.ClientToBackend,
+                PacketKind.Request,
+                routedPacketId: 402,
+                routedVersion: 3,
+                new GatewayBackendExchangeId(Guid.NewGuid()),
+                [4, 5, 6]);
+            await WriteBackendRouteDataEnvelopeAsync(secondStream, PacketKind.Request, secondEnvelope);
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+
+            Assert.Equal(1, routeManager.RelayCount);
         }
         finally
         {
