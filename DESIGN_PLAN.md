@@ -10,6 +10,28 @@ This plan covers the security issue where a client can provide a `RouteId` that 
 
 The goal is to prevent client-controlled identifiers from becoming implicit routing authority. The Gateway must own route creation, bind each route to the authenticated connection context, and validate every later frame against that binding.
 
+The target behavior is a persistent Backend <-> Gateway <-> Client route with two independent request/ACK channels:
+
+- Client-to-Backend `Request`/ACK.
+- Backend-to-client `Request`/ACK.
+
+The two channels must be able to operate concurrently without completing, timing out, or closing each other's pending exchanges.
+
+### Current Implementation Facts
+
+The current `RouteId` is not a persistent route or session identifier. It is used as a pending client-originated request key:
+
+- A client sends `GATE_BACKEND_ROUTE` with a client-provided `RouteId`.
+- The Gateway registers that `RouteId` only when the routed frame is a client-originated `Request`.
+- The registry entry maps the `RouteId` back to the owning client connection.
+- When the Backend sends a frame with the same `RouteId`, the Gateway forwards it to that client only if the route is still pending.
+- When the Backend frame is a `Response`, the Gateway removes the route.
+- If the same `RouteId` is used later, or if the route has timed out, the Gateway treats it as unknown and drops it.
+
+This supports a one-shot client-to-Backend request/response flow, but it does not support a durable route that can carry later Backend pushes or Backend-originated requests.
+
+Partial TCP reads are not the root cause of this limitation. `PacketFrameReader` already reads the packet header and payload exactly across multiple stream reads. Concurrent client and Backend pushes are important to support, but they expose the route lifetime and correlation model problem rather than causing it.
+
 ### Current Risk
 
 The current Backend route flow accepts a client-provided `RouteId` in the route envelope. The Gateway registers that identifier as a pending route and later uses it to locate the client connection when Backend frames arrive.
@@ -70,6 +92,8 @@ The Gateway stores exchange state separately for each direction:
 
 This keeps the route lifetime independent from individual request/ACK lifetimes.
 
+`RouteToken` is responsible for selecting the persistent route. `ExchangeId` is responsible for matching one request to one ACK. Completing an exchange must never remove the persistent route by itself.
+
 ## P1: Persistent Route Protocol
 
 ### Protocol Plan
@@ -89,11 +113,18 @@ This keeps the route lifetime independent from individual request/ACK lifetimes.
    - Each data frame carries `RouteToken`, direction, routed packet kind, routed packet id, routed version, optional `ExchangeId`, and payload.
    - `Request` frames create pending exchange records for their direction.
    - `Response` or ACK frames are forwarded only when the matching pending exchange exists.
+   - Client-originated and Backend-originated exchanges are stored independently.
+   - A completed ACK removes only the matching pending exchange, not the route.
 
 4. Keep `RouteToken` and `ExchangeId` semantically separate.
    - `RouteToken` decides which client and Backend route are connected.
    - `ExchangeId` decides which request is being acknowledged.
    - Never remove the route just because one exchange completes.
+
+5. Update client read policy and Gateway validation for ACKs.
+   - Client `Response` frames are accepted only when they match a Backend-originated pending exchange.
+   - Unknown, expired, mismatched, or wrong-direction ACKs are rejected.
+   - Accepting client ACKs must not make arbitrary client-provided `Response` frames authoritative.
 
 ### Identifier Generation
 
@@ -151,9 +182,10 @@ Reject frames by default when any check fails.
 2. Add tests for token generation, route binding, expiry, close, and direction-specific exchange matching.
 3. Add a new route-open/route-close/data protocol path beside the existing pending route flow.
 4. Update clients to open a route and use Gateway-issued route tokens.
-5. Update Backend route handling to validate route tokens and exchange identifiers.
-6. Deprecate client-provided `RouteId` as an authoritative route key.
-7. Remove the old pending `RouteId` flow once all callers use Gateway-issued route tokens.
+5. Update Gateway client input policy so client ACKs are allowed only through validated route-data frames.
+6. Update Backend route handling to validate route tokens and exchange identifiers.
+7. Deprecate client-provided `RouteId` as an authoritative route key.
+8. Remove the old pending `RouteId` flow once all callers use Gateway-issued route tokens.
 
 ### Validation Plan
 
