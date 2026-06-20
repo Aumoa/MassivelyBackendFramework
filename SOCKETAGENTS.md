@@ -25,6 +25,10 @@
 - Master and Dedicated are internal services. They rely on platform isolation such as private networking, firewalls, security groups, or Kubernetes network policies to prevent direct external access.
 - Master and Dedicated may trust packets that arrive from authenticated internal nodes and skip expensive hostile-input checks in hot paths, but they must keep cheap protocol sanity checks such as packet header, kind, id, version, payload length, and schema compatibility.
 - Gateway owns basic packet compatibility validation, including version and payload size policy. Dedicated owns game-rule validation and final authoritative state changes.
+- Treat packet headers, magic values, opcodes, packet kind IDs, and client build IDs as framing or compatibility data, not as secrets or proof that the sender is an authorized client.
+- Assume hostile clients can learn and replay any constants shipped in the client binary or visible on the wire. Reviews should flag designs that rely on obscured packet IDs, cracked HEAD values, or similar client-known identifiers as an anti-forgery mechanism.
+- Keep packet boundary detection separate from authentication, authorization, and session validation. A well-formed packet with a valid header or kind must still be checked against the authenticated connection, current session state, allowed packet set, payload schema, and routing authority before it is forwarded or applied.
+- For state-changing or order-sensitive protocols, review whether the server needs sequence numbers, nonces, replay windows, idempotency keys, or other cheap checks to reject replayed, reordered, duplicated, or cross-session packets.
 - Do not use Master as a data-plane relay for player gameplay packets. Master should observe and coordinate service state, ownership, and routing metadata only.
 
 ## Gateway Batching
