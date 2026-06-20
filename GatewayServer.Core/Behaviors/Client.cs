@@ -11,7 +11,8 @@ internal class Client(
     NetworkStream networkStream,
     Stream stream,
     ILogger logger,
-    int maxQueuedPackets = 1024) : IClient, IAsyncDisposable
+    int maxQueuedPackets = 1024,
+    int idleTimeoutMilliseconds = 0) : IClient, IAsyncDisposable
 {
     private readonly NetworkStream m_NetworkStream = networkStream;
     private readonly CancellationTokenSource m_Cancellation = new();
@@ -122,10 +123,11 @@ internal class Client(
         {
             try
             {
+                using var readCancellation = CreateReadCancellation(cancellationToken);
                 var packet = await PacketFrameReader.ReadAsync(
                     stream,
                     PacketReadPolicy.UntrustedClient,
-                    cancellationToken).ConfigureAwait(false);
+                    readCancellation.Token).ConfigureAwait(false);
 
                 if (packet == null)
                 {
@@ -199,5 +201,16 @@ internal class Client(
             SingleWriter = true,
             AllowSynchronousContinuations = false
         });
+    }
+
+    private CancellationTokenSource CreateReadCancellation(CancellationToken cancellationToken)
+    {
+        var readCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (idleTimeoutMilliseconds > 0)
+        {
+            readCancellation.CancelAfter(TimeSpan.FromMilliseconds(idleTimeoutMilliseconds));
+        }
+
+        return readCancellation;
     }
 }

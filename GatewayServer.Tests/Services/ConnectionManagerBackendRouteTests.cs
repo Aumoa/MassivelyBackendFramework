@@ -2341,6 +2341,83 @@ public sealed class ConnectionManagerBackendRouteTests
         }
     }
 
+    [Fact]
+    public async Task ClientIdleTimeout_DisconnectsIdleClient()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"]
+            },
+            out var port,
+            connectionOptions: new ConnectionManagerOptions
+            {
+                IPAddress = "127.0.0.1",
+                ClientIdleTimeoutMilliseconds = 25,
+                ClientAuthenticationTimeoutMilliseconds = 0
+            });
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            using var disconnectedFrame = await ReadOptionalFrameAsync(stream, TimeSpan.FromSeconds(5));
+            Assert.Null(disconnectedFrame);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task ClientAuthenticationTimeout_DisconnectsUnauthenticatedClient()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"]
+            },
+            out var port,
+            connectionOptions: new ConnectionManagerOptions
+            {
+                IPAddress = "127.0.0.1",
+                ClientIdleTimeoutMilliseconds = 0,
+                ClientAuthenticationTimeoutMilliseconds = 25
+            },
+            authenticateClients: false);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            using var disconnectedFrame = await ReadOptionalFrameAsync(stream, TimeSpan.FromSeconds(5));
+            Assert.Null(disconnectedFrame);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
     private static ConnectionManager CreateConnectionManager(
         RecordingBackendRouteManager routeManager,
         BackendRouteOptions backendRouteOptions,
@@ -2391,6 +2468,36 @@ public sealed class ConnectionManagerBackendRouteTests
             PacketReadPolicy.TrustedServer,
             timeout.Token);
         return frame ?? throw new EndOfStreamException("Gateway test connection closed.");
+    }
+
+    private static async Task<PacketFrame?> ReadOptionalFrameAsync(
+        Stream stream,
+        TimeSpan timeout)
+    {
+        using var timeoutCancellation = new CancellationTokenSource(timeout);
+        try
+        {
+            return await PacketFrameReader.ReadAsync(
+                stream,
+                PacketReadPolicy.TrustedServer,
+                timeoutCancellation.Token);
+        }
+        catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested)
+        {
+            throw new TimeoutException("Gateway test connection did not close before the timeout.");
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (ObjectDisposedException)
+        {
+            return null;
+        }
+        catch (SocketException)
+        {
+            return null;
+        }
     }
 
     private static async Task WriteBackendRouteEnvelopeAsync(

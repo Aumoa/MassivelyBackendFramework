@@ -12,6 +12,10 @@ public record ConnectionManagerOptions
 
     public int MaxQueuedClientPackets { get; set; } = 1024;
 
+    public int ClientIdleTimeoutMilliseconds { get; set; } = 120000;
+
+    public int ClientAuthenticationTimeoutMilliseconds { get; set; } = 30000;
+
     public string CertificateSubjectName { get; set; } = "localhost";
 
     public StoreName CertificateStoreName { get; set; } = StoreName.My;

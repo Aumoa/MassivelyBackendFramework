@@ -192,7 +192,8 @@ internal class ConnectionManager(
             networkStream,
             s,
             logger,
-            options.Value.MaxQueuedClientPackets);
+            options.Value.MaxQueuedClientPackets,
+            options.Value.ClientIdleTimeoutMilliseconds);
         GatewayClientAuthenticationContext authenticationContext;
         try
         {
@@ -226,6 +227,11 @@ internal class ConnectionManager(
                     RemoveBackendRoutes(client);
                 };
 
+                StartAuthenticationTimeout(
+                    client,
+                    authenticationContext,
+                    options.Value.ClientAuthenticationTimeoutMilliseconds,
+                    cancellationToken);
                 client.Start();
                 HandleClientPacketsAsync(client, authenticationContext, cancellationToken);
             }
@@ -293,6 +299,63 @@ internal class ConnectionManager(
             {
                 logger.LogDebug(e, "Gateway client disposal completed with an error after echo loop.");
             }
+        }
+    }
+
+    private void StartAuthenticationTimeout(
+        Client client,
+        GatewayClientAuthenticationContext authenticationContext,
+        int timeoutMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        if (timeoutMilliseconds <= 0 ||
+            authenticationContext.IsAuthenticated)
+        {
+            return;
+        }
+
+        var timeoutCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        client.Completed += () =>
+        {
+            _ = timeoutCancellation.CancelAsync();
+        };
+        _ = MonitorAuthenticationTimeoutAsync(
+            client,
+            authenticationContext,
+            timeoutMilliseconds,
+            timeoutCancellation);
+    }
+
+    private async Task MonitorAuthenticationTimeoutAsync(
+        Client client,
+        GatewayClientAuthenticationContext authenticationContext,
+        int timeoutMilliseconds,
+        CancellationTokenSource timeoutCancellation)
+    {
+        try
+        {
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(Math.Max(1, timeoutMilliseconds)),
+                timeoutCancellation.Token).ConfigureAwait(false);
+            if (!authenticationContext.IsAuthenticated)
+            {
+                logger.LogWarning("Gateway client authentication timed out.");
+                await client.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) when (timeoutCancellation.IsCancellationRequested)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Gateway client authentication timeout monitor failed.");
+        }
+        finally
+        {
+            timeoutCancellation.Dispose();
         }
     }
 
