@@ -162,6 +162,68 @@ public sealed class BackendConnectionManagerTests
     }
 
     [Fact]
+    public async Task RelayFrameAsync_RaisesRouteDataFrames()
+    {
+        var routeToken = new GatewayBackendRouteToken("route-token-a");
+        var routeDataPayload = new byte[] { 4, 5, 6 };
+        var routeDataEnvelope = new GatewayBackendRouteDataEnvelope(
+            routeToken,
+            GatewayBackendRouteDirection.BackendToClient,
+            PacketKind.Notify,
+            routedPacketId: 305,
+            routedVersion: 7,
+            exchangeId: null,
+            routeDataPayload);
+        await using var backend = new FakeBackendServer(
+            responseEnvelope: null,
+            routeDataEnvelope: routeDataEnvelope);
+
+        var issuer = new RecordingDirectConnectCodeIssuer("direct-code");
+        var catalog = new FakeBackendNodeCatalog(CreateSnapshot(
+            CreateNode("alpha", "backend-a", "master-a", backend.Port)));
+        var manager = CreateManager(catalog, issuer);
+        manager.SetMasterConnectionId("gateway-master-a");
+        await manager.StartAsync(CancellationToken.None);
+
+        var receivedFrame = new TaskCompletionSource<BackendRouteDataFrameReceived>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.RouteDataFrameReceived += (frame, _) =>
+        {
+            receivedFrame.TrySetResult(frame);
+            return ValueTask.CompletedTask;
+        };
+
+        using var requestFrame = CreateBackendRouteFrame(
+            "alpha",
+            Guid.NewGuid(),
+            PacketKind.Notify,
+            routedPacketId: 101,
+            routedVersion: 2,
+            [1, 2, 3]);
+
+        try
+        {
+            await manager.RelayFrameAsync("alpha", requestFrame, CancellationToken.None);
+
+            var routedBack = await receivedFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("alpha", routedBack.BackendKind);
+            Assert.Equal("backend-a", routedBack.NodeId);
+            Assert.Equal("master-a", routedBack.MasterConnectionId);
+            Assert.Equal(routeToken, routedBack.Envelope.RouteToken);
+            Assert.Equal(GatewayBackendRouteDirection.BackendToClient, routedBack.Envelope.Direction);
+            Assert.Equal(PacketKind.Notify, routedBack.Envelope.RoutedKind);
+            Assert.Equal((ushort)305, routedBack.Envelope.RoutedPacketId);
+            Assert.Equal((ushort)7, routedBack.Envelope.RoutedVersion);
+            Assert.False(routedBack.Envelope.ExchangeId.HasValue);
+            Assert.Equal(routeDataPayload, routedBack.Envelope.RoutedPayload);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task ConnectAsync_RejectsAcceptedNodeIdMismatch()
     {
         await using var backend = new FakeBackendServer(
@@ -337,16 +399,19 @@ public sealed class BackendConnectionManagerTests
         private readonly TcpListener m_Listener;
         private readonly CancellationTokenSource m_Cancellation = new();
         private readonly GatewayBackendRouteEnvelope? m_ResponseEnvelope;
+        private readonly GatewayBackendRouteDataEnvelope? m_RouteDataEnvelope;
         private readonly string? m_AcceptedNodeId;
         private readonly bool m_ExpectRelay;
         private readonly Task m_RunTask;
 
         public FakeBackendServer(
             GatewayBackendRouteEnvelope? responseEnvelope,
+            GatewayBackendRouteDataEnvelope? routeDataEnvelope = null,
             string? acceptedNodeId = null,
             bool expectRelay = true)
         {
             m_ResponseEnvelope = responseEnvelope;
+            m_RouteDataEnvelope = routeDataEnvelope;
             m_AcceptedNodeId = acceptedNodeId;
             m_ExpectRelay = expectRelay;
             m_Listener = new TcpListener(IPAddress.Loopback, 0);
@@ -446,6 +511,17 @@ public sealed class BackendConnectionManagerTests
                         m_ResponseEnvelope,
                         GatewayBackendRouteEnvelope.Codec);
                     await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken);
+                }
+
+                if (m_RouteDataEnvelope != null)
+                {
+                    using var routeDataFrame = PacketCodec.Encode(
+                        m_RouteDataEnvelope.RoutedKind,
+                        Pid.GATE_BACKEND_ROUTE_DATA,
+                        GatewayBackendRouteDataEnvelope.ProtocolVersion,
+                        m_RouteDataEnvelope,
+                        GatewayBackendRouteDataEnvelope.Codec);
+                    await PacketFrameWriter.WriteAsync(stream, routeDataFrame, cancellationToken);
                 }
 
                 await WaitUntilCancelledAsync(cancellationToken);

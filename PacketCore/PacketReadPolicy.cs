@@ -8,7 +8,7 @@ public readonly struct PacketReadPolicy
     public const int DefaultTrustedMaxPayloadLength = PacketHeader.MaxPayloadLength;
 
     public static readonly PacketReadPolicy UntrustedClient = new PacketReadPolicy(
-        PacketKindMask.Request | PacketKindMask.Notify,
+        PacketKindMask.Request | PacketKindMask.Response | PacketKindMask.Notify,
         DefaultUntrustedMaxPayloadLength,
         rejectUnknownFlags: true);
 

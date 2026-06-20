@@ -16,6 +16,8 @@ internal interface IBackendRouteManager
 {
     event BackendRouteFrameReceivedHandler? RouteFrameReceived;
 
+    event BackendRouteDataFrameReceivedHandler? RouteDataFrameReceived;
+
     string[] GetDiscoveredBackendKinds();
 
     ValueTask<IBackendRouteSession> ConnectAsync(
@@ -45,6 +47,10 @@ internal delegate ValueTask BackendRouteFrameReceivedHandler(
     BackendRouteFrameReceived frame,
     CancellationToken cancellationToken);
 
+internal delegate ValueTask BackendRouteDataFrameReceivedHandler(
+    BackendRouteDataFrameReceived frame,
+    CancellationToken cancellationToken);
+
 internal sealed class BackendRouteFrameReceived(
     string backendKind,
     string nodeId,
@@ -58,6 +64,21 @@ internal sealed class BackendRouteFrameReceived(
     public string MasterConnectionId { get; } = masterConnectionId;
 
     public GatewayBackendRouteEnvelope Envelope { get; } = envelope;
+}
+
+internal sealed class BackendRouteDataFrameReceived(
+    string backendKind,
+    string nodeId,
+    string masterConnectionId,
+    GatewayBackendRouteDataEnvelope envelope)
+{
+    public string BackendKind { get; } = backendKind;
+
+    public string NodeId { get; } = nodeId;
+
+    public string MasterConnectionId { get; } = masterConnectionId;
+
+    public GatewayBackendRouteDataEnvelope Envelope { get; } = envelope;
 }
 
 internal interface IBackendConnectionStatusProvider
@@ -83,6 +104,8 @@ internal sealed class BackendConnectionManager(
     private string? m_MasterConnectionId;
 
     public event BackendRouteFrameReceivedHandler? RouteFrameReceived;
+
+    public event BackendRouteDataFrameReceivedHandler? RouteDataFrameReceived;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -546,6 +569,10 @@ internal sealed class BackendConnectionManager(
                     {
                         await HandleBackendRouteFrameAsync(peer, frame, cancellationToken).ConfigureAwait(false);
                     }
+                    else if (frame.Header.PacketId == Pid.GATE_BACKEND_ROUTE_DATA)
+                    {
+                        await HandleBackendRouteDataFrameAsync(peer, frame, cancellationToken).ConfigureAwait(false);
+                    }
                 }
             }
         }
@@ -608,6 +635,44 @@ internal sealed class BackendConnectionManager(
         }
 
         foreach (BackendRouteFrameReceivedHandler handler in handlers.GetInvocationList())
+        {
+            await handler(received, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask HandleBackendRouteDataFrameAsync(
+        BackendPeer peer,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (frame.Header.Version != GatewayBackendRouteDataEnvelope.ProtocolVersion)
+        {
+            logger.LogWarning(
+                "Backend route data frame used unsupported version. BackendKind={BackendKind}, BackendNodeId={NodeId}, Version={Version}.",
+                peer.Node.BackendKind,
+                peer.Node.NodeId,
+                frame.Header.Version);
+            return;
+        }
+
+        var envelope = PacketCodec.Decode(frame, GatewayBackendRouteDataEnvelope.Codec);
+        if (envelope.Direction != GatewayBackendRouteDirection.BackendToClient)
+        {
+            throw new InvalidOperationException("Backend route data frames from Backend sessions must use the BackendToClient direction.");
+        }
+
+        var received = new BackendRouteDataFrameReceived(
+            peer.Node.BackendKind,
+            peer.Node.NodeId,
+            peer.Node.MasterConnectionId,
+            envelope);
+        var handlers = RouteDataFrameReceived;
+        if (handlers == null)
+        {
+            return;
+        }
+
+        foreach (BackendRouteDataFrameReceivedHandler handler in handlers.GetInvocationList())
         {
             await handler(received, cancellationToken).ConfigureAwait(false);
         }
