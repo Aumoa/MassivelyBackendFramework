@@ -297,6 +297,12 @@ internal class ConnectionManager(
             return;
         }
 
+        if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE_DATA)
+        {
+            await HandleBackendRouteDataPacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         await RejectUnsupportedPersistentBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
     }
 
@@ -444,6 +450,98 @@ internal class ConnectionManager(
                     GatewayBackendRouteOpenResponse.Rejected(GetResponseBackendKind(backendKind), "Backend route open was rejected."),
                     cancellationToken).ConfigureAwait(false);
             }
+        }
+    }
+
+    private async Task HandleBackendRouteDataPacketAsync(
+        Client client,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        PersistentBackendRoute<Client>? route = null;
+        GatewayBackendExchangeId? registeredExchangeId = null;
+        var exchangeRegistered = false;
+        var backendKind = string.Empty;
+
+        try
+        {
+            if (packet.Header.Kind is not (PacketKind.Request or PacketKind.Notify))
+            {
+                throw new InvalidOperationException("Client Backend route data packets must be Request or Notify packets.");
+            }
+
+            if (packet.Header.Version != GatewayBackendRouteDataEnvelope.ProtocolVersion)
+            {
+                throw new InvalidOperationException($"Unsupported Backend route data protocol version {packet.Header.Version}.");
+            }
+
+            var envelope = PacketCodec.Decode(packet, GatewayBackendRouteDataEnvelope.Codec);
+            if (envelope.Direction != GatewayBackendRouteDirection.ClientToBackend)
+            {
+                throw new InvalidOperationException("Client Backend route data packets must use the ClientToBackend direction.");
+            }
+
+            if (packet.Header.Kind != envelope.RoutedKind)
+            {
+                throw new InvalidOperationException("Backend route data packet kind must match the routed packet kind.");
+            }
+
+            if (!m_PersistentBackendRouteRegistry.TryGet(envelope.RouteToken, out route))
+            {
+                throw new InvalidOperationException("Unknown Backend route token.");
+            }
+
+            if (!ReferenceEquals(route.Owner, client))
+            {
+                throw new UnauthorizedAccessException("Backend route token is not owned by this client.");
+            }
+
+            if (route.State != PersistentBackendRouteState.Open)
+            {
+                throw new InvalidOperationException("Persistent Backend route is not open.");
+            }
+
+            backendKind = route.BackendKind;
+            if (envelope.RoutedKind == PacketKind.Request)
+            {
+                registeredExchangeId = envelope.ExchangeId ?? throw new InvalidOperationException("Client Backend route requests require an exchange id.");
+                route.RegisterClientOriginExchange(
+                    registeredExchangeId.Value,
+                    envelope.RoutedPacketId,
+                    envelope.RoutedVersion);
+                exchangeRegistered = true;
+            }
+
+            using var routedFrame = PacketCodec.Encode(
+                envelope.RoutedKind,
+                Pid.GATE_BACKEND_ROUTE_DATA,
+                GatewayBackendRouteDataEnvelope.ProtocolVersion,
+                envelope,
+                GatewayBackendRouteDataEnvelope.Codec);
+            await backendRouteManager.RelayFrameAsync(
+                backendKind,
+                routedFrame,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            if (exchangeRegistered &&
+                route != null &&
+                registeredExchangeId.HasValue)
+            {
+                route.RemoveClientOriginExchange(registeredExchangeId.Value);
+            }
+
+            logger.LogWarning(
+                e,
+                "Gateway rejected Backend route data packet. BackendKind={BackendKind}, PacketKind={PacketKind}, PacketId={PacketId}.",
+                backendKind,
+                packet.Header.Kind,
+                packet.Header.PacketId);
         }
     }
 
