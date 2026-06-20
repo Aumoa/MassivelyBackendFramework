@@ -98,18 +98,18 @@ This keeps the route lifetime independent from individual request/ACK lifetimes.
 
 ### Protocol Plan
 
-1. Add an explicit route-open operation.
+1. Implement an explicit route-open operation.
    - Client requests a Backend route by Backend kind or another authorized target selector.
    - Gateway authenticates and authorizes the request.
    - Gateway generates `RouteToken` with a cryptographically secure random source.
    - Gateway returns the token to the client only after binding it to the connection and target.
 
-2. Add an explicit route-close operation.
+2. Implement an explicit route-close operation.
    - Either side may request close.
    - Gateway closes the route when the client disconnects, the Backend session is no longer valid, the route expires, or authorization is revoked.
    - Closing a route cancels pending exchanges in both directions.
 
-3. Add route-data frames.
+3. Implement route-data handling.
    - Each data frame carries `RouteToken`, direction, routed packet kind, routed packet id, routed version, optional `ExchangeId`, and payload.
    - `Request` frames create pending exchange records for their direction.
    - `Response` or ACK frames are forwarded only when the matching pending exchange exists.
@@ -178,9 +178,9 @@ Reject frames by default when any check fails.
 
 ### Migration Steps
 
-1. Introduce route token and exchange identifier types without changing existing behavior.
-2. Add tests for token generation, route binding, expiry, close, and direction-specific exchange matching.
-3. Add a new route-open/route-close/data protocol path beside the existing pending route flow.
+1. Add a Gateway route token generator and persistent route registry.
+2. Add tests for token generation, route binding, expiry, close behavior, and direction-specific exchange matching.
+3. Implement route-open/route-close/data handling beside the existing pending route flow.
 4. Update clients to open a route and use Gateway-issued route tokens.
 5. Update Gateway client input policy so client ACKs are allowed only through validated route-data frames.
 6. Update Backend route handling to validate route tokens and exchange identifiers.
