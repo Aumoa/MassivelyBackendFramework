@@ -20,38 +20,10 @@ The target behavior remains:
 
 - Persistent routes are currently bound to an authenticated client connection and Backend kind, but not yet strongly pinned to a specific Backend node/session lifetime.
 - If a Backend session is replaced or lost, the Gateway still needs an explicit policy for closing, suspending, or rebinding affected persistent routes.
-- Backend-origin route close is not yet wired as an explicit data-plane signal to clients.
 - Abuse controls exist for open route counts and pending exchanges, but route-open/exchange creation rate limiting and bounded client input queues are still missing.
 - The legacy one-shot `GATE_BACKEND_ROUTE` flow still accepts client-provided `RouteId` values and must remain treated as a migration compatibility path, not an authoritative persistent route model.
 
-## P1: Backend-Initiated Route Close
-
-### Protocol Plan
-
-1. Allow trusted Backend sessions to send `GATE_BACKEND_ROUTE_CLOSE`.
-   - Decode `GatewayBackendRouteClose` from Backend sessions.
-   - Require the Backend-to-Gateway frame to use the expected close packet kind and protocol version.
-   - Raise the close frame through `BackendConnectionManager` to `ConnectionManager`.
-
-2. Close the persistent route in Gateway.
-   - Verify the route token is known and open.
-   - Verify the route is bound to the Backend kind, and later to the exact Backend node/session once node binding is implemented.
-   - Close the route and clear pending exchanges.
-
-3. Notify the owning client.
-   - Forward a close notification to the route owner.
-   - Do not let Backend close requests affect routes owned by other Backend kinds or unknown tokens.
-   - Default-deny malformed, unknown, mismatched, or stale close frames.
-
-### Validation Plan
-
-- Backend close for an open route notifies the owning client and removes the route.
-- Backend close clears client-origin and Backend-origin pending exchanges.
-- Backend close with an unknown route token is ignored.
-- Backend close from the wrong Backend kind is rejected.
-- Client data sent after Backend close is not relayed.
-
-## P2: Backend Node And Session Binding
+## P1: Backend Node And Session Binding
 
 ### Plan
 
@@ -75,7 +47,7 @@ The target behavior remains:
 - Backend session loss closes or suspends affected routes.
 - Session replacement does not inherit old route authority by Backend kind alone.
 
-## P3: Abuse Controls
+## P2: Abuse Controls
 
 ### Plan
 
@@ -91,7 +63,7 @@ The target behavior remains:
 - Exchange creation bursts are limited without closing unrelated exchanges.
 - Backpressure does not create unobserved fire-and-forget failures during shutdown.
 
-## P4: Legacy RouteId Migration
+## P3: Legacy RouteId Migration
 
 ### Plan
 

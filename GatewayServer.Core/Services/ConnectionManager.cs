@@ -81,6 +81,7 @@ internal class ConnectionManager(
 
         backendRouteManager.RouteFrameReceived += OnBackendRouteFrameReceivedAsync;
         backendRouteManager.RouteDataFrameReceived += OnBackendRouteDataFrameReceivedAsync;
+        backendRouteManager.RouteCloseFrameReceived += OnBackendRouteCloseFrameReceivedAsync;
         logger.LogInformation("Gateway client listener is running on {Address}:{Port} with TLS.", connectionOptions.IPAddress, connectionOptions.Port);
 
         m_AcceptTask = StartAcceptAsync(m_GracefulCancellation.Token);
@@ -90,6 +91,7 @@ internal class ConnectionManager(
     {
         backendRouteManager.RouteFrameReceived -= OnBackendRouteFrameReceivedAsync;
         backendRouteManager.RouteDataFrameReceived -= OnBackendRouteDataFrameReceivedAsync;
+        backendRouteManager.RouteCloseFrameReceived -= OnBackendRouteCloseFrameReceivedAsync;
         await m_GracefulCancellation.CancelAsync().ConfigureAwait(false);
         m_Socket?.Dispose();
         m_BackendRouteRegistry.CancelAll();
@@ -803,6 +805,61 @@ internal class ConnectionManager(
             logger.LogWarning(
                 e,
                 "Gateway rejected Backend route data frame. BackendKind={BackendKind}, NodeId={NodeId}.",
+                frame.BackendKind,
+                frame.NodeId);
+        }
+    }
+
+    private async ValueTask OnBackendRouteCloseFrameReceivedAsync(
+        BackendRouteCloseFrameReceived frame,
+        CancellationToken cancellationToken)
+    {
+        PersistentBackendRoute<Client>? route = null;
+
+        try
+        {
+            var close = frame.Close;
+            if (!m_PersistentBackendRouteRegistry.TryGet(close.RouteToken, out route))
+            {
+                logger.LogWarning(
+                    "Gateway received Backend route close for an unknown route token. BackendKind={BackendKind}, NodeId={NodeId}.",
+                    frame.BackendKind,
+                    frame.NodeId);
+                return;
+            }
+
+            if (!string.Equals(route.BackendKind, frame.BackendKind, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Backend route close used a Backend kind that does not match the route binding.");
+            }
+
+            if (route.State != PersistentBackendRouteState.Open)
+            {
+                throw new InvalidOperationException("Persistent Backend route is not open.");
+            }
+
+            if (!m_PersistentBackendRouteRegistry.Close(close.RouteToken, close.Reason))
+            {
+                throw new InvalidOperationException("Persistent Backend route could not be closed.");
+            }
+
+            using var clientFrame = PacketCodec.Encode(
+                PacketKind.Notify,
+                Pid.GATE_BACKEND_ROUTE_CLOSE,
+                GatewayBackendRouteClose.ProtocolVersion,
+                close,
+                GatewayBackendRouteClose.Codec);
+            await route.Owner.WriteAsync(clientFrame, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Gateway rejected Backend route close frame. BackendKind={BackendKind}, NodeId={NodeId}.",
                 frame.BackendKind,
                 frame.NodeId);
         }

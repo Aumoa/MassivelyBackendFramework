@@ -224,6 +224,55 @@ public sealed class BackendConnectionManagerTests
     }
 
     [Fact]
+    public async Task RelayFrameAsync_RaisesRouteCloseFrames()
+    {
+        var routeToken = new GatewayBackendRouteToken("route-token-a");
+        var routeClose = new GatewayBackendRouteClose(routeToken, "backend closed");
+        await using var backend = new FakeBackendServer(
+            responseEnvelope: null,
+            routeClose: routeClose);
+
+        var issuer = new RecordingDirectConnectCodeIssuer("direct-code");
+        var catalog = new FakeBackendNodeCatalog(CreateSnapshot(
+            CreateNode("alpha", "backend-a", "master-a", backend.Port)));
+        var manager = CreateManager(catalog, issuer);
+        manager.SetMasterConnectionId("gateway-master-a");
+        await manager.StartAsync(CancellationToken.None);
+
+        var receivedFrame = new TaskCompletionSource<BackendRouteCloseFrameReceived>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.RouteCloseFrameReceived += (frame, _) =>
+        {
+            receivedFrame.TrySetResult(frame);
+            return ValueTask.CompletedTask;
+        };
+
+        using var requestFrame = CreateBackendRouteFrame(
+            "alpha",
+            Guid.NewGuid(),
+            PacketKind.Notify,
+            routedPacketId: 101,
+            routedVersion: 2,
+            [1, 2, 3]);
+
+        try
+        {
+            await manager.RelayFrameAsync("alpha", requestFrame, CancellationToken.None);
+
+            var routedBack = await receivedFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("alpha", routedBack.BackendKind);
+            Assert.Equal("backend-a", routedBack.NodeId);
+            Assert.Equal("master-a", routedBack.MasterConnectionId);
+            Assert.Equal(routeToken, routedBack.Close.RouteToken);
+            Assert.Equal("backend closed", routedBack.Close.Reason);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task ConnectAsync_RejectsAcceptedNodeIdMismatch()
     {
         await using var backend = new FakeBackendServer(
@@ -400,6 +449,7 @@ public sealed class BackendConnectionManagerTests
         private readonly CancellationTokenSource m_Cancellation = new();
         private readonly GatewayBackendRouteEnvelope? m_ResponseEnvelope;
         private readonly GatewayBackendRouteDataEnvelope? m_RouteDataEnvelope;
+        private readonly GatewayBackendRouteClose? m_RouteClose;
         private readonly string? m_AcceptedNodeId;
         private readonly bool m_ExpectRelay;
         private readonly Task m_RunTask;
@@ -407,11 +457,13 @@ public sealed class BackendConnectionManagerTests
         public FakeBackendServer(
             GatewayBackendRouteEnvelope? responseEnvelope,
             GatewayBackendRouteDataEnvelope? routeDataEnvelope = null,
+            GatewayBackendRouteClose? routeClose = null,
             string? acceptedNodeId = null,
             bool expectRelay = true)
         {
             m_ResponseEnvelope = responseEnvelope;
             m_RouteDataEnvelope = routeDataEnvelope;
+            m_RouteClose = routeClose;
             m_AcceptedNodeId = acceptedNodeId;
             m_ExpectRelay = expectRelay;
             m_Listener = new TcpListener(IPAddress.Loopback, 0);
@@ -522,6 +574,17 @@ public sealed class BackendConnectionManagerTests
                         m_RouteDataEnvelope,
                         GatewayBackendRouteDataEnvelope.Codec);
                     await PacketFrameWriter.WriteAsync(stream, routeDataFrame, cancellationToken);
+                }
+
+                if (m_RouteClose != null)
+                {
+                    using var routeCloseFrame = PacketCodec.Encode(
+                        PacketKind.Notify,
+                        Pid.GATE_BACKEND_ROUTE_CLOSE,
+                        GatewayBackendRouteClose.ProtocolVersion,
+                        m_RouteClose,
+                        GatewayBackendRouteClose.Codec);
+                    await PacketFrameWriter.WriteAsync(stream, routeCloseFrame, cancellationToken);
                 }
 
                 await WaitUntilCancelledAsync(cancellationToken);
