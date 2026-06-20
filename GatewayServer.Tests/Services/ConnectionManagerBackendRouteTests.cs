@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using GatewayServer.Options;
 using GatewayServer.Protocols;
 using GatewayServer.Services;
@@ -162,23 +164,130 @@ public sealed class ConnectionManagerBackendRouteTests
         }
     }
 
+    [Fact]
+    public async Task StartAsync_RejectsPlaintextConfiguration()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"]
+            },
+            out _,
+            connectionOptions: new ConnectionManagerOptions
+            {
+                IPAddress = "127.0.0.1",
+                UseTls = false
+            });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await connectionManager.StartAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task StartAsync_FailsWhenTlsCertificateCannotBeLoaded()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var expected = new InvalidOperationException("missing certificate");
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"]
+            },
+            out _,
+            certificateLoader: new ThrowingCertificateLoader(expected));
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await connectionManager.StartAsync(CancellationToken.None));
+
+        Assert.Same(expected, actual);
+    }
+
+    [Fact]
+    public async Task StartAsync_AllowsUntrustedCertificateOnlyInDevelopment()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var certificateLoader = new StaticCertificateLoader(CreateServerCertificate());
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"]
+            },
+            out _,
+            hostEnvironment: new TestHostEnvironment
+            {
+                EnvironmentName = Environments.Development
+            },
+            certificateLoader: certificateLoader);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            Assert.True(certificateLoader.AllowUntrustedCertificate);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_RequiresTrustedCertificateOutsideDevelopment()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var certificateLoader = new StaticCertificateLoader(CreateServerCertificate());
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"]
+            },
+            out _,
+            hostEnvironment: new TestHostEnvironment
+            {
+                EnvironmentName = Environments.Production
+            },
+            certificateLoader: certificateLoader);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            Assert.False(certificateLoader.AllowUntrustedCertificate);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
     private static ConnectionManager CreateConnectionManager(
         RecordingBackendRouteManager routeManager,
         BackendRouteOptions backendRouteOptions,
-        out int port)
+        out int port,
+        ConnectionManagerOptions? connectionOptions = null,
+        IHostEnvironment? hostEnvironment = null,
+        IGatewayClientCertificateLoader? certificateLoader = null,
+        IGatewayClientStreamAuthenticator? streamAuthenticator = null)
     {
         port = GetAvailableTcpPort();
+        connectionOptions ??= new ConnectionManagerOptions
+        {
+            IPAddress = "127.0.0.1"
+        };
+        connectionOptions.Port = port;
         return new ConnectionManager(
-            Microsoft.Extensions.Options.Options.Create(new ConnectionManagerOptions
-            {
-                IPAddress = "127.0.0.1",
-                Port = port,
-                UseTls = false
-            }),
+            Microsoft.Extensions.Options.Options.Create(connectionOptions),
             Microsoft.Extensions.Options.Options.Create(backendRouteOptions),
             routeManager,
+            certificateLoader ?? new StaticCertificateLoader(CreateServerCertificate()),
+            streamAuthenticator ?? new PassThroughStreamAuthenticator(),
             NullLogger<ConnectionManager>.Instance,
-            new TestHostEnvironment());
+            hostEnvironment ?? new TestHostEnvironment());
     }
 
     private static int GetAvailableTcpPort()
@@ -218,6 +327,42 @@ public sealed class ConnectionManagerBackendRouteTests
             envelope,
             GatewayBackendRouteEnvelope.Codec);
         await PacketFrameWriter.WriteAsync(stream, frame, timeout.Token);
+    }
+
+    private static X509Certificate2 CreateServerCertificate()
+    {
+        var rsa = RSA.Create(2048);
+        var request = new CertificateRequest(
+            "CN=localhost",
+            rsa,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+        request.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
+        request.CertificateExtensions.Add(new X509KeyUsageExtension(
+            X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment,
+            false));
+        request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(
+            new OidCollection
+            {
+                new Oid("1.3.6.1.5.5.7.3.1")
+            },
+            false));
+        request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
+        var subjectAlternativeNames = new SubjectAlternativeNameBuilder();
+        subjectAlternativeNames.AddDnsName("localhost");
+        request.CertificateExtensions.Add(subjectAlternativeNames.Build());
+
+        var notBefore = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var notAfter = DateTimeOffset.UtcNow.AddHours(1);
+        var serialNumber = RandomNumberGenerator.GetBytes(16);
+        var generator = X509SignatureGenerator.CreateForRSA(rsa, RSASignaturePadding.Pkcs1);
+        var certificate = request.Create(
+            request.SubjectName,
+            generator,
+            notBefore,
+            notAfter,
+            serialNumber);
+        return certificate.CopyWithPrivateKey(rsa);
     }
 
     private sealed class RecordingBackendRouteManager : IBackendRouteManager
@@ -278,6 +423,42 @@ public sealed class ConnectionManagerBackendRouteTests
     private sealed record ObservedBackendRouteFrame(
         string BackendKind,
         GatewayBackendRouteEnvelope Envelope);
+
+    private sealed class StaticCertificateLoader(X509Certificate2 certificate) : IGatewayClientCertificateLoader
+    {
+        public bool? AllowUntrustedCertificate { get; private set; }
+
+        public Task<X509Certificate2> LoadAsync(
+            ConnectionManagerOptions options,
+            bool allowUntrustedCertificate,
+            CancellationToken cancellationToken)
+        {
+            AllowUntrustedCertificate = allowUntrustedCertificate;
+            return Task.FromResult(certificate);
+        }
+    }
+
+    private sealed class ThrowingCertificateLoader(Exception exception) : IGatewayClientCertificateLoader
+    {
+        public Task<X509Certificate2> LoadAsync(
+            ConnectionManagerOptions options,
+            bool allowUntrustedCertificate,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromException<X509Certificate2>(exception);
+        }
+    }
+
+    private sealed class PassThroughStreamAuthenticator : IGatewayClientStreamAuthenticator
+    {
+        public ValueTask<Stream> AuthenticateAsync(
+            NetworkStream networkStream,
+            X509Certificate2 serverCertificate,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult<Stream>(networkStream);
+        }
+    }
 
     private sealed class TestHostEnvironment : IHostEnvironment
     {

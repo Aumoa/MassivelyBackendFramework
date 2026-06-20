@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Net;
-using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -24,6 +23,8 @@ internal class ConnectionManager(
     IOptions<ConnectionManagerOptions> options,
     IOptions<BackendRouteOptions> backendRouteOptions,
     IBackendRouteManager backendRouteManager,
+    IGatewayClientCertificateLoader certificateLoader,
+    IGatewayClientStreamAuthenticator streamAuthenticator,
     ILogger<ConnectionManager> logger,
     IHostEnvironment env) : IHostedService, IConnectionManager, IBackendRouteStatusProvider
 {
@@ -37,30 +38,43 @@ internal class ConnectionManager(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        backendRouteManager.RouteFrameReceived += OnBackendRouteFrameReceivedAsync;
-
-        if (options.Value.UseTls)
+        var connectionOptions = options.Value;
+        if (!connectionOptions.UseTls)
         {
-            if (env.IsDevelopment())
+            throw new InvalidOperationException("Gateway client listener requires TLS. Development may use a private or self-signed certificate, but plaintext TCP is not supported.");
+        }
+
+        m_Cert = await certificateLoader
+            .LoadAsync(connectionOptions, env.IsDevelopment(), cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            var listenAddress = await MasterEndpointResolver.ResolveBindAddressAsync(
+                connectionOptions.IPAddress,
+                cancellationToken).ConfigureAwait(false);
+            m_Socket = new Socket(listenAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            if (listenAddress.Equals(IPAddress.IPv6Any))
             {
-                m_Cert = await LoadDevelopmentCertAsync(cancellationToken).ConfigureAwait(false);
+                m_Socket.DualMode = true;
             }
-        }
 
-        var listenAddress = await MasterEndpointResolver.ResolveBindAddressAsync(
-            options.Value.IPAddress,
-            cancellationToken).ConfigureAwait(false);
-        m_Socket = new Socket(listenAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        if (listenAddress.Equals(IPAddress.IPv6Any))
+            m_Socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
+            m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            m_Socket.Bind(new IPEndPoint(listenAddress, connectionOptions.Port));
+            m_Socket.Listen();
+        }
+        catch
         {
-            m_Socket.DualMode = true;
+            m_Socket?.Dispose();
+            m_Socket = null;
+            m_Cert?.Dispose();
+            m_Cert = null;
+            throw;
         }
 
-        m_Socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.NoDelay, true);
-        m_Socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-        m_Socket.Bind(new IPEndPoint(listenAddress, options.Value.Port));
-        m_Socket.Listen();
-        logger.LogInformation("Gateway client listener is running on {Address}:{Port}.", options.Value.IPAddress, options.Value.Port);
+        backendRouteManager.RouteFrameReceived += OnBackendRouteFrameReceivedAsync;
+        logger.LogInformation("Gateway client listener is running on {Address}:{Port} with TLS.", connectionOptions.IPAddress, connectionOptions.Port);
 
         m_AcceptTask = StartAcceptAsync(m_GracefulCancellation.Token);
     }
@@ -78,6 +92,8 @@ internal class ConnectionManager(
         }
 
         await DisposeClientsAsync().ConfigureAwait(false);
+        m_Cert?.Dispose();
+        m_Cert = null;
     }
 
     private async Task StartAcceptAsync(CancellationToken cancellationToken)
@@ -89,7 +105,7 @@ internal class ConnectionManager(
             try
             {
                 clientSocket = await m_Socket!.AcceptAsync(cancellationToken).ConfigureAwait(false);
-                StartHandshakeAsync(clientSocket, m_Cert, cancellationToken);
+                StartHandshakeAsync(clientSocket, m_Cert!, cancellationToken);
                 clientSocket = null;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -115,30 +131,18 @@ internal class ConnectionManager(
         }
     }
 
-    private async void StartHandshakeAsync(Socket socket, X509Certificate2? serverCert, CancellationToken cancellationToken)
+    private async void StartHandshakeAsync(Socket socket, X509Certificate2 serverCert, CancellationToken cancellationToken)
     {
         socket.NoDelay = true;
 
         var networkStream = new NetworkStream(socket, ownsSocket: true);
-        SslStream sslStream = null!;
-        if (m_Cert != null)
-        {
-            sslStream = new SslStream(networkStream, leaveInnerStreamOpen: false);
-        }
-
-        Stream s;
+        Stream? s = null;
 
         try
         {
-            if (sslStream != null && serverCert != null)
-            {
-                await sslStream.AuthenticateAsServerAsync(serverCert, clientCertificateRequired: false, enabledSslProtocols: System.Security.Authentication.SslProtocols.Tls13, checkCertificateRevocation: true);
-                s = sslStream;
-            }
-            else
-            {
-                s = networkStream;
-            }
+            s = await streamAuthenticator
+                .AuthenticateAsync(networkStream, serverCert, cancellationToken)
+                .ConfigureAwait(false);
 
             var handshakeNotify = new GatewayHandshakeNotify("https://accounts.ayla.r-e.kr/authorize");
             using var handshakeFrame = PacketCodec.Encode(
@@ -152,12 +156,7 @@ internal class ConnectionManager(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            if (sslStream != null)
-            {
-                await sslStream.DisposeAsync().ConfigureAwait(false);
-            }
-
-            await networkStream.DisposeAsync().ConfigureAwait(false);
+            await DisposeHandshakeStreamsAsync(networkStream, s).ConfigureAwait(false);
             socket.Dispose();
 
             return;
@@ -166,12 +165,7 @@ internal class ConnectionManager(
         {
             logger.LogError("Error during handshake: {Message}", e.Message);
 
-            if (sslStream != null)
-            {
-                await sslStream.DisposeAsync().ConfigureAwait(false);
-            }
-
-            await networkStream.DisposeAsync().ConfigureAwait(false);
+            await DisposeHandshakeStreamsAsync(networkStream, s).ConfigureAwait(false);
             socket.Dispose();
 
             return;
@@ -467,21 +461,17 @@ internal class ConnectionManager(
         }
     }
 
-    private static async Task<X509Certificate2> LoadDevelopmentCertAsync(CancellationToken cancellationToken)
+    private static async ValueTask DisposeHandshakeStreamsAsync(
+        NetworkStream networkStream,
+        Stream? authenticatedStream)
     {
-        return await Task.Run(() =>
+        if (authenticatedStream != null &&
+            !ReferenceEquals(authenticatedStream, networkStream))
         {
-            using var store = new X509Store(StoreName.My, StoreLocation.LocalMachine);
-            store.Open(OpenFlags.ReadOnly);
+            await authenticatedStream.DisposeAsync().ConfigureAwait(false);
+            return;
+        }
 
-            var certs = store.Certificates.Find(X509FindType.FindBySubjectName, "localhost", false);
-
-            if (certs.Count == 0)
-            {
-                throw new InvalidOperationException("No development certificate found. Please create a self-signed certificate with the subject name 'localhost' and install it in the LocalMachine/My store.");
-            }
-
-            return certs[0];
-        }, cancellationToken);
+        await networkStream.DisposeAsync().ConfigureAwait(false);
     }
 }

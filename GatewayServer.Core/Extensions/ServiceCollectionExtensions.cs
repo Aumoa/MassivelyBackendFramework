@@ -18,6 +18,8 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<IConnectionManager, ConnectionManager>();
         s.AddSingleton<IBackendRouteStatusProvider>(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
         s.AddHostedService(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
+        s.AddSingleton<IGatewayClientCertificateLoader, GatewayClientCertificateLoader>();
+        s.AddSingleton<IGatewayClientStreamAuthenticator, GatewayClientTlsStreamAuthenticator>();
         s.AddSingleton<DedicatedNodeCatalog>();
         s.AddSingleton<IDedicatedNodeCatalog>(p => p.GetRequiredService<DedicatedNodeCatalog>());
         s.AddSingleton<IDedicatedNodeCatalogWriter>(p => p.GetRequiredService<DedicatedNodeCatalog>());
