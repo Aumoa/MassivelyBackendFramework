@@ -35,7 +35,6 @@ internal class ConnectionManager(
     private readonly BackendRouteOptions m_BackendRouteOptions = backendRouteOptions.Value;
     private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_ClientOriginPrincipalExchangeCounters = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_BackendOriginPrincipalExchangeCounters = new(StringComparer.Ordinal);
-    private readonly BackendRouteRegistry<Client> m_BackendRouteRegistry = new(backendRouteOptions.Value, logger);
     private readonly PersistentBackendRouteRegistry<Client> m_PersistentBackendRouteRegistry = new(
         backendRouteOptions.Value,
         routeTokenGenerator,
@@ -83,7 +82,6 @@ internal class ConnectionManager(
             throw;
         }
 
-        backendRouteManager.RouteFrameReceived += OnBackendRouteFrameReceivedAsync;
         backendRouteManager.RouteDataFrameReceived += OnBackendRouteDataFrameReceivedAsync;
         backendRouteManager.RouteCloseFrameReceived += OnBackendRouteCloseFrameReceivedAsync;
         backendRouteManager.RouteSessionClosed += OnBackendRouteSessionClosedAsync;
@@ -94,13 +92,11 @@ internal class ConnectionManager(
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        backendRouteManager.RouteFrameReceived -= OnBackendRouteFrameReceivedAsync;
         backendRouteManager.RouteDataFrameReceived -= OnBackendRouteDataFrameReceivedAsync;
         backendRouteManager.RouteCloseFrameReceived -= OnBackendRouteCloseFrameReceivedAsync;
         backendRouteManager.RouteSessionClosed -= OnBackendRouteSessionClosedAsync;
         await m_GracefulCancellation.CancelAsync().ConfigureAwait(false);
         m_Socket?.Dispose();
-        m_BackendRouteRegistry.CancelAll();
         m_PersistentBackendRouteRegistry.CancelAll();
 
         if (m_AcceptTask != null)
@@ -373,14 +369,7 @@ internal class ConnectionManager(
 
         if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE)
         {
-            m_BackendRouteRegistry.RecordLegacyRoutePacket(packet.Header.Kind);
-            if (!m_BackendRouteOptions.EnableLegacyOneShotRoutes)
-            {
-                await RejectDisabledLegacyBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
-                return;
-            }
-
-            await HandleBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+            await RejectRemovedLegacyBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -403,97 +392,6 @@ internal class ConnectionManager(
         }
 
         await RejectUnsupportedPersistentBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task HandleBackendRoutePacketAsync(
-        Client client,
-        PacketFrame packet,
-        CancellationToken cancellationToken)
-    {
-        var backendKind = string.Empty;
-        var routeId = Guid.Empty;
-        var routeRegistered = false;
-
-        try
-        {
-            if (packet.Header.Kind is not (PacketKind.Request or PacketKind.Notify))
-            {
-                throw new InvalidOperationException("Backend route packets must be Request or Notify packets.");
-            }
-
-            if (packet.Header.Version != GatewayBackendRouteEnvelope.ProtocolVersion)
-            {
-                throw new InvalidOperationException($"Unsupported Backend route protocol version {packet.Header.Version}.");
-            }
-
-            var envelope = PacketCodec.Decode(packet, GatewayBackendRouteEnvelope.Codec);
-            backendKind = envelope.BackendKind;
-            routeId = envelope.RouteId;
-            if (envelope.RoutedKind is not (PacketKind.Request or PacketKind.Notify))
-            {
-                throw new InvalidOperationException("Client Backend route envelopes must contain Request or Notify packets.");
-            }
-
-            if (packet.Header.Kind != envelope.RoutedKind)
-            {
-                throw new InvalidOperationException("Backend route packet kind must match the routed packet kind.");
-            }
-
-            backendKind = m_BackendRouteRegistry.RequireAllowedBackendKind(backendKind);
-
-            if (envelope.RoutedKind == PacketKind.Request)
-            {
-                m_BackendRouteRegistry.Register(routeId, backendKind, client, m_GracefulCancellation.Token);
-                routeRegistered = true;
-            }
-
-            using var routedFrame = PacketCodec.Encode(
-                envelope.RoutedKind,
-                Pid.GATE_BACKEND_ROUTE,
-                GatewayBackendRouteEnvelope.ProtocolVersion,
-                envelope,
-                GatewayBackendRouteEnvelope.Codec);
-            await backendRouteManager.RelayFrameAsync(
-                backendKind,
-                routedFrame,
-                cancellationToken).ConfigureAwait(false);
-
-            if (packet.Header.Kind == PacketKind.Request)
-            {
-                await WriteBackendRouteResponseAsync(
-                    client,
-                    packet.Header.Version,
-                    GatewayBackendRouteResponse.Accepted(routeId, backendKind),
-                    cancellationToken).ConfigureAwait(false);
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception e)
-        {
-            logger.LogWarning(
-                e,
-                "Gateway rejected Backend route packet. BackendKind={BackendKind}, PacketKind={PacketKind}, PacketId={PacketId}.",
-                backendKind,
-                packet.Header.Kind,
-                packet.Header.PacketId);
-
-            if (packet.Header.Kind == PacketKind.Request)
-            {
-                if (routeRegistered)
-                {
-                    m_BackendRouteRegistry.Remove(routeId);
-                }
-
-                await WriteBackendRouteResponseAsync(
-                    client,
-                    packet.Header.Version,
-                    GatewayBackendRouteResponse.Rejected(GetResponseRouteId(routeId), backendKind, "Backend route was rejected."),
-                    cancellationToken).ConfigureAwait(false);
-            }
-        }
     }
 
     private async Task HandleBackendRouteOpenPacketAsync(
@@ -772,13 +670,13 @@ internal class ConnectionManager(
         }
     }
 
-    private async Task RejectDisabledLegacyBackendRoutePacketAsync(
+    private async Task RejectRemovedLegacyBackendRoutePacketAsync(
         Client client,
         PacketFrame packet,
         CancellationToken cancellationToken)
     {
         logger.LogWarning(
-            "Gateway rejected disabled legacy Backend route packet. PacketKind={PacketKind}, PacketId={PacketId}.",
+            "Gateway rejected removed legacy Backend route packet. PacketKind={PacketKind}, PacketId={PacketId}.",
             packet.Header.Kind,
             packet.Header.PacketId);
 
@@ -791,7 +689,7 @@ internal class ConnectionManager(
         await WriteBackendRouteResponseAsync(
             client,
             packet.Header.Version,
-            GatewayBackendRouteResponse.Rejected(routeId, backendKind, "Legacy Backend route flow is disabled."),
+            GatewayBackendRouteResponse.Rejected(routeId, backendKind, "Legacy Backend route flow has been removed."),
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -815,33 +713,6 @@ internal class ConnectionManager(
                 GatewayBackendRouteOpenResponse.Rejected(backendKind, "Persistent Backend route handling is not enabled."),
                 cancellationToken).ConfigureAwait(false);
         }
-    }
-
-    private async ValueTask OnBackendRouteFrameReceivedAsync(
-        BackendRouteFrameReceived frame,
-        CancellationToken cancellationToken)
-    {
-        if (!m_BackendRouteRegistry.TryGet(frame.Envelope.RouteId, out var pendingRoute))
-        {
-            logger.LogWarning(
-                "Gateway received Backend route frame for an unknown client route. BackendKind={BackendKind}, RouteId={RouteId}.",
-                frame.BackendKind,
-                frame.Envelope.RouteId);
-            return;
-        }
-
-        if (frame.Envelope.RoutedKind == PacketKind.Response)
-        {
-            m_BackendRouteRegistry.Remove(frame.Envelope.RouteId);
-        }
-
-        using var clientFrame = PacketCodec.Encode(
-            PacketKind.Notify,
-            Pid.GATE_BACKEND_ROUTE,
-            GatewayBackendRouteEnvelope.ProtocolVersion,
-            frame.Envelope,
-            GatewayBackendRouteEnvelope.Codec);
-        await pendingRoute.Owner.WriteAsync(clientFrame, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask OnBackendRouteDataFrameReceivedAsync(
@@ -1132,14 +1003,12 @@ internal class ConnectionManager(
     {
         return
         [
-            .. m_BackendRouteRegistry.GetStatusItems(),
             .. m_PersistentBackendRouteRegistry.GetStatusItems()
         ];
     }
 
     private void RemoveBackendRoutes(Client client)
     {
-        m_BackendRouteRegistry.RemoveOwnerRoutes(client);
         m_PersistentBackendRouteRegistry.RemoveOwnerRoutes(client, "client disconnected");
     }
 

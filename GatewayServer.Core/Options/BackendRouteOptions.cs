@@ -4,8 +4,6 @@ public sealed record BackendRouteOptions
 {
     public string[] AllowedBackendKinds { get; set; } = [];
 
-    public bool EnableLegacyOneShotRoutes { get; set; }
-
     public int RequestTimeoutMilliseconds { get; set; } = 30000;
 
     public int MaxPendingRoutes { get; set; } = 4096;

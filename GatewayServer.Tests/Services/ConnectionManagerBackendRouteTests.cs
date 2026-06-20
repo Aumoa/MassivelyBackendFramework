@@ -17,7 +17,7 @@ namespace GatewayServer.Tests.Services;
 public sealed class ConnectionManagerBackendRouteTests
 {
     [Fact]
-    public async Task ClientRouteRequest_RelaysToBackendAndForwardsBackendResponse()
+    public async Task ClientRouteRequest_RejectsRemovedLegacyOneShotRoutes()
     {
         var routeManager = new RecordingBackendRouteManager();
         var connectionManager = CreateConnectionManager(
@@ -25,114 +25,6 @@ public sealed class ConnectionManagerBackendRouteTests
             new BackendRouteOptions
             {
                 AllowedBackendKinds = ["alpha"],
-                EnableLegacyOneShotRoutes = true,
-                RequestTimeoutMilliseconds = 5000,
-                MaxPendingRoutes = 8,
-                MaxPendingRoutesPerClient = 2
-            },
-            out var port);
-
-        await connectionManager.StartAsync(CancellationToken.None);
-
-        try
-        {
-            using var client = new TcpClient();
-            await client.ConnectAsync(IPAddress.Loopback, port);
-            await using var stream = client.GetStream();
-
-            using (var handshakeFrame = await ReadRequiredFrameAsync(stream))
-            {
-                Assert.Equal(PacketKind.Notify, handshakeFrame.Header.Kind);
-                Assert.Equal(Pid.GATE_HANDSHAKE_NOTIFY, handshakeFrame.Header.PacketId);
-
-                var handshake = PacketCodec.Decode(handshakeFrame, GatewayHandshakeNotify.Codec);
-                Assert.Equal("https://accounts.ayla.r-e.kr/authorize", handshake.LoginUri);
-            }
-
-            var routeId = Guid.NewGuid();
-            var requestPayload = new byte[] { 1, 2, 3, 4 };
-            var requestEnvelope = new GatewayBackendRouteEnvelope(
-                "alpha",
-                routeId,
-                PacketKind.Request,
-                routedPacketId: 101,
-                routedVersion: 2,
-                requestPayload);
-            await WriteBackendRouteEnvelopeAsync(stream, PacketKind.Request, requestEnvelope);
-
-            var relayed = await routeManager.RelayedFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Equal("alpha", relayed.BackendKind);
-            Assert.Equal(routeId, relayed.Envelope.RouteId);
-            Assert.Equal(PacketKind.Request, relayed.Envelope.RoutedKind);
-            Assert.Equal((ushort)101, relayed.Envelope.RoutedPacketId);
-            Assert.Equal((ushort)2, relayed.Envelope.RoutedVersion);
-            Assert.Equal(requestPayload, relayed.Envelope.RoutedPayload);
-
-            using (var acceptedFrame = await ReadRequiredFrameAsync(stream))
-            {
-                Assert.Equal(PacketKind.Response, acceptedFrame.Header.Kind);
-                Assert.Equal(Pid.GATE_BACKEND_ROUTE, acceptedFrame.Header.PacketId);
-
-                var accepted = PacketCodec.Decode(acceptedFrame, GatewayBackendRouteResponse.Codec);
-                Assert.True(accepted.Success);
-                Assert.Equal("alpha", accepted.BackendKind);
-                Assert.Equal(routeId, accepted.RouteId);
-                Assert.Equal(string.Empty, accepted.ErrorMessage);
-            }
-
-            var responsePayload = new byte[] { 9, 8, 7 };
-            await routeManager.PublishBackendRouteFrameAsync(new GatewayBackendRouteEnvelope(
-                "alpha",
-                routeId,
-                PacketKind.Response,
-                routedPacketId: 201,
-                routedVersion: 3,
-                responsePayload));
-
-            using (var backendFrame = await ReadRequiredFrameAsync(stream))
-            {
-                Assert.Equal(PacketKind.Notify, backendFrame.Header.Kind);
-                Assert.Equal(Pid.GATE_BACKEND_ROUTE, backendFrame.Header.PacketId);
-                Assert.Equal(GatewayBackendRouteEnvelope.ProtocolVersion, backendFrame.Header.Version);
-
-                var backendEnvelope = PacketCodec.Decode(backendFrame, GatewayBackendRouteEnvelope.Codec);
-                Assert.Equal("alpha", backendEnvelope.BackendKind);
-                Assert.Equal(routeId, backendEnvelope.RouteId);
-                Assert.Equal(PacketKind.Response, backendEnvelope.RoutedKind);
-                Assert.Equal((ushort)201, backendEnvelope.RoutedPacketId);
-                Assert.Equal((ushort)3, backendEnvelope.RoutedVersion);
-                Assert.Equal(responsePayload, backendEnvelope.RoutedPayload);
-            }
-
-            Assert.Contains(connectionManager.GetStatusItems(), item =>
-                item.Group == "Backend routes" &&
-                item.Name == "Pending routes" &&
-                item.Value == "0");
-            Assert.Contains(connectionManager.GetStatusItems(), item =>
-                item.Group == "Backend routes" &&
-                item.Name == "Legacy one-shot packets" &&
-                item.Value == "1");
-            Assert.Contains(connectionManager.GetStatusItems(), item =>
-                item.Group == "Backend routes" &&
-                item.Name == "Legacy one-shot requests" &&
-                item.Value == "1");
-        }
-        finally
-        {
-            await connectionManager.StopAsync(CancellationToken.None);
-        }
-    }
-
-    [Fact]
-    public async Task ClientRouteRequest_RejectsBackendKindWhenNotAllowlisted()
-    {
-        var routeManager = new RecordingBackendRouteManager();
-        var connectionManager = CreateConnectionManager(
-            routeManager,
-            new BackendRouteOptions
-            {
-                AllowedBackendKinds = [],
-                EnableLegacyOneShotRoutes = true,
                 RequestTimeoutMilliseconds = 5000
             },
             out var port);
@@ -166,70 +58,9 @@ public sealed class ConnectionManagerBackendRouteTests
             Assert.False(rejected.Success);
             Assert.Equal("alpha", rejected.BackendKind);
             Assert.Equal(routeId, rejected.RouteId);
-            Assert.Equal("Backend route was rejected.", rejected.ErrorMessage);
-            Assert.Equal(0, routeManager.RelayCount);
-        }
-        finally
-        {
-            await connectionManager.StopAsync(CancellationToken.None);
-        }
-    }
-
-    [Fact]
-    public async Task ClientRouteRequest_RejectsWhenLegacyOneShotRoutesAreDisabled()
-    {
-        var routeManager = new RecordingBackendRouteManager();
-        var connectionManager = CreateConnectionManager(
-            routeManager,
-            new BackendRouteOptions
-            {
-                AllowedBackendKinds = ["alpha"],
-                EnableLegacyOneShotRoutes = false,
-                RequestTimeoutMilliseconds = 5000
-            },
-            out var port);
-
-        await connectionManager.StartAsync(CancellationToken.None);
-
-        try
-        {
-            using var client = new TcpClient();
-            await client.ConnectAsync(IPAddress.Loopback, port);
-            await using var stream = client.GetStream();
-            using (await ReadRequiredFrameAsync(stream))
-            {
-            }
-
-            var routeId = Guid.NewGuid();
-            var requestEnvelope = new GatewayBackendRouteEnvelope(
-                "alpha",
-                routeId,
-                PacketKind.Request,
-                routedPacketId: 101,
-                routedVersion: 2,
-                [1, 2, 3]);
-            await WriteBackendRouteEnvelopeAsync(stream, PacketKind.Request, requestEnvelope);
-
-            using var rejectedFrame = await ReadRequiredFrameAsync(stream);
-            Assert.Equal(PacketKind.Response, rejectedFrame.Header.Kind);
-            Assert.Equal(Pid.GATE_BACKEND_ROUTE, rejectedFrame.Header.PacketId);
-
-            var rejected = PacketCodec.Decode(rejectedFrame, GatewayBackendRouteResponse.Codec);
-            Assert.False(rejected.Success);
-            Assert.Equal("alpha", rejected.BackendKind);
-            Assert.Equal(routeId, rejected.RouteId);
-            Assert.Equal("Legacy Backend route flow is disabled.", rejected.ErrorMessage);
+            Assert.Equal("Legacy Backend route flow has been removed.", rejected.ErrorMessage);
             Assert.Equal(0, routeManager.RelayCount);
             Assert.Equal(0, routeManager.ConnectCount);
-
-            Assert.Contains(connectionManager.GetStatusItems(), item =>
-                item.Group == "Backend routes" &&
-                item.Name == "Legacy one-shot routes" &&
-                item.Value == "Disabled");
-            Assert.Contains(connectionManager.GetStatusItems(), item =>
-                item.Group == "Backend routes" &&
-                item.Name == "Legacy one-shot packets" &&
-                item.Value == "1");
         }
         finally
         {

@@ -2,13 +2,13 @@
 
 All plans in this file must be written in priority order, with the highest-priority design and safety work first. Completed implementation items should be removed from the active plan unless they are needed as short context for a remaining migration risk.
 
-## P0: Legacy RouteId Rollout
+## P0: Gateway Route Hardening Status
 
 ### Scope
 
-In-repository Gateway route hardening is implemented. Persistent Backend routing now uses Gateway-issued `RouteToken` values, per-request `ExchangeId` values for route-data correlation, Backend session binding for Backend-origin authority checks, bounded client packet queues, route/exchange rate limits, and client idle/authentication timeouts.
+In-repository Gateway route hardening is implemented. Persistent Backend routing uses Gateway-issued `RouteToken` values, per-request `ExchangeId` values for route-data correlation, Backend session binding for Backend-origin authority checks, bounded client packet queues, route/exchange rate limits, and client idle/authentication timeouts.
 
-The remaining work is rollout outside this repository: move any external callers away from the legacy one-shot `GATE_BACKEND_ROUTE` / client-provided `RouteId` flow.
+The legacy one-shot `GATE_BACKEND_ROUTE` / client-provided `RouteId` pending flow has been removed from the client-facing Gateway path. Legacy requests now receive a rejection response instead of being registered or relayed.
 
 The target behavior remains:
 
@@ -18,23 +18,9 @@ The target behavior remains:
 - Completing, timing out, or rejecting one exchange must not close the persistent route.
 - Closing the route must cancel pending exchanges in both directions.
 
-### Remaining Risks
+### Remaining Work
 
-- The legacy one-shot `GATE_BACKEND_ROUTE` flow is disabled by default. Environments with unmigrated external callers must explicitly opt in with `EnableLegacyOneShotRoutes`.
-
-### Plan
-
-1. Update any external clients to open persistent routes and use Gateway-issued `RouteToken` values.
-2. Monitor `Legacy one-shot packets` status until external legacy traffic is gone.
-3. Remove any temporary `EnableLegacyOneShotRoutes` opt-in once an environment has migrated.
-4. Keep compatibility tests while both paths exist.
-5. Remove the old pending `RouteId` flow once all callers use route-open/data/close.
-
-### Validation Plan
-
-- New external clients do not need to provide authoritative route identifiers.
-- Legacy callers continue to work during the migration window.
-- Removing the legacy path does not remove persistent route-open/data/close coverage.
+- No active in-repository Gateway route hardening work remains.
 
 ## Non-Goals
 
