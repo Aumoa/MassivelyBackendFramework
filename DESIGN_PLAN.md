@@ -2,11 +2,13 @@
 
 All plans in this file must be written in priority order, with the highest-priority design and safety work first. Completed implementation items should be removed from the active plan unless they are needed as short context for a remaining migration risk.
 
-## P0: Remaining Gateway Route Hardening
+## P0: Legacy RouteId Rollout
 
 ### Scope
 
-Persistent Backend routing now uses Gateway-issued `RouteToken` values, per-request `ExchangeId` values for route-data correlation, and Backend session binding for Backend-origin authority checks. The remaining hardening work is to finish broader abuse controls and migration away from the legacy one-shot `RouteId` flow.
+In-repository Gateway route hardening is implemented. Persistent Backend routing now uses Gateway-issued `RouteToken` values, per-request `ExchangeId` values for route-data correlation, Backend session binding for Backend-origin authority checks, bounded client packet queues, route/exchange rate limits, and client idle/authentication timeouts.
+
+The remaining work is rollout outside this repository: move any external callers away from the legacy one-shot `GATE_BACKEND_ROUTE` / client-provided `RouteId` flow.
 
 The target behavior remains:
 
@@ -18,9 +20,7 @@ The target behavior remains:
 
 ### Remaining Risks
 
-- Gateway route hardening is implemented for the in-repository Gateway path. The legacy one-shot `GATE_BACKEND_ROUTE` flow is explicitly configurable for migration compatibility, but it remains enabled by default until external callers move to persistent route-open/data/close.
-
-## P1: Legacy RouteId Rollout
+- The legacy one-shot `GATE_BACKEND_ROUTE` flow is explicitly configurable for migration compatibility, but it remains enabled by default until external callers move to persistent route-open/data/close.
 
 ### Plan
 
