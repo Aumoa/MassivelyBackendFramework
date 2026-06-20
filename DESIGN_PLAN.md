@@ -191,7 +191,7 @@ Reject frames by default when any check fails.
 
 1. Add explicit TLS mode validation for the public Gateway listener, including fail-fast certificate handling when Gateway terminates TLS.
 2. Add a client authentication state model for Gateway sockets and block route-open/data/close until authentication completes.
-3. Add tests for route binding, expiry, close behavior, and direction-specific exchange matching as persistent route handling is wired into the Gateway.
+3. Add tests for route binding and direction-specific exchange matching as persistent route handling is wired into the Gateway.
 4. Implement route-open/route-close/data handling beside the existing pending route flow.
 5. Update clients to open a route and use Gateway-issued route tokens.
 6. Update Gateway client input policy so client ACKs are allowed only through validated route-data frames.
