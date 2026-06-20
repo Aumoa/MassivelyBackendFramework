@@ -124,6 +124,7 @@ internal sealed class BackendRouteRegistry<TOwner>(
             new("Backend routes", "Allowed kinds", allowedBackendKinds.Length == 0
                 ? "None"
                 : string.Join(", ", allowedBackendKinds.OrderBy(static item => item, StringComparer.Ordinal))),
+            new("Backend routes", "Legacy one-shot routes", options.EnableLegacyOneShotRoutes ? "Enabled" : "Disabled"),
             new("Backend routes", "Pending routes", pendingRoutes.Length.ToString()),
             new("Backend routes", "Request timeout", $"{GetBackendRouteTimeoutMilliseconds()} ms"),
             new("Backend routes", "Max pending routes", FormatLimit(options.MaxPendingRoutes)),

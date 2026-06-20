@@ -49,6 +49,10 @@ public sealed class BackendRouteRegistryTests
                 item.Value == "alpha, beta");
             Assert.Contains(status, item =>
                 item.Group == "Backend routes" &&
+                item.Name == "Legacy one-shot routes" &&
+                item.Value == "Enabled");
+            Assert.Contains(status, item =>
+                item.Group == "Backend routes" &&
                 item.Name == "Pending routes" &&
                 item.Value == "2");
             Assert.Contains(status, item =>

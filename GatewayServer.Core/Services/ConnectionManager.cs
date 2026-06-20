@@ -31,6 +31,7 @@ internal class ConnectionManager(
     IHostEnvironment env) : IHostedService, IConnectionManager, IBackendRouteStatusProvider
 {
     private readonly CancellationTokenSource m_GracefulCancellation = new();
+    private readonly BackendRouteOptions m_BackendRouteOptions = backendRouteOptions.Value;
     private readonly BackendRouteRegistry<Client> m_BackendRouteRegistry = new(backendRouteOptions.Value, logger);
     private readonly PersistentBackendRouteRegistry<Client> m_PersistentBackendRouteRegistry = new(
         backendRouteOptions.Value,
@@ -302,6 +303,12 @@ internal class ConnectionManager(
 
         if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE)
         {
+            if (!m_BackendRouteOptions.EnableLegacyOneShotRoutes)
+            {
+                await RejectDisabledLegacyBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
             await HandleBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
             return;
         }
@@ -683,6 +690,29 @@ internal class ConnectionManager(
                 GatewayBackendRouteOpenResponse.Rejected(backendKind, "Client is not authenticated."),
                 cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private async Task RejectDisabledLegacyBackendRoutePacketAsync(
+        Client client,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        logger.LogWarning(
+            "Gateway rejected disabled legacy Backend route packet. PacketKind={PacketKind}, PacketId={PacketId}.",
+            packet.Header.Kind,
+            packet.Header.PacketId);
+
+        if (packet.Header.Kind != PacketKind.Request)
+        {
+            return;
+        }
+
+        var (routeId, backendKind) = GetBackendRouteResponseIdentity(packet);
+        await WriteBackendRouteResponseAsync(
+            client,
+            packet.Header.Version,
+            GatewayBackendRouteResponse.Rejected(routeId, backendKind, "Legacy Backend route flow is disabled."),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RejectUnsupportedPersistentBackendRoutePacketAsync(

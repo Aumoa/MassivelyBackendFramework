@@ -166,6 +166,64 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
+    public async Task ClientRouteRequest_RejectsWhenLegacyOneShotRoutesAreDisabled()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                EnableLegacyOneShotRoutes = false,
+                RequestTimeoutMilliseconds = 5000
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            var routeId = Guid.NewGuid();
+            var requestEnvelope = new GatewayBackendRouteEnvelope(
+                "alpha",
+                routeId,
+                PacketKind.Request,
+                routedPacketId: 101,
+                routedVersion: 2,
+                [1, 2, 3]);
+            await WriteBackendRouteEnvelopeAsync(stream, PacketKind.Request, requestEnvelope);
+
+            using var rejectedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, rejectedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_ROUTE, rejectedFrame.Header.PacketId);
+
+            var rejected = PacketCodec.Decode(rejectedFrame, GatewayBackendRouteResponse.Codec);
+            Assert.False(rejected.Success);
+            Assert.Equal("alpha", rejected.BackendKind);
+            Assert.Equal(routeId, rejected.RouteId);
+            Assert.Equal("Legacy Backend route flow is disabled.", rejected.ErrorMessage);
+            Assert.Equal(0, routeManager.RelayCount);
+            Assert.Equal(0, routeManager.ConnectCount);
+
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Backend routes" &&
+                item.Name == "Legacy one-shot routes" &&
+                item.Value == "Disabled");
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task ClientRouteRequest_RejectsBeforeAuthentication()
     {
         var routeManager = new RecordingBackendRouteManager();

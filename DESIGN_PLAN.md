@@ -19,7 +19,7 @@ The target behavior remains:
 ### Remaining Risks
 
 - Abuse controls exist for open route counts, pending exchanges, connection-scoped route-open bursts, and per-route exchange creation bursts, but bounded client input queues, idle/authentication timeouts, and principal-scoped limits are still missing.
-- The legacy one-shot `GATE_BACKEND_ROUTE` flow still accepts client-provided `RouteId` values and must remain treated as a migration compatibility path, not an authoritative persistent route model.
+- The legacy one-shot `GATE_BACKEND_ROUTE` flow is now explicitly configurable for migration compatibility, but it remains enabled by default until callers move to persistent route-open/data/close.
 
 ## P1: Abuse Controls
 
@@ -41,7 +41,7 @@ The target behavior remains:
 ### Plan
 
 1. Update clients to open persistent routes and use Gateway-issued `RouteToken` values.
-2. Mark the legacy one-shot `GATE_BACKEND_ROUTE` / client-provided `RouteId` path as deprecated.
+2. Disable `EnableLegacyOneShotRoutes` in environments where all callers have migrated.
 3. Keep compatibility tests while both paths exist.
 4. Remove the old pending `RouteId` flow once all callers use route-open/data/close.
 
