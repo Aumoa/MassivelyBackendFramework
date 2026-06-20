@@ -54,6 +54,9 @@
 - Do not use Dependency Injection as part of real-time packet processing or game-logic hot paths.
 - In hot paths, minimize allocation, locks, blocking calls, scheduler overhead, reflection, and unnecessary async state machine creation.
 - Consider high-performance .NET primitives when appropriate, including `System.IO.Pipelines`, `SocketAsyncEventArgs`, `ArrayPool<T>`, `MemoryPool<T>`, `Span<T>`, `Memory<T>`, `ValueTask`, bounded queues, and custom schedulers.
+- Make a serious effort to improve throughput, latency, allocation behavior, and cache locality in performance-sensitive socket and Dedicated paths. When safe abstractions cannot reasonably deliver the needed result, `ref`, `in`, `readonly ref`, `ref struct`, `stackalloc`, custom memory layouts, or `unsafe` code may be appropriate.
+- Keep `unsafe` and ref-heavy code narrowly scoped, isolated behind clear APIs, and justified by a meaningful measured or clearly reasoned performance benefit. Do not introduce unsafe contexts or hard-to-maintain low-level code for speculative or cold-path wins.
+- During reviews, actively examine performance-sensitive changes for avoidable allocations, copies, bounds checks, synchronization, blocking, scheduler overhead, and data-layout issues. Be practical rather than dogmatic: prefer clear evidence or hot-path reasoning, and avoid nitpicking low-impact cold paths.
 
 ## Async Work And SynchronizationContext
 
