@@ -1,222 +1,112 @@
 # Design Plan
 
-All plans in this file must be written in priority order, with the highest-priority design and safety work first. When new items are added, place them by priority instead of appending them only by conversation order.
+All plans in this file must be written in priority order, with the highest-priority design and safety work first. Completed implementation items should be removed from the active plan unless they are needed as short context for a remaining migration risk.
 
-## P0: Gateway Route Identifier Hardening
+## P0: Remaining Gateway Route Hardening
 
 ### Scope
 
-This plan covers the security issue where a client can provide a `RouteId` that the Gateway later uses as the key for routing Backend responses or pushes back to that client.
+Persistent Backend routing now uses Gateway-issued `RouteToken` values and per-request `ExchangeId` values for route-data correlation. The remaining hardening work is to finish the parts that still depend on broader runtime ownership, Backend session lifetime, and migration away from the legacy one-shot `RouteId` flow.
 
-The goal is to prevent client-controlled identifiers from becoming implicit routing authority. The Gateway must own route creation, bind each route to the authenticated connection context, and validate every later frame against that binding.
+The target behavior remains:
 
-The target behavior is a persistent Backend <-> Gateway <-> Client route with two independent request/ACK channels:
+- `RouteToken` selects a Gateway-owned persistent Backend route.
+- `ExchangeId` matches one request to one response within that route.
+- Client-to-Backend and Backend-to-client exchanges are independent.
+- Completing, timing out, or rejecting one exchange must not close the persistent route.
+- Closing the route must cancel pending exchanges in both directions.
 
-- Client-to-Backend `Request`/ACK.
-- Backend-to-client `Request`/ACK.
+### Remaining Risks
 
-The two channels must be able to operate concurrently without completing, timing out, or closing each other's pending exchanges.
+- Persistent routes are currently bound to an authenticated client connection and Backend kind, but not yet strongly pinned to a specific Backend node/session lifetime.
+- If a Backend session is replaced or lost, the Gateway still needs an explicit policy for closing, suspending, or rebinding affected persistent routes.
+- Backend-origin route close is not yet wired as an explicit data-plane signal to clients.
+- Abuse controls exist for open route counts and pending exchanges, but route-open/exchange creation rate limiting and bounded client input queues are still missing.
+- The legacy one-shot `GATE_BACKEND_ROUTE` flow still accepts client-provided `RouteId` values and must remain treated as a migration compatibility path, not an authoritative persistent route model.
 
-### Current Implementation Facts
-
-The current `RouteId` is not a persistent route or session identifier. It is used as a pending client-originated request key:
-
-- A client sends `GATE_BACKEND_ROUTE` with a client-provided `RouteId`.
-- The Gateway registers that `RouteId` only when the routed frame is a client-originated `Request`.
-- The registry entry maps the `RouteId` back to the owning client connection.
-- When the Backend sends a frame with the same `RouteId`, the Gateway forwards it to that client only if the route is still pending.
-- When the Backend frame is a `Response`, the Gateway removes the route.
-- If the same `RouteId` is used later, or if the route has timed out, the Gateway treats it as unknown and drops it.
-
-This supports a one-shot client-to-Backend request/response flow, but it does not support a durable route that can carry later Backend pushes or Backend-originated requests.
-
-Partial TCP reads are not the root cause of this limitation. `PacketFrameReader` already reads the packet header and payload exactly across multiple stream reads. Concurrent client and Backend pushes are important to support, but they expose the route lifetime and correlation model problem rather than causing it.
-
-### Current Risk
-
-The current Backend route flow accepts a client-provided `RouteId` in the route envelope. The Gateway registers that identifier as a pending route and later uses it to locate the client connection when Backend frames arrive.
-
-This creates several risks:
-
-- A client-selected identifier can be confused with a server-issued routing handle.
-- A random-looking `RouteId` may be treated as authorization instead of only correlation.
-- Backend frames may be routed if they match an identifier without enough checks against the original client, Backend kind, Backend node, direction, and route lifetime.
-- Reusing the same identifier for both route ownership and request/response correlation makes persistent routes difficult to secure.
-
-Using a secure random identifier reduces guessing risk, but it is not enough by itself. The Gateway must also enforce ownership and state transitions.
-
-### Security Goals
-
-- Clients must not create authoritative route identifiers.
-- Route identifiers must be opaque and generated by the Gateway with a cryptographically secure random source.
-- Public Gateway listeners must either terminate TLS themselves or be explicitly configured to run behind a trusted TLS-terminating edge; `UseTls=true` must not silently fall back to plaintext when no certificate is available.
-- Route-open and route-data handling must require an authenticated client session before any Backend target is selected or contacted.
-- A route identifier must be bound to the authenticated client connection and authorized Backend target.
-- Per-request ACK matching must use a separate exchange identifier, not the persistent route identifier.
-- Client-to-Backend and Backend-to-client request/ACK channels must have independent pending exchange state.
-- Gateway validation must default-deny unknown, expired, closed, mismatched, or directionally invalid route and exchange identifiers.
-- Logs and admin surfaces must avoid exposing full bearer-style route tokens.
-
-### Proposed Model
-
-Use two different identifiers:
-
-- `RouteToken`: Gateway-issued persistent route handle.
-- `ExchangeId`: per-request correlation identifier within a route.
-
-The Gateway stores route state similar to:
-
-```text
-RouteToken -> {
-  ClientConnection,
-  AuthenticatedPrincipal,
-  BackendKind,
-  BackendNodeOrSession,
-  CreatedAt,
-  ExpiresAt,
-  State,
-  AllowedDirections
-}
-```
-
-The Gateway stores exchange state separately for each direction:
-
-```text
-(RouteToken, ExchangeId, Direction) -> {
-  RequestPacketId,
-  RequestVersion,
-  CreatedAt,
-  ExpiresAt,
-  Initiator,
-  ExpectedAckSide
-}
-```
-
-This keeps the route lifetime independent from individual request/ACK lifetimes.
-
-`RouteToken` is responsible for selecting the persistent route. `ExchangeId` is responsible for matching one request to one ACK. Completing an exchange must never remove the persistent route by itself.
-
-## P1: Persistent Route Protocol
+## P1: Backend-Initiated Route Close
 
 ### Protocol Plan
 
-1. Implement an explicit route-open operation.
-   - Client requests a Backend route by Backend kind or another authorized target selector.
-   - Gateway authenticates and authorizes the request.
-   - Gateway generates `RouteToken` with a cryptographically secure random source.
-   - Gateway returns the token to the client only after binding it to the connection and target.
+1. Allow trusted Backend sessions to send `GATE_BACKEND_ROUTE_CLOSE`.
+   - Decode `GatewayBackendRouteClose` from Backend sessions.
+   - Require the Backend-to-Gateway frame to use the expected close packet kind and protocol version.
+   - Raise the close frame through `BackendConnectionManager` to `ConnectionManager`.
 
-2. Implement an explicit route-close operation.
-   - Either side may request close.
-   - Gateway closes the route when the client disconnects, the Backend session is no longer valid, the route expires, or authorization is revoked.
-   - Closing a route cancels pending exchanges in both directions.
+2. Close the persistent route in Gateway.
+   - Verify the route token is known and open.
+   - Verify the route is bound to the Backend kind, and later to the exact Backend node/session once node binding is implemented.
+   - Close the route and clear pending exchanges.
 
-3. Implement route-data handling.
-   - Each data frame carries `RouteToken`, direction, routed packet kind, routed packet id, routed version, optional `ExchangeId`, and payload.
-   - `Request` frames create pending exchange records for their direction.
-   - `Response` or ACK frames are forwarded only when the matching pending exchange exists.
-   - Client-originated and Backend-originated exchanges are stored independently.
-   - A completed ACK removes only the matching pending exchange, not the route.
-
-4. Keep `RouteToken` and `ExchangeId` semantically separate.
-   - `RouteToken` decides which client and Backend route are connected.
-   - `ExchangeId` decides which request is being acknowledged.
-   - Never remove the route just because one exchange completes.
-
-5. Update client read policy and Gateway validation for ACKs.
-   - Client `Response` frames are accepted only when they match a Backend-originated pending exchange.
-   - Unknown, expired, mismatched, or wrong-direction ACKs are rejected.
-   - Accepting client ACKs must not make arbitrary client-provided `Response` frames authoritative.
-
-### Identifier Generation
-
-Generate route tokens in the Gateway only.
-
-Recommended token properties:
-
-- At least 128 bits of entropy from `RandomNumberGenerator`.
-- Prefer 256 bits if the token is treated like a bearer handle.
-- Encode as base64url or another opaque transport-safe representation.
-- Do not use user-provided GUIDs as authoritative route tokens.
-- Do not log full token values; log a short fingerprint or stable hash prefix when needed.
-
-`Guid.NewGuid()` may be acceptable for non-secret correlation, but route tokens should be treated as security-sensitive opaque handles and generated through an explicit CSPRNG token generator.
-
-## P2: Gateway Validation And Abuse Controls
-
-### Gateway Validation Rules
-
-Before enabling persistent route operations on the public Gateway listener:
-
-- If Gateway terminates TLS, fail startup when TLS is enabled but no usable server certificate is configured.
-- If TLS is terminated by an upstream edge, require an explicit configuration mode for that deployment instead of silently accepting plaintext.
-- Do not accept route-open, route-data, or route-close frames until the client connection has completed authentication.
-
-For every client-to-Gateway frame:
-
-- Verify the client connection is authenticated.
-- Verify the route token belongs to that exact client connection or authenticated principal.
-- Verify the Backend kind or target matches the route binding.
-- Verify the route is open and not expired.
-- Verify the frame direction is permitted.
-- For ACK/Response frames, verify a matching Backend-originated pending exchange exists.
-
-For every Backend-to-Gateway frame:
-
-- Verify the Backend session is trusted.
-- Verify the route token is known, open, and bound to that Backend kind or node.
-- Verify the route has not expired or been closed.
-- Verify the frame direction is permitted.
-- For ACK/Response frames, verify a matching client-originated pending exchange exists.
-
-Reject frames by default when any check fails.
-
-### Abuse Controls
-
-- Use bounded client input queues or equivalent backpressure for externally reachable client sockets.
-- Apply connection, idle, authentication, and route-open timeouts.
-- Apply per-client packet and route-open rate limits before contacting Backend nodes.
-- Limit open routes globally.
-- Limit open routes per client connection.
-- Limit open routes per authenticated principal.
-- Limit pending exchanges per route and per direction.
-- Apply separate timeouts for route lifetime and exchange lifetime.
-- Close routes on client disconnect.
-- Close or suspend routes when the Backend session is replaced or lost.
-- Rate limit route-open and exchange creation attempts.
-
-## P3: Migration And Validation
-
-### Migration Steps
-
-1. Add explicit TLS mode validation for the public Gateway listener, including fail-fast certificate handling when Gateway terminates TLS.
-2. Add a client authentication state model for Gateway sockets and block route-open/data/close until authentication completes.
-3. Add tests for route binding and direction-specific exchange matching as persistent route handling is wired into the Gateway.
-4. Implement route-open/route-close/data handling beside the existing pending route flow.
-5. Update clients to open a route and use Gateway-issued route tokens.
-6. Update Gateway client input policy so client ACKs are allowed only through validated route-data frames.
-7. Update Backend route handling to validate route tokens and exchange identifiers.
-8. Deprecate client-provided `RouteId` as an authoritative route key.
-9. Remove the old pending `RouteId` flow once all callers use Gateway-issued route tokens.
+3. Notify the owning client.
+   - Forward a close notification to the route owner.
+   - Do not let Backend close requests affect routes owned by other Backend kinds or unknown tokens.
+   - Default-deny malformed, unknown, mismatched, or stale close frames.
 
 ### Validation Plan
 
-Add focused tests for:
+- Backend close for an open route notifies the owning client and removes the route.
+- Backend close clears client-origin and Backend-origin pending exchanges.
+- Backend close with an unknown route token is ignored.
+- Backend close from the wrong Backend kind is rejected.
+- Client data sent after Backend close is not relayed.
 
-- Client cannot choose or override a route token.
-- Gateway fails startup when configured to terminate TLS without a usable certificate.
-- Route-open is rejected before client authentication completes.
-- Unknown route token is rejected.
-- Route token bound to one client cannot be used by another client.
-- Backend kind or node mismatch is rejected.
-- Client-originated request and Backend-originated request use independent exchange registries.
-- Completing one exchange does not close the persistent route.
-- ACK without a pending exchange is rejected.
-- Expired route and expired exchange are rejected.
-- Client disconnect removes routes and pending exchanges.
-- Logs do not contain full route tokens.
+## P2: Backend Node And Session Binding
 
-### Non-Goals
+### Plan
+
+1. Extend persistent route state beyond `BackendKind`.
+   - Track the selected Backend node id and master connection id, or an explicit Backend session identity.
+   - Decide whether route-open should immediately allocate/connect to a Backend session or lazily bind on first relay.
+
+2. Validate every Backend-origin frame against the route binding.
+   - Match Backend kind.
+   - Match Backend node/session identity once available.
+   - Reject frames from a replacement or unrelated Backend session unless a deliberate rebinding policy exists.
+
+3. Handle Backend session loss.
+   - Close or suspend routes bound to the lost session.
+   - Clear pending exchanges.
+   - Notify clients when the route is no longer usable.
+
+### Validation Plan
+
+- Backend frame from the wrong node/session is rejected.
+- Backend session loss closes or suspends affected routes.
+- Session replacement does not inherit old route authority by Backend kind alone.
+
+## P3: Abuse Controls
+
+### Plan
+
+- Add bounded client input queues or equivalent backpressure for externally reachable client sockets.
+- Add route-open rate limits per connection and per authenticated principal.
+- Add exchange creation rate limits per route, direction, connection, and authenticated principal.
+- Add idle/authentication timeouts where they are not already explicit.
+- Add open route limits per authenticated principal.
+
+### Validation Plan
+
+- Route-open burst attempts are limited before contacting Backend nodes.
+- Exchange creation bursts are limited without closing unrelated exchanges.
+- Backpressure does not create unobserved fire-and-forget failures during shutdown.
+
+## P4: Legacy RouteId Migration
+
+### Plan
+
+1. Update clients to open persistent routes and use Gateway-issued `RouteToken` values.
+2. Mark the legacy one-shot `GATE_BACKEND_ROUTE` / client-provided `RouteId` path as deprecated.
+3. Keep compatibility tests while both paths exist.
+4. Remove the old pending `RouteId` flow once all callers use route-open/data/close.
+
+### Validation Plan
+
+- New clients do not need to provide authoritative route identifiers.
+- Legacy callers continue to work during the migration window.
+- Removing the legacy path does not remove persistent route-open/data/close coverage.
+
+## Non-Goals
 
 - Do not use Master as a data-plane relay.
 - Do not make route tokens a substitute for authentication or authorization.
