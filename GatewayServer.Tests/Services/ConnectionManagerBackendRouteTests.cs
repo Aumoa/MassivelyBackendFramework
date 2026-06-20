@@ -963,6 +963,221 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
+    public async Task RouteCloseRequest_ClosesRouteAndAcknowledges()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                RequestTimeoutMilliseconds = 5000,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            var routeToken = await OpenPersistentBackendRouteAsync(stream);
+            var close = new GatewayBackendRouteClose(routeToken, "client closed");
+            await WriteBackendRouteCloseRequestAsync(stream, close);
+
+            using (var closeFrame = await ReadRequiredFrameAsync(stream))
+            {
+                Assert.Equal(PacketKind.Response, closeFrame.Header.Kind);
+                Assert.Equal(Pid.GATE_BACKEND_ROUTE_CLOSE, closeFrame.Header.PacketId);
+
+                var acknowledged = PacketCodec.Decode(closeFrame, GatewayBackendRouteClose.Codec);
+                Assert.Equal(routeToken, acknowledged.RouteToken);
+                Assert.Equal("client closed", acknowledged.Reason);
+            }
+
+            await WaitForStatusValueAsync(
+                connectionManager,
+                "Persistent Backend routes",
+                "Open routes",
+                "0");
+
+            var dataEnvelope = new GatewayBackendRouteDataEnvelope(
+                routeToken,
+                GatewayBackendRouteDirection.ClientToBackend,
+                PacketKind.Notify,
+                routedPacketId: 301,
+                routedVersion: 2,
+                exchangeId: null,
+                [1, 2, 3]);
+            await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Notify, dataEnvelope);
+
+            await AssertNoDataRelayAsync(routeManager);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RouteCloseRequest_RejectsRouteTokenOwnedByAnotherClient()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                RequestTimeoutMilliseconds = 5000,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var ownerClient = new TcpClient();
+            await ownerClient.ConnectAsync(IPAddress.Loopback, port);
+            await using var ownerStream = ownerClient.GetStream();
+            using (await ReadRequiredFrameAsync(ownerStream))
+            {
+            }
+
+            var routeToken = await OpenPersistentBackendRouteAsync(ownerStream);
+
+            using var otherClient = new TcpClient();
+            await otherClient.ConnectAsync(IPAddress.Loopback, port);
+            await using var otherStream = otherClient.GetStream();
+            using (await ReadRequiredFrameAsync(otherStream))
+            {
+            }
+
+            await WriteBackendRouteCloseRequestAsync(
+                otherStream,
+                new GatewayBackendRouteClose(routeToken, "other client"));
+
+            await AssertNoClientFrameAsync(otherStream);
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Open routes" &&
+                item.Value == "1");
+
+            var dataEnvelope = new GatewayBackendRouteDataEnvelope(
+                routeToken,
+                GatewayBackendRouteDirection.ClientToBackend,
+                PacketKind.Notify,
+                routedPacketId: 301,
+                routedVersion: 2,
+                exchangeId: null,
+                [1, 2, 3]);
+            await WriteBackendRouteDataEnvelopeAsync(ownerStream, PacketKind.Notify, dataEnvelope);
+
+            var relayed = await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(routeToken, relayed.Envelope.RouteToken);
+            Assert.Equal(PacketKind.Notify, relayed.Envelope.RoutedKind);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RouteCloseRequest_ClearsPendingExchanges()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                RequestTimeoutMilliseconds = 5000,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            var routeToken = await OpenPersistentBackendRouteAsync(stream);
+            var clientExchangeId = new GatewayBackendExchangeId(Guid.NewGuid());
+            var clientRequest = new GatewayBackendRouteDataEnvelope(
+                routeToken,
+                GatewayBackendRouteDirection.ClientToBackend,
+                PacketKind.Request,
+                routedPacketId: 401,
+                routedVersion: 3,
+                clientExchangeId,
+                [1, 2, 3]);
+            await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Request, clientRequest);
+            await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            var backendExchangeId = new GatewayBackendExchangeId(Guid.NewGuid());
+            var backendRequest = new GatewayBackendRouteDataEnvelope(
+                routeToken,
+                GatewayBackendRouteDirection.BackendToClient,
+                PacketKind.Request,
+                routedPacketId: 601,
+                routedVersion: 4,
+                backendExchangeId,
+                [8, 8, 8]);
+            await routeManager.PublishBackendRouteDataFrameAsync("alpha", backendRequest);
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Pending client exchanges" &&
+                item.Value == "1");
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Pending backend exchanges" &&
+                item.Value == "1");
+
+            await WriteBackendRouteCloseRequestAsync(
+                stream,
+                new GatewayBackendRouteClose(routeToken, "client closed"));
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WaitForStatusValueAsync(
+                connectionManager,
+                "Persistent Backend routes",
+                "Open routes",
+                "0");
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Pending client exchanges" &&
+                item.Value == "0");
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Persistent Backend routes" &&
+                item.Name == "Pending backend exchanges" &&
+                item.Value == "0");
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task RouteData_RejectsUnknownRouteToken()
     {
         var routeManager = new RecordingBackendRouteManager();
@@ -1339,6 +1554,20 @@ public sealed class ConnectionManagerBackendRouteTests
         Assert.True(accepted.Success);
         Assert.NotNull(accepted.RouteToken);
         return accepted.RouteToken!;
+    }
+
+    private static async Task WriteBackendRouteCloseRequestAsync(
+        Stream stream,
+        GatewayBackendRouteClose close)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var frame = PacketCodec.Encode(
+            PacketKind.Request,
+            Pid.GATE_BACKEND_ROUTE_CLOSE,
+            GatewayBackendRouteClose.ProtocolVersion,
+            close,
+            GatewayBackendRouteClose.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, timeout.Token);
     }
 
     private static async Task WriteBackendRouteDataEnvelopeAsync(

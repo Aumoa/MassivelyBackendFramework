@@ -314,6 +314,12 @@ internal class ConnectionManager(
             return;
         }
 
+        if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE_CLOSE)
+        {
+            await HandleBackendRouteClosePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         await RejectUnsupportedPersistentBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
     }
 
@@ -461,6 +467,66 @@ internal class ConnectionManager(
                     GatewayBackendRouteOpenResponse.Rejected(GetResponseBackendKind(backendKind), "Backend route open was rejected."),
                     cancellationToken).ConfigureAwait(false);
             }
+        }
+    }
+
+    private async Task HandleBackendRouteClosePacketAsync(
+        Client client,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        GatewayBackendRouteClose? request = null;
+
+        try
+        {
+            if (packet.Header.Kind != PacketKind.Request)
+            {
+                throw new InvalidOperationException("Backend route close packets must be Request packets.");
+            }
+
+            if (packet.Header.Version != GatewayBackendRouteClose.ProtocolVersion)
+            {
+                throw new InvalidOperationException($"Unsupported Backend route close protocol version {packet.Header.Version}.");
+            }
+
+            request = PacketCodec.Decode(packet, GatewayBackendRouteClose.Codec);
+            if (!m_PersistentBackendRouteRegistry.TryGet(request.RouteToken, out var route))
+            {
+                throw new InvalidOperationException("Unknown Backend route token.");
+            }
+
+            if (!ReferenceEquals(route.Owner, client))
+            {
+                throw new UnauthorizedAccessException("Backend route token is not owned by this client.");
+            }
+
+            if (route.State != PersistentBackendRouteState.Open)
+            {
+                throw new InvalidOperationException("Persistent Backend route is not open.");
+            }
+
+            if (!m_PersistentBackendRouteRegistry.Close(request.RouteToken, request.Reason))
+            {
+                throw new InvalidOperationException("Persistent Backend route could not be closed.");
+            }
+
+            await WriteBackendRouteCloseResponseAsync(
+                client,
+                packet.Header.Version,
+                request,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Gateway rejected Backend route close packet. PacketKind={PacketKind}, PacketId={PacketId}.",
+                packet.Header.Kind,
+                packet.Header.PacketId);
         }
     }
 
@@ -790,6 +856,21 @@ internal class ConnectionManager(
             version,
             routeResponse,
             GatewayBackendRouteOpenResponse.Codec);
+        await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteBackendRouteCloseResponseAsync(
+        Client client,
+        ushort version,
+        GatewayBackendRouteClose routeClose,
+        CancellationToken cancellationToken)
+    {
+        using var response = PacketCodec.Encode(
+            PacketKind.Response,
+            Pid.GATE_BACKEND_ROUTE_CLOSE,
+            version,
+            routeClose,
+            GatewayBackendRouteClose.Codec);
         await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
