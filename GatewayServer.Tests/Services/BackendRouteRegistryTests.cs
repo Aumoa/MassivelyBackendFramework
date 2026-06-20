@@ -1,6 +1,7 @@
 using GatewayServer.Options;
 using GatewayServer.Services;
 using Microsoft.Extensions.Logging.Abstractions;
+using PacketCore;
 using Xunit;
 
 namespace GatewayServer.Tests.Services;
@@ -53,6 +54,10 @@ public sealed class BackendRouteRegistryTests
                 item.Value == "Enabled");
             Assert.Contains(status, item =>
                 item.Group == "Backend routes" &&
+                item.Name == "Legacy one-shot packets" &&
+                item.Value == "0");
+            Assert.Contains(status, item =>
+                item.Group == "Backend routes" &&
                 item.Name == "Pending routes" &&
                 item.Value == "2");
             Assert.Contains(status, item =>
@@ -73,6 +78,33 @@ public sealed class BackendRouteRegistryTests
             registry.CancelAll();
             await WaitForRouteTasksAsync(alphaRoute, betaRoute);
         }
+    }
+
+    [Fact]
+    public void RecordLegacyRoutePacket_UpdatesStatusCounters()
+    {
+        var registry = CreateRegistry(new BackendRouteOptions
+        {
+            AllowedBackendKinds = ["alpha"]
+        });
+
+        registry.RecordLegacyRoutePacket(PacketKind.Request);
+        registry.RecordLegacyRoutePacket(PacketKind.Notify);
+        registry.RecordLegacyRoutePacket(PacketKind.Response);
+
+        var status = registry.GetStatusItems();
+        Assert.Contains(status, item =>
+            item.Group == "Backend routes" &&
+            item.Name == "Legacy one-shot packets" &&
+            item.Value == "3");
+        Assert.Contains(status, item =>
+            item.Group == "Backend routes" &&
+            item.Name == "Legacy one-shot requests" &&
+            item.Value == "1");
+        Assert.Contains(status, item =>
+            item.Group == "Backend routes" &&
+            item.Name == "Legacy one-shot notifies" &&
+            item.Value == "1");
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using GatewayServer.Options;
 using MasterServer.ControlPlane;
 using Microsoft.Extensions.Logging;
+using PacketCore;
 
 namespace GatewayServer.Services;
 
@@ -12,6 +13,9 @@ internal sealed class BackendRouteRegistry<TOwner>(
 {
     private readonly object m_RegistrationSync = new();
     private readonly ConcurrentDictionary<Guid, PendingBackendRoute<TOwner>> m_PendingRoutes = [];
+    private long m_LegacyPacketsReceived;
+    private long m_LegacyRequestsReceived;
+    private long m_LegacyNotifiesReceived;
 
     public string RequireAllowedBackendKind(string backendKind)
     {
@@ -31,6 +35,19 @@ internal sealed class BackendRouteRegistry<TOwner>(
         }
 
         throw new UnauthorizedAccessException($"Backend kind '{normalizedBackendKind}' is not enabled for client routing.");
+    }
+
+    public void RecordLegacyRoutePacket(PacketKind packetKind)
+    {
+        Interlocked.Increment(ref m_LegacyPacketsReceived);
+        if (packetKind == PacketKind.Request)
+        {
+            Interlocked.Increment(ref m_LegacyRequestsReceived);
+        }
+        else if (packetKind == PacketKind.Notify)
+        {
+            Interlocked.Increment(ref m_LegacyNotifiesReceived);
+        }
     }
 
     public PendingBackendRoute<TOwner> Register(
@@ -88,7 +105,13 @@ internal sealed class BackendRouteRegistry<TOwner>(
             return false;
         }
 
-        pendingRoute.TimeoutCancellation.Cancel();
+        try
+        {
+            pendingRoute.TimeoutCancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
         return true;
     }
 
@@ -125,6 +148,9 @@ internal sealed class BackendRouteRegistry<TOwner>(
                 ? "None"
                 : string.Join(", ", allowedBackendKinds.OrderBy(static item => item, StringComparer.Ordinal))),
             new("Backend routes", "Legacy one-shot routes", options.EnableLegacyOneShotRoutes ? "Enabled" : "Disabled"),
+            new("Backend routes", "Legacy one-shot packets", Interlocked.Read(ref m_LegacyPacketsReceived).ToString()),
+            new("Backend routes", "Legacy one-shot requests", Interlocked.Read(ref m_LegacyRequestsReceived).ToString()),
+            new("Backend routes", "Legacy one-shot notifies", Interlocked.Read(ref m_LegacyNotifiesReceived).ToString()),
             new("Backend routes", "Pending routes", pendingRoutes.Length.ToString()),
             new("Backend routes", "Request timeout", $"{GetBackendRouteTimeoutMilliseconds()} ms"),
             new("Backend routes", "Max pending routes", FormatLimit(options.MaxPendingRoutes)),

@@ -25,9 +25,10 @@ The target behavior remains:
 ### Plan
 
 1. Update any external clients to open persistent routes and use Gateway-issued `RouteToken` values.
-2. Disable `EnableLegacyOneShotRoutes` in environments where all callers have migrated.
-3. Keep compatibility tests while both paths exist.
-4. Remove the old pending `RouteId` flow once all callers use route-open/data/close.
+2. Monitor `Legacy one-shot packets` status until external legacy traffic is gone.
+3. Disable `EnableLegacyOneShotRoutes` in environments where all callers have migrated.
+4. Keep compatibility tests while both paths exist.
+5. Remove the old pending `RouteId` flow once all callers use route-open/data/close.
 
 ### Validation Plan
 

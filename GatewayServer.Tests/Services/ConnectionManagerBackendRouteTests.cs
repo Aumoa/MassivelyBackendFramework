@@ -107,6 +107,14 @@ public sealed class ConnectionManagerBackendRouteTests
                 item.Group == "Backend routes" &&
                 item.Name == "Pending routes" &&
                 item.Value == "0");
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Backend routes" &&
+                item.Name == "Legacy one-shot packets" &&
+                item.Value == "1");
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Backend routes" &&
+                item.Name == "Legacy one-shot requests" &&
+                item.Value == "1");
         }
         finally
         {
@@ -216,6 +224,10 @@ public sealed class ConnectionManagerBackendRouteTests
                 item.Group == "Backend routes" &&
                 item.Name == "Legacy one-shot routes" &&
                 item.Value == "Disabled");
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Backend routes" &&
+                item.Name == "Legacy one-shot packets" &&
+                item.Value == "1");
         }
         finally
         {

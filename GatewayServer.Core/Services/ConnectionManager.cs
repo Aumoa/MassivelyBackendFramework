@@ -373,6 +373,7 @@ internal class ConnectionManager(
 
         if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE)
         {
+            m_BackendRouteRegistry.RecordLegacyRoutePacket(packet.Header.Kind);
             if (!m_BackendRouteOptions.EnableLegacyOneShotRoutes)
             {
                 await RejectDisabledLegacyBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);

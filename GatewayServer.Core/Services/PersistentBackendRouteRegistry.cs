@@ -638,7 +638,13 @@ internal sealed class PersistentBackendRoute<TOwner>(
         CloseReason = reason;
         m_ClientOriginExchanges.Clear();
         m_BackendOriginExchanges.Clear();
-        TimeoutCancellation.Cancel();
+        try
+        {
+            TimeoutCancellation.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
         return true;
     }
 
