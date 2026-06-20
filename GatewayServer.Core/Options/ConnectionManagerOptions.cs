@@ -10,6 +10,8 @@ public record ConnectionManagerOptions
 
     public bool UseTls { get; set; } = true;
 
+    public int MaxQueuedClientPackets { get; set; } = 1024;
+
     public string CertificateSubjectName { get; set; } = "localhost";
 
     public StoreName CertificateStoreName { get; set; } = StoreName.My;

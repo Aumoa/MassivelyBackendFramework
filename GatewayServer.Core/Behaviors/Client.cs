@@ -7,11 +7,15 @@ using PacketCore;
 
 namespace GatewayServer.Behaviors;
 
-internal class Client(NetworkStream networkStream, Stream stream, ILogger logger) : IClient, IAsyncDisposable
+internal class Client(
+    NetworkStream networkStream,
+    Stream stream,
+    ILogger logger,
+    int maxQueuedPackets = 1024) : IClient, IAsyncDisposable
 {
     private readonly NetworkStream m_NetworkStream = networkStream;
     private readonly CancellationTokenSource m_Cancellation = new();
-    private readonly Channel<PacketFrame> m_RequestsChannel = Channel.CreateUnbounded<PacketFrame>();
+    private readonly Channel<PacketFrame> m_RequestsChannel = CreateRequestsChannel(maxQueuedPackets);
     private readonly SemaphoreSlim m_WriteLock = new(1, 1);
     private ExceptionDispatchInfo? m_ExceptionDispatchInfo;
     private int m_Completion;
@@ -175,4 +179,25 @@ internal class Client(NetworkStream networkStream, Stream stream, ILogger logger
     public event Action? Completed;
 
     public event Action<Exception>? CommunicationError;
+
+    internal static Channel<PacketFrame> CreateRequestsChannel(int maxQueuedPackets)
+    {
+        if (maxQueuedPackets <= 0)
+        {
+            return Channel.CreateUnbounded<PacketFrame>(new UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = true,
+                AllowSynchronousContinuations = false
+            });
+        }
+
+        return Channel.CreateBounded<PacketFrame>(new BoundedChannelOptions(maxQueuedPackets)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = true,
+            SingleWriter = true,
+            AllowSynchronousContinuations = false
+        });
+    }
 }

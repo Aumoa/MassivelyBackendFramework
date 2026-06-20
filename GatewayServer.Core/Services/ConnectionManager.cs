@@ -188,7 +188,11 @@ internal class ConnectionManager(
             return;
         }
 
-        var client = new Client(networkStream, s, logger);
+        var client = new Client(
+            networkStream,
+            s,
+            logger,
+            options.Value.MaxQueuedClientPackets);
         GatewayClientAuthenticationContext authenticationContext;
         try
         {
