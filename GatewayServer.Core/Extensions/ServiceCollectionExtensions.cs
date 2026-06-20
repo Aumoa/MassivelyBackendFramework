@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<IGatewayClientAuthenticationContextFactory, GatewayClientAuthenticationContextFactory>();
         s.AddSingleton<IGatewayClientCertificateLoader, GatewayClientCertificateLoader>();
         s.AddSingleton<IGatewayClientStreamAuthenticator, GatewayClientTlsStreamAuthenticator>();
+        s.AddSingleton<IGatewayBackendRouteTokenGenerator, GatewayBackendRouteTokenGenerator>();
         s.AddSingleton<DedicatedNodeCatalog>();
         s.AddSingleton<IDedicatedNodeCatalog>(p => p.GetRequiredService<DedicatedNodeCatalog>());
         s.AddSingleton<IDedicatedNodeCatalogWriter>(p => p.GetRequiredService<DedicatedNodeCatalog>());

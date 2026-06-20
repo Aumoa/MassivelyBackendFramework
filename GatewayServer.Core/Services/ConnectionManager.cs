@@ -26,11 +26,16 @@ internal class ConnectionManager(
     IGatewayClientCertificateLoader certificateLoader,
     IGatewayClientStreamAuthenticator streamAuthenticator,
     IGatewayClientAuthenticationContextFactory authenticationContextFactory,
+    IGatewayBackendRouteTokenGenerator routeTokenGenerator,
     ILogger<ConnectionManager> logger,
     IHostEnvironment env) : IHostedService, IConnectionManager, IBackendRouteStatusProvider
 {
     private readonly CancellationTokenSource m_GracefulCancellation = new();
     private readonly BackendRouteRegistry<Client> m_BackendRouteRegistry = new(backendRouteOptions.Value, logger);
+    private readonly PersistentBackendRouteRegistry<Client> m_PersistentBackendRouteRegistry = new(
+        backendRouteOptions.Value,
+        routeTokenGenerator,
+        logger);
 
     private Socket? m_Socket;
     private Task? m_AcceptTask;
@@ -86,6 +91,7 @@ internal class ConnectionManager(
         await m_GracefulCancellation.CancelAsync().ConfigureAwait(false);
         m_Socket?.Dispose();
         m_BackendRouteRegistry.CancelAll();
+        m_PersistentBackendRouteRegistry.CancelAll();
 
         if (m_AcceptTask != null)
         {
@@ -285,6 +291,12 @@ internal class ConnectionManager(
             return;
         }
 
+        if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE_OPEN)
+        {
+            await HandleBackendRouteOpenPacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         await RejectUnsupportedPersistentBackendRoutePacketAsync(client, packet, cancellationToken).ConfigureAwait(false);
     }
 
@@ -374,6 +386,62 @@ internal class ConnectionManager(
                     client,
                     packet.Header.Version,
                     GatewayBackendRouteResponse.Rejected(GetResponseRouteId(routeId), backendKind, "Backend route was rejected."),
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task HandleBackendRouteOpenPacketAsync(
+        Client client,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        var backendKind = string.Empty;
+
+        try
+        {
+            if (packet.Header.Kind != PacketKind.Request)
+            {
+                throw new InvalidOperationException("Backend route open packets must be Request packets.");
+            }
+
+            if (packet.Header.Version != GatewayBackendRouteOpenRequest.ProtocolVersion)
+            {
+                throw new InvalidOperationException($"Unsupported Backend route open protocol version {packet.Header.Version}.");
+            }
+
+            var request = PacketCodec.Decode(packet, GatewayBackendRouteOpenRequest.Codec);
+            backendKind = request.BackendKind;
+            var route = m_PersistentBackendRouteRegistry.Open(
+                backendKind,
+                client,
+                m_GracefulCancellation.Token);
+
+            await WriteBackendRouteOpenResponseAsync(
+                client,
+                packet.Header.Version,
+                GatewayBackendRouteOpenResponse.Accepted(route.RouteToken, route.BackendKind),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Gateway rejected Backend route open packet. BackendKind={BackendKind}, PacketKind={PacketKind}, PacketId={PacketId}.",
+                backendKind,
+                packet.Header.Kind,
+                packet.Header.PacketId);
+
+            if (packet.Header.Kind == PacketKind.Request)
+            {
+                await WriteBackendRouteOpenResponseAsync(
+                    client,
+                    packet.Header.Version,
+                    GatewayBackendRouteOpenResponse.Rejected(GetResponseBackendKind(backendKind), "Backend route open was rejected."),
                     cancellationToken).ConfigureAwait(false);
             }
         }
@@ -515,12 +583,17 @@ internal class ConnectionManager(
 
     public ServiceAdminStatusItem[] GetStatusItems()
     {
-        return m_BackendRouteRegistry.GetStatusItems();
+        return
+        [
+            .. m_BackendRouteRegistry.GetStatusItems(),
+            .. m_PersistentBackendRouteRegistry.GetStatusItems()
+        ];
     }
 
     private void RemoveBackendRoutes(Client client)
     {
         m_BackendRouteRegistry.RemoveOwnerRoutes(client);
+        m_PersistentBackendRouteRegistry.RemoveOwnerRoutes(client, "client disconnected");
     }
 
     private static Guid GetResponseRouteId(Guid routeId)
