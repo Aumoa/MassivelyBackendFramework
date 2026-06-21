@@ -165,6 +165,117 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
+    public async Task ClientAuthenticateRequest_RejectsWhenTokenValidatorIsNotConfigured()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                RequestTimeoutMilliseconds = 5000
+            },
+            out var port,
+            authenticateClients: false);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteClientAuthenticateRequestAsync(stream, new GatewayClientAuthenticateRequest("access-token-alpha"));
+
+            using var rejectedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, rejectedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_CLIENT_AUTHENTICATE, rejectedFrame.Header.PacketId);
+
+            var rejected = PacketCodec.Decode(rejectedFrame, GatewayClientAuthenticateResponse.Codec);
+            Assert.False(rejected.Success);
+            Assert.Equal(string.Empty, rejected.SubjectId);
+            Assert.Equal("Gateway client token validator is not configured.", rejected.ErrorMessage);
+
+            await WriteBackendRouteOpenRequestAsync(stream, new GatewayBackendRouteOpenRequest("alpha"));
+
+            using var routeRejectedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, routeRejectedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_ROUTE_OPEN, routeRejectedFrame.Header.PacketId);
+
+            var routeRejected = PacketCodec.Decode(routeRejectedFrame, GatewayBackendRouteOpenResponse.Codec);
+            Assert.False(routeRejected.Success);
+            Assert.Equal("Client is not authenticated.", routeRejected.ErrorMessage);
+            Assert.Equal(0, routeManager.ConnectCount);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task ClientAuthenticateRequest_AllowsRouteOpenAfterValidToken()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                AllowedBackendKinds = ["alpha"],
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                MaxOpenRoutesPerClient = 2,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port,
+            authenticateClients: false,
+            clientTokenValidator: new StaticGatewayClientTokenValidator("access-token-alpha", "player-1"));
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteClientAuthenticateRequestAsync(stream, new GatewayClientAuthenticateRequest("access-token-alpha"));
+
+            using var acceptedAuthFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, acceptedAuthFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_CLIENT_AUTHENTICATE, acceptedAuthFrame.Header.PacketId);
+
+            var acceptedAuth = PacketCodec.Decode(acceptedAuthFrame, GatewayClientAuthenticateResponse.Codec);
+            Assert.True(acceptedAuth.Success);
+            Assert.Equal("player-1", acceptedAuth.SubjectId);
+            Assert.Equal(string.Empty, acceptedAuth.ErrorMessage);
+
+            await WriteBackendRouteOpenRequestAsync(stream, new GatewayBackendRouteOpenRequest("alpha"));
+
+            using var acceptedRouteFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, acceptedRouteFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_ROUTE_OPEN, acceptedRouteFrame.Header.PacketId);
+
+            var acceptedRoute = PacketCodec.Decode(acceptedRouteFrame, GatewayBackendRouteOpenResponse.Codec);
+            Assert.True(acceptedRoute.Success);
+            Assert.Equal("alpha", acceptedRoute.BackendKind);
+            Assert.NotNull(acceptedRoute.RouteToken);
+            Assert.Equal(1, routeManager.ConnectCount);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task RouteOpenRequest_ReturnsGatewayIssuedTokenForAuthenticatedClient()
     {
         var routeManager = new RecordingBackendRouteManager();
@@ -2271,7 +2382,8 @@ public sealed class ConnectionManagerBackendRouteTests
         IHostEnvironment? hostEnvironment = null,
         IGatewayClientCertificateLoader? certificateLoader = null,
         IGatewayClientStreamAuthenticator? streamAuthenticator = null,
-        bool authenticateClients = true)
+        bool authenticateClients = true,
+        IGatewayClientTokenValidator? clientTokenValidator = null)
     {
         port = GetAvailableTcpPort();
         connectionOptions ??= new ConnectionManagerOptions
@@ -2286,6 +2398,7 @@ public sealed class ConnectionManagerBackendRouteTests
             certificateLoader ?? new StaticCertificateLoader(CreateServerCertificate()),
             streamAuthenticator ?? new PassThroughStreamAuthenticator(),
             new StaticGatewayClientAuthenticationContextFactory(authenticateClients),
+            clientTokenValidator ?? new RejectingGatewayClientTokenValidator(),
             new GatewayBackendRouteTokenGenerator(),
             NullLogger<ConnectionManager>.Instance,
             hostEnvironment ?? new TestHostEnvironment());
@@ -2371,6 +2484,20 @@ public sealed class ConnectionManagerBackendRouteTests
             GatewayBackendRouteOpenRequest.ProtocolVersion,
             request,
             GatewayBackendRouteOpenRequest.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, timeout.Token);
+    }
+
+    private static async Task WriteClientAuthenticateRequestAsync(
+        Stream stream,
+        GatewayClientAuthenticateRequest request)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var frame = PacketCodec.Encode(
+            PacketKind.Request,
+            Pid.GATE_CLIENT_AUTHENTICATE,
+            GatewayClientAuthenticateRequest.ProtocolVersion,
+            request,
+            GatewayClientAuthenticateRequest.Codec);
         await PacketFrameWriter.WriteAsync(stream, frame, timeout.Token);
     }
 
@@ -2769,6 +2896,25 @@ public sealed class ConnectionManagerBackendRouteTests
             }
 
             return context;
+        }
+    }
+
+    private sealed class StaticGatewayClientTokenValidator(
+        string acceptedAccessToken,
+        string subjectId) : IGatewayClientTokenValidator
+    {
+        public ValueTask<GatewayClientTokenValidationResult> ValidateAsync(
+            string accessToken,
+            CancellationToken cancellationToken)
+        {
+            if (string.Equals(accessToken, acceptedAccessToken, StringComparison.Ordinal))
+            {
+                return ValueTask.FromResult(
+                    GatewayClientTokenValidationResult.Accepted(new GatewayClientPrincipal(subjectId)));
+            }
+
+            return ValueTask.FromResult(
+                GatewayClientTokenValidationResult.Rejected("Invalid Gateway client access token."));
         }
     }
 

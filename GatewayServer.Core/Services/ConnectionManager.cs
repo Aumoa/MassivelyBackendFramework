@@ -27,6 +27,7 @@ internal class ConnectionManager(
     IGatewayClientCertificateLoader certificateLoader,
     IGatewayClientStreamAuthenticator streamAuthenticator,
     IGatewayClientAuthenticationContextFactory authenticationContextFactory,
+    IGatewayClientTokenValidator clientTokenValidator,
     IGatewayBackendRouteTokenGenerator routeTokenGenerator,
     ILogger<ConnectionManager> logger,
     IHostEnvironment env) : IHostedService, IConnectionManager, IBackendRouteStatusProvider
@@ -250,6 +251,16 @@ internal class ConnectionManager(
         {
             await foreach (var packet in client.ReadPacketsAsync(cancellationToken))
             {
+                if (packet.Header.PacketId == Pid.GATE_CLIENT_AUTHENTICATE)
+                {
+                    await HandleClientAuthenticatePacketAsync(
+                        client,
+                        authenticationContext,
+                        packet,
+                        cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
                 if (IsBackendRoutePacket(packet))
                 {
                     await HandleBackendRouteClientPacketAsync(
@@ -294,6 +305,80 @@ internal class ConnectionManager(
             catch (Exception e)
             {
                 logger.LogDebug(e, "Gateway client disposal completed with an error after echo loop.");
+            }
+        }
+    }
+
+    private async Task HandleClientAuthenticatePacketAsync(
+        Client client,
+        GatewayClientAuthenticationContext authenticationContext,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (packet.Header.Kind != PacketKind.Request)
+            {
+                throw new InvalidOperationException("Gateway client authentication packets must be Request packets.");
+            }
+
+            if (packet.Header.Version != GatewayClientAuthenticateRequest.ProtocolVersion)
+            {
+                throw new InvalidOperationException($"Unsupported Gateway client authentication protocol version {packet.Header.Version}.");
+            }
+
+            if (authenticationContext.IsAuthenticated)
+            {
+                var currentPrincipal = authenticationContext.Principal ?? throw new InvalidOperationException("Authenticated Gateway client context is missing a principal.");
+                await WriteClientAuthenticateResponseAsync(
+                    client,
+                    packet.Header.Version,
+                    GatewayClientAuthenticateResponse.Accepted(currentPrincipal.SubjectId),
+                    cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            var request = PacketCodec.Decode(packet, GatewayClientAuthenticateRequest.Codec);
+            var result = await clientTokenValidator
+                .ValidateAsync(request.AccessToken, cancellationToken)
+                .ConfigureAwait(false);
+            if (result.Success)
+            {
+                var principal = result.Principal ?? throw new InvalidOperationException("Gateway client token validation succeeded without a principal.");
+                authenticationContext.MarkAuthenticated(principal);
+                await WriteClientAuthenticateResponseAsync(
+                    client,
+                    packet.Header.Version,
+                    GatewayClientAuthenticateResponse.Accepted(principal.SubjectId),
+                    cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            await WriteClientAuthenticateResponseAsync(
+                client,
+                packet.Header.Version,
+                GatewayClientAuthenticateResponse.Rejected(GetAuthenticationErrorMessage(result.ErrorMessage)),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Gateway rejected client authentication packet. PacketKind={PacketKind}, PacketId={PacketId}.",
+                packet.Header.Kind,
+                packet.Header.PacketId);
+
+            if (packet.Header.Kind == PacketKind.Request)
+            {
+                await WriteClientAuthenticateResponseAsync(
+                    client,
+                    packet.Header.Version,
+                    GatewayClientAuthenticateResponse.Rejected("Gateway client authentication was rejected."),
+                    cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -999,6 +1084,21 @@ internal class ConnectionManager(
         await client.WriteAsync(clientFrame, cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task WriteClientAuthenticateResponseAsync(
+        Client client,
+        ushort version,
+        GatewayClientAuthenticateResponse authenticationResponse,
+        CancellationToken cancellationToken)
+    {
+        using var response = PacketCodec.Encode(
+            PacketKind.Response,
+            Pid.GATE_CLIENT_AUTHENTICATE,
+            version,
+            authenticationResponse,
+            GatewayClientAuthenticateResponse.Codec);
+        await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
     public ServiceAdminStatusItem[] GetStatusItems()
     {
         return
@@ -1063,6 +1163,13 @@ internal class ConnectionManager(
     private static string GetResponseBackendKind(string backendKind)
     {
         return string.IsNullOrWhiteSpace(backendKind) ? "unknown" : backendKind.Trim();
+    }
+
+    private static string GetAuthenticationErrorMessage(string errorMessage)
+    {
+        return string.IsNullOrWhiteSpace(errorMessage)
+            ? "Gateway client authentication was rejected."
+            : errorMessage;
     }
 
     private async Task DisposeClientsAsync()
