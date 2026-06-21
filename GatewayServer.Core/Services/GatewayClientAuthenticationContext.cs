@@ -8,7 +8,7 @@ internal enum GatewayClientAuthenticationState
     Authenticated
 }
 
-internal sealed class GatewayClientPrincipal
+public sealed class GatewayClientPrincipal
 {
     public GatewayClientPrincipal(string subjectId)
     {
@@ -66,7 +66,7 @@ internal sealed class GatewayClientAuthenticationContextFactory : IGatewayClient
     }
 }
 
-internal sealed class GatewayClientTokenValidationResult
+public sealed class GatewayClientTokenValidationResult
 {
     private GatewayClientTokenValidationResult(
         bool success,
@@ -110,7 +110,7 @@ internal sealed class GatewayClientTokenValidationResult
     }
 }
 
-internal interface IGatewayClientTokenValidator
+public interface IGatewayClientTokenValidator
 {
     ValueTask<GatewayClientTokenValidationResult> ValidateAsync(
         string accessToken,
