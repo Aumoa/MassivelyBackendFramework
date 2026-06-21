@@ -2,6 +2,7 @@
 using GatewayServer.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace GatewayServer.Extensions;
 
@@ -18,6 +19,11 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<IConnectionManager, ConnectionManager>();
         s.AddSingleton<IBackendRouteStatusProvider>(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
         s.AddHostedService(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
+        s.AddSingleton<IGatewayClientAuthenticationContextFactory, GatewayClientAuthenticationContextFactory>();
+        s.TryAddSingleton<IGatewayClientTokenValidator, RejectingGatewayClientTokenValidator>();
+        s.AddSingleton<IGatewayClientCertificateLoader, GatewayClientCertificateLoader>();
+        s.AddSingleton<IGatewayClientStreamAuthenticator, GatewayClientTlsStreamAuthenticator>();
+        s.AddSingleton<IGatewayBackendRouteTokenGenerator, GatewayBackendRouteTokenGenerator>();
         s.AddSingleton<DedicatedNodeCatalog>();
         s.AddSingleton<IDedicatedNodeCatalog>(p => p.GetRequiredService<DedicatedNodeCatalog>());
         s.AddSingleton<IDedicatedNodeCatalogWriter>(p => p.GetRequiredService<DedicatedNodeCatalog>());
