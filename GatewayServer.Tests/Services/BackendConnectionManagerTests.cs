@@ -223,6 +223,70 @@ public sealed class BackendConnectionManagerTests
     }
 
     [Fact]
+    public async Task RelayFrameAsync_DropsRouteDataFramesWhenFrameKindDiffersFromRoutedKind()
+    {
+        var routeDataEnvelope = new GatewayBackendChannelDataEnvelope(
+            channelId: 37,
+            PacketKind.Response,
+            routedPacketId: 305,
+            routedVersion: 7,
+            new GatewayBackendExchangeId(Guid.NewGuid()),
+            [4, 5, 6]);
+        var routeClose = new GatewayBackendChannelClose(37, "backend closed");
+        await using var backend = new FakeBackendServer(
+            responseEnvelope: null,
+            routeDataEnvelope: routeDataEnvelope,
+            routeClose: routeClose,
+            routeDataFrameKind: PacketKind.Notify);
+
+        var issuer = new RecordingDirectConnectCodeIssuer("direct-code");
+        var catalog = new FakeBackendNodeCatalog(CreateSnapshot(
+            CreateNode("alpha", "backend-a", "master-a", backend.Port)));
+        var manager = CreateManager(catalog, issuer);
+        manager.SetMasterConnectionId("gateway-master-a");
+        await manager.StartAsync(CancellationToken.None);
+
+        var receivedFrame = new TaskCompletionSource<BackendRouteDataFrameReceived>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.RouteDataFrameReceived += (frame, _) =>
+        {
+            receivedFrame.TrySetResult(frame);
+            return ValueTask.CompletedTask;
+        };
+
+        var receivedClose = new TaskCompletionSource<BackendRouteCloseFrameReceived>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.RouteCloseFrameReceived += (frame, _) =>
+        {
+            receivedClose.TrySetResult(frame);
+            return ValueTask.CompletedTask;
+        };
+
+        using var requestFrame = CreateBackendRouteFrame(
+            "alpha",
+            Guid.NewGuid(),
+            PacketKind.Notify,
+            routedPacketId: 101,
+            routedVersion: 2,
+            [1, 2, 3]);
+
+        try
+        {
+            await manager.RelayFrameAsync("alpha", requestFrame, CancellationToken.None);
+            await backend.RelayedEnvelope.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            var routedClose = await receivedClose.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(receivedFrame.Task.IsCompleted);
+            Assert.Equal((uint)37, routedClose.Close.ChannelId);
+            Assert.Equal("backend closed", routedClose.Close.Reason);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task RelayFrameAsync_RaisesRouteCloseFrames()
     {
         var routeClose = new GatewayBackendChannelClose(37, "backend closed");
@@ -498,6 +562,7 @@ public sealed class BackendConnectionManagerTests
         private readonly GatewayBackendRouteEnvelope? m_ResponseEnvelope;
         private readonly GatewayBackendChannelDataEnvelope? m_RouteDataEnvelope;
         private readonly GatewayBackendChannelClose? m_RouteClose;
+        private readonly PacketKind? m_RouteDataFrameKind;
         private readonly string? m_AcceptedNodeId;
         private readonly bool m_ExpectRelay;
         private readonly bool m_CloseAfterRelay;
@@ -507,6 +572,7 @@ public sealed class BackendConnectionManagerTests
             GatewayBackendRouteEnvelope? responseEnvelope,
             GatewayBackendChannelDataEnvelope? routeDataEnvelope = null,
             GatewayBackendChannelClose? routeClose = null,
+            PacketKind? routeDataFrameKind = null,
             string? acceptedNodeId = null,
             bool expectRelay = true,
             bool closeAfterRelay = false)
@@ -514,6 +580,7 @@ public sealed class BackendConnectionManagerTests
             m_ResponseEnvelope = responseEnvelope;
             m_RouteDataEnvelope = routeDataEnvelope;
             m_RouteClose = routeClose;
+            m_RouteDataFrameKind = routeDataFrameKind;
             m_AcceptedNodeId = acceptedNodeId;
             m_ExpectRelay = expectRelay;
             m_CloseAfterRelay = closeAfterRelay;
@@ -623,7 +690,7 @@ public sealed class BackendConnectionManagerTests
                 if (m_RouteDataEnvelope != null)
                 {
                     using var routeDataFrame = PacketCodec.Encode(
-                        m_RouteDataEnvelope.RoutedKind,
+                        m_RouteDataFrameKind ?? m_RouteDataEnvelope.RoutedKind,
                         Pid.GATE_BACKEND_CHANNEL_DATA,
                         GatewayBackendChannelDataEnvelope.ProtocolVersion,
                         m_RouteDataEnvelope,

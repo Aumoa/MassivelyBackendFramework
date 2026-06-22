@@ -397,6 +397,17 @@ internal sealed class GatewayConnectionManager(
         }
 
         var envelope = PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec);
+        if (frame.Header.Kind != envelope.RoutedKind)
+        {
+            logger.LogWarning(
+                "Backend rejected Gateway Backend channel data with mismatched packet kind. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, PacketKind={PacketKind}, RoutedKind={RoutedKind}.",
+                connectionId,
+                gatewayNodeId,
+                frame.Header.Kind,
+                envelope.RoutedKind);
+            return;
+        }
+
         var context = new BackendGatewayPacketContext(
             gatewayNodeId,
             connectionId,

@@ -781,6 +781,17 @@ internal sealed class BackendConnectionManager(
         }
 
         var envelope = PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec);
+        if (frame.Header.Kind != envelope.RoutedKind)
+        {
+            logger.LogWarning(
+                "Backend channel data frame used mismatched packet kind. BackendKind={BackendKind}, BackendNodeId={NodeId}, PacketKind={PacketKind}, RoutedKind={RoutedKind}.",
+                peer.Node.BackendKind,
+                peer.Node.NodeId,
+                frame.Header.Kind,
+                envelope.RoutedKind);
+            return;
+        }
+
         var received = new BackendRouteDataFrameReceived(
             peer.Node.BackendKind,
             peer.Node.NodeId,

@@ -69,6 +69,71 @@ public sealed class BackendGatewayConnectionManagerTests
     }
 
     [Fact]
+    public async Task GatewayHandshake_DropsChannelDataWhenFrameKindDiffersFromRoutedKind()
+    {
+        var port = GetFreeTcpPort();
+        var runtime = new RecordingWorldRuntime();
+        var validator = new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend);
+        var manager = CreateManager(port, runtime, validator);
+        await manager.StartAsync(CancellationToken.None);
+
+        using var client = new TcpClient();
+        try
+        {
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            await CompleteGatewayHandshakeAsync(stream);
+
+            var mismatchedEnvelope = new GatewayBackendChannelDataEnvelope(
+                channelId: 123,
+                PacketKind.Response,
+                routedPacketId: 501,
+                routedVersion: 2,
+                new GatewayBackendExchangeId(Guid.NewGuid()),
+                [7, 8, 9]);
+            using (var frame = PacketCodec.Encode(
+                       PacketKind.Notify,
+                       Pid.GATE_BACKEND_CHANNEL_DATA,
+                       GatewayBackendChannelDataEnvelope.ProtocolVersion,
+                       mismatchedEnvelope,
+                       GatewayBackendChannelDataEnvelope.Codec))
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+            }
+
+            byte[] payload = [1, 2, 3];
+            var validEnvelope = new GatewayBackendChannelDataEnvelope(
+                channelId: 124,
+                PacketKind.Notify,
+                routedPacketId: 502,
+                routedVersion: 3,
+                exchangeId: null,
+                payload);
+            using (var frame = PacketCodec.Encode(
+                       PacketKind.Notify,
+                       Pid.GATE_BACKEND_CHANNEL_DATA,
+                       GatewayBackendChannelDataEnvelope.ProtocolVersion,
+                       validEnvelope,
+                       GatewayBackendChannelDataEnvelope.Codec))
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+            }
+
+            var received = await runtime.Packet.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal((uint)124, received.Context.ChannelId);
+            Assert.Equal(PacketKind.Notify, received.Context.Kind);
+            Assert.Equal((ushort)502, received.Context.PacketId);
+            Assert.Equal((ushort)3, received.Context.Version);
+            Assert.Null(received.Context.ExchangeId);
+            Assert.Equal(payload, received.Payload);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task GatewayHandshake_RoutesRequestExchangeIdToRuntime()
     {
         var port = GetFreeTcpPort();
