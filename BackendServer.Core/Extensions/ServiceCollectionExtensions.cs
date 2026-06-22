@@ -15,6 +15,8 @@ public static class ServiceCollectionExtensions
         services.Configure<GatewayListenerOptions>(config.GetSection("GatewayListener"));
 
         services.TryAddSingleton<IBackendRuntime, NoOpBackendRuntime>();
+        services.AddSingleton<GatewayChannelSender>();
+        services.AddSingleton<IBackendGatewayChannelSender>(static provider => provider.GetRequiredService<GatewayChannelSender>());
         services.AddHostedService<BackendRuntimeHostedService>();
         services.AddSingleton<GatewayConnectionManager>();
         services.AddSingleton<IGatewayConnectionStatusProvider>(static provider => provider.GetRequiredService<GatewayConnectionManager>());

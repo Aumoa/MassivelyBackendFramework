@@ -25,6 +25,7 @@ internal sealed class GatewayConnectionManager(
     IOptions<GatewayListenerOptions> options,
     IBackendRuntime backendRuntime,
     IDirectConnectCodeValidator directConnectCodeValidator,
+    GatewayChannelSender channelSender,
     ILogger<GatewayConnectionManager> logger) : IHostedService, IGatewayConnectionStatusProvider
 {
     private readonly GatewayListenerOptions m_Options = options.Value;
@@ -160,6 +161,7 @@ internal sealed class GatewayConnectionManager(
 
             var acceptedGateway = await AuthenticateGatewayAsync(connectionId, activeStream, cancellationToken).ConfigureAwait(false);
             gatewayNodeId = acceptedGateway.NodeId;
+            channelSender.AttachSession(connectionId, gatewayNodeId, activeStream);
             m_GatewayConnectionStates[connectionId] = "Trusted";
             logger.LogInformation(
                 "Backend accepted Gateway direct connection. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, RemoteEndPoint={RemoteEndPoint}.",
@@ -200,6 +202,7 @@ internal sealed class GatewayConnectionManager(
         }
         finally
         {
+            channelSender.DetachSession(connectionId);
             if (sslStream != null)
             {
                 await sslStream.DisposeAsync().ConfigureAwait(false);
@@ -355,7 +358,8 @@ internal sealed class GatewayConnectionManager(
             envelope.RoutedKind,
             envelope.RoutedPacketId,
             envelope.RoutedVersion,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            envelope.ExchangeId?.Value);
         await backendRuntime.HandleGatewayPacketAsync(context, envelope.RoutedPayload, cancellationToken).ConfigureAwait(false);
     }
 

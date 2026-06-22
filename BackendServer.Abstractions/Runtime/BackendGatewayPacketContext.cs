@@ -12,7 +12,8 @@ public sealed class BackendGatewayPacketContext
         PacketKind kind,
         ushort packetId,
         ushort version,
-        DateTimeOffset receivedAt)
+        DateTimeOffset receivedAt,
+        Guid? exchangeId = null)
     {
         if (string.IsNullOrWhiteSpace(gatewayNodeId))
         {
@@ -24,6 +25,16 @@ public sealed class BackendGatewayPacketContext
             throw new ArgumentOutOfRangeException(nameof(channelId));
         }
 
+        if (exchangeId == Guid.Empty)
+        {
+            throw new ArgumentException("Exchange id cannot be empty.", nameof(exchangeId));
+        }
+
+        if (kind is (PacketKind.Request or PacketKind.Response) && exchangeId == null)
+        {
+            throw new ArgumentException("Request and response packets require an exchange id.", nameof(exchangeId));
+        }
+
         GatewayNodeId = gatewayNodeId;
         GatewayConnectionId = gatewayConnectionId;
         ChannelId = channelId;
@@ -31,6 +42,7 @@ public sealed class BackendGatewayPacketContext
         PacketId = packetId;
         Version = version;
         ReceivedAt = receivedAt;
+        ExchangeId = exchangeId;
     }
 
     public string GatewayNodeId { get; }
@@ -39,11 +51,15 @@ public sealed class BackendGatewayPacketContext
 
     public uint ChannelId { get; }
 
+    public BackendGatewayChannel Channel => new(GatewayConnectionId, ChannelId);
+
     public PacketKind Kind { get; }
 
     public ushort PacketId { get; }
 
     public ushort Version { get; }
+
+    public Guid? ExchangeId { get; }
 
     public DateTimeOffset ReceivedAt { get; }
 }
