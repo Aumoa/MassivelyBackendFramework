@@ -3,7 +3,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Collections.Concurrent;
-using DedicatedServer.Options;
+using BackendServer.Options;
 using MasterServer.ControlPlane;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PacketCore;
 
-namespace DedicatedServer.Services;
+namespace BackendServer.Services;
 
 internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
@@ -80,7 +80,7 @@ internal sealed class MasterConnectionManager(
         if (!m_Options.Enabled)
         {
             SetStatus("Disabled");
-            logger.LogInformation("Dedicated Master control-plane connection is disabled.");
+            logger.LogInformation("Backend Master control-plane connection is disabled.");
             return Task.CompletedTask;
         }
 
@@ -107,7 +107,7 @@ internal sealed class MasterConnectionManager(
             {
                 await RunSessionAsync(cancellationToken).ConfigureAwait(false);
                 SetStatus("Disconnected");
-                logger.LogInformation("Dedicated Master control-plane connection closed.");
+                logger.LogInformation("Backend Master control-plane connection closed.");
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -117,7 +117,7 @@ internal sealed class MasterConnectionManager(
             {
                 SetStatus("Reconnecting", lastError: e.Message);
                 logger.LogWarning(
-                    "Dedicated Master handshake timed out: {Message} Endpoint={Address}:{Port}.",
+                    "Backend Master handshake timed out: {Message} Endpoint={Address}:{Port}.",
                     e.Message,
                     m_Options.IPAddress,
                     m_Options.Port);
@@ -127,7 +127,7 @@ internal sealed class MasterConnectionManager(
                 SetStatus("Reconnecting", lastError: e.Message);
                 logger.LogWarning(
                     e,
-                    "Dedicated Master control-plane session ended before it could be maintained. Endpoint={Address}:{Port}.",
+                    "Backend Master control-plane session ended before it could be maintained. Endpoint={Address}:{Port}.",
                     m_Options.IPAddress,
                     m_Options.Port);
             }
@@ -153,7 +153,7 @@ internal sealed class MasterConnectionManager(
             m_Options.Port,
             cancellationToken).ConfigureAwait(false);
         SetStatus("Handshaking", markConnected: true);
-        logger.LogInformation("Dedicated connected to Master socket at {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
+        logger.LogInformation("Backend connected to Master socket at {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
 
         await using var networkStream = new NetworkStream(socket, ownsSocket: false);
         SslStream? sslStream = null;
@@ -175,12 +175,12 @@ internal sealed class MasterConnectionManager(
             var accepted = await CompleteHandshakeAsync(activeStream, cancellationToken).ConfigureAwait(false);
             SetStatus("Trusted", masterConnectionId: accepted.ConnectionId, markTrusted: true);
             logger.LogInformation(
-                "Dedicated Master control-plane session trusted. NodeId={NodeId}, MasterConnectionId={ConnectionId}.",
+                "Backend Master control-plane session trusted. NodeId={NodeId}, MasterConnectionId={ConnectionId}.",
                 accepted.NodeId,
                 accepted.ConnectionId);
 
             m_ActiveStream = activeStream;
-            await AdvertiseGatewayEndpointAsync(activeStream, cancellationToken).ConfigureAwait(false);
+            await AdvertiseBackendEndpointAsync(activeStream, cancellationToken).ConfigureAwait(false);
             await DrainTrustedFramesAsync(activeStream, cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -211,7 +211,7 @@ internal sealed class MasterConnectionManager(
             var challenge = PacketCodec.Decode(challengeFrame, NodeAuthChallenge.Codec);
 
             var hello = new NodeHello(
-                MasterNodeKind.Dedicated,
+                MasterNodeKind.Backend,
                 m_Options.NodeId,
                 m_Options.DisplayName,
                 MasterControlProtocol.SchemaVersion);
@@ -249,7 +249,7 @@ internal sealed class MasterConnectionManager(
             var accepted = PacketCodec.Decode(acceptedFrame, NodeAccepted.Codec);
             if (!string.Equals(accepted.NodeId, hello.NodeId, StringComparison.Ordinal))
             {
-                throw new InvalidOperationException("Master accepted a different node id than the Dedicated requested.");
+                throw new InvalidOperationException("Master accepted a different node id than the Backend requested.");
             }
 
             return accepted;
@@ -262,22 +262,24 @@ internal sealed class MasterConnectionManager(
         }
     }
 
-    private async Task AdvertiseGatewayEndpointAsync(Stream stream, CancellationToken cancellationToken)
+    private async Task AdvertiseBackendEndpointAsync(Stream stream, CancellationToken cancellationToken)
     {
-        var advertise = new DedicatedEndpointAdvertise(
+        var advertise = new BackendEndpointAdvertise(
+            m_Options.BackendKind,
             new MasterSocketEndpoint(
                 m_GatewayListenerOptions.IPAddress,
                 m_GatewayListenerOptions.Port,
                 m_GatewayListenerOptions.UseTls));
         using var frame = PacketCodec.Encode(
             PacketKind.Control,
-            MasterControlPacketIds.DedicatedEndpointAdvertise,
+            MasterControlPacketIds.BackendEndpointAdvertise,
             MasterControlProtocol.SchemaVersion,
             advertise,
-            DedicatedEndpointAdvertise.Codec);
+            BackendEndpointAdvertise.Codec);
         await WriteFrameAsync(stream, frame, cancellationToken).ConfigureAwait(false);
         logger.LogInformation(
-            "Dedicated advertised Gateway listener endpoint to Master. Endpoint={Address}:{Port}, UseTls={UseTls}.",
+            "Backend advertised Gateway endpoint to Master. BackendKind={BackendKind}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
+            advertise.BackendKind,
             advertise.GatewayEndpoint.IPAddress,
             advertise.GatewayEndpoint.Port,
             advertise.GatewayEndpoint.UseTls);
@@ -295,7 +297,7 @@ internal sealed class MasterConnectionManager(
 
         if (frame == null)
         {
-            throw new EndOfStreamException("Master connection closed before Dedicated handshake completed.");
+            throw new EndOfStreamException("Master connection closed before Backend handshake completed.");
         }
 
         try
@@ -398,7 +400,7 @@ internal sealed class MasterConnectionManager(
         var response = new ServiceAdminStatusResponse(
             request.RequestId,
             success: true,
-            MasterNodeKind.Dedicated,
+            MasterNodeKind.Backend,
             m_Options.NodeId,
             m_Options.DisplayName,
             masterConnectionId ?? request.TargetConnectionId,
@@ -467,6 +469,11 @@ internal sealed class MasterConnectionManager(
         if (string.IsNullOrWhiteSpace(m_Options.SharedSecret))
         {
             throw new InvalidOperationException("MasterConnection:SharedSecret must be configured.");
+        }
+
+        if (string.IsNullOrWhiteSpace(m_Options.BackendKind))
+        {
+            throw new InvalidOperationException("MasterConnection:BackendKind must be configured.");
         }
     }
 

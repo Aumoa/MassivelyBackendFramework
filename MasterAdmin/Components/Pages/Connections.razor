@@ -29,7 +29,7 @@
             <label>
                 <span>@T("CONNECTION_CREDENTIALS_NODE_KIND")</span>
                 <InputSelect @bind-Value="Form.NodeKind">
-                    @foreach (var kind in SupportedNodeKinds)
+                    @foreach (var kind in SelectableNodeKinds)
                     {
                         <option value="@kind">@GetNodeKindText(kind)</option>
                     }
@@ -142,10 +142,9 @@
 </section>
 
 @code {
-    private static readonly MasterNodeKind[] SupportedNodeKinds =
+    private static readonly MasterNodeKind[] StandardNodeKinds =
     [
         MasterNodeKind.Gateway,
-        MasterNodeKind.Dedicated,
         MasterNodeKind.Backend
     ];
 
@@ -160,6 +159,11 @@
     private string? ErrorMessage { get; set; }
 
     private bool IsBusy { get; set; }
+
+    private MasterNodeKind[] SelectableNodeKinds => EditingId.HasValue &&
+                                                    Form.NodeKind == MasterNodeKind.Dedicated
+        ? [.. StandardNodeKinds, MasterNodeKind.Dedicated]
+        : StandardNodeKinds;
 
     private string FormTitle => EditingId.HasValue
         ? T("CONNECTION_CREDENTIALS_EDIT_TITLE")

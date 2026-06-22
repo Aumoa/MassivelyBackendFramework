@@ -27,6 +27,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\BackendServer.Abstractions\BackendServer.Abstractions.csproj" />
+    <ProjectReference Include="..\BackendServer.Core\BackendServer.Core.csproj" />
     <ProjectReference Include="..\GatewayServer.Abstractions\GatewayServer.Abstractions.csproj" />
     <ProjectReference Include="..\GatewayServer.Core\GatewayServer.Core.csproj" />
     <ProjectReference Include="..\MasterServer.Abstractions\MasterServer.Abstractions.csproj" />

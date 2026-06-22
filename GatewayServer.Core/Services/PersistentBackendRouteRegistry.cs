@@ -8,6 +8,7 @@ namespace GatewayServer.Services;
 
 internal sealed class PersistentBackendRouteRegistry<TOwner>(
     BackendRouteOptions options,
+    IGatewayBackendRoutePolicyProvider backendRoutePolicy,
     IGatewayBackendRouteTokenGenerator tokenGenerator,
     ILogger logger)
     where TOwner : class
@@ -16,6 +17,8 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
     private readonly ConcurrentDictionary<TOwner, FixedWindowRateCounter> m_OpenAttemptCounters = new();
     private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_PrincipalOpenAttemptCounters = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, PersistentBackendRoute<TOwner>> m_Routes = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<uint, PersistentBackendRoute<TOwner>> m_ChannelRoutes = new();
+    private int m_NextChannelId;
 
     public string RequireAllowedBackendKind(string backendKind)
     {
@@ -25,13 +28,9 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
         }
 
         var normalizedBackendKind = backendKind.Trim();
-        var allowedBackendKinds = options.AllowedBackendKinds ?? [];
-        if (allowedBackendKinds.Any(candidate => string.Equals(
-                candidate?.Trim(),
-                normalizedBackendKind,
-                StringComparison.Ordinal)))
+        if (backendRoutePolicy.IsBackendKindAllowed(normalizedBackendKind, out var allowedBackendKind))
         {
-            return normalizedBackendKind;
+            return allowedBackendKind;
         }
 
         throw new UnauthorizedAccessException($"Backend kind '{normalizedBackendKind}' is not enabled for persistent client routing.");
@@ -133,6 +132,7 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
                 var now = DateTimeOffset.UtcNow;
                 route = new PersistentBackendRoute<TOwner>(
                     tokenGenerator.Generate(),
+                    AllocateChannelId(),
                     normalizedBackendBinding,
                     owner,
                     normalizedPrincipalSubjectId,
@@ -148,8 +148,13 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
 
                 if (m_Routes.TryAdd(route.RouteToken.Value, route))
                 {
-                    route.TimeoutTask = ExpireRouteAsync(route);
-                    return route;
+                    if (m_ChannelRoutes.TryAdd(route.ChannelId, route))
+                    {
+                        route.TimeoutTask = ExpireRouteAsync(route);
+                        return route;
+                    }
+
+                    m_Routes.TryRemove(route.RouteToken.Value, out _);
                 }
 
                 route.Close("duplicate route token");
@@ -173,6 +178,19 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
         return m_Routes.TryGetValue(routeToken.Value, out route!);
     }
 
+    public bool TryGet(
+        uint channelId,
+        out PersistentBackendRoute<TOwner> route)
+    {
+        if (channelId == 0)
+        {
+            route = null!;
+            return false;
+        }
+
+        return m_ChannelRoutes.TryGetValue(channelId, out route!);
+    }
+
     public bool Close(
         GatewayBackendRouteToken routeToken,
         string reason)
@@ -192,6 +210,7 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
             return false;
         }
 
+        m_ChannelRoutes.TryRemove(route.ChannelId, out _);
         route.Close(reason);
         return true;
     }
@@ -216,6 +235,7 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
             if (pair.Value.BackendBinding == backendBinding &&
                 m_Routes.TryRemove(pair.Key, out var route))
             {
+                m_ChannelRoutes.TryRemove(route.ChannelId, out _);
                 route.Close(reason);
                 removed.Add(route);
             }
@@ -225,6 +245,13 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
     }
 
     public int RemoveOwnerRoutes(
+        TOwner owner,
+        string reason)
+    {
+        return RemoveOwnerRoutesAndReturn(owner, reason).Length;
+    }
+
+    public PersistentBackendRoute<TOwner>[] RemoveOwnerRoutesAndReturn(
         TOwner owner,
         string reason)
     {
@@ -238,18 +265,18 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
             throw new ArgumentNullException(nameof(reason));
         }
 
-        var removed = 0;
+        var removed = new List<PersistentBackendRoute<TOwner>>();
         foreach (var pair in m_Routes.ToArray())
         {
             if (ReferenceEquals(pair.Value.Owner, owner) &&
                 Close(pair.Value.RouteToken, reason))
             {
-                removed++;
+                removed.Add(pair.Value);
             }
         }
 
         m_OpenAttemptCounters.TryRemove(owner, out _);
-        return removed;
+        return [.. removed];
     }
 
     public void CancelAll()
@@ -263,7 +290,7 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
     public ServiceAdminStatusItem[] GetStatusItems()
     {
         var routes = m_Routes.Values.ToArray();
-        var allowedBackendKinds = options.AllowedBackendKinds ?? [];
+        var allowedBackendKinds = backendRoutePolicy.GetAllowedBackendKinds();
         var items = new List<ServiceAdminStatusItem>
         {
             new("Persistent Backend routes", "Allowed kinds", allowedBackendKinds.Length == 0
@@ -347,6 +374,7 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
 
             if (m_Routes.TryRemove(route.RouteToken.Value, out _))
             {
+                m_ChannelRoutes.TryRemove(route.ChannelId, out _);
                 route.Close("expired");
                 logger.LogWarning(
                     "Gateway persistent Backend route expired. BackendKind={BackendKind}, RouteTokenFingerprint={RouteTokenFingerprint}, CreatedAt={CreatedAt:O}, ExpiresAt={ExpiresAt:O}.",
@@ -379,6 +407,21 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
     private int GetRouteLifetimeMilliseconds()
     {
         return Math.Max(1, options.RouteLifetimeMilliseconds);
+    }
+
+    private uint AllocateChannelId()
+    {
+        for (var attempt = 0; attempt < int.MaxValue; attempt++)
+        {
+            var channelId = unchecked((uint)Interlocked.Increment(ref m_NextChannelId));
+            if (channelId != 0 &&
+                !m_ChannelRoutes.ContainsKey(channelId))
+            {
+                return channelId;
+            }
+        }
+
+        throw new InvalidOperationException("Gateway could not allocate a unique Backend channel id.");
     }
 
     private int GetExchangeTimeoutMilliseconds()
@@ -463,6 +506,7 @@ internal sealed class FixedWindowRateCounter
 
 internal sealed class PersistentBackendRoute<TOwner>(
     GatewayBackendRouteToken routeToken,
+    uint channelId,
     BackendRouteBinding backendBinding,
     TOwner owner,
     string? principalSubjectId,
@@ -484,6 +528,8 @@ internal sealed class PersistentBackendRoute<TOwner>(
     private readonly ConcurrentDictionary<GatewayBackendExchangeId, PersistentBackendRouteExchange> m_BackendOriginExchanges = [];
 
     public GatewayBackendRouteToken RouteToken { get; } = routeToken;
+
+    public uint ChannelId { get; } = channelId;
 
     public BackendRouteBinding BackendBinding { get; } = backendBinding;
 

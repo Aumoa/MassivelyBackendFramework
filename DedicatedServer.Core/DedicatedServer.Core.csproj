@@ -12,9 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DedicatedServer.Abstractions\DedicatedServer.Abstractions.csproj" />
-    <ProjectReference Include="..\MasterServer.Abstractions\MasterServer.Abstractions.csproj" />
-    <ProjectReference Include="..\PacketCore\PacketCore.csproj" />
+    <ProjectReference Include="..\BackendServer.Abstractions\BackendServer.Abstractions.csproj" />
+    <ProjectReference Include="..\BackendServer.Core\BackendServer.Core.csproj" />
   </ItemGroup>
 
 </Project>

@@ -18,6 +18,8 @@ internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
     IDedicatedNodeCatalogWriter dedicatedNodeCatalog,
     IBackendNodeCatalogWriter backendNodeCatalog,
+    IGatewayBackendRoutePolicyWriter backendRoutePolicy,
+    IGatewayClientSecretCredentialWriter gatewayClientSecretCredentials,
     IServiceProvider serviceProvider,
     ILogger<MasterConnectionManager> logger) : IHostedService, IMasterConnectionStatusProvider, IDirectConnectCodeIssuer
 {
@@ -374,6 +376,32 @@ internal sealed class MasterConnectionManager(
                 }
 
                 if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.GatewayBackendRoutePolicySnapshot)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.GatewayBackendRoutePolicySnapshot);
+                    var snapshot = PacketCodec.Decode(frame, GatewayBackendRoutePolicySnapshot.Codec);
+                    backendRoutePolicy.Publish(snapshot);
+                    logger.LogInformation(
+                        "Gateway received Backend route policy snapshot. AllowedBackendKinds={AllowedBackendKinds}.",
+                        string.Join(", ", snapshot.AllowedBackendKinds
+                            .Distinct(StringComparer.Ordinal)
+                            .OrderBy(static backendKind => backendKind, StringComparer.Ordinal)));
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.GatewayClientSecretCredentialSnapshot)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.GatewayClientSecretCredentialSnapshot);
+                    var snapshot = PacketCodec.Decode(frame, GatewayClientSecretCredentialSnapshot.Codec);
+                    gatewayClientSecretCredentials.Publish(snapshot);
+                    logger.LogInformation(
+                        "Gateway received client secret credential snapshot. SecretCount={Count}.",
+                        snapshot.Secrets.Length);
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
                     frame.Header.PacketId == MasterControlPacketIds.ServiceAdminStatusRequest)
                 {
                     MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.ServiceAdminStatusRequest);
@@ -425,7 +453,6 @@ internal sealed class MasterConnectionManager(
             items.Add(new ServiceAdminStatusItem("Master", "Last error", status.LastError));
         }
 
-        items.AddRange(serviceProvider.GetRequiredService<IDedicatedConnectionStatusProvider>().GetStatusItems());
         items.AddRange(serviceProvider.GetRequiredService<IBackendConnectionStatusProvider>().GetStatusItems());
         items.AddRange(serviceProvider.GetRequiredService<IBackendRouteStatusProvider>().GetStatusItems());
 

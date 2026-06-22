@@ -20,4 +20,10 @@ public static class MasterControlPacketIds
     public const ushort DirectConnectCode = 115;
     public const ushort ServiceConnectionCredentialManagementRequest = 116;
     public const ushort ServiceConnectionCredentialManagementResponse = 117;
+    public const ushort GatewayBackendRoutePolicySnapshot = 118;
+    public const ushort GatewayBackendRoutePolicyManagementRequest = 119;
+    public const ushort GatewayBackendRoutePolicyManagementResponse = 120;
+    public const ushort GatewayClientSecretCredentialSnapshot = 121;
+    public const ushort GatewayClientSecretCredentialManagementRequest = 122;
+    public const ushort GatewayClientSecretCredentialManagementResponse = 123;
 }

@@ -5,15 +5,16 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using DedicatedServer.Options;
-using DedicatedServer.Runtime;
+using BackendServer.Options;
+using BackendServer.Runtime;
+using GatewayServer.Protocols;
 using MasterServer.ControlPlane;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PacketCore;
 
-namespace DedicatedServer.Services;
+namespace BackendServer.Services;
 
 internal interface IGatewayConnectionStatusProvider
 {
@@ -22,8 +23,9 @@ internal interface IGatewayConnectionStatusProvider
 
 internal sealed class GatewayConnectionManager(
     IOptions<GatewayListenerOptions> options,
-    IDedicatedWorldRuntime worldRuntime,
+    IBackendRuntime backendRuntime,
     IDirectConnectCodeValidator directConnectCodeValidator,
+    GatewayChannelSender channelSender,
     ILogger<GatewayConnectionManager> logger) : IHostedService, IGatewayConnectionStatusProvider
 {
     private readonly GatewayListenerOptions m_Options = options.Value;
@@ -58,7 +60,7 @@ internal sealed class GatewayConnectionManager(
         m_Socket.Bind(new IPEndPoint(listenAddress, m_Options.Port));
         m_Socket.Listen(m_Options.Backlog);
 
-        logger.LogInformation("Dedicated Gateway listener is running on {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
+        logger.LogInformation("Backend Gateway listener is running on {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
         m_AcceptTask = AcceptLoopAsync(m_Shutdown.Token);
     }
 
@@ -128,7 +130,7 @@ internal sealed class GatewayConnectionManager(
 
                 if (completed.Exception != null)
                 {
-                    logger.LogError(completed.Exception, "Unhandled Dedicated Gateway connection task failure.");
+                    logger.LogError(completed.Exception, "Unhandled Backend Gateway connection task failure.");
                 }
             },
             CancellationToken.None,
@@ -159,9 +161,10 @@ internal sealed class GatewayConnectionManager(
 
             var acceptedGateway = await AuthenticateGatewayAsync(connectionId, activeStream, cancellationToken).ConfigureAwait(false);
             gatewayNodeId = acceptedGateway.NodeId;
+            channelSender.AttachSession(connectionId, gatewayNodeId, activeStream);
             m_GatewayConnectionStates[connectionId] = "Trusted";
             logger.LogInformation(
-                "Dedicated accepted Gateway direct connection. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, RemoteEndPoint={RemoteEndPoint}.",
+                "Backend accepted Gateway direct connection. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, RemoteEndPoint={RemoteEndPoint}.",
                 connectionId,
                 gatewayNodeId,
                 socket.RemoteEndPoint);
@@ -199,6 +202,7 @@ internal sealed class GatewayConnectionManager(
         }
         finally
         {
+            channelSender.DetachSession(connectionId);
             if (sslStream != null)
             {
                 await sslStream.DisposeAsync().ConfigureAwait(false);
@@ -229,7 +233,7 @@ internal sealed class GatewayConnectionManager(
         var hello = PacketCodec.Decode(helloFrame, NodeHello.Codec);
         if (hello.NodeKind != MasterNodeKind.Gateway)
         {
-            throw new UnauthorizedAccessException($"Dedicated only accepts Gateway nodes, but received {hello.NodeKind}.");
+            throw new UnauthorizedAccessException($"Backend only accepts Gateway nodes, but received {hello.NodeKind}.");
         }
 
         if (hello.ProtocolVersion != MasterControlProtocol.SchemaVersion)
@@ -261,7 +265,7 @@ internal sealed class GatewayConnectionManager(
             handshakeTimeout.Token).ConfigureAwait(false);
         if (!string.Equals(validation.GatewayNodeId, hello.NodeId, StringComparison.Ordinal) ||
             !string.Equals(validation.GatewayMasterConnectionId, hello.MasterConnectionId, StringComparison.Ordinal) ||
-            validation.TargetNodeKind != MasterNodeKind.Dedicated)
+            validation.TargetNodeKind != MasterNodeKind.Backend)
         {
             throw new UnauthorizedAccessException("Direct connect code validation returned an unexpected connection identity.");
         }
@@ -300,16 +304,156 @@ internal sealed class GatewayConnectionManager(
 
             using (frame)
             {
-                var context = new DedicatedGatewayPacketContext(
-                    gatewayNodeId,
+                if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_OPEN)
+                {
+                    await HandleGatewayChannelOpenFrameAsync(
+                        connectionId,
+                        gatewayNodeId,
+                        frame,
+                        cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_DATA)
+                {
+                    await HandleGatewayChannelDataFrameAsync(
+                        connectionId,
+                        gatewayNodeId,
+                        frame,
+                        cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_CLOSE)
+                {
+                    await HandleGatewayChannelCloseFrameAsync(
+                        connectionId,
+                        gatewayNodeId,
+                        frame,
+                        cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                logger.LogWarning(
+                    "Backend rejected unsupported Gateway Backend packet. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, PacketKind={PacketKind}, PacketId={PacketId}.",
                     connectionId,
+                    gatewayNodeId,
                     frame.Header.Kind,
-                    frame.Header.PacketId,
-                    frame.Header.Version,
-                    DateTimeOffset.UtcNow);
-                await worldRuntime.HandleGatewayPacketAsync(context, frame.Payload, cancellationToken).ConfigureAwait(false);
+                    frame.Header.PacketId);
             }
         }
+    }
+
+    private async ValueTask HandleGatewayChannelOpenFrameAsync(
+        Guid connectionId,
+        string gatewayNodeId,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (frame.Header.Kind != PacketKind.Notify)
+        {
+            logger.LogWarning(
+                "Backend rejected Gateway Backend channel open with invalid packet kind. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, PacketKind={PacketKind}.",
+                connectionId,
+                gatewayNodeId,
+                frame.Header.Kind);
+            return;
+        }
+
+        if (frame.Header.Version != GatewayBackendChannelOpen.ProtocolVersion)
+        {
+            logger.LogWarning(
+                "Backend rejected unsupported Gateway Backend channel open version. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, Version={Version}.",
+                connectionId,
+                gatewayNodeId,
+                frame.Header.Version);
+            return;
+        }
+
+        var open = PacketCodec.Decode(frame, GatewayBackendChannelOpen.Codec);
+        var context = new BackendGatewayChannelOpenContext(
+            gatewayNodeId,
+            connectionId,
+            open.ChannelId,
+            open.PrincipalSubjectId,
+            DateTimeOffset.UtcNow);
+        await backendRuntime.HandleGatewayChannelOpenedAsync(context, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask HandleGatewayChannelDataFrameAsync(
+        Guid connectionId,
+        string gatewayNodeId,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (frame.Header.Version != GatewayBackendChannelDataEnvelope.ProtocolVersion)
+        {
+            logger.LogWarning(
+                "Backend rejected unsupported Gateway Backend channel data version. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, Version={Version}.",
+                connectionId,
+                gatewayNodeId,
+                frame.Header.Version);
+            return;
+        }
+
+        var envelope = PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec);
+        if (frame.Header.Kind != envelope.RoutedKind)
+        {
+            logger.LogWarning(
+                "Backend rejected Gateway Backend channel data with mismatched packet kind. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, PacketKind={PacketKind}, RoutedKind={RoutedKind}.",
+                connectionId,
+                gatewayNodeId,
+                frame.Header.Kind,
+                envelope.RoutedKind);
+            return;
+        }
+
+        var context = new BackendGatewayPacketContext(
+            gatewayNodeId,
+            connectionId,
+            envelope.ChannelId,
+            envelope.RoutedKind,
+            envelope.RoutedPacketId,
+            envelope.RoutedVersion,
+            DateTimeOffset.UtcNow,
+            envelope.ExchangeId?.Value);
+        await backendRuntime.HandleGatewayPacketAsync(context, envelope.RoutedPayload, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask HandleGatewayChannelCloseFrameAsync(
+        Guid connectionId,
+        string gatewayNodeId,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (frame.Header.Kind != PacketKind.Notify)
+        {
+            logger.LogWarning(
+                "Backend rejected Gateway Backend channel close with invalid packet kind. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, PacketKind={PacketKind}.",
+                connectionId,
+                gatewayNodeId,
+                frame.Header.Kind);
+            return;
+        }
+
+        if (frame.Header.Version != GatewayBackendChannelClose.ProtocolVersion)
+        {
+            logger.LogWarning(
+                "Backend rejected unsupported Gateway Backend channel close version. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, Version={Version}.",
+                connectionId,
+                gatewayNodeId,
+                frame.Header.Version);
+            return;
+        }
+
+        var close = PacketCodec.Decode(frame, GatewayBackendChannelClose.Codec);
+        var context = new BackendGatewayChannelCloseContext(
+            gatewayNodeId,
+            connectionId,
+            close.ChannelId,
+            close.Reason,
+            DateTimeOffset.UtcNow);
+        await backendRuntime.HandleGatewayChannelClosedAsync(context, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<PacketFrame> ReadRequiredHandshakeFrameAsync(
@@ -324,7 +468,7 @@ internal sealed class GatewayConnectionManager(
 
         if (frame == null)
         {
-            throw new EndOfStreamException("Gateway connection closed before Dedicated handshake completed.");
+            throw new EndOfStreamException("Gateway connection closed before Backend handshake completed.");
         }
 
         try

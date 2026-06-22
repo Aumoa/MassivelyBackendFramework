@@ -1,6 +1,6 @@
 using MasterServer.ControlPlane;
 
-namespace DedicatedServer.Services;
+namespace BackendServer.Services;
 
 internal interface IDirectConnectCodeValidator
 {

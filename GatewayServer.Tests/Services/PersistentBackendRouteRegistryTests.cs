@@ -42,25 +42,26 @@ public sealed class PersistentBackendRouteRegistryTests
     public async Task Open_AddsPersistentRoutesAndStatusGroups()
     {
         using var shutdown = new CancellationTokenSource();
-        var registry = CreateRegistry(new BackendRouteOptions
-        {
-            AllowedBackendKinds = ["beta", "alpha"],
-            MaxOpenRoutes = 4,
-            MaxOpenRoutesPerClient = 2,
-            MaxOpenRoutesPerPrincipal = 7,
-            RouteLifetimeMilliseconds = 10000,
-            ExchangeTimeoutMilliseconds = 7000,
-            MaxPendingExchangesPerRoute = 8,
-            MaxPendingExchangesPerRoutePerDirection = 4,
-            RouteOpenRateLimitWindowMilliseconds = 2000,
-            MaxRouteOpenAttemptsPerClientPerWindow = 3,
-            MaxRouteOpenAttemptsPerPrincipalPerWindow = 9,
-            ExchangeRateLimitWindowMilliseconds = 3000,
-            MaxClientOriginExchangeCreatesPerRoutePerWindow = 5,
-            MaxBackendOriginExchangeCreatesPerRoutePerWindow = 6,
-            MaxClientOriginExchangeCreatesPerPrincipalPerWindow = 10,
-            MaxBackendOriginExchangeCreatesPerPrincipalPerWindow = 11
-        });
+        var registry = CreateRegistry(
+            new BackendRouteOptions
+            {
+                MaxOpenRoutes = 4,
+                MaxOpenRoutesPerClient = 2,
+                MaxOpenRoutesPerPrincipal = 7,
+                RouteLifetimeMilliseconds = 10000,
+                ExchangeTimeoutMilliseconds = 7000,
+                MaxPendingExchangesPerRoute = 8,
+                MaxPendingExchangesPerRoutePerDirection = 4,
+                RouteOpenRateLimitWindowMilliseconds = 2000,
+                MaxRouteOpenAttemptsPerClientPerWindow = 3,
+                MaxRouteOpenAttemptsPerPrincipalPerWindow = 9,
+                ExchangeRateLimitWindowMilliseconds = 3000,
+                MaxClientOriginExchangeCreatesPerRoutePerWindow = 5,
+                MaxBackendOriginExchangeCreatesPerRoutePerWindow = 6,
+                MaxClientOriginExchangeCreatesPerPrincipalPerWindow = 10,
+                MaxBackendOriginExchangeCreatesPerPrincipalPerWindow = 11
+            },
+            ["beta", "alpha"]);
         var firstOwner = new object();
         var secondOwner = new object();
         var alphaRoute = registry.Open(CreateBinding(" alpha "), firstOwner, shutdown.Token);
@@ -69,6 +70,9 @@ public sealed class PersistentBackendRouteRegistryTests
         try
         {
             Assert.True(registry.TryGet(alphaRoute.RouteToken, out var persistentAlpha));
+            Assert.NotEqual(0u, persistentAlpha.ChannelId);
+            Assert.True(registry.TryGet(persistentAlpha.ChannelId, out var channelAlpha));
+            Assert.Same(persistentAlpha, channelAlpha);
             Assert.Same(firstOwner, persistentAlpha.Owner);
             Assert.Equal("backend-a", persistentAlpha.BackendBinding.NodeId);
             Assert.Equal("master-a", persistentAlpha.BackendBinding.MasterConnectionId);
@@ -150,7 +154,6 @@ public sealed class PersistentBackendRouteRegistryTests
     {
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"]
         });
 
         Assert.Equal("alpha", registry.RequireAllowedBackendKind(" alpha "));
@@ -164,7 +167,6 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             MaxOpenRoutes = 1,
             MaxOpenRoutesPerClient = 0,
             RouteLifetimeMilliseconds = 10000
@@ -189,7 +191,6 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             MaxOpenRoutes = 0,
             MaxOpenRoutesPerClient = 1,
             RouteLifetimeMilliseconds = 10000
@@ -220,7 +221,6 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             MaxOpenRoutes = 0,
             MaxOpenRoutesPerClient = 0,
             MaxOpenRoutesPerPrincipal = 1,
@@ -261,7 +261,6 @@ public sealed class PersistentBackendRouteRegistryTests
     {
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             RouteOpenRateLimitWindowMilliseconds = 10000,
             MaxRouteOpenAttemptsPerClientPerWindow = 2
         });
@@ -284,7 +283,6 @@ public sealed class PersistentBackendRouteRegistryTests
     {
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             RouteOpenRateLimitWindowMilliseconds = 10000,
             MaxRouteOpenAttemptsPerClientPerWindow = 0,
             MaxRouteOpenAttemptsPerPrincipalPerWindow = 2
@@ -305,13 +303,13 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             RouteLifetimeMilliseconds = 10000
         });
         var route = registry.Open(CreateBinding("alpha"), new object(), shutdown.Token);
 
         Assert.True(registry.Close(route.RouteToken, "client closed"));
         Assert.False(registry.TryGet(route.RouteToken, out _));
+        Assert.False(registry.TryGet(route.ChannelId, out _));
         Assert.False(registry.Close(route.RouteToken, "client closed"));
         Assert.Equal(PersistentBackendRouteState.Closed, route.State);
         Assert.Equal("client closed", route.CloseReason);
@@ -325,7 +323,6 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             MaxOpenRoutes = 0,
             MaxOpenRoutesPerClient = 0,
             RouteLifetimeMilliseconds = 10000
@@ -359,7 +356,6 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             MaxOpenRoutes = 0,
             MaxOpenRoutesPerClient = 0,
             RouteLifetimeMilliseconds = 10000
@@ -401,7 +397,6 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             RouteLifetimeMilliseconds = 25
         });
         var route = registry.Open(CreateBinding("alpha"), new object(), shutdown.Token);
@@ -419,7 +414,6 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             RouteLifetimeMilliseconds = 10000,
             MaxPendingExchangesPerRoute = 1,
             MaxPendingExchangesPerRoutePerDirection = 0
@@ -452,7 +446,6 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             RouteLifetimeMilliseconds = 10000,
             MaxPendingExchangesPerRoute = 0,
             MaxPendingExchangesPerRoutePerDirection = 1
@@ -492,7 +485,6 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             RouteLifetimeMilliseconds = 10000,
             ExchangeRateLimitWindowMilliseconds = 10000,
             MaxClientOriginExchangeCreatesPerRoutePerWindow = 1,
@@ -535,7 +527,6 @@ public sealed class PersistentBackendRouteRegistryTests
         using var shutdown = new CancellationTokenSource();
         var registry = CreateRegistry(new BackendRouteOptions
         {
-            AllowedBackendKinds = ["alpha"],
             RouteLifetimeMilliseconds = 10000,
             ExchangeTimeoutMilliseconds = 25,
             MaxPendingExchangesPerRoute = 1,
@@ -570,12 +561,45 @@ public sealed class PersistentBackendRouteRegistryTests
         }
     }
 
-    private static PersistentBackendRouteRegistry<object> CreateRegistry(BackendRouteOptions options)
+    private static PersistentBackendRouteRegistry<object> CreateRegistry(
+        BackendRouteOptions options,
+        string[]? allowedBackendKinds = null)
     {
         return new PersistentBackendRouteRegistry<object>(
             options,
+            new StaticGatewayBackendRoutePolicyProvider(allowedBackendKinds ?? ["alpha"]),
             new GatewayBackendRouteTokenGenerator(),
             NullLogger.Instance);
+    }
+
+    private sealed class StaticGatewayBackendRoutePolicyProvider(string[] allowedBackendKinds)
+        : IGatewayBackendRoutePolicyProvider
+    {
+        private readonly string[] m_AllowedBackendKinds =
+        [
+            .. allowedBackendKinds
+                .Where(static backendKind => !string.IsNullOrWhiteSpace(backendKind))
+                .Select(static backendKind => backendKind.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static backendKind => backendKind, StringComparer.Ordinal)
+        ];
+
+        public string[] GetAllowedBackendKinds()
+        {
+            return [.. m_AllowedBackendKinds];
+        }
+
+        public bool IsBackendKindAllowed(string backendKind, out string normalizedBackendKind)
+        {
+            var normalized = string.IsNullOrWhiteSpace(backendKind)
+                ? string.Empty
+                : backendKind.Trim();
+            normalizedBackendKind = normalized;
+            return m_AllowedBackendKinds.Any(candidate => string.Equals(
+                candidate,
+                normalized,
+                StringComparison.Ordinal));
+        }
     }
 
     private static BackendRouteBinding CreateBinding(

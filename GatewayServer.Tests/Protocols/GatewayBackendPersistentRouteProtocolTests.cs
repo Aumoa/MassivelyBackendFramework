@@ -109,6 +109,100 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
     }
 
     [Fact]
+    public void ChannelDataEnvelope_Codec_RoundTrips_ChannelAndExchangeMetadata()
+    {
+        var exchangeId = new GatewayBackendExchangeId(Guid.NewGuid());
+        byte[] payload = [1, 2, 3, 4];
+        var envelope = new GatewayBackendChannelDataEnvelope(
+            channelId: 37,
+            PacketKind.Request,
+            routedPacketId: 456,
+            routedVersion: 3,
+            exchangeId,
+            payload);
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Request,
+            Pid.GATE_BACKEND_CHANNEL_DATA,
+            GatewayBackendChannelDataEnvelope.ProtocolVersion,
+            envelope,
+            GatewayBackendChannelDataEnvelope.Codec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec);
+
+        Assert.Equal((uint)37, decoded.ChannelId);
+        Assert.Equal(PacketKind.Request, decoded.RoutedKind);
+        Assert.Equal((ushort)456, decoded.RoutedPacketId);
+        Assert.Equal((ushort)3, decoded.RoutedVersion);
+        Assert.True(decoded.ExchangeId.HasValue);
+        Assert.Equal(exchangeId, decoded.ExchangeId.Value);
+        Assert.Equal(payload, decoded.RoutedPayload);
+    }
+
+    [Fact]
+    public void ChannelDataEnvelope_Codec_RoundTrips_NotifyWithoutExchangeId()
+    {
+        byte[] payload = [9, 8, 7];
+        var envelope = new GatewayBackendChannelDataEnvelope(
+            channelId: 42,
+            PacketKind.Notify,
+            routedPacketId: 789,
+            routedVersion: 1,
+            exchangeId: null,
+            payload);
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Notify,
+            Pid.GATE_BACKEND_CHANNEL_DATA,
+            GatewayBackendChannelDataEnvelope.ProtocolVersion,
+            envelope,
+            GatewayBackendChannelDataEnvelope.Codec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec);
+
+        Assert.Equal((uint)42, decoded.ChannelId);
+        Assert.Equal(PacketKind.Notify, decoded.RoutedKind);
+        Assert.False(decoded.ExchangeId.HasValue);
+        Assert.Equal(payload, decoded.RoutedPayload);
+    }
+
+    [Fact]
+    public void ChannelOpen_Codec_RoundTrips_ChannelAndPrincipal()
+    {
+        var open = new GatewayBackendChannelOpen(37, "player-1");
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Notify,
+            Pid.GATE_BACKEND_CHANNEL_OPEN,
+            GatewayBackendChannelOpen.ProtocolVersion,
+            open,
+            GatewayBackendChannelOpen.Codec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendChannelOpen.Codec);
+
+        Assert.Equal((uint)37, decoded.ChannelId);
+        Assert.Equal("player-1", decoded.PrincipalSubjectId);
+    }
+
+    [Fact]
+    public void ChannelOpen_Codec_RoundTrips_AnonymousChannel()
+    {
+        var open = new GatewayBackendChannelOpen(37, principalSubjectId: null);
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Notify,
+            Pid.GATE_BACKEND_CHANNEL_OPEN,
+            GatewayBackendChannelOpen.ProtocolVersion,
+            open,
+            GatewayBackendChannelOpen.Codec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendChannelOpen.Codec);
+
+        Assert.Equal((uint)37, decoded.ChannelId);
+        Assert.Null(decoded.PrincipalSubjectId);
+    }
+
+    [Fact]
     public void Close_Codec_RoundTrips_RouteToken()
     {
         var routeToken = new GatewayBackendRouteToken("route-token-alpha");
@@ -125,6 +219,24 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
 
         Assert.Equal(routeToken, decoded.RouteToken);
         Assert.Equal("client disconnected", decoded.Reason);
+    }
+
+    [Fact]
+    public void ChannelClose_Codec_RoundTrips_ChannelId()
+    {
+        var close = new GatewayBackendChannelClose(37, "backend closed");
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Notify,
+            Pid.GATE_BACKEND_CHANNEL_CLOSE,
+            GatewayBackendChannelClose.ProtocolVersion,
+            close,
+            GatewayBackendChannelClose.Codec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendChannelClose.Codec);
+
+        Assert.Equal((uint)37, decoded.ChannelId);
+        Assert.Equal("backend closed", decoded.Reason);
     }
 
     [Fact]
@@ -174,6 +286,18 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new GatewayBackendRouteDataEnvelope(
             new GatewayBackendRouteToken("route-token-alpha"),
             (GatewayBackendRouteDirection)255,
+            PacketKind.Notify,
+            routedPacketId: 123,
+            routedVersion: 1,
+            exchangeId: null,
+            []));
+    }
+
+    [Fact]
+    public void ChannelDataEnvelope_Rejects_ZeroChannelId()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new GatewayBackendChannelDataEnvelope(
+            channelId: 0,
             PacketKind.Notify,
             routedPacketId: 123,
             routedVersion: 1,

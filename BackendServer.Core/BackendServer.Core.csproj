@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>BackendServer</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BackendServer.Abstractions\BackendServer.Abstractions.csproj" />
+    <ProjectReference Include="..\GatewayServer.Abstractions\GatewayServer.Abstractions.csproj" />
+    <ProjectReference Include="..\MasterServer.Abstractions\MasterServer.Abstractions.csproj" />
+    <ProjectReference Include="..\PacketCore\PacketCore.csproj" />
+  </ItemGroup>
+
+</Project>
