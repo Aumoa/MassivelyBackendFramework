@@ -14,7 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="..\BackendServer.Abstractions\BackendServer.Abstractions.csproj" />
     <ProjectReference Include="..\BackendServer.Core\BackendServer.Core.csproj" />
-    <ProjectReference Include="..\DedicatedServer.Abstractions\DedicatedServer.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>
