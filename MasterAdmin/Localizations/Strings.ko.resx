@@ -435,4 +435,88 @@
   <data name="BACKEND_ROUTES_REMOVE" xml:space="preserve">
     <value>제거</value>
   </data>
+  <data name="NAV_GATEWAY_CLIENT_SECRETS" xml:space="preserve">
+    <value>클라이언트 시크릿</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_EYEBROW" xml:space="preserve">
+    <value>Gateway 인증</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_TITLE" xml:space="preserve">
+    <value>Gateway 클라이언트 시크릿</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_SUMMARY" xml:space="preserve">
+    <value>Backend route를 열기 전에 사용하는 Gateway 클라이언트 access token을 발급하고 회전합니다.</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_FORM_DESCRIPTION" xml:space="preserve">
+    <value>Gateway 클라이언트 credential을 생성하거나 수정합니다. Access token은 발급 시에만 표시됩니다.</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_NEW" xml:space="preserve">
+    <value>새로 만들기</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_CREATE_TITLE" xml:space="preserve">
+    <value>클라이언트 시크릿 생성</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_EDIT_TITLE" xml:space="preserve">
+    <value>클라이언트 시크릿 수정</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_SUBJECT_ID" xml:space="preserve">
+    <value>Subject ID</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_DISPLAY_NAME" xml:space="preserve">
+    <value>표시 이름</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_TOKEN_ID" xml:space="preserve">
+    <value>Token ID</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_ENABLED" xml:space="preserve">
+    <value>활성</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_DISABLED" xml:space="preserve">
+    <value>비활성</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_CREATE" xml:space="preserve">
+    <value>생성</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_SAVE" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_SAVING" xml:space="preserve">
+    <value>저장 중</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_TOKEN_CREATED" xml:space="preserve">
+    <value>Access token 발급됨</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_TOKEN_DESCRIPTION" xml:space="preserve">
+    <value>이 token은 한 번만 표시됩니다. 대체 token은 credential을 회전해서 발급하세요.</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_LIST_TITLE" xml:space="preserve">
+    <value>클라이언트 Credential</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_LIST_DESCRIPTION" xml:space="preserve">
+    <value>활성 credential hash는 Master 제어 소켓을 통해 연결된 Gateway에 전달됩니다.</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_EMPTY_TITLE" xml:space="preserve">
+    <value>클라이언트 시크릿 없음</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>credential을 생성하기 전까지 관리형 secret으로 인증할 수 있는 Gateway 클라이언트가 없습니다.</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_STATUS" xml:space="preserve">
+    <value>상태</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_UPDATED" xml:space="preserve">
+    <value>수정 시각</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_ACTIONS" xml:space="preserve">
+    <value>작업</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_EDIT" xml:space="preserve">
+    <value>수정</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_ROTATE" xml:space="preserve">
+    <value>회전</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_REMOVE" xml:space="preserve">
+    <value>제거</value>
+  </data>
 </root>

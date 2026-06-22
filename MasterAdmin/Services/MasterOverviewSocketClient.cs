@@ -17,7 +17,8 @@ public sealed class MasterOverviewSocketClient(
     IHostedService,
     IMasterOverviewProvider,
     IServiceConnectionCredentials,
-    IGatewayBackendRoutePolicy
+    IGatewayBackendRoutePolicy,
+    IGatewayClientSecretCredentials
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
@@ -26,6 +27,7 @@ public sealed class MasterOverviewSocketClient(
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<ServiceAdminStatusResponse>> m_PendingStatusRequests = [];
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<ServiceConnectionCredentialManagementResponse>> m_PendingCredentialRequests = [];
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<GatewayBackendRoutePolicyManagementResponse>> m_PendingBackendRoutePolicyRequests = [];
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<GatewayClientSecretCredentialManagementResponse>> m_PendingGatewayClientSecretRequests = [];
     private MasterOverviewState m_State = CreateInitialState(options.Value);
     private Task? m_RunTask;
     private Stream? m_ActiveStream;
@@ -159,6 +161,74 @@ public sealed class MasterOverviewSocketClient(
         EnsureGatewayBackendRoutePolicyResponseSucceeded(response);
     }
 
+    async ValueTask<GatewayClientSecretCredentialInfo[]> IGatewayClientSecretCredentials.GetCredentialsAsync(CancellationToken cancellationToken)
+    {
+        var response = await RequestGatewayClientSecretCredentialManagementAsync(
+            GatewayClientSecretCredentialManagementRequest.List(Guid.NewGuid()),
+            cancellationToken).ConfigureAwait(false);
+        EnsureGatewayClientSecretCredentialResponseSucceeded(response);
+        return response.Credentials;
+    }
+
+    ValueTask<GatewayClientSecretValidationInfo[]> IGatewayClientSecretCredentials.GetActiveSecretsAsync(CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException("MasterAdmin does not expose Gateway client secret hashes.");
+    }
+
+    async ValueTask<GatewayClientSecretCredentialCreated> IGatewayClientSecretCredentials.CreateCredentialAsync(
+        GatewayClientSecretCredentialInput input,
+        CancellationToken cancellationToken)
+    {
+        var response = await RequestGatewayClientSecretCredentialManagementAsync(
+            GatewayClientSecretCredentialManagementRequest.Create(Guid.NewGuid(), input),
+            cancellationToken).ConfigureAwait(false);
+        EnsureGatewayClientSecretCredentialResponseSucceeded(response);
+        if (response.Credentials.Length != 1)
+        {
+            throw new InvalidOperationException("Master did not return the created Gateway client secret credential.");
+        }
+
+        if (string.IsNullOrWhiteSpace(response.AccessToken))
+        {
+            throw new InvalidOperationException("Master did not return the created Gateway client access token.");
+        }
+
+        return new GatewayClientSecretCredentialCreated(response.Credentials[0], response.AccessToken);
+    }
+
+    async ValueTask IGatewayClientSecretCredentials.UpdateCredentialAsync(
+        long id,
+        GatewayClientSecretCredentialInput input,
+        CancellationToken cancellationToken)
+    {
+        var response = await RequestGatewayClientSecretCredentialManagementAsync(
+            GatewayClientSecretCredentialManagementRequest.Update(Guid.NewGuid(), id, input),
+            cancellationToken).ConfigureAwait(false);
+        EnsureGatewayClientSecretCredentialResponseSucceeded(response);
+    }
+
+    async ValueTask<string> IGatewayClientSecretCredentials.RotateSecretAsync(long id, CancellationToken cancellationToken)
+    {
+        var response = await RequestGatewayClientSecretCredentialManagementAsync(
+            GatewayClientSecretCredentialManagementRequest.RotateSecret(Guid.NewGuid(), id),
+            cancellationToken).ConfigureAwait(false);
+        EnsureGatewayClientSecretCredentialResponseSucceeded(response);
+        if (string.IsNullOrWhiteSpace(response.AccessToken))
+        {
+            throw new InvalidOperationException("Master did not return the rotated Gateway client access token.");
+        }
+
+        return response.AccessToken;
+    }
+
+    async ValueTask IGatewayClientSecretCredentials.RemoveCredentialAsync(long id, CancellationToken cancellationToken)
+    {
+        var response = await RequestGatewayClientSecretCredentialManagementAsync(
+            GatewayClientSecretCredentialManagementRequest.Remove(Guid.NewGuid(), id),
+            cancellationToken).ConfigureAwait(false);
+        EnsureGatewayClientSecretCredentialResponseSucceeded(response);
+    }
+
     public async Task<ServiceAdminStatusResponse> RequestServiceAdminStatusAsync(
         string targetConnectionId,
         CancellationToken cancellationToken = default)
@@ -273,6 +343,43 @@ public sealed class MasterOverviewSocketClient(
         finally
         {
             m_PendingBackendRoutePolicyRequests.TryRemove(request.RequestId, out _);
+        }
+    }
+
+    private async Task<GatewayClientSecretCredentialManagementResponse> RequestGatewayClientSecretCredentialManagementAsync(
+        GatewayClientSecretCredentialManagementRequest request,
+        CancellationToken cancellationToken)
+    {
+        var stream = m_ActiveStream ?? throw new InvalidOperationException("Master overview socket is not connected.");
+        var completion = new TaskCompletionSource<GatewayClientSecretCredentialManagementResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!m_PendingGatewayClientSecretRequests.TryAdd(request.RequestId, completion))
+        {
+            throw new InvalidOperationException("A duplicate Gateway client secret credential management request id was generated.");
+        }
+
+        try
+        {
+            using var frame = PacketCodec.Encode(
+                PacketKind.Control,
+                MasterControlPacketIds.GatewayClientSecretCredentialManagementRequest,
+                MasterControlProtocol.SchemaVersion,
+                request,
+                GatewayClientSecretCredentialManagementRequest.Codec);
+            await m_WriteLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                m_WriteLock.Release();
+            }
+
+            return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            m_PendingGatewayClientSecretRequests.TryRemove(request.RequestId, out _);
         }
     }
 
@@ -556,6 +663,18 @@ public sealed class MasterOverviewSocketClient(
                     {
                         completion.TrySetResult(response);
                     }
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.GatewayClientSecretCredentialManagementResponse)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.GatewayClientSecretCredentialManagementResponse);
+                    var response = PacketCodec.Decode(frame, GatewayClientSecretCredentialManagementResponse.Codec);
+                    if (m_PendingGatewayClientSecretRequests.TryRemove(response.RequestId, out var completion))
+                    {
+                        completion.TrySetResult(response);
+                    }
                 }
             }
         }
@@ -661,6 +780,14 @@ public sealed class MasterOverviewSocketClient(
                 completion.TrySetException(exception);
             }
         }
+
+        foreach (var request in m_PendingGatewayClientSecretRequests.ToArray())
+        {
+            if (m_PendingGatewayClientSecretRequests.TryRemove(request.Key, out var completion))
+            {
+                completion.TrySetException(exception);
+            }
+        }
     }
 
     private static void EnsureCredentialResponseSucceeded(ServiceConnectionCredentialManagementResponse response)
@@ -686,6 +813,19 @@ public sealed class MasterOverviewSocketClient(
         throw new InvalidOperationException(
             string.IsNullOrWhiteSpace(response.ErrorMessage)
                 ? "Master rejected the Gateway Backend route policy management request."
+                : response.ErrorMessage);
+    }
+
+    private static void EnsureGatewayClientSecretCredentialResponseSucceeded(GatewayClientSecretCredentialManagementResponse response)
+    {
+        if (response.Success)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(response.ErrorMessage)
+                ? "Master rejected the Gateway client secret credential management request."
                 : response.ErrorMessage);
     }
 

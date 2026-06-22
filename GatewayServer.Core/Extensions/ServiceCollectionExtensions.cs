@@ -20,7 +20,9 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<IBackendRouteStatusProvider>(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
         s.AddHostedService(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
         s.AddSingleton<IGatewayClientAuthenticationContextFactory, GatewayClientAuthenticationContextFactory>();
-        s.TryAddSingleton<IGatewayClientTokenValidator, RejectingGatewayClientTokenValidator>();
+        s.AddSingleton<GatewayClientSecretCredentialCatalog>();
+        s.TryAddSingleton<IGatewayClientTokenValidator>(p => p.GetRequiredService<GatewayClientSecretCredentialCatalog>());
+        s.AddSingleton<IGatewayClientSecretCredentialWriter>(p => p.GetRequiredService<GatewayClientSecretCredentialCatalog>());
         s.AddSingleton<GatewayBackendRoutePolicyCatalog>();
         s.AddSingleton<IGatewayBackendRoutePolicyProvider>(p => p.GetRequiredService<GatewayBackendRoutePolicyCatalog>());
         s.AddSingleton<IGatewayBackendRoutePolicyWriter>(p => p.GetRequiredService<GatewayBackendRoutePolicyCatalog>());

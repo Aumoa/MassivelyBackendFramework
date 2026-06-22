@@ -19,6 +19,7 @@ internal sealed class MasterConnectionManager(
     IDedicatedNodeCatalogWriter dedicatedNodeCatalog,
     IBackendNodeCatalogWriter backendNodeCatalog,
     IGatewayBackendRoutePolicyWriter backendRoutePolicy,
+    IGatewayClientSecretCredentialWriter gatewayClientSecretCredentials,
     IServiceProvider serviceProvider,
     ILogger<MasterConnectionManager> logger) : IHostedService, IMasterConnectionStatusProvider, IDirectConnectCodeIssuer
 {
@@ -385,6 +386,18 @@ internal sealed class MasterConnectionManager(
                         string.Join(", ", snapshot.AllowedBackendKinds
                             .Distinct(StringComparer.Ordinal)
                             .OrderBy(static backendKind => backendKind, StringComparer.Ordinal)));
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.GatewayClientSecretCredentialSnapshot)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.GatewayClientSecretCredentialSnapshot);
+                    var snapshot = PacketCodec.Decode(frame, GatewayClientSecretCredentialSnapshot.Codec);
+                    gatewayClientSecretCredentials.Publish(snapshot);
+                    logger.LogInformation(
+                        "Gateway received client secret credential snapshot. SecretCount={Count}.",
+                        snapshot.Secrets.Length);
                     continue;
                 }
 

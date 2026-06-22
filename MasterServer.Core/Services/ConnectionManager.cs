@@ -21,12 +21,14 @@ internal sealed class ConnectionManager(
     IDirectConnectCodeStore directConnectCodeStore,
     IServiceConnectionCredentials serviceConnectionCredentials,
     IGatewayBackendRoutePolicy gatewayBackendRoutePolicy,
+    IGatewayClientSecretCredentials gatewayClientSecretCredentials,
     ILogger<ConnectionManager> logger) : IHostedService, IConnectionManager
 {
     private readonly MasterSocketOptions m_Options = options.Value;
     private readonly ServiceConnectionCredentialOptions m_ServiceCredentialOptions = serviceCredentialOptions.Value;
     private readonly IServiceConnectionCredentials m_ServiceConnectionCredentials = serviceConnectionCredentials;
     private readonly IGatewayBackendRoutePolicy m_GatewayBackendRoutePolicy = gatewayBackendRoutePolicy;
+    private readonly IGatewayClientSecretCredentials m_GatewayClientSecretCredentials = gatewayClientSecretCredentials;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly ConcurrentDictionary<Guid, MasterConnection> m_Connections = [];
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
@@ -415,6 +417,12 @@ internal sealed class ConnectionManager(
             await HandleGatewayBackendRoutePolicyManagementRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
             return;
         }
+
+        if (frame.Header.PacketId == MasterControlPacketIds.GatewayClientSecretCredentialManagementRequest)
+        {
+            await HandleGatewayClientSecretCredentialManagementRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+            return;
+        }
     }
 
     private async Task PushOverviewUntilClosedAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)
@@ -529,6 +537,7 @@ internal sealed class ConnectionManager(
         await WriteDedicatedNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
         await WriteBackendNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
         await WriteGatewayBackendRoutePolicySnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+        await WriteGatewayClientSecretCredentialSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task WriteDedicatedNodeSnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
@@ -555,6 +564,15 @@ internal sealed class ConnectionManager(
             MasterControlPacketIds.GatewayBackendRoutePolicySnapshot,
             await CreateGatewayBackendRoutePolicySnapshotAsync(cancellationToken).ConfigureAwait(false),
             GatewayBackendRoutePolicySnapshot.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteGatewayClientSecretCredentialSnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
+    {
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.GatewayClientSecretCredentialSnapshot,
+            await CreateGatewayClientSecretCredentialSnapshotAsync(cancellationToken).ConfigureAwait(false),
+            GatewayClientSecretCredentialSnapshot.Codec,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -588,6 +606,42 @@ internal sealed class ConnectionManager(
                 logger.LogWarning(
                     e,
                     "Failed to push Gateway Backend route policy snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    gateway.ConnectionId,
+                    gateway.NodeId);
+            }
+        }
+    }
+
+    private async Task BroadcastGatewayClientSecretCredentialSnapshotAsync(CancellationToken cancellationToken)
+    {
+        var gateways = m_Connections.Values
+            .Where(static connection => connection.IsTrusted && connection.NodeKind == MasterNodeKind.Gateway)
+            .ToArray();
+
+        foreach (var gateway in gateways)
+        {
+            try
+            {
+                await WriteGatewayClientSecretCredentialSnapshotAsync(gateway, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception e) when (IsRemoteDisconnect(e))
+            {
+                logger.LogDebug(
+                    e,
+                    "Gateway client secret credential snapshot write failed because the remote connection closed. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    gateway.ConnectionId,
+                    gateway.NodeId);
+                gateway.Dispose();
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(
+                    e,
+                    "Failed to push Gateway client secret credential snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
                     gateway.ConnectionId,
                     gateway.NodeId);
             }
@@ -917,6 +971,55 @@ internal sealed class ConnectionManager(
         }
     }
 
+    private async Task HandleGatewayClientSecretCredentialManagementRequestAsync(
+        MasterConnection source,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.GatewayClientSecretCredentialManagementRequest);
+        var request = PacketCodec.Decode(frame, GatewayClientSecretCredentialManagementRequest.Codec);
+
+        if (source.NodeKind != MasterNodeKind.MasterAdmin)
+        {
+            logger.LogWarning(
+                "Rejected Gateway client secret credential management request from non-admin node. SourceConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
+                source.ConnectionId,
+                source.NodeKind,
+                source.NodeId);
+            return;
+        }
+
+        GatewayClientSecretCredentialManagementResponse response;
+        try
+        {
+            response = await ExecuteGatewayClientSecretCredentialRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Failed to process Gateway client secret credential management request. RequestId={RequestId}, Operation={Operation}.",
+                request.RequestId,
+                request.Operation);
+            response = GatewayClientSecretCredentialManagementResponse.Failure(request.RequestId, e.Message);
+        }
+
+        await source.WriteControlAsync(
+            MasterControlPacketIds.GatewayClientSecretCredentialManagementResponse,
+            response,
+            GatewayClientSecretCredentialManagementResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+
+        if (response.Success && IsGatewayClientSecretCredentialMutation(request.Operation))
+        {
+            await BroadcastGatewayClientSecretCredentialSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private async ValueTask<ServiceConnectionCredentialManagementResponse> ExecuteServiceConnectionCredentialRequestAsync(
         ServiceConnectionCredentialManagementRequest request,
         CancellationToken cancellationToken)
@@ -1009,6 +1112,58 @@ internal sealed class ConnectionManager(
         }
     }
 
+    private async ValueTask<GatewayClientSecretCredentialManagementResponse> ExecuteGatewayClientSecretCredentialRequestAsync(
+        GatewayClientSecretCredentialManagementRequest request,
+        CancellationToken cancellationToken)
+    {
+        switch (request.Operation)
+        {
+            case GatewayClientSecretCredentialOperation.List:
+            {
+                var credentials = await m_GatewayClientSecretCredentials.GetCredentialsAsync(cancellationToken).ConfigureAwait(false);
+                return GatewayClientSecretCredentialManagementResponse.SuccessResult(request.RequestId, credentials);
+            }
+
+            case GatewayClientSecretCredentialOperation.Create:
+            {
+                var created = await m_GatewayClientSecretCredentials.CreateCredentialAsync(request.ToInput(), cancellationToken).ConfigureAwait(false);
+                return GatewayClientSecretCredentialManagementResponse.SuccessResult(
+                    request.RequestId,
+                    [created.Credential],
+                    created.AccessToken);
+            }
+
+            case GatewayClientSecretCredentialOperation.Update:
+                await m_GatewayClientSecretCredentials.UpdateCredentialAsync(
+                    request.CredentialId,
+                    request.ToInput(),
+                    cancellationToken).ConfigureAwait(false);
+                return GatewayClientSecretCredentialManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<GatewayClientSecretCredentialInfo>());
+
+            case GatewayClientSecretCredentialOperation.RotateSecret:
+            {
+                var accessToken = await m_GatewayClientSecretCredentials.RotateSecretAsync(
+                    request.CredentialId,
+                    cancellationToken).ConfigureAwait(false);
+                return GatewayClientSecretCredentialManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<GatewayClientSecretCredentialInfo>(),
+                    accessToken);
+            }
+
+            case GatewayClientSecretCredentialOperation.Remove:
+                await m_GatewayClientSecretCredentials.RemoveCredentialAsync(request.CredentialId, cancellationToken).ConfigureAwait(false);
+                return GatewayClientSecretCredentialManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<GatewayClientSecretCredentialInfo>());
+
+            default:
+                throw new InvalidOperationException($"Unsupported Gateway client secret credential management operation '{request.Operation}'.");
+        }
+    }
+
     private async Task WriteDirectConnectCodeFailureAsync(
         MasterConnection connection,
         Guid requestId,
@@ -1066,6 +1221,15 @@ internal sealed class ConnectionManager(
             GatewayBackendRoutePolicyOperation.Remove;
     }
 
+    private static bool IsGatewayClientSecretCredentialMutation(GatewayClientSecretCredentialOperation operation)
+    {
+        return operation is
+            GatewayClientSecretCredentialOperation.Create or
+            GatewayClientSecretCredentialOperation.Update or
+            GatewayClientSecretCredentialOperation.RotateSecret or
+            GatewayClientSecretCredentialOperation.Remove;
+    }
+
     private MasterOverviewSnapshot CreateOverviewSnapshot()
     {
         return new MasterOverviewSnapshot(
@@ -1104,6 +1268,16 @@ internal sealed class ConnectionManager(
             .ConfigureAwait(false);
         return new GatewayBackendRoutePolicySnapshot(
             allowedBackendKinds,
+            DateTimeOffset.UtcNow);
+    }
+
+    private async Task<GatewayClientSecretCredentialSnapshot> CreateGatewayClientSecretCredentialSnapshotAsync(CancellationToken cancellationToken)
+    {
+        var secrets = await m_GatewayClientSecretCredentials
+            .GetActiveSecretsAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return new GatewayClientSecretCredentialSnapshot(
+            secrets,
             DateTimeOffset.UtcNow);
     }
 

@@ -435,4 +435,88 @@
   <data name="BACKEND_ROUTES_REMOVE" xml:space="preserve">
     <value>Remove</value>
   </data>
+  <data name="NAV_GATEWAY_CLIENT_SECRETS" xml:space="preserve">
+    <value>Client Secrets</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_EYEBROW" xml:space="preserve">
+    <value>Gateway Authentication</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_TITLE" xml:space="preserve">
+    <value>Gateway Client Secrets</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_SUMMARY" xml:space="preserve">
+    <value>Issue and rotate Gateway client access tokens used before opening Backend routes.</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_FORM_DESCRIPTION" xml:space="preserve">
+    <value>Create or edit a Gateway client credential. Access tokens are shown only when issued.</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_NEW" xml:space="preserve">
+    <value>New</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_CREATE_TITLE" xml:space="preserve">
+    <value>Create client secret</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_EDIT_TITLE" xml:space="preserve">
+    <value>Edit client secret</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_SUBJECT_ID" xml:space="preserve">
+    <value>Subject ID</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_DISPLAY_NAME" xml:space="preserve">
+    <value>Display Name</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_TOKEN_ID" xml:space="preserve">
+    <value>Token ID</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_ENABLED" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_DISABLED" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_CREATE" xml:space="preserve">
+    <value>Create</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_SAVING" xml:space="preserve">
+    <value>Saving</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_TOKEN_CREATED" xml:space="preserve">
+    <value>Access token issued</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_TOKEN_DESCRIPTION" xml:space="preserve">
+    <value>This token is shown once. Rotate the credential to issue a replacement.</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_LIST_TITLE" xml:space="preserve">
+    <value>Client Credentials</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_LIST_DESCRIPTION" xml:space="preserve">
+    <value>Enabled credential hashes are pushed to connected Gateways over the Master control-plane socket.</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_EMPTY_TITLE" xml:space="preserve">
+    <value>No client secrets</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>No Gateway clients can authenticate with managed secrets until a credential is created.</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_STATUS" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_UPDATED" xml:space="preserve">
+    <value>Updated</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_ACTIONS" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_EDIT" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_ROTATE" xml:space="preserve">
+    <value>Rotate</value>
+  </data>
+  <data name="GATEWAY_CLIENT_SECRETS_REMOVE" xml:space="preserve">
+    <value>Remove</value>
+  </data>
 </root>
