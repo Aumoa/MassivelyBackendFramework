@@ -165,11 +165,9 @@ public sealed class BackendConnectionManagerTests
     [Fact]
     public async Task RelayFrameAsync_RaisesRouteDataFrames()
     {
-        var routeToken = new GatewayBackendRouteToken("route-token-a");
         var routeDataPayload = new byte[] { 4, 5, 6 };
-        var routeDataEnvelope = new GatewayBackendRouteDataEnvelope(
-            routeToken,
-            GatewayBackendRouteDirection.BackendToClient,
+        var routeDataEnvelope = new GatewayBackendChannelDataEnvelope(
+            channelId: 37,
             PacketKind.Notify,
             routedPacketId: 305,
             routedVersion: 7,
@@ -211,8 +209,7 @@ public sealed class BackendConnectionManagerTests
             Assert.Equal("backend-a", routedBack.NodeId);
             Assert.Equal("master-a", routedBack.MasterConnectionId);
             Assert.Equal(FakeBackendServer.DirectConnectionId, routedBack.DirectConnectionId);
-            Assert.Equal(routeToken, routedBack.Envelope.RouteToken);
-            Assert.Equal(GatewayBackendRouteDirection.BackendToClient, routedBack.Envelope.Direction);
+            Assert.Equal((uint)37, routedBack.Envelope.ChannelId);
             Assert.Equal(PacketKind.Notify, routedBack.Envelope.RoutedKind);
             Assert.Equal((ushort)305, routedBack.Envelope.RoutedPacketId);
             Assert.Equal((ushort)7, routedBack.Envelope.RoutedVersion);
@@ -228,8 +225,7 @@ public sealed class BackendConnectionManagerTests
     [Fact]
     public async Task RelayFrameAsync_RaisesRouteCloseFrames()
     {
-        var routeToken = new GatewayBackendRouteToken("route-token-a");
-        var routeClose = new GatewayBackendRouteClose(routeToken, "backend closed");
+        var routeClose = new GatewayBackendChannelClose(37, "backend closed");
         await using var backend = new FakeBackendServer(
             responseEnvelope: null,
             routeClose: routeClose);
@@ -266,7 +262,7 @@ public sealed class BackendConnectionManagerTests
             Assert.Equal("backend-a", routedBack.NodeId);
             Assert.Equal("master-a", routedBack.MasterConnectionId);
             Assert.Equal(FakeBackendServer.DirectConnectionId, routedBack.DirectConnectionId);
-            Assert.Equal(routeToken, routedBack.Close.RouteToken);
+            Assert.Equal((uint)37, routedBack.Close.ChannelId);
             Assert.Equal("backend closed", routedBack.Close.Reason);
         }
         finally
@@ -500,8 +496,8 @@ public sealed class BackendConnectionManagerTests
         private readonly TcpListener m_Listener;
         private readonly CancellationTokenSource m_Cancellation = new();
         private readonly GatewayBackendRouteEnvelope? m_ResponseEnvelope;
-        private readonly GatewayBackendRouteDataEnvelope? m_RouteDataEnvelope;
-        private readonly GatewayBackendRouteClose? m_RouteClose;
+        private readonly GatewayBackendChannelDataEnvelope? m_RouteDataEnvelope;
+        private readonly GatewayBackendChannelClose? m_RouteClose;
         private readonly string? m_AcceptedNodeId;
         private readonly bool m_ExpectRelay;
         private readonly bool m_CloseAfterRelay;
@@ -509,8 +505,8 @@ public sealed class BackendConnectionManagerTests
 
         public FakeBackendServer(
             GatewayBackendRouteEnvelope? responseEnvelope,
-            GatewayBackendRouteDataEnvelope? routeDataEnvelope = null,
-            GatewayBackendRouteClose? routeClose = null,
+            GatewayBackendChannelDataEnvelope? routeDataEnvelope = null,
+            GatewayBackendChannelClose? routeClose = null,
             string? acceptedNodeId = null,
             bool expectRelay = true,
             bool closeAfterRelay = false)
@@ -628,10 +624,10 @@ public sealed class BackendConnectionManagerTests
                 {
                     using var routeDataFrame = PacketCodec.Encode(
                         m_RouteDataEnvelope.RoutedKind,
-                        Pid.GATE_BACKEND_ROUTE_DATA,
-                        GatewayBackendRouteDataEnvelope.ProtocolVersion,
+                        Pid.GATE_BACKEND_CHANNEL_DATA,
+                        GatewayBackendChannelDataEnvelope.ProtocolVersion,
                         m_RouteDataEnvelope,
-                        GatewayBackendRouteDataEnvelope.Codec);
+                        GatewayBackendChannelDataEnvelope.Codec);
                     await PacketFrameWriter.WriteAsync(stream, routeDataFrame, cancellationToken);
                 }
 
@@ -639,10 +635,10 @@ public sealed class BackendConnectionManagerTests
                 {
                     using var routeCloseFrame = PacketCodec.Encode(
                         PacketKind.Notify,
-                        Pid.GATE_BACKEND_ROUTE_CLOSE,
-                        GatewayBackendRouteClose.ProtocolVersion,
+                        Pid.GATE_BACKEND_CHANNEL_CLOSE,
+                        GatewayBackendChannelClose.ProtocolVersion,
                         m_RouteClose,
-                        GatewayBackendRouteClose.Codec);
+                        GatewayBackendChannelClose.Codec);
                     await PacketFrameWriter.WriteAsync(stream, routeCloseFrame, cancellationToken);
                 }
 

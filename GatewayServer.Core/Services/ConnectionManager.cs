@@ -686,12 +686,20 @@ internal class ConnectionManager(
                 matchedBackendOriginResponseExchangeId = exchangeId;
             }
 
+            var channelEnvelope = new GatewayBackendChannelDataEnvelope(
+                route.ChannelId,
+                envelope.RoutedKind,
+                envelope.RoutedPacketId,
+                envelope.RoutedVersion,
+                envelope.ExchangeId,
+                envelope.RoutedPayload);
+
             using var routedFrame = PacketCodec.Encode(
                 envelope.RoutedKind,
-                Pid.GATE_BACKEND_ROUTE_DATA,
-                GatewayBackendRouteDataEnvelope.ProtocolVersion,
-                envelope,
-                GatewayBackendRouteDataEnvelope.Codec);
+                Pid.GATE_BACKEND_CHANNEL_DATA,
+                GatewayBackendChannelDataEnvelope.ProtocolVersion,
+                channelEnvelope,
+                GatewayBackendChannelDataEnvelope.Codec);
             await backendRouteManager.RelayFrameAsync(
                 route.BackendBinding,
                 routedFrame,
@@ -814,16 +822,12 @@ internal class ConnectionManager(
         try
         {
             var envelope = frame.Envelope;
-            if (envelope.Direction != GatewayBackendRouteDirection.BackendToClient)
-            {
-                throw new InvalidOperationException("Backend route data frames from Backend must use the BackendToClient direction.");
-            }
-
-            if (!m_PersistentBackendRouteRegistry.TryGet(envelope.RouteToken, out route))
+            if (!m_PersistentBackendRouteRegistry.TryGet(envelope.ChannelId, out route))
             {
                 logger.LogWarning(
-                    "Gateway received Backend route data for an unknown route token. BackendKind={BackendKind}.",
-                    frame.BackendKind);
+                    "Gateway received Backend route data for an unknown channel. BackendKind={BackendKind}, ChannelId={ChannelId}.",
+                    frame.BackendKind,
+                    envelope.ChannelId);
                 return;
             }
 
@@ -866,11 +870,20 @@ internal class ConnectionManager(
                 matchedClientOriginResponseExchangeId = exchangeId;
             }
 
+            var clientEnvelope = new GatewayBackendRouteDataEnvelope(
+                route.RouteToken,
+                GatewayBackendRouteDirection.BackendToClient,
+                envelope.RoutedKind,
+                envelope.RoutedPacketId,
+                envelope.RoutedVersion,
+                envelope.ExchangeId,
+                envelope.RoutedPayload);
+
             using var clientFrame = PacketCodec.Encode(
                 envelope.RoutedKind,
                 Pid.GATE_BACKEND_ROUTE_DATA,
                 GatewayBackendRouteDataEnvelope.ProtocolVersion,
-                envelope,
+                clientEnvelope,
                 GatewayBackendRouteDataEnvelope.Codec);
             await route.Owner.WriteAsync(clientFrame, cancellationToken).ConfigureAwait(false);
             if (matchedClientOriginResponseExchangeId.HasValue)
@@ -908,12 +921,13 @@ internal class ConnectionManager(
         try
         {
             var close = frame.Close;
-            if (!m_PersistentBackendRouteRegistry.TryGet(close.RouteToken, out route))
+            if (!m_PersistentBackendRouteRegistry.TryGet(close.ChannelId, out route))
             {
                 logger.LogWarning(
-                    "Gateway received Backend route close for an unknown route token. BackendKind={BackendKind}, NodeId={NodeId}.",
+                    "Gateway received Backend route close for an unknown channel. BackendKind={BackendKind}, NodeId={NodeId}, ChannelId={ChannelId}.",
                     frame.BackendKind,
-                    frame.NodeId);
+                    frame.NodeId,
+                    close.ChannelId);
                 return;
             }
 
@@ -931,12 +945,15 @@ internal class ConnectionManager(
                 throw new InvalidOperationException("Persistent Backend route is not open.");
             }
 
-            if (!m_PersistentBackendRouteRegistry.Close(close.RouteToken, close.Reason))
+            if (!m_PersistentBackendRouteRegistry.Close(route.RouteToken, close.Reason))
             {
                 throw new InvalidOperationException("Persistent Backend route could not be closed.");
             }
 
-            await WriteBackendRouteCloseNotifyAsync(route.Owner, close, cancellationToken).ConfigureAwait(false);
+            await WriteBackendRouteCloseNotifyAsync(
+                route.Owner,
+                new GatewayBackendRouteClose(route.RouteToken, close.Reason),
+                cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

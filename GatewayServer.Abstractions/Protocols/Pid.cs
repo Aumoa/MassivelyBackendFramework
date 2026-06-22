@@ -13,4 +13,6 @@ public static class Pid
     public const ushort GATE_BACKEND_ROUTE_DATA = 5;
     public const ushort GATE_BACKEND_ROUTE_CLOSE = 6;
     public const ushort GATE_CLIENT_AUTHENTICATE = 7;
+    public const ushort GATE_BACKEND_CHANNEL_DATA = 8;
+    public const ushort GATE_BACKEND_CHANNEL_CLOSE = 9;
 }

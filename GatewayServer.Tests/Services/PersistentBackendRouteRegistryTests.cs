@@ -70,6 +70,9 @@ public sealed class PersistentBackendRouteRegistryTests
         try
         {
             Assert.True(registry.TryGet(alphaRoute.RouteToken, out var persistentAlpha));
+            Assert.NotEqual(0u, persistentAlpha.ChannelId);
+            Assert.True(registry.TryGet(persistentAlpha.ChannelId, out var channelAlpha));
+            Assert.Same(persistentAlpha, channelAlpha);
             Assert.Same(firstOwner, persistentAlpha.Owner);
             Assert.Equal("backend-a", persistentAlpha.BackendBinding.NodeId);
             Assert.Equal("master-a", persistentAlpha.BackendBinding.MasterConnectionId);
@@ -306,6 +309,7 @@ public sealed class PersistentBackendRouteRegistryTests
 
         Assert.True(registry.Close(route.RouteToken, "client closed"));
         Assert.False(registry.TryGet(route.RouteToken, out _));
+        Assert.False(registry.TryGet(route.ChannelId, out _));
         Assert.False(registry.Close(route.RouteToken, "client closed"));
         Assert.Equal(PersistentBackendRouteState.Closed, route.State);
         Assert.Equal("client closed", route.CloseReason);

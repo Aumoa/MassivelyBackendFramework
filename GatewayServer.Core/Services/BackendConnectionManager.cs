@@ -93,7 +93,7 @@ internal sealed class BackendRouteDataFrameReceived(
     string nodeId,
     string masterConnectionId,
     string directConnectionId,
-    GatewayBackendRouteDataEnvelope envelope)
+    GatewayBackendChannelDataEnvelope envelope)
 {
     public string BackendKind { get; } = backendKind;
 
@@ -103,7 +103,7 @@ internal sealed class BackendRouteDataFrameReceived(
 
     public string DirectConnectionId { get; } = directConnectionId;
 
-    public GatewayBackendRouteDataEnvelope Envelope { get; } = envelope;
+    public GatewayBackendChannelDataEnvelope Envelope { get; } = envelope;
 }
 
 internal sealed class BackendRouteCloseFrameReceived(
@@ -111,7 +111,7 @@ internal sealed class BackendRouteCloseFrameReceived(
     string nodeId,
     string masterConnectionId,
     string directConnectionId,
-    GatewayBackendRouteClose close)
+    GatewayBackendChannelClose close)
 {
     public string BackendKind { get; } = backendKind;
 
@@ -121,7 +121,7 @@ internal sealed class BackendRouteCloseFrameReceived(
 
     public string DirectConnectionId { get; } = directConnectionId;
 
-    public GatewayBackendRouteClose Close { get; } = close;
+    public GatewayBackendChannelClose Close { get; } = close;
 }
 
 internal sealed class BackendRouteSessionClosed(
@@ -685,11 +685,11 @@ internal sealed class BackendConnectionManager(
                     {
                         await HandleBackendRouteFrameAsync(peer, session, frame, cancellationToken).ConfigureAwait(false);
                     }
-                    else if (frame.Header.PacketId == Pid.GATE_BACKEND_ROUTE_DATA)
+                    else if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_DATA)
                     {
                         await HandleBackendRouteDataFrameAsync(peer, session, frame, cancellationToken).ConfigureAwait(false);
                     }
-                    else if (frame.Header.PacketId == Pid.GATE_BACKEND_ROUTE_CLOSE)
+                    else if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_CLOSE)
                     {
                         await HandleBackendRouteCloseFrameAsync(peer, session, frame, cancellationToken).ConfigureAwait(false);
                     }
@@ -770,22 +770,17 @@ internal sealed class BackendConnectionManager(
         PacketFrame frame,
         CancellationToken cancellationToken)
     {
-        if (frame.Header.Version != GatewayBackendRouteDataEnvelope.ProtocolVersion)
+        if (frame.Header.Version != GatewayBackendChannelDataEnvelope.ProtocolVersion)
         {
             logger.LogWarning(
-                "Backend route data frame used unsupported version. BackendKind={BackendKind}, BackendNodeId={NodeId}, Version={Version}.",
+                "Backend channel data frame used unsupported version. BackendKind={BackendKind}, BackendNodeId={NodeId}, Version={Version}.",
                 peer.Node.BackendKind,
                 peer.Node.NodeId,
                 frame.Header.Version);
             return;
         }
 
-        var envelope = PacketCodec.Decode(frame, GatewayBackendRouteDataEnvelope.Codec);
-        if (envelope.Direction != GatewayBackendRouteDirection.BackendToClient)
-        {
-            throw new InvalidOperationException("Backend route data frames from Backend sessions must use the BackendToClient direction.");
-        }
-
+        var envelope = PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec);
         var received = new BackendRouteDataFrameReceived(
             peer.Node.BackendKind,
             peer.Node.NodeId,
@@ -815,17 +810,17 @@ internal sealed class BackendConnectionManager(
             throw new InvalidOperationException("Backend route close frames from Backend sessions must use Notify packets.");
         }
 
-        if (frame.Header.Version != GatewayBackendRouteClose.ProtocolVersion)
+        if (frame.Header.Version != GatewayBackendChannelClose.ProtocolVersion)
         {
             logger.LogWarning(
-                "Backend route close frame used unsupported version. BackendKind={BackendKind}, BackendNodeId={NodeId}, Version={Version}.",
+                "Backend channel close frame used unsupported version. BackendKind={BackendKind}, BackendNodeId={NodeId}, Version={Version}.",
                 peer.Node.BackendKind,
                 peer.Node.NodeId,
                 frame.Header.Version);
             return;
         }
 
-        var close = PacketCodec.Decode(frame, GatewayBackendRouteClose.Codec);
+        var close = PacketCodec.Decode(frame, GatewayBackendChannelClose.Codec);
         var received = new BackendRouteCloseFrameReceived(
             peer.Node.BackendKind,
             peer.Node.NodeId,

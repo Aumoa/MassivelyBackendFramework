@@ -589,8 +589,7 @@ public sealed class ConnectionManagerBackendRouteTests
             var relayed = await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal("alpha", relayed.BackendKind);
             Assert.Equal(routeManager.DefaultBinding, relayed.Binding);
-            Assert.Equal(routeToken, relayed.Envelope.RouteToken);
-            Assert.Equal(GatewayBackendRouteDirection.ClientToBackend, relayed.Envelope.Direction);
+            Assert.NotEqual(0u, relayed.Envelope.ChannelId);
             Assert.Equal(PacketKind.Notify, relayed.Envelope.RoutedKind);
             Assert.Equal((ushort)301, relayed.Envelope.RoutedPacketId);
             Assert.Equal((ushort)2, relayed.Envelope.RoutedVersion);
@@ -644,7 +643,7 @@ public sealed class ConnectionManagerBackendRouteTests
 
             var relayed = await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal("alpha", relayed.BackendKind);
-            Assert.Equal(routeToken, relayed.Envelope.RouteToken);
+            Assert.NotEqual(0u, relayed.Envelope.ChannelId);
             Assert.Equal(PacketKind.Request, relayed.Envelope.RoutedKind);
             Assert.True(relayed.Envelope.ExchangeId.HasValue);
             Assert.Equal(exchangeId, relayed.Envelope.ExchangeId.Value);
@@ -1064,8 +1063,7 @@ public sealed class ConnectionManagerBackendRouteTests
 
             var relayed = await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal("alpha", relayed.BackendKind);
-            Assert.Equal(routeToken, relayed.Envelope.RouteToken);
-            Assert.Equal(GatewayBackendRouteDirection.ClientToBackend, relayed.Envelope.Direction);
+            Assert.NotEqual(0u, relayed.Envelope.ChannelId);
             Assert.Equal(PacketKind.Response, relayed.Envelope.RoutedKind);
             Assert.True(relayed.Envelope.ExchangeId.HasValue);
             Assert.Equal(exchangeId, relayed.Envelope.ExchangeId.Value);
@@ -1521,7 +1519,7 @@ public sealed class ConnectionManagerBackendRouteTests
             await WriteBackendRouteDataEnvelopeAsync(ownerStream, PacketKind.Notify, dataEnvelope);
 
             var relayed = await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Equal(routeToken, relayed.Envelope.RouteToken);
+            Assert.NotEqual(0u, relayed.Envelope.ChannelId);
             Assert.Equal(PacketKind.Notify, relayed.Envelope.RoutedKind);
         }
         finally
@@ -1768,7 +1766,7 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
-    public async Task BackendRouteClose_IgnoresUnknownRouteToken()
+    public async Task BackendRouteClose_IgnoresUnknownChannelId()
     {
         var routeManager = new RecordingBackendRouteManager();
         var connectionManager = CreateConnectionManager(
@@ -1794,7 +1792,7 @@ public sealed class ConnectionManagerBackendRouteTests
             var routeToken = await OpenPersistentBackendRouteAsync(stream);
             await routeManager.PublishBackendRouteCloseFrameAsync(
                 "alpha",
-                new GatewayBackendRouteClose(new GatewayBackendRouteToken("unknown-route-token"), "backend closed"));
+                new GatewayBackendChannelClose(999, "backend closed"));
 
             await AssertNoClientFrameAsync(stream);
             Assert.Contains(connectionManager.GetStatusItems(), item =>
@@ -1813,7 +1811,7 @@ public sealed class ConnectionManagerBackendRouteTests
             await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Notify, dataEnvelope);
 
             var relayed = await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Equal(routeToken, relayed.Envelope.RouteToken);
+            Assert.NotEqual(0u, relayed.Envelope.ChannelId);
             Assert.Equal(PacketKind.Notify, relayed.Envelope.RoutedKind);
         }
         finally
@@ -1975,7 +1973,7 @@ public sealed class ConnectionManagerBackendRouteTests
 
             var relayed = await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.Equal(routeManager.DefaultBinding, relayed.Binding);
-            Assert.Equal(routeToken, relayed.Envelope.RouteToken);
+            Assert.NotEqual(0u, relayed.Envelope.ChannelId);
         }
         finally
         {
@@ -2630,8 +2628,11 @@ public sealed class ConnectionManagerBackendRouteTests
             "backend-a",
             "master-a",
             "backend-direct-a");
+        private readonly object m_TestChannelSync = new();
+        private readonly Dictionary<string, uint> m_TestChannelIdsByRouteToken = new(StringComparer.Ordinal);
         private int m_ConnectCount;
         private int m_RelayCount;
+        private uint m_NextTestChannelId;
 
         public event BackendRouteFrameReceivedHandler? RouteFrameReceived;
 
@@ -2683,12 +2684,12 @@ public sealed class ConnectionManagerBackendRouteTests
                     backendKind,
                     PacketCodec.Decode(frame, GatewayBackendRouteEnvelope.Codec)));
             }
-            else if (frame.Header.PacketId == Pid.GATE_BACKEND_ROUTE_DATA)
+            else if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_DATA)
             {
                 RelayedDataFrame.TrySetResult(new ObservedBackendRouteDataFrame(
                     backendKind,
                     null,
-                    PacketCodec.Decode(frame, GatewayBackendRouteDataEnvelope.Codec)));
+                    PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec)));
             }
             else
             {
@@ -2709,7 +2710,7 @@ public sealed class ConnectionManagerBackendRouteTests
             }
 
             Interlocked.Increment(ref m_RelayCount);
-            if (frame.Header.PacketId != Pid.GATE_BACKEND_ROUTE_DATA)
+            if (frame.Header.PacketId != Pid.GATE_BACKEND_CHANNEL_DATA)
             {
                 throw new InvalidOperationException("ConnectionManager relayed an unexpected bound Backend route packet.");
             }
@@ -2717,7 +2718,7 @@ public sealed class ConnectionManagerBackendRouteTests
             RelayedDataFrame.TrySetResult(new ObservedBackendRouteDataFrame(
                 binding.BackendKind,
                 binding,
-                PacketCodec.Decode(frame, GatewayBackendRouteDataEnvelope.Codec)));
+                PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec)));
 
             return ValueTask.CompletedTask;
         }
@@ -2749,6 +2750,21 @@ public sealed class ConnectionManagerBackendRouteTests
             string masterConnectionId = "master-a",
             string directConnectionId = "backend-direct-a")
         {
+            await PublishBackendRouteDataFrameAsync(
+                backendKind,
+                CreateChannelDataEnvelope(envelope),
+                nodeId,
+                masterConnectionId,
+                directConnectionId);
+        }
+
+        public async Task PublishBackendRouteDataFrameAsync(
+            string backendKind,
+            GatewayBackendChannelDataEnvelope envelope,
+            string nodeId = "backend-a",
+            string masterConnectionId = "master-a",
+            string directConnectionId = "backend-direct-a")
+        {
             var frame = new BackendRouteDataFrameReceived(
                 backendKind,
                 nodeId,
@@ -2770,6 +2786,21 @@ public sealed class ConnectionManagerBackendRouteTests
         public async Task PublishBackendRouteCloseFrameAsync(
             string backendKind,
             GatewayBackendRouteClose close,
+            string nodeId = "backend-a",
+            string masterConnectionId = "master-a",
+            string directConnectionId = "backend-direct-a")
+        {
+            await PublishBackendRouteCloseFrameAsync(
+                backendKind,
+                new GatewayBackendChannelClose(GetTestChannelId(close.RouteToken), close.Reason),
+                nodeId,
+                masterConnectionId,
+                directConnectionId);
+        }
+
+        public async Task PublishBackendRouteCloseFrameAsync(
+            string backendKind,
+            GatewayBackendChannelClose close,
             string nodeId = "backend-a",
             string masterConnectionId = "master-a",
             string directConnectionId = "backend-direct-a")
@@ -2808,6 +2839,32 @@ public sealed class ConnectionManagerBackendRouteTests
                 await handler(frame, CancellationToken.None);
             }
         }
+
+        private GatewayBackendChannelDataEnvelope CreateChannelDataEnvelope(GatewayBackendRouteDataEnvelope envelope)
+        {
+            return new GatewayBackendChannelDataEnvelope(
+                GetTestChannelId(envelope.RouteToken),
+                envelope.RoutedKind,
+                envelope.RoutedPacketId,
+                envelope.RoutedVersion,
+                envelope.ExchangeId,
+                envelope.RoutedPayload);
+        }
+
+        private uint GetTestChannelId(GatewayBackendRouteToken routeToken)
+        {
+            lock (m_TestChannelSync)
+            {
+                if (m_TestChannelIdsByRouteToken.TryGetValue(routeToken.Value, out var channelId))
+                {
+                    return channelId;
+                }
+
+                channelId = ++m_NextTestChannelId;
+                m_TestChannelIdsByRouteToken[routeToken.Value] = channelId;
+                return channelId;
+            }
+        }
     }
 
     private sealed record ObservedBackendRouteFrame(
@@ -2817,7 +2874,7 @@ public sealed class ConnectionManagerBackendRouteTests
     private sealed record ObservedBackendRouteDataFrame(
         string BackendKind,
         BackendRouteBinding? Binding,
-        GatewayBackendRouteDataEnvelope Envelope);
+        GatewayBackendChannelDataEnvelope Envelope);
 
     private sealed class RecordingBackendRouteSession(
         RecordingBackendRouteManager owner,
