@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>DedicatedServer</RootNamespace>
+    <RootNamespace>BackendServer</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,8 +13,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BackendServer.Abstractions\BackendServer.Abstractions.csproj" />
-    <ProjectReference Include="..\BackendServer.Core\BackendServer.Core.csproj" />
-    <ProjectReference Include="..\DedicatedServer.Abstractions\DedicatedServer.Abstractions.csproj" />
+    <ProjectReference Include="..\GatewayServer.Abstractions\GatewayServer.Abstractions.csproj" />
+    <ProjectReference Include="..\MasterServer.Abstractions\MasterServer.Abstractions.csproj" />
+    <ProjectReference Include="..\PacketCore\PacketCore.csproj" />
   </ItemGroup>
 
 </Project>

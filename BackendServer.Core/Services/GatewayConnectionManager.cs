@@ -5,8 +5,8 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using DedicatedServer.Options;
-using DedicatedServer.Runtime;
+using BackendServer.Options;
+using BackendServer.Runtime;
 using GatewayServer.Protocols;
 using MasterServer.ControlPlane;
 using Microsoft.Extensions.Hosting;
@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PacketCore;
 
-namespace DedicatedServer.Services;
+namespace BackendServer.Services;
 
 internal interface IGatewayConnectionStatusProvider
 {
@@ -23,7 +23,7 @@ internal interface IGatewayConnectionStatusProvider
 
 internal sealed class GatewayConnectionManager(
     IOptions<GatewayListenerOptions> options,
-    IDedicatedWorldRuntime worldRuntime,
+    IBackendRuntime backendRuntime,
     IDirectConnectCodeValidator directConnectCodeValidator,
     ILogger<GatewayConnectionManager> logger) : IHostedService, IGatewayConnectionStatusProvider
 {
@@ -59,7 +59,7 @@ internal sealed class GatewayConnectionManager(
         m_Socket.Bind(new IPEndPoint(listenAddress, m_Options.Port));
         m_Socket.Listen(m_Options.Backlog);
 
-        logger.LogInformation("Dedicated Gateway listener is running on {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
+        logger.LogInformation("Backend Gateway listener is running on {Address}:{Port}.", m_Options.IPAddress, m_Options.Port);
         m_AcceptTask = AcceptLoopAsync(m_Shutdown.Token);
     }
 
@@ -129,7 +129,7 @@ internal sealed class GatewayConnectionManager(
 
                 if (completed.Exception != null)
                 {
-                    logger.LogError(completed.Exception, "Unhandled Dedicated Gateway connection task failure.");
+                    logger.LogError(completed.Exception, "Unhandled Backend Gateway connection task failure.");
                 }
             },
             CancellationToken.None,
@@ -162,7 +162,7 @@ internal sealed class GatewayConnectionManager(
             gatewayNodeId = acceptedGateway.NodeId;
             m_GatewayConnectionStates[connectionId] = "Trusted";
             logger.LogInformation(
-                "Dedicated accepted Gateway direct connection. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, RemoteEndPoint={RemoteEndPoint}.",
+                "Backend accepted Gateway direct connection. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, RemoteEndPoint={RemoteEndPoint}.",
                 connectionId,
                 gatewayNodeId,
                 socket.RemoteEndPoint);
@@ -230,7 +230,7 @@ internal sealed class GatewayConnectionManager(
         var hello = PacketCodec.Decode(helloFrame, NodeHello.Codec);
         if (hello.NodeKind != MasterNodeKind.Gateway)
         {
-            throw new UnauthorizedAccessException($"Dedicated only accepts Gateway nodes, but received {hello.NodeKind}.");
+            throw new UnauthorizedAccessException($"Backend only accepts Gateway nodes, but received {hello.NodeKind}.");
         }
 
         if (hello.ProtocolVersion != MasterControlProtocol.SchemaVersion)
@@ -322,7 +322,7 @@ internal sealed class GatewayConnectionManager(
                 }
 
                 logger.LogWarning(
-                    "Dedicated rejected unsupported Gateway Backend packet. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, PacketKind={PacketKind}, PacketId={PacketId}.",
+                    "Backend rejected unsupported Gateway Backend packet. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, PacketKind={PacketKind}, PacketId={PacketId}.",
                     connectionId,
                     gatewayNodeId,
                     frame.Header.Kind,
@@ -340,7 +340,7 @@ internal sealed class GatewayConnectionManager(
         if (frame.Header.Version != GatewayBackendChannelDataEnvelope.ProtocolVersion)
         {
             logger.LogWarning(
-                "Dedicated rejected unsupported Gateway Backend channel data version. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, Version={Version}.",
+                "Backend rejected unsupported Gateway Backend channel data version. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, Version={Version}.",
                 connectionId,
                 gatewayNodeId,
                 frame.Header.Version);
@@ -348,7 +348,7 @@ internal sealed class GatewayConnectionManager(
         }
 
         var envelope = PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec);
-        var context = new DedicatedGatewayPacketContext(
+        var context = new BackendGatewayPacketContext(
             gatewayNodeId,
             connectionId,
             envelope.ChannelId,
@@ -356,7 +356,7 @@ internal sealed class GatewayConnectionManager(
             envelope.RoutedPacketId,
             envelope.RoutedVersion,
             DateTimeOffset.UtcNow);
-        await worldRuntime.HandleGatewayPacketAsync(context, envelope.RoutedPayload, cancellationToken).ConfigureAwait(false);
+        await backendRuntime.HandleGatewayPacketAsync(context, envelope.RoutedPayload, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask HandleGatewayChannelCloseFrameAsync(
@@ -368,7 +368,7 @@ internal sealed class GatewayConnectionManager(
         if (frame.Header.Kind != PacketKind.Notify)
         {
             logger.LogWarning(
-                "Dedicated rejected Gateway Backend channel close with invalid packet kind. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, PacketKind={PacketKind}.",
+                "Backend rejected Gateway Backend channel close with invalid packet kind. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, PacketKind={PacketKind}.",
                 connectionId,
                 gatewayNodeId,
                 frame.Header.Kind);
@@ -378,7 +378,7 @@ internal sealed class GatewayConnectionManager(
         if (frame.Header.Version != GatewayBackendChannelClose.ProtocolVersion)
         {
             logger.LogWarning(
-                "Dedicated rejected unsupported Gateway Backend channel close version. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, Version={Version}.",
+                "Backend rejected unsupported Gateway Backend channel close version. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, Version={Version}.",
                 connectionId,
                 gatewayNodeId,
                 frame.Header.Version);
@@ -386,13 +386,13 @@ internal sealed class GatewayConnectionManager(
         }
 
         var close = PacketCodec.Decode(frame, GatewayBackendChannelClose.Codec);
-        var context = new DedicatedGatewayChannelCloseContext(
+        var context = new BackendGatewayChannelCloseContext(
             gatewayNodeId,
             connectionId,
             close.ChannelId,
             close.Reason,
             DateTimeOffset.UtcNow);
-        await worldRuntime.HandleGatewayChannelClosedAsync(context, cancellationToken).ConfigureAwait(false);
+        await backendRuntime.HandleGatewayChannelClosedAsync(context, cancellationToken).ConfigureAwait(false);
     }
 
     private static async Task<PacketFrame> ReadRequiredHandshakeFrameAsync(
@@ -407,7 +407,7 @@ internal sealed class GatewayConnectionManager(
 
         if (frame == null)
         {
-            throw new EndOfStreamException("Gateway connection closed before Dedicated handshake completed.");
+            throw new EndOfStreamException("Gateway connection closed before Backend handshake completed.");
         }
 
         try

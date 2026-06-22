@@ -1,4 +1,4 @@
-namespace DedicatedServer.Options;
+namespace BackendServer.Options;
 
 public sealed record MasterConnectionOptions
 {
@@ -12,11 +12,11 @@ public sealed record MasterConnectionOptions
 
     public string ServerName { get; set; } = "localhost";
 
-    public string NodeId { get; set; } = "dedicated-local";
+    public string NodeId { get; set; } = "backend-local";
 
-    public string DisplayName { get; set; } = "Dedicated";
+    public string DisplayName { get; set; } = "Backend";
 
-    public string BackendKind { get; set; } = "dedicated";
+    public string BackendKind { get; set; } = "backend";
 
     public string SharedSecret { get; set; } = string.Empty;
 

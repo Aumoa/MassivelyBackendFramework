@@ -1,4 +1,4 @@
-namespace DedicatedServer.Options;
+namespace BackendServer.Options;
 
 public sealed record GatewayListenerOptions
 {

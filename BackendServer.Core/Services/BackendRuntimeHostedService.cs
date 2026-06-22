@@ -1,9 +1,9 @@
-using DedicatedServer.Runtime;
+using BackendServer.Runtime;
 using Microsoft.Extensions.Hosting;
 
-namespace DedicatedServer.Services;
+namespace BackendServer.Services;
 
-internal sealed class DedicatedWorldHostedService(IDedicatedWorldRuntime runtime) : IHostedService
+internal sealed class BackendRuntimeHostedService(IBackendRuntime runtime) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {

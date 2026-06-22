@@ -1,4 +1,5 @@
-using DedicatedServer.Options;
+using BackendServer.Extensions;
+using BackendServer.Runtime;
 using DedicatedServer.Runtime;
 using DedicatedServer.Services;
 using Microsoft.Extensions.Configuration;
@@ -11,17 +12,9 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddDedicatedServer(this IServiceCollection services, IConfiguration config)
     {
-        services.Configure<MasterConnectionOptions>(config.GetSection("MasterConnection"));
-        services.Configure<GatewayListenerOptions>(config.GetSection("GatewayListener"));
-
         services.TryAddSingleton<IDedicatedWorldRuntime, NoOpDedicatedWorldRuntime>();
-        services.AddHostedService<DedicatedWorldHostedService>();
-        services.AddSingleton<GatewayConnectionManager>();
-        services.AddSingleton<IGatewayConnectionStatusProvider>(static provider => provider.GetRequiredService<GatewayConnectionManager>());
-        services.AddHostedService(static provider => provider.GetRequiredService<GatewayConnectionManager>());
-        services.AddSingleton<MasterConnectionManager>();
-        services.AddSingleton<IDirectConnectCodeValidator>(static provider => provider.GetRequiredService<MasterConnectionManager>());
-        services.AddHostedService(static provider => provider.GetRequiredService<MasterConnectionManager>());
+        services.TryAddSingleton<IBackendRuntime, DedicatedBackendRuntime>();
+        services.AddBackendServer(config);
 
         return services;
     }

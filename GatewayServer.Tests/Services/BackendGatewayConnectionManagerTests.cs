@@ -1,8 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
-using DedicatedServer.Options;
-using DedicatedServer.Runtime;
-using DedicatedServer.Services;
+using BackendServer.Options;
+using BackendServer.Runtime;
+using BackendServer.Services;
 using GatewayServer.Protocols;
 using MasterServer.ControlPlane;
 using Microsoft.Extensions.Logging;
@@ -12,7 +12,7 @@ using Xunit;
 
 namespace GatewayServer.Tests.Services;
 
-public sealed class DedicatedGatewayConnectionManagerTests
+public sealed class BackendGatewayConnectionManagerTests
 {
     [Fact]
     public async Task GatewayHandshake_AcceptsBackendTicketAndRoutesChannelData()
@@ -103,7 +103,7 @@ public sealed class DedicatedGatewayConnectionManagerTests
 
             Assert.True(
                 accepted == null || accepted.Header.PacketId != MasterControlPacketIds.NodeAccepted,
-                "Dedicated listener must not accept direct-connect tickets issued for the legacy Dedicated target kind.");
+                "Backend listener must not accept direct-connect tickets issued for the legacy Dedicated target kind.");
             Assert.False(runtime.Packet.Task.IsCompleted);
         }
         finally
@@ -151,7 +151,7 @@ public sealed class DedicatedGatewayConnectionManagerTests
 
     private static GatewayConnectionManager CreateManager(
         int port,
-        IDedicatedWorldRuntime runtime,
+        IBackendRuntime runtime,
         IDirectConnectCodeValidator validator)
     {
         return new GatewayConnectionManager(
@@ -211,7 +211,7 @@ public sealed class DedicatedGatewayConnectionManagerTests
         CancellationToken cancellationToken)
     {
         var frame = await PacketFrameReader.ReadAsync(stream, policy, cancellationToken);
-        return frame ?? throw new EndOfStreamException("Dedicated Gateway test connection closed.");
+        return frame ?? throw new EndOfStreamException("Backend Gateway test connection closed.");
     }
 
     private static async Task<PacketFrame?> TryReadFrameAsync(
@@ -286,8 +286,8 @@ public sealed class DedicatedGatewayConnectionManagerTests
                 gatewayNodeId,
                 gatewayMasterConnectionId,
                 targetNodeKind,
-                "dedicated-local",
-                "dedicated-master-a",
+                "backend-local",
+                "backend-master-a",
                 string.Empty));
         }
     }
@@ -297,12 +297,12 @@ public sealed class DedicatedGatewayConnectionManagerTests
         string GatewayNodeId,
         string GatewayMasterConnectionId);
 
-    private sealed class RecordingWorldRuntime : IDedicatedWorldRuntime
+    private sealed class RecordingWorldRuntime : IBackendRuntime
     {
         public TaskCompletionSource<ReceivedPacket> Packet { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public TaskCompletionSource<DedicatedGatewayChannelCloseContext> Close { get; } = new(
+        public TaskCompletionSource<BackendGatewayChannelCloseContext> Close { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ValueTask StartAsync(CancellationToken cancellationToken)
@@ -316,7 +316,7 @@ public sealed class DedicatedGatewayConnectionManagerTests
         }
 
         public ValueTask HandleGatewayPacketAsync(
-            DedicatedGatewayPacketContext context,
+            BackendGatewayPacketContext context,
             ReadOnlyMemory<byte> payload,
             CancellationToken cancellationToken)
         {
@@ -325,7 +325,7 @@ public sealed class DedicatedGatewayConnectionManagerTests
         }
 
         public ValueTask HandleGatewayChannelClosedAsync(
-            DedicatedGatewayChannelCloseContext context,
+            BackendGatewayChannelCloseContext context,
             CancellationToken cancellationToken)
         {
             Close.TrySetResult(context);
@@ -334,7 +334,7 @@ public sealed class DedicatedGatewayConnectionManagerTests
     }
 
     private sealed record ReceivedPacket(
-        DedicatedGatewayPacketContext Context,
+        BackendGatewayPacketContext Context,
         byte[] Payload);
 
     private sealed class TestLogger<T> : ILogger<T>
