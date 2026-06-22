@@ -12,7 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ASPNETUtility\ASPNETUtility.csproj" />
     <ProjectReference Include="..\MasterServer.Core\MasterServer.Core.csproj" />
+    <ProjectReference Include="..\MasterServer.SQL\MasterServer.SQL.csproj" />
+    <ProjectReference Include="..\SQLMigration\SQLMigration.csproj" />
   </ItemGroup>
 
   <ItemGroup>
