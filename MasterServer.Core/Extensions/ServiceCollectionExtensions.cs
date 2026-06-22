@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
             .PersistKeysToStackExchangeRedis(redis)
             .SetApplicationName(serviceConnectionCredentials.DataProtectionApplicationName);
         services.AddSingleton<IServiceConnectionCredentials, MySqlServiceConnectionCredentials>();
+        services.AddSingleton<IGatewayBackendRoutePolicy, MySqlGatewayBackendRoutePolicy>();
         services.AddSingleton<INodeAuthSecretProvider, MySqlNodeAuthSecretProvider>();
         services.AddSingleton<IDirectConnectCodeStore, RedisDirectConnectCodeStore>();
 

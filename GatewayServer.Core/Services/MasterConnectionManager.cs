@@ -18,6 +18,7 @@ internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
     IDedicatedNodeCatalogWriter dedicatedNodeCatalog,
     IBackendNodeCatalogWriter backendNodeCatalog,
+    IGatewayBackendRoutePolicyWriter backendRoutePolicy,
     IServiceProvider serviceProvider,
     ILogger<MasterConnectionManager> logger) : IHostedService, IMasterConnectionStatusProvider, IDirectConnectCodeIssuer
 {
@@ -368,6 +369,20 @@ internal sealed class MasterConnectionManager(
                         snapshot.Nodes.Length,
                         string.Join(", ", snapshot.Nodes
                             .Select(static node => node.BackendKind)
+                            .Distinct(StringComparer.Ordinal)
+                            .OrderBy(static backendKind => backendKind, StringComparer.Ordinal)));
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.GatewayBackendRoutePolicySnapshot)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.GatewayBackendRoutePolicySnapshot);
+                    var snapshot = PacketCodec.Decode(frame, GatewayBackendRoutePolicySnapshot.Codec);
+                    backendRoutePolicy.Publish(snapshot);
+                    logger.LogInformation(
+                        "Gateway received Backend route policy snapshot. AllowedBackendKinds={AllowedBackendKinds}.",
+                        string.Join(", ", snapshot.AllowedBackendKinds
                             .Distinct(StringComparer.Ordinal)
                             .OrderBy(static backendKind => backendKind, StringComparer.Ordinal)));
                     continue;

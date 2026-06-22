@@ -13,7 +13,11 @@ namespace MasterAdmin.Services;
 
 public sealed class MasterOverviewSocketClient(
     IOptions<MasterConnectionOptions> options,
-    ILogger<MasterOverviewSocketClient> logger) : IHostedService, IMasterOverviewProvider, IServiceConnectionCredentials
+    ILogger<MasterOverviewSocketClient> logger) :
+    IHostedService,
+    IMasterOverviewProvider,
+    IServiceConnectionCredentials,
+    IGatewayBackendRoutePolicy
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
@@ -21,6 +25,7 @@ public sealed class MasterOverviewSocketClient(
     private readonly SemaphoreSlim m_WriteLock = new(1, 1);
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<ServiceAdminStatusResponse>> m_PendingStatusRequests = [];
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<ServiceConnectionCredentialManagementResponse>> m_PendingCredentialRequests = [];
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<GatewayBackendRoutePolicyManagementResponse>> m_PendingBackendRoutePolicyRequests = [];
     private MasterOverviewState m_State = CreateInitialState(options.Value);
     private Task? m_RunTask;
     private Stream? m_ActiveStream;
@@ -96,6 +101,62 @@ public sealed class MasterOverviewSocketClient(
             ServiceConnectionCredentialManagementRequest.Remove(Guid.NewGuid(), id),
             cancellationToken).ConfigureAwait(false);
         EnsureCredentialResponseSucceeded(response);
+    }
+
+    public async ValueTask<string[]> GetAllowedBackendKindsAsync(CancellationToken cancellationToken = default)
+    {
+        var entries = await GetEntriesAsync(cancellationToken).ConfigureAwait(false);
+        return
+        [
+            .. entries
+                .Where(static entry => entry.Enabled)
+                .Select(static entry => entry.BackendKind)
+                .OrderBy(static backendKind => backendKind, StringComparer.Ordinal)
+        ];
+    }
+
+    public async ValueTask<GatewayBackendRoutePolicyEntryInfo[]> GetEntriesAsync(CancellationToken cancellationToken = default)
+    {
+        var response = await RequestGatewayBackendRoutePolicyManagementAsync(
+            GatewayBackendRoutePolicyManagementRequest.List(Guid.NewGuid()),
+            cancellationToken).ConfigureAwait(false);
+        EnsureGatewayBackendRoutePolicyResponseSucceeded(response);
+        return response.Entries;
+    }
+
+    public async ValueTask<GatewayBackendRoutePolicyEntryInfo> CreateEntryAsync(
+        GatewayBackendRoutePolicyEntryInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await RequestGatewayBackendRoutePolicyManagementAsync(
+            GatewayBackendRoutePolicyManagementRequest.Create(Guid.NewGuid(), input),
+            cancellationToken).ConfigureAwait(false);
+        EnsureGatewayBackendRoutePolicyResponseSucceeded(response);
+        if (response.Entries.Length != 1)
+        {
+            throw new InvalidOperationException("Master did not return the created Gateway Backend route policy entry.");
+        }
+
+        return response.Entries[0];
+    }
+
+    public async ValueTask UpdateEntryAsync(
+        long id,
+        GatewayBackendRoutePolicyEntryInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await RequestGatewayBackendRoutePolicyManagementAsync(
+            GatewayBackendRoutePolicyManagementRequest.Update(Guid.NewGuid(), id, input),
+            cancellationToken).ConfigureAwait(false);
+        EnsureGatewayBackendRoutePolicyResponseSucceeded(response);
+    }
+
+    public async ValueTask RemoveEntryAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var response = await RequestGatewayBackendRoutePolicyManagementAsync(
+            GatewayBackendRoutePolicyManagementRequest.Remove(Guid.NewGuid(), id),
+            cancellationToken).ConfigureAwait(false);
+        EnsureGatewayBackendRoutePolicyResponseSucceeded(response);
     }
 
     public async Task<ServiceAdminStatusResponse> RequestServiceAdminStatusAsync(
@@ -175,6 +236,43 @@ public sealed class MasterOverviewSocketClient(
         finally
         {
             m_PendingCredentialRequests.TryRemove(request.RequestId, out _);
+        }
+    }
+
+    private async Task<GatewayBackendRoutePolicyManagementResponse> RequestGatewayBackendRoutePolicyManagementAsync(
+        GatewayBackendRoutePolicyManagementRequest request,
+        CancellationToken cancellationToken)
+    {
+        var stream = m_ActiveStream ?? throw new InvalidOperationException("Master overview socket is not connected.");
+        var completion = new TaskCompletionSource<GatewayBackendRoutePolicyManagementResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!m_PendingBackendRoutePolicyRequests.TryAdd(request.RequestId, completion))
+        {
+            throw new InvalidOperationException("A duplicate Gateway Backend route policy management request id was generated.");
+        }
+
+        try
+        {
+            using var frame = PacketCodec.Encode(
+                PacketKind.Control,
+                MasterControlPacketIds.GatewayBackendRoutePolicyManagementRequest,
+                MasterControlProtocol.SchemaVersion,
+                request,
+                GatewayBackendRoutePolicyManagementRequest.Codec);
+            await m_WriteLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                m_WriteLock.Release();
+            }
+
+            return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            m_PendingBackendRoutePolicyRequests.TryRemove(request.RequestId, out _);
         }
     }
 
@@ -446,6 +544,18 @@ public sealed class MasterOverviewSocketClient(
                     {
                         completion.TrySetResult(response);
                     }
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.GatewayBackendRoutePolicyManagementResponse)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.GatewayBackendRoutePolicyManagementResponse);
+                    var response = PacketCodec.Decode(frame, GatewayBackendRoutePolicyManagementResponse.Codec);
+                    if (m_PendingBackendRoutePolicyRequests.TryRemove(response.RequestId, out var completion))
+                    {
+                        completion.TrySetResult(response);
+                    }
                 }
             }
         }
@@ -543,6 +653,14 @@ public sealed class MasterOverviewSocketClient(
                 completion.TrySetException(exception);
             }
         }
+
+        foreach (var request in m_PendingBackendRoutePolicyRequests.ToArray())
+        {
+            if (m_PendingBackendRoutePolicyRequests.TryRemove(request.Key, out var completion))
+            {
+                completion.TrySetException(exception);
+            }
+        }
     }
 
     private static void EnsureCredentialResponseSucceeded(ServiceConnectionCredentialManagementResponse response)
@@ -555,6 +673,19 @@ public sealed class MasterOverviewSocketClient(
         throw new InvalidOperationException(
             string.IsNullOrWhiteSpace(response.ErrorMessage)
                 ? "Master rejected the credential management request."
+                : response.ErrorMessage);
+    }
+
+    private static void EnsureGatewayBackendRoutePolicyResponseSucceeded(GatewayBackendRoutePolicyManagementResponse response)
+    {
+        if (response.Success)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(response.ErrorMessage)
+                ? "Master rejected the Gateway Backend route policy management request."
                 : response.ErrorMessage);
     }
 

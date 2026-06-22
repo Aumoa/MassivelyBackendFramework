@@ -24,6 +24,7 @@ internal class ConnectionManager(
     IOptions<ConnectionManagerOptions> options,
     IOptions<BackendRouteOptions> backendRouteOptions,
     IBackendRouteManager backendRouteManager,
+    IGatewayBackendRoutePolicyProvider gatewayBackendRoutePolicy,
     IGatewayClientCertificateLoader certificateLoader,
     IGatewayClientStreamAuthenticator streamAuthenticator,
     IGatewayClientAuthenticationContextFactory authenticationContextFactory,
@@ -38,6 +39,7 @@ internal class ConnectionManager(
     private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_BackendOriginPrincipalExchangeCounters = new(StringComparer.Ordinal);
     private readonly PersistentBackendRouteRegistry<Client> m_PersistentBackendRouteRegistry = new(
         backendRouteOptions.Value,
+        gatewayBackendRoutePolicy,
         routeTokenGenerator,
         logger);
 

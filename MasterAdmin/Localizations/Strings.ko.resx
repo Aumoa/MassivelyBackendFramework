@@ -279,6 +279,9 @@
   <data name="NAV_CONNECTIONS" xml:space="preserve">
     <value>연결 자격</value>
   </data>
+  <data name="NAV_BACKEND_ROUTES" xml:space="preserve">
+    <value>백엔드 라우트</value>
+  </data>
   <data name="CONNECTION_CREDENTIALS_EYEBROW" xml:space="preserve">
     <value>자격 증명</value>
   </data>
@@ -364,6 +367,72 @@
     <value>회전</value>
   </data>
   <data name="CONNECTION_CREDENTIALS_REMOVE" xml:space="preserve">
+    <value>제거</value>
+  </data>
+  <data name="BACKEND_ROUTES_EYEBROW" xml:space="preserve">
+    <value>Gateway 정책</value>
+  </data>
+  <data name="BACKEND_ROUTES_TITLE" xml:space="preserve">
+    <value>백엔드 라우트 정책</value>
+  </data>
+  <data name="BACKEND_ROUTES_SUMMARY" xml:space="preserve">
+    <value>Gateway 클라이언트가 persistent route로 열 수 있는 백엔드 종류를 관리합니다.</value>
+  </data>
+  <data name="BACKEND_ROUTES_FORM_DESCRIPTION" xml:space="preserve">
+    <value>연결된 Gateway에 적용할 백엔드 종류 allow-list 항목을 생성하거나 수정합니다.</value>
+  </data>
+  <data name="BACKEND_ROUTES_NEW" xml:space="preserve">
+    <value>새로 만들기</value>
+  </data>
+  <data name="BACKEND_ROUTES_CREATE_TITLE" xml:space="preserve">
+    <value>라우트 정책 생성</value>
+  </data>
+  <data name="BACKEND_ROUTES_EDIT_TITLE" xml:space="preserve">
+    <value>라우트 정책 수정</value>
+  </data>
+  <data name="BACKEND_ROUTES_BACKEND_KIND" xml:space="preserve">
+    <value>백엔드 종류</value>
+  </data>
+  <data name="BACKEND_ROUTES_ENABLED" xml:space="preserve">
+    <value>활성</value>
+  </data>
+  <data name="BACKEND_ROUTES_DISABLED" xml:space="preserve">
+    <value>비활성</value>
+  </data>
+  <data name="BACKEND_ROUTES_CREATE" xml:space="preserve">
+    <value>생성</value>
+  </data>
+  <data name="BACKEND_ROUTES_SAVE" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="BACKEND_ROUTES_SAVING" xml:space="preserve">
+    <value>저장 중</value>
+  </data>
+  <data name="BACKEND_ROUTES_LIST_TITLE" xml:space="preserve">
+    <value>허용된 백엔드 종류</value>
+  </data>
+  <data name="BACKEND_ROUTES_LIST_DESCRIPTION" xml:space="preserve">
+    <value>활성 항목은 Master 제어 소켓을 통해 연결된 Gateway에 전달됩니다.</value>
+  </data>
+  <data name="BACKEND_ROUTES_EMPTY_TITLE" xml:space="preserve">
+    <value>백엔드 라우트 정책 없음</value>
+  </data>
+  <data name="BACKEND_ROUTES_EMPTY_DESCRIPTION" xml:space="preserve">
+    <value>활성 백엔드 종류를 추가하기 전까지 클라이언트 Backend route open은 허용되지 않습니다.</value>
+  </data>
+  <data name="BACKEND_ROUTES_STATUS" xml:space="preserve">
+    <value>상태</value>
+  </data>
+  <data name="BACKEND_ROUTES_UPDATED" xml:space="preserve">
+    <value>수정 시각</value>
+  </data>
+  <data name="BACKEND_ROUTES_ACTIONS" xml:space="preserve">
+    <value>작업</value>
+  </data>
+  <data name="BACKEND_ROUTES_EDIT" xml:space="preserve">
+    <value>수정</value>
+  </data>
+  <data name="BACKEND_ROUTES_REMOVE" xml:space="preserve">
     <value>제거</value>
   </data>
 </root>

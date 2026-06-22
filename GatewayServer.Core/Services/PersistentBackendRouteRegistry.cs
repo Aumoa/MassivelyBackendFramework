@@ -8,6 +8,7 @@ namespace GatewayServer.Services;
 
 internal sealed class PersistentBackendRouteRegistry<TOwner>(
     BackendRouteOptions options,
+    IGatewayBackendRoutePolicyProvider backendRoutePolicy,
     IGatewayBackendRouteTokenGenerator tokenGenerator,
     ILogger logger)
     where TOwner : class
@@ -25,13 +26,9 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
         }
 
         var normalizedBackendKind = backendKind.Trim();
-        var allowedBackendKinds = options.AllowedBackendKinds ?? [];
-        if (allowedBackendKinds.Any(candidate => string.Equals(
-                candidate?.Trim(),
-                normalizedBackendKind,
-                StringComparison.Ordinal)))
+        if (backendRoutePolicy.IsBackendKindAllowed(normalizedBackendKind, out var allowedBackendKind))
         {
-            return normalizedBackendKind;
+            return allowedBackendKind;
         }
 
         throw new UnauthorizedAccessException($"Backend kind '{normalizedBackendKind}' is not enabled for persistent client routing.");
@@ -263,7 +260,7 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
     public ServiceAdminStatusItem[] GetStatusItems()
     {
         var routes = m_Routes.Values.ToArray();
-        var allowedBackendKinds = options.AllowedBackendKinds ?? [];
+        var allowedBackendKinds = backendRoutePolicy.GetAllowedBackendKinds();
         var items = new List<ServiceAdminStatusItem>
         {
             new("Persistent Backend routes", "Allowed kinds", allowedBackendKinds.Length == 0

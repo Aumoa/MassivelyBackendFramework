@@ -1,0 +1,228 @@
+@page "/backend-routes"
+@attribute [Authorize(Policy = MasterAuthorizationPolicies.Admin)]
+@inject IGatewayBackendRoutePolicy BackendRoutePolicy
+
+<PageTitle>@T("BACKEND_ROUTES_TITLE")</PageTitle>
+
+<section class="backend-routes-header">
+    <div>
+        <p class="eyebrow">@T("BACKEND_ROUTES_EYEBROW")</p>
+        <h1>@T("BACKEND_ROUTES_TITLE")</h1>
+        <p class="summary">@T("BACKEND_ROUTES_SUMMARY")</p>
+    </div>
+</section>
+
+<section class="route-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>@FormTitle</h2>
+            <p>@T("BACKEND_ROUTES_FORM_DESCRIPTION")</p>
+        </div>
+        <button type="button" class="refresh-button" @onclick="ResetForm">
+            @T("BACKEND_ROUTES_NEW")
+        </button>
+    </div>
+
+    <EditForm Model="Form" OnValidSubmit="SaveAsync" FormName="gateway-backend-route-policy-entry">
+        <DataAnnotationsValidator />
+        <div class="route-form">
+            <label>
+                <span>@T("BACKEND_ROUTES_BACKEND_KIND")</span>
+                <InputText @bind-Value="Form.BackendKind" maxlength="128" />
+            </label>
+            <label class="toggle-row">
+                <InputCheckbox @bind-Value="Form.Enabled" />
+                <span>@T("BACKEND_ROUTES_ENABLED")</span>
+            </label>
+            <button type="submit" class="refresh-button" disabled="@IsBusy">
+                @SaveButtonText
+            </button>
+        </div>
+        <ValidationSummary />
+    </EditForm>
+</section>
+
+<section class="route-panel">
+    <div class="panel-heading">
+        <div>
+            <h2>@T("BACKEND_ROUTES_LIST_TITLE")</h2>
+            <p>@T("BACKEND_ROUTES_LIST_DESCRIPTION")</p>
+        </div>
+        <button type="button" class="refresh-button" @onclick="LoadAsync" disabled="@IsBusy">
+            @Strings.NODE_REFRESH
+        </button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+    {
+        <div class="empty-state">
+            <strong>@Strings.NODE_STATUS_ERROR_TITLE</strong>
+            <span>@ErrorMessage</span>
+        </div>
+    }
+    else if (Items.Length == 0)
+    {
+        <div class="empty-state">
+            <strong>@T("BACKEND_ROUTES_EMPTY_TITLE")</strong>
+            <span>@T("BACKEND_ROUTES_EMPTY_DESCRIPTION")</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>@T("BACKEND_ROUTES_BACKEND_KIND")</th>
+                        <th>@T("BACKEND_ROUTES_STATUS")</th>
+                        <th>@T("BACKEND_ROUTES_UPDATED")</th>
+                        <th>@T("BACKEND_ROUTES_ACTIONS")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Items)
+                    {
+                        <tr>
+                            <td><code>@item.BackendKind</code></td>
+                            <td>@(item.Enabled ? T("BACKEND_ROUTES_ENABLED") : T("BACKEND_ROUTES_DISABLED"))</td>
+                            <td>@item.UpdatedAt</td>
+                            <td>
+                                <div class="action-row">
+                                    <button type="button" class="table-button" @onclick="() => Edit(item)" disabled="@IsBusy">
+                                        @T("BACKEND_ROUTES_EDIT")
+                                    </button>
+                                    <button type="button" class="table-button danger" @onclick="() => RemoveAsync(item.Id)" disabled="@IsBusy">
+                                        @T("BACKEND_ROUTES_REMOVE")
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    private GatewayBackendRoutePolicyEntryInfo[] Items { get; set; } = [];
+
+    private RoutePolicyFormModel Form { get; set; } = new();
+
+    private long? EditingId { get; set; }
+
+    private string? ErrorMessage { get; set; }
+
+    private bool IsBusy { get; set; }
+
+    private string FormTitle => EditingId.HasValue
+        ? T("BACKEND_ROUTES_EDIT_TITLE")
+        : T("BACKEND_ROUTES_CREATE_TITLE");
+
+    private string SaveButtonText => IsBusy
+        ? T("BACKEND_ROUTES_SAVING")
+        : EditingId.HasValue
+            ? T("BACKEND_ROUTES_SAVE")
+            : T("BACKEND_ROUTES_CREATE");
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        await RunBusyAsync(async () =>
+        {
+            Items = await BackendRoutePolicy.GetEntriesAsync();
+        });
+    }
+
+    private async Task SaveAsync()
+    {
+        await RunBusyAsync(async () =>
+        {
+            var input = new GatewayBackendRoutePolicyEntryInput(
+                Form.BackendKind.Trim(),
+                Form.Enabled);
+
+            if (EditingId.HasValue)
+            {
+                await BackendRoutePolicy.UpdateEntryAsync(EditingId.Value, input);
+            }
+            else
+            {
+                await BackendRoutePolicy.CreateEntryAsync(input);
+            }
+
+            ResetForm();
+            Items = await BackendRoutePolicy.GetEntriesAsync();
+        });
+    }
+
+    private async Task RemoveAsync(long id)
+    {
+        await RunBusyAsync(async () =>
+        {
+            await BackendRoutePolicy.RemoveEntryAsync(id);
+            Items = await BackendRoutePolicy.GetEntriesAsync();
+            if (EditingId == id)
+            {
+                ResetForm();
+            }
+        });
+    }
+
+    private void Edit(GatewayBackendRoutePolicyEntryInfo item)
+    {
+        EditingId = item.Id;
+        Form = new RoutePolicyFormModel
+        {
+            BackendKind = item.BackendKind,
+            Enabled = item.Enabled
+        };
+    }
+
+    private void ResetForm()
+    {
+        EditingId = null;
+        Form = new RoutePolicyFormModel();
+    }
+
+    private async Task RunBusyAsync(Func<Task> action)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            ErrorMessage = null;
+            await action();
+        }
+        catch (Exception e)
+        {
+            ErrorMessage = e.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, Strings.Culture) ?? key;
+    }
+
+    private sealed class RoutePolicyFormModel
+    {
+        [Required]
+        [StringLength(128)]
+        public string BackendKind { get; set; } = string.Empty;
+
+        public bool Enabled { get; set; } = true;
+    }
+}

@@ -24,10 +24,10 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000
             },
-            out var port);
+            out var port,
+            allowedBackendKinds: []);
 
         await connectionManager.StartAsync(CancellationToken.None);
 
@@ -76,7 +76,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000
             },
             out var port,
@@ -128,7 +127,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000
             },
             out var port,
@@ -172,7 +170,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000
             },
             out var port,
@@ -225,7 +222,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 MaxOpenRoutes = 8,
                 MaxOpenRoutesPerClient = 2,
@@ -283,7 +279,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 MaxOpenRoutes = 8,
                 MaxOpenRoutesPerClient = 2,
@@ -341,7 +336,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 MaxOpenRoutes = 8,
                 MaxOpenRoutesPerClient = 8,
@@ -404,7 +398,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 MaxOpenRoutes = 8,
                 MaxOpenRoutesPerClient = 8,
@@ -468,10 +461,10 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = [],
                 RequestTimeoutMilliseconds = 5000
             },
-            out var port);
+            out var port,
+            allowedBackendKinds: []);
 
         await connectionManager.StartAsync(CancellationToken.None);
 
@@ -516,7 +509,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -565,7 +557,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -621,7 +612,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -682,7 +672,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 MaxOpenRoutes = 8,
                 MaxOpenRoutesPerClient = 8,
@@ -755,7 +744,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -818,7 +806,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000,
                 MaxPendingExchangesPerRoutePerDirection = 1
@@ -881,7 +868,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -938,7 +924,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1017,7 +1002,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1106,7 +1090,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1155,7 +1138,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000,
                 ExchangeTimeoutMilliseconds = 25
@@ -1221,7 +1203,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1269,7 +1250,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000,
                 ExchangeTimeoutMilliseconds = 25
@@ -1338,7 +1318,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1383,7 +1362,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1435,7 +1413,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1498,7 +1475,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1562,7 +1538,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1650,7 +1625,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1714,7 +1688,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1802,7 +1775,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1858,7 +1830,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1900,7 +1871,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -1964,7 +1934,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -2022,7 +1991,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000
             },
             out var port);
@@ -2065,7 +2033,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -2118,7 +2085,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -2163,7 +2129,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"],
                 RequestTimeoutMilliseconds = 5000,
                 RouteLifetimeMilliseconds = 5000
             },
@@ -2204,7 +2169,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"]
             },
             out _,
             connectionOptions: new ConnectionManagerOptions
@@ -2226,7 +2190,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"]
             },
             out _,
             certificateLoader: new ThrowingCertificateLoader(expected));
@@ -2246,7 +2209,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"]
             },
             out _,
             hostEnvironment: new TestHostEnvironment
@@ -2276,7 +2238,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"]
             },
             out _,
             hostEnvironment: new TestHostEnvironment
@@ -2305,7 +2266,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"]
             },
             out var port,
             connectionOptions: new ConnectionManagerOptions
@@ -2343,7 +2303,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager,
             new BackendRouteOptions
             {
-                AllowedBackendKinds = ["alpha"]
             },
             out var port,
             connectionOptions: new ConnectionManagerOptions
@@ -2383,7 +2342,8 @@ public sealed class ConnectionManagerBackendRouteTests
         IGatewayClientCertificateLoader? certificateLoader = null,
         IGatewayClientStreamAuthenticator? streamAuthenticator = null,
         bool authenticateClients = true,
-        IGatewayClientTokenValidator? clientTokenValidator = null)
+        IGatewayClientTokenValidator? clientTokenValidator = null,
+        string[]? allowedBackendKinds = null)
     {
         port = GetAvailableTcpPort();
         connectionOptions ??= new ConnectionManagerOptions
@@ -2395,6 +2355,7 @@ public sealed class ConnectionManagerBackendRouteTests
             Microsoft.Extensions.Options.Options.Create(connectionOptions),
             Microsoft.Extensions.Options.Options.Create(backendRouteOptions),
             routeManager,
+            new StaticGatewayBackendRoutePolicyProvider(allowedBackendKinds ?? ["alpha"]),
             certificateLoader ?? new StaticCertificateLoader(CreateServerCertificate()),
             streamAuthenticator ?? new PassThroughStreamAuthenticator(),
             new StaticGatewayClientAuthenticationContextFactory(authenticateClients),
@@ -2402,6 +2363,36 @@ public sealed class ConnectionManagerBackendRouteTests
             new GatewayBackendRouteTokenGenerator(),
             NullLogger<ConnectionManager>.Instance,
             hostEnvironment ?? new TestHostEnvironment());
+    }
+
+    private sealed class StaticGatewayBackendRoutePolicyProvider(string[] allowedBackendKinds)
+        : IGatewayBackendRoutePolicyProvider
+    {
+        private readonly string[] m_AllowedBackendKinds =
+        [
+            .. allowedBackendKinds
+                .Where(static backendKind => !string.IsNullOrWhiteSpace(backendKind))
+                .Select(static backendKind => backendKind.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static backendKind => backendKind, StringComparer.Ordinal)
+        ];
+
+        public string[] GetAllowedBackendKinds()
+        {
+            return [.. m_AllowedBackendKinds];
+        }
+
+        public bool IsBackendKindAllowed(string backendKind, out string normalizedBackendKind)
+        {
+            var normalized = string.IsNullOrWhiteSpace(backendKind)
+                ? string.Empty
+                : backendKind.Trim();
+            normalizedBackendKind = normalized;
+            return m_AllowedBackendKinds.Any(candidate => string.Equals(
+                candidate,
+                normalized,
+                StringComparison.Ordinal));
+        }
     }
 
     private static int GetAvailableTcpPort()

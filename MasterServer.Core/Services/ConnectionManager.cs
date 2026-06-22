@@ -20,11 +20,13 @@ internal sealed class ConnectionManager(
     INodeAuthSecretProvider nodeAuthSecretProvider,
     IDirectConnectCodeStore directConnectCodeStore,
     IServiceConnectionCredentials serviceConnectionCredentials,
+    IGatewayBackendRoutePolicy gatewayBackendRoutePolicy,
     ILogger<ConnectionManager> logger) : IHostedService, IConnectionManager
 {
     private readonly MasterSocketOptions m_Options = options.Value;
     private readonly ServiceConnectionCredentialOptions m_ServiceCredentialOptions = serviceCredentialOptions.Value;
     private readonly IServiceConnectionCredentials m_ServiceConnectionCredentials = serviceConnectionCredentials;
+    private readonly IGatewayBackendRoutePolicy m_GatewayBackendRoutePolicy = gatewayBackendRoutePolicy;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly ConcurrentDictionary<Guid, MasterConnection> m_Connections = [];
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
@@ -407,6 +409,12 @@ internal sealed class ConnectionManager(
             await HandleServiceConnectionCredentialManagementRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
             return;
         }
+
+        if (frame.Header.PacketId == MasterControlPacketIds.GatewayBackendRoutePolicyManagementRequest)
+        {
+            await HandleGatewayBackendRoutePolicyManagementRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+            return;
+        }
     }
 
     private async Task PushOverviewUntilClosedAsync(MasterConnection connection, Stream stream, CancellationToken cancellationToken)
@@ -520,6 +528,7 @@ internal sealed class ConnectionManager(
     {
         await WriteDedicatedNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
         await WriteBackendNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+        await WriteGatewayBackendRoutePolicySnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task WriteDedicatedNodeSnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
@@ -538,6 +547,51 @@ internal sealed class ConnectionManager(
             CreateBackendNodeSnapshot(),
             BackendNodeSnapshot.Codec,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteGatewayBackendRoutePolicySnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
+    {
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.GatewayBackendRoutePolicySnapshot,
+            await CreateGatewayBackendRoutePolicySnapshotAsync(cancellationToken).ConfigureAwait(false),
+            GatewayBackendRoutePolicySnapshot.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task BroadcastGatewayBackendRoutePolicySnapshotAsync(CancellationToken cancellationToken)
+    {
+        var gateways = m_Connections.Values
+            .Where(static connection => connection.IsTrusted && connection.NodeKind == MasterNodeKind.Gateway)
+            .ToArray();
+
+        foreach (var gateway in gateways)
+        {
+            try
+            {
+                await WriteGatewayBackendRoutePolicySnapshotAsync(gateway, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception e) when (IsRemoteDisconnect(e))
+            {
+                logger.LogDebug(
+                    e,
+                    "Gateway Backend route policy snapshot write failed because the remote connection closed. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    gateway.ConnectionId,
+                    gateway.NodeId);
+                gateway.Dispose();
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(
+                    e,
+                    "Failed to push Gateway Backend route policy snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    gateway.ConnectionId,
+                    gateway.NodeId);
+            }
+        }
     }
 
     private async Task RelayServiceAdminStatusRequestAsync(
@@ -814,6 +868,55 @@ internal sealed class ConnectionManager(
             cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task HandleGatewayBackendRoutePolicyManagementRequestAsync(
+        MasterConnection source,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.GatewayBackendRoutePolicyManagementRequest);
+        var request = PacketCodec.Decode(frame, GatewayBackendRoutePolicyManagementRequest.Codec);
+
+        if (source.NodeKind != MasterNodeKind.MasterAdmin)
+        {
+            logger.LogWarning(
+                "Rejected Gateway Backend route policy management request from non-admin node. SourceConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
+                source.ConnectionId,
+                source.NodeKind,
+                source.NodeId);
+            return;
+        }
+
+        GatewayBackendRoutePolicyManagementResponse response;
+        try
+        {
+            response = await ExecuteGatewayBackendRoutePolicyRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Failed to process Gateway Backend route policy management request. RequestId={RequestId}, Operation={Operation}.",
+                request.RequestId,
+                request.Operation);
+            response = GatewayBackendRoutePolicyManagementResponse.Failure(request.RequestId, e.Message);
+        }
+
+        await source.WriteControlAsync(
+            MasterControlPacketIds.GatewayBackendRoutePolicyManagementResponse,
+            response,
+            GatewayBackendRoutePolicyManagementResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+
+        if (response.Success && IsGatewayBackendRoutePolicyMutation(request.Operation))
+        {
+            await BroadcastGatewayBackendRoutePolicySnapshotAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private async ValueTask<ServiceConnectionCredentialManagementResponse> ExecuteServiceConnectionCredentialRequestAsync(
         ServiceConnectionCredentialManagementRequest request,
         CancellationToken cancellationToken)
@@ -866,6 +969,46 @@ internal sealed class ConnectionManager(
         }
     }
 
+    private async ValueTask<GatewayBackendRoutePolicyManagementResponse> ExecuteGatewayBackendRoutePolicyRequestAsync(
+        GatewayBackendRoutePolicyManagementRequest request,
+        CancellationToken cancellationToken)
+    {
+        switch (request.Operation)
+        {
+            case GatewayBackendRoutePolicyOperation.List:
+            {
+                var entries = await m_GatewayBackendRoutePolicy.GetEntriesAsync(cancellationToken).ConfigureAwait(false);
+                return GatewayBackendRoutePolicyManagementResponse.SuccessResult(request.RequestId, entries);
+            }
+
+            case GatewayBackendRoutePolicyOperation.Create:
+            {
+                var created = await m_GatewayBackendRoutePolicy.CreateEntryAsync(request.ToInput(), cancellationToken).ConfigureAwait(false);
+                return GatewayBackendRoutePolicyManagementResponse.SuccessResult(
+                    request.RequestId,
+                    [created]);
+            }
+
+            case GatewayBackendRoutePolicyOperation.Update:
+                await m_GatewayBackendRoutePolicy.UpdateEntryAsync(
+                    request.EntryId,
+                    request.ToInput(),
+                    cancellationToken).ConfigureAwait(false);
+                return GatewayBackendRoutePolicyManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<GatewayBackendRoutePolicyEntryInfo>());
+
+            case GatewayBackendRoutePolicyOperation.Remove:
+                await m_GatewayBackendRoutePolicy.RemoveEntryAsync(request.EntryId, cancellationToken).ConfigureAwait(false);
+                return GatewayBackendRoutePolicyManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<GatewayBackendRoutePolicyEntryInfo>());
+
+            default:
+                throw new InvalidOperationException($"Unsupported Gateway Backend route policy management operation '{request.Operation}'.");
+        }
+    }
+
     private async Task WriteDirectConnectCodeFailureAsync(
         MasterConnection connection,
         Guid requestId,
@@ -915,6 +1058,14 @@ internal sealed class ConnectionManager(
         return nodeKind is MasterNodeKind.Dedicated or MasterNodeKind.Backend;
     }
 
+    private static bool IsGatewayBackendRoutePolicyMutation(GatewayBackendRoutePolicyOperation operation)
+    {
+        return operation is
+            GatewayBackendRoutePolicyOperation.Create or
+            GatewayBackendRoutePolicyOperation.Update or
+            GatewayBackendRoutePolicyOperation.Remove;
+    }
+
     private MasterOverviewSnapshot CreateOverviewSnapshot()
     {
         return new MasterOverviewSnapshot(
@@ -943,6 +1094,16 @@ internal sealed class ConnectionManager(
                 .Select(static endpoint => endpoint!)
                 .OrderBy(static endpoint => endpoint.BackendKind, StringComparer.Ordinal)
                 .ThenBy(static endpoint => endpoint.NodeId, StringComparer.Ordinal)],
+            DateTimeOffset.UtcNow);
+    }
+
+    private async Task<GatewayBackendRoutePolicySnapshot> CreateGatewayBackendRoutePolicySnapshotAsync(CancellationToken cancellationToken)
+    {
+        var allowedBackendKinds = await m_GatewayBackendRoutePolicy
+            .GetAllowedBackendKindsAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return new GatewayBackendRoutePolicySnapshot(
+            allowedBackendKinds,
             DateTimeOffset.UtcNow);
     }
 
