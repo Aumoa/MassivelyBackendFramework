@@ -16,6 +16,18 @@ internal sealed class NoOpBackendRuntime(ILogger<NoOpBackendRuntime> logger) : I
         return ValueTask.CompletedTask;
     }
 
+    public ValueTask HandleGatewayChannelOpenedAsync(
+        BackendGatewayChannelOpenContext context,
+        CancellationToken cancellationToken)
+    {
+        logger.LogDebug(
+            "Ignored Gateway channel open because no Backend runtime is configured. GatewayNodeId={GatewayNodeId}, ChannelId={ChannelId}, PrincipalSubjectId={PrincipalSubjectId}.",
+            context.GatewayNodeId,
+            context.ChannelId,
+            context.PrincipalSubjectId);
+        return ValueTask.CompletedTask;
+    }
+
     public ValueTask HandleGatewayPacketAsync(
         BackendGatewayPacketContext context,
         ReadOnlyMemory<byte> payload,

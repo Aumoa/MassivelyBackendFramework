@@ -15,4 +15,5 @@ public static class Pid
     public const ushort GATE_CLIENT_AUTHENTICATE = 7;
     public const ushort GATE_BACKEND_CHANNEL_DATA = 8;
     public const ushort GATE_BACKEND_CHANNEL_CLOSE = 9;
+    public const ushort GATE_BACKEND_CHANNEL_OPEN = 10;
 }

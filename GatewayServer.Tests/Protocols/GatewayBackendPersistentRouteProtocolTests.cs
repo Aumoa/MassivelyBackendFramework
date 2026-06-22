@@ -167,6 +167,42 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
     }
 
     [Fact]
+    public void ChannelOpen_Codec_RoundTrips_ChannelAndPrincipal()
+    {
+        var open = new GatewayBackendChannelOpen(37, "player-1");
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Notify,
+            Pid.GATE_BACKEND_CHANNEL_OPEN,
+            GatewayBackendChannelOpen.ProtocolVersion,
+            open,
+            GatewayBackendChannelOpen.Codec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendChannelOpen.Codec);
+
+        Assert.Equal((uint)37, decoded.ChannelId);
+        Assert.Equal("player-1", decoded.PrincipalSubjectId);
+    }
+
+    [Fact]
+    public void ChannelOpen_Codec_RoundTrips_AnonymousChannel()
+    {
+        var open = new GatewayBackendChannelOpen(37, principalSubjectId: null);
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Notify,
+            Pid.GATE_BACKEND_CHANNEL_OPEN,
+            GatewayBackendChannelOpen.ProtocolVersion,
+            open,
+            GatewayBackendChannelOpen.Codec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendChannelOpen.Codec);
+
+        Assert.Equal((uint)37, decoded.ChannelId);
+        Assert.Null(decoded.PrincipalSubjectId);
+    }
+
+    [Fact]
     public void Close_Codec_RoundTrips_RouteToken()
     {
         var routeToken = new GatewayBackendRouteToken("route-token-alpha");

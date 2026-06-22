@@ -487,7 +487,9 @@ internal class ConnectionManager(
         PacketFrame packet,
         CancellationToken cancellationToken)
     {
+        PersistentBackendRoute<Client>? openedRoute = null;
         var backendKind = string.Empty;
+        var backendOpenNotified = false;
 
         try
         {
@@ -519,6 +521,10 @@ internal class ConnectionManager(
                 client,
                 principalSubjectId,
                 m_GracefulCancellation.Token);
+            openedRoute = route;
+
+            await NotifyBackendRouteOpenedAsync(route, cancellationToken).ConfigureAwait(false);
+            backendOpenNotified = true;
 
             await WriteBackendRouteOpenResponseAsync(
                 client,
@@ -532,6 +538,21 @@ internal class ConnectionManager(
         }
         catch (Exception e)
         {
+            if (openedRoute != null &&
+                openedRoute.State == PersistentBackendRouteState.Open)
+            {
+                m_PersistentBackendRouteRegistry.Close(
+                    openedRoute.RouteToken,
+                    "Backend route open failed.");
+                if (backendOpenNotified)
+                {
+                    await NotifyBackendRouteClosedAsync(
+                        openedRoute,
+                        "Backend route open failed.",
+                        cancellationToken).ConfigureAwait(false);
+                }
+            }
+
             logger.LogWarning(
                 e,
                 "Gateway rejected Backend route open packet. BackendKind={BackendKind}, PacketKind={PacketKind}, PacketId={PacketId}.",
@@ -1180,6 +1201,22 @@ internal class ConnectionManager(
                 route.BackendBinding.NodeId,
                 route.ChannelId);
         }
+    }
+
+    private async Task NotifyBackendRouteOpenedAsync(
+        PersistentBackendRoute<Client> route,
+        CancellationToken cancellationToken)
+    {
+        using var openFrame = PacketCodec.Encode(
+            PacketKind.Notify,
+            Pid.GATE_BACKEND_CHANNEL_OPEN,
+            GatewayBackendChannelOpen.ProtocolVersion,
+            new GatewayBackendChannelOpen(route.ChannelId, route.PrincipalSubjectId),
+            GatewayBackendChannelOpen.Codec);
+        await backendRouteManager.RelayFrameAsync(
+            route.BackendBinding,
+            openFrame,
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static Guid GetResponseRouteId(Guid routeId)

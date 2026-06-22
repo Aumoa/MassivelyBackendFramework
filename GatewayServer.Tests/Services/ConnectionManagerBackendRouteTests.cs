@@ -264,6 +264,12 @@ public sealed class ConnectionManagerBackendRouteTests
             Assert.Equal("alpha", acceptedRoute.BackendKind);
             Assert.NotNull(acceptedRoute.RouteToken);
             Assert.Equal(1, routeManager.ConnectCount);
+
+            var opened = await routeManager.RelayedOpenFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("alpha", opened.BackendKind);
+            Assert.Equal(routeManager.DefaultBinding, opened.Binding);
+            Assert.NotEqual(0u, opened.Open.ChannelId);
+            Assert.Equal("player-1", opened.Open.PrincipalSubjectId);
         }
         finally
         {
@@ -311,7 +317,13 @@ public sealed class ConnectionManagerBackendRouteTests
             Assert.NotEqual("alpha", routeToken!.Value);
             Assert.True(routeToken.Value.Length >= 32);
             Assert.Equal(string.Empty, accepted.ErrorMessage);
-            Assert.Equal(0, routeManager.RelayCount);
+            Assert.Equal(1, routeManager.RelayCount);
+
+            var opened = await routeManager.RelayedOpenFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("alpha", opened.BackendKind);
+            Assert.Equal(routeManager.DefaultBinding, opened.Binding);
+            Assert.NotEqual(0u, opened.Open.ChannelId);
+            Assert.Equal("test-client", opened.Open.PrincipalSubjectId);
 
             Assert.Contains(connectionManager.GetStatusItems(), item =>
                 item.Group == "Persistent Backend routes" &&
@@ -595,7 +607,7 @@ public sealed class ConnectionManagerBackendRouteTests
             Assert.Equal((ushort)2, relayed.Envelope.RoutedVersion);
             Assert.False(relayed.Envelope.ExchangeId.HasValue);
             Assert.Equal(payload, relayed.Envelope.RoutedPayload);
-            Assert.Equal(1, routeManager.RelayCount);
+            Assert.Equal(2, routeManager.RelayCount);
         }
         finally
         {
@@ -714,7 +726,7 @@ public sealed class ConnectionManagerBackendRouteTests
                 [1, 2, 3]);
             await WriteBackendRouteDataEnvelopeAsync(firstStream, PacketKind.Request, firstEnvelope);
             await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Equal(1, routeManager.RelayCount);
+            Assert.Equal(3, routeManager.RelayCount);
 
             var secondEnvelope = new GatewayBackendRouteDataEnvelope(
                 secondRouteToken,
@@ -727,7 +739,7 @@ public sealed class ConnectionManagerBackendRouteTests
             await WriteBackendRouteDataEnvelopeAsync(secondStream, PacketKind.Request, secondEnvelope);
             await Task.Delay(TimeSpan.FromMilliseconds(250));
 
-            Assert.Equal(1, routeManager.RelayCount);
+            Assert.Equal(3, routeManager.RelayCount);
         }
         finally
         {
@@ -780,12 +792,12 @@ public sealed class ConnectionManagerBackendRouteTests
 
             await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Request, firstEnvelope);
             await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Equal(1, routeManager.RelayCount);
+            Assert.Equal(2, routeManager.RelayCount);
 
             await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Request, duplicateEnvelope);
             await Task.Delay(TimeSpan.FromMilliseconds(250));
 
-            Assert.Equal(1, routeManager.RelayCount);
+            Assert.Equal(2, routeManager.RelayCount);
             Assert.Contains(connectionManager.GetStatusItems(), item =>
                 item.Group == "Persistent Backend routes" &&
                 item.Name == "Pending client exchanges" &&
@@ -842,12 +854,12 @@ public sealed class ConnectionManagerBackendRouteTests
 
             await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Request, firstEnvelope);
             await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Equal(1, routeManager.RelayCount);
+            Assert.Equal(2, routeManager.RelayCount);
 
             await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Request, rejectedEnvelope);
             await Task.Delay(TimeSpan.FromMilliseconds(250));
 
-            Assert.Equal(1, routeManager.RelayCount);
+            Assert.Equal(2, routeManager.RelayCount);
             Assert.Contains(connectionManager.GetStatusItems(), item =>
                 item.Group == "Persistent Backend routes" &&
                 item.Name == "Pending client exchanges" &&
@@ -2648,6 +2660,9 @@ public sealed class ConnectionManagerBackendRouteTests
         public TaskCompletionSource<ObservedBackendRouteFrame> RelayedFrame { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public TaskCompletionSource<ObservedBackendRouteOpenFrame> RelayedOpenFrame { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
         public TaskCompletionSource<ObservedBackendRouteDataFrame> RelayedDataFrame { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -2690,6 +2705,13 @@ public sealed class ConnectionManagerBackendRouteTests
                     backendKind,
                     PacketCodec.Decode(frame, GatewayBackendRouteEnvelope.Codec)));
             }
+            else if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_OPEN)
+            {
+                RelayedOpenFrame.TrySetResult(new ObservedBackendRouteOpenFrame(
+                    backendKind,
+                    null,
+                    PacketCodec.Decode(frame, GatewayBackendChannelOpen.Codec)));
+            }
             else if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_DATA)
             {
                 RelayedDataFrame.TrySetResult(new ObservedBackendRouteDataFrame(
@@ -2723,6 +2745,16 @@ public sealed class ConnectionManagerBackendRouteTests
             }
 
             Interlocked.Increment(ref m_RelayCount);
+            if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_OPEN)
+            {
+                RelayedOpenFrame.TrySetResult(new ObservedBackendRouteOpenFrame(
+                    binding.BackendKind,
+                    binding,
+                    PacketCodec.Decode(frame, GatewayBackendChannelOpen.Codec)));
+
+                return ValueTask.CompletedTask;
+            }
+
             if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_DATA)
             {
                 RelayedDataFrame.TrySetResult(new ObservedBackendRouteDataFrame(
@@ -2898,6 +2930,11 @@ public sealed class ConnectionManagerBackendRouteTests
         string BackendKind,
         BackendRouteBinding? Binding,
         GatewayBackendChannelDataEnvelope Envelope);
+
+    private sealed record ObservedBackendRouteOpenFrame(
+        string BackendKind,
+        BackendRouteBinding? Binding,
+        GatewayBackendChannelOpen Open);
 
     private sealed record ObservedBackendRouteCloseFrame(
         string BackendKind,

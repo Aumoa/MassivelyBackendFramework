@@ -117,6 +117,96 @@ public sealed class BackendGatewayConnectionManagerTests
     }
 
     [Fact]
+    public async Task GatewayChannelOpen_RoutesOpenToRuntime()
+    {
+        var port = GetFreeTcpPort();
+        var runtime = new RecordingWorldRuntime();
+        var manager = CreateManager(port, runtime, new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend));
+        await manager.StartAsync(CancellationToken.None);
+
+        using var client = new TcpClient();
+        try
+        {
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            var accepted = await CompleteGatewayHandshakeAsync(stream);
+
+            var open = new GatewayBackendChannelOpen(456, "player-1");
+            using (var frame = PacketCodec.Encode(
+                       PacketKind.Notify,
+                       Pid.GATE_BACKEND_CHANNEL_OPEN,
+                       GatewayBackendChannelOpen.ProtocolVersion,
+                       open,
+                       GatewayBackendChannelOpen.Codec))
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+            }
+
+            var received = await runtime.Open.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("gateway-test", received.GatewayNodeId);
+            Assert.Equal(Guid.ParseExact(accepted.ConnectionId, "N"), received.GatewayConnectionId);
+            Assert.Equal((uint)456, received.ChannelId);
+            Assert.Equal(new BackendGatewayChannel(received.GatewayConnectionId, 456), received.Channel);
+            Assert.Equal("player-1", received.PrincipalSubjectId);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task GatewayChannelOpen_AllowsRuntimeToPushImmediately()
+    {
+        var port = GetFreeTcpPort();
+        var sender = new GatewayChannelSender(new TestLogger<GatewayChannelSender>());
+        var runtime = new OpenPushRuntime(sender);
+        var manager = CreateManager(
+            port,
+            runtime,
+            new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend),
+            sender);
+        await manager.StartAsync(CancellationToken.None);
+
+        using var client = new TcpClient();
+        try
+        {
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            await CompleteGatewayHandshakeAsync(stream);
+
+            var open = new GatewayBackendChannelOpen(456, "player-1");
+            using (var frame = PacketCodec.Encode(
+                       PacketKind.Notify,
+                       Pid.GATE_BACKEND_CHANNEL_OPEN,
+                       GatewayBackendChannelOpen.ProtocolVersion,
+                       open,
+                       GatewayBackendChannelOpen.Codec))
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+            }
+
+            using var pushedFrame = await ReadRequiredFrameAsync(
+                stream,
+                MasterControlProtocol.TrustedControlPlanePolicy,
+                CancellationToken.None);
+            Assert.Equal(PacketKind.Notify, pushedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_CHANNEL_DATA, pushedFrame.Header.PacketId);
+
+            var pushed = PacketCodec.Decode(pushedFrame, GatewayBackendChannelDataEnvelope.Codec);
+            Assert.Equal((uint)456, pushed.ChannelId);
+            Assert.Equal(PacketKind.Notify, pushed.RoutedKind);
+            Assert.Equal((ushort)777, pushed.RoutedPacketId);
+            Assert.Equal((ushort)1, pushed.RoutedVersion);
+            Assert.Equal(new byte[] { 1, 2, 3 }, pushed.RoutedPayload);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task GatewayHandshake_RejectsDedicatedTargetTicket()
     {
         var port = GetFreeTcpPort();
@@ -503,6 +593,9 @@ public sealed class BackendGatewayConnectionManagerTests
 
     private sealed class RecordingWorldRuntime : IBackendRuntime
     {
+        public TaskCompletionSource<BackendGatewayChannelOpenContext> Open { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
         public TaskCompletionSource<ReceivedPacket> Packet { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -516,6 +609,14 @@ public sealed class BackendGatewayConnectionManagerTests
 
         public ValueTask StopAsync(CancellationToken cancellationToken)
         {
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask HandleGatewayChannelOpenedAsync(
+            BackendGatewayChannelOpenContext context,
+            CancellationToken cancellationToken)
+        {
+            Open.TrySetResult(context);
             return ValueTask.CompletedTask;
         }
 
@@ -540,6 +641,46 @@ public sealed class BackendGatewayConnectionManagerTests
     private sealed record ReceivedPacket(
         BackendGatewayPacketContext Context,
         byte[] Payload);
+
+    private sealed class OpenPushRuntime(IBackendGatewayChannelSender sender) : IBackendRuntime
+    {
+        public ValueTask StartAsync(CancellationToken cancellationToken)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask StopAsync(CancellationToken cancellationToken)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask HandleGatewayChannelOpenedAsync(
+            BackendGatewayChannelOpenContext context,
+            CancellationToken cancellationToken)
+        {
+            return sender.SendNotifyAsync(
+                context.Channel,
+                packetId: 777,
+                version: 1,
+                new byte[] { 1, 2, 3 },
+                cancellationToken);
+        }
+
+        public ValueTask HandleGatewayPacketAsync(
+            BackendGatewayPacketContext context,
+            ReadOnlyMemory<byte> payload,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask HandleGatewayChannelClosedAsync(
+            BackendGatewayChannelCloseContext context,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.CompletedTask;
+        }
+    }
 
     private sealed class TestLogger<T> : ILogger<T>
     {

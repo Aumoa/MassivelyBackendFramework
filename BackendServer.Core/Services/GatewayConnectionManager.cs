@@ -304,6 +304,16 @@ internal sealed class GatewayConnectionManager(
 
             using (frame)
             {
+                if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_OPEN)
+                {
+                    await HandleGatewayChannelOpenFrameAsync(
+                        connectionId,
+                        gatewayNodeId,
+                        frame,
+                        cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
                 if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_DATA)
                 {
                     await HandleGatewayChannelDataFrameAsync(
@@ -332,6 +342,42 @@ internal sealed class GatewayConnectionManager(
                     frame.Header.PacketId);
             }
         }
+    }
+
+    private async ValueTask HandleGatewayChannelOpenFrameAsync(
+        Guid connectionId,
+        string gatewayNodeId,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (frame.Header.Kind != PacketKind.Notify)
+        {
+            logger.LogWarning(
+                "Backend rejected Gateway Backend channel open with invalid packet kind. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, PacketKind={PacketKind}.",
+                connectionId,
+                gatewayNodeId,
+                frame.Header.Kind);
+            return;
+        }
+
+        if (frame.Header.Version != GatewayBackendChannelOpen.ProtocolVersion)
+        {
+            logger.LogWarning(
+                "Backend rejected unsupported Gateway Backend channel open version. ConnectionId={ConnectionId}, GatewayNodeId={GatewayNodeId}, Version={Version}.",
+                connectionId,
+                gatewayNodeId,
+                frame.Header.Version);
+            return;
+        }
+
+        var open = PacketCodec.Decode(frame, GatewayBackendChannelOpen.Codec);
+        var context = new BackendGatewayChannelOpenContext(
+            gatewayNodeId,
+            connectionId,
+            open.ChannelId,
+            open.PrincipalSubjectId,
+            DateTimeOffset.UtcNow);
+        await backendRuntime.HandleGatewayChannelOpenedAsync(context, cancellationToken).ConfigureAwait(false);
     }
 
     private async ValueTask HandleGatewayChannelDataFrameAsync(

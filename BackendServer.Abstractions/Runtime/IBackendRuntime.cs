@@ -10,6 +10,10 @@ public interface IBackendRuntime
 
     ValueTask StopAsync(CancellationToken cancellationToken);
 
+    ValueTask HandleGatewayChannelOpenedAsync(
+        BackendGatewayChannelOpenContext context,
+        CancellationToken cancellationToken);
+
     ValueTask HandleGatewayPacketAsync(
         BackendGatewayPacketContext context,
         ReadOnlyMemory<byte> payload,
