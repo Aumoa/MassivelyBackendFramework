@@ -14,4 +14,8 @@ public interface IDedicatedWorldRuntime
         DedicatedGatewayPacketContext context,
         ReadOnlyMemory<byte> payload,
         CancellationToken cancellationToken);
+
+    ValueTask HandleGatewayChannelClosedAsync(
+        DedicatedGatewayChannelCloseContext context,
+        CancellationToken cancellationToken);
 }

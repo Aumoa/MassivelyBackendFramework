@@ -16,6 +16,8 @@ public sealed record MasterConnectionOptions
 
     public string DisplayName { get; set; } = "Dedicated";
 
+    public string BackendKind { get; set; } = "dedicated";
+
     public string SharedSecret { get; set; } = string.Empty;
 
     public int ReconnectDelayMilliseconds { get; set; } = 5000;

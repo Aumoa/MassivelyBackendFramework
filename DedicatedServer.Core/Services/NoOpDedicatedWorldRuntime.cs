@@ -22,10 +22,23 @@ internal sealed class NoOpDedicatedWorldRuntime(ILogger<NoOpDedicatedWorldRuntim
         CancellationToken cancellationToken)
     {
         logger.LogDebug(
-            "Ignored Gateway packet because no world runtime is configured. GatewayNodeId={GatewayNodeId}, PacketId={PacketId}, PayloadLength={PayloadLength}.",
+            "Ignored Gateway packet because no world runtime is configured. GatewayNodeId={GatewayNodeId}, ChannelId={ChannelId}, PacketId={PacketId}, PayloadLength={PayloadLength}.",
             context.GatewayNodeId,
+            context.ChannelId,
             context.PacketId,
             payload.Length);
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask HandleGatewayChannelClosedAsync(
+        DedicatedGatewayChannelCloseContext context,
+        CancellationToken cancellationToken)
+    {
+        logger.LogDebug(
+            "Ignored Gateway channel close because no world runtime is configured. GatewayNodeId={GatewayNodeId}, ChannelId={ChannelId}, Reason={Reason}.",
+            context.GatewayNodeId,
+            context.ChannelId,
+            context.Reason);
         return ValueTask.CompletedTask;
     }
 }

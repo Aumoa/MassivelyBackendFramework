@@ -1446,6 +1446,10 @@ public sealed class ConnectionManagerBackendRouteTests
                 "Persistent Backend routes",
                 "Open routes",
                 "0");
+            var relayedClose = await routeManager.RelayedCloseFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(routeManager.DefaultBinding, relayedClose.Binding);
+            Assert.NotEqual(0u, relayedClose.Close.ChannelId);
+            Assert.Equal("client closed", relayedClose.Close.Reason);
 
             var dataEnvelope = new GatewayBackendRouteDataEnvelope(
                 routeToken,
@@ -2540,7 +2544,6 @@ public sealed class ConnectionManagerBackendRouteTests
             routeManager.RelayedDataFrame.Task,
             Task.Delay(TimeSpan.FromMilliseconds(250)));
         Assert.NotSame(routeManager.RelayedDataFrame.Task, completed);
-        Assert.Equal(0, routeManager.RelayCount);
     }
 
     private static async Task AssertNoClientFrameAsync(Stream stream)
@@ -2648,6 +2651,9 @@ public sealed class ConnectionManagerBackendRouteTests
         public TaskCompletionSource<ObservedBackendRouteDataFrame> RelayedDataFrame { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
+        public TaskCompletionSource<ObservedBackendRouteCloseFrame> RelayedCloseFrame { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
         public BackendRouteBinding DefaultBinding => m_DefaultBinding;
 
         public int ConnectCount => Volatile.Read(ref m_ConnectCount);
@@ -2691,6 +2697,13 @@ public sealed class ConnectionManagerBackendRouteTests
                     null,
                     PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec)));
             }
+            else if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_CLOSE)
+            {
+                RelayedCloseFrame.TrySetResult(new ObservedBackendRouteCloseFrame(
+                    backendKind,
+                    null,
+                    PacketCodec.Decode(frame, GatewayBackendChannelClose.Codec)));
+            }
             else
             {
                 throw new InvalidOperationException("ConnectionManager relayed an unexpected Backend route packet.");
@@ -2710,17 +2723,27 @@ public sealed class ConnectionManagerBackendRouteTests
             }
 
             Interlocked.Increment(ref m_RelayCount);
-            if (frame.Header.PacketId != Pid.GATE_BACKEND_CHANNEL_DATA)
+            if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_DATA)
             {
-                throw new InvalidOperationException("ConnectionManager relayed an unexpected bound Backend route packet.");
+                RelayedDataFrame.TrySetResult(new ObservedBackendRouteDataFrame(
+                    binding.BackendKind,
+                    binding,
+                    PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec)));
+
+                return ValueTask.CompletedTask;
             }
 
-            RelayedDataFrame.TrySetResult(new ObservedBackendRouteDataFrame(
-                binding.BackendKind,
-                binding,
-                PacketCodec.Decode(frame, GatewayBackendChannelDataEnvelope.Codec)));
+            if (frame.Header.PacketId == Pid.GATE_BACKEND_CHANNEL_CLOSE)
+            {
+                RelayedCloseFrame.TrySetResult(new ObservedBackendRouteCloseFrame(
+                    binding.BackendKind,
+                    binding,
+                    PacketCodec.Decode(frame, GatewayBackendChannelClose.Codec)));
 
-            return ValueTask.CompletedTask;
+                return ValueTask.CompletedTask;
+            }
+
+            throw new InvalidOperationException("ConnectionManager relayed an unexpected bound Backend route packet.");
         }
 
         public async Task PublishBackendRouteFrameAsync(GatewayBackendRouteEnvelope envelope)
@@ -2875,6 +2898,11 @@ public sealed class ConnectionManagerBackendRouteTests
         string BackendKind,
         BackendRouteBinding? Binding,
         GatewayBackendChannelDataEnvelope Envelope);
+
+    private sealed record ObservedBackendRouteCloseFrame(
+        string BackendKind,
+        BackendRouteBinding? Binding,
+        GatewayBackendChannelClose Close);
 
     private sealed class RecordingBackendRouteSession(
         RecordingBackendRouteManager owner,

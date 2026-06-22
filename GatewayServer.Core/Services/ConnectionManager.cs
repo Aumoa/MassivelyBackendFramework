@@ -595,6 +595,7 @@ internal class ConnectionManager(
                 packet.Header.Version,
                 request,
                 cancellationToken).ConfigureAwait(false);
+            await NotifyBackendRouteClosedAsync(route, request.Reason, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -1128,7 +1129,57 @@ internal class ConnectionManager(
 
     private void RemoveBackendRoutes(Client client)
     {
-        m_PersistentBackendRouteRegistry.RemoveOwnerRoutes(client, "client disconnected");
+        var routes = m_PersistentBackendRouteRegistry.RemoveOwnerRoutesAndReturn(client, "client disconnected");
+        if (routes.Length == 0)
+        {
+            return;
+        }
+
+        _ = NotifyBackendRoutesClosedAsync(routes, "client disconnected", CancellationToken.None);
+    }
+
+    private async Task NotifyBackendRoutesClosedAsync(
+        PersistentBackendRoute<Client>[] routes,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        foreach (var route in routes)
+        {
+            await NotifyBackendRouteClosedAsync(route, reason, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task NotifyBackendRouteClosedAsync(
+        PersistentBackendRoute<Client> route,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var closeFrame = PacketCodec.Encode(
+                PacketKind.Notify,
+                Pid.GATE_BACKEND_CHANNEL_CLOSE,
+                GatewayBackendChannelClose.ProtocolVersion,
+                new GatewayBackendChannelClose(route.ChannelId, reason),
+                GatewayBackendChannelClose.Codec);
+            await backendRouteManager.RelayFrameAsync(
+                route.BackendBinding,
+                closeFrame,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Gateway could not notify Backend that a persistent route closed. BackendKind={BackendKind}, NodeId={NodeId}, ChannelId={ChannelId}.",
+                route.BackendKind,
+                route.BackendBinding.NodeId,
+                route.ChannelId);
+        }
     }
 
     private static Guid GetResponseRouteId(Guid routeId)

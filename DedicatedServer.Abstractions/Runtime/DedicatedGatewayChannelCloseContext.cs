@@ -1,17 +1,14 @@
 using System;
-using PacketCore;
 
 namespace DedicatedServer.Runtime;
 
-public sealed class DedicatedGatewayPacketContext
+public sealed class DedicatedGatewayChannelCloseContext
 {
-    public DedicatedGatewayPacketContext(
+    public DedicatedGatewayChannelCloseContext(
         string gatewayNodeId,
         Guid gatewayConnectionId,
         uint channelId,
-        PacketKind kind,
-        ushort packetId,
-        ushort version,
+        string reason,
         DateTimeOffset receivedAt)
     {
         if (string.IsNullOrWhiteSpace(gatewayNodeId))
@@ -19,12 +16,15 @@ public sealed class DedicatedGatewayPacketContext
             throw new ArgumentException("Gateway node id is required.", nameof(gatewayNodeId));
         }
 
+        if (channelId == 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(channelId));
+        }
+
         GatewayNodeId = gatewayNodeId;
         GatewayConnectionId = gatewayConnectionId;
         ChannelId = channelId;
-        Kind = kind;
-        PacketId = packetId;
-        Version = version;
+        Reason = reason ?? throw new ArgumentNullException(nameof(reason));
         ReceivedAt = receivedAt;
     }
 
@@ -34,11 +34,7 @@ public sealed class DedicatedGatewayPacketContext
 
     public uint ChannelId { get; }
 
-    public PacketKind Kind { get; }
-
-    public ushort PacketId { get; }
-
-    public ushort Version { get; }
+    public string Reason { get; }
 
     public DateTimeOffset ReceivedAt { get; }
 }

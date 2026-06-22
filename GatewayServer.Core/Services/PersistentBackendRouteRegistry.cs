@@ -248,6 +248,13 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
         TOwner owner,
         string reason)
     {
+        return RemoveOwnerRoutesAndReturn(owner, reason).Length;
+    }
+
+    public PersistentBackendRoute<TOwner>[] RemoveOwnerRoutesAndReturn(
+        TOwner owner,
+        string reason)
+    {
         if (owner == null)
         {
             throw new ArgumentNullException(nameof(owner));
@@ -258,18 +265,18 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
             throw new ArgumentNullException(nameof(reason));
         }
 
-        var removed = 0;
+        var removed = new List<PersistentBackendRoute<TOwner>>();
         foreach (var pair in m_Routes.ToArray())
         {
             if (ReferenceEquals(pair.Value.Owner, owner) &&
                 Close(pair.Value.RouteToken, reason))
             {
-                removed++;
+                removed.Add(pair.Value);
             }
         }
 
         m_OpenAttemptCounters.TryRemove(owner, out _);
-        return removed;
+        return [.. removed];
     }
 
     public void CancelAll()

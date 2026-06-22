@@ -453,7 +453,6 @@ internal sealed class MasterConnectionManager(
             items.Add(new ServiceAdminStatusItem("Master", "Last error", status.LastError));
         }
 
-        items.AddRange(serviceProvider.GetRequiredService<IDedicatedConnectionStatusProvider>().GetStatusItems());
         items.AddRange(serviceProvider.GetRequiredService<IBackendConnectionStatusProvider>().GetStatusItems());
         items.AddRange(serviceProvider.GetRequiredService<IBackendRouteStatusProvider>().GetStatusItems());
 
