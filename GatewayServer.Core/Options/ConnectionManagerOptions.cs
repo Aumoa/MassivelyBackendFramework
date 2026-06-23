@@ -18,6 +18,12 @@ public record ConnectionManagerOptions
 
     public string CertificateSubjectName { get; set; } = "localhost";
 
+    public string? CertificatePath { get; set; }
+
+    public string? CertificateKeyPath { get; set; }
+
+    public string? CertificatePassword { get; set; }
+
     public StoreName CertificateStoreName { get; set; } = StoreName.My;
 
     public StoreLocation CertificateStoreLocation { get; set; } = StoreLocation.CurrentUser;
