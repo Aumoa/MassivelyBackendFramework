@@ -6,8 +6,7 @@ using GatewayServer.Behaviors;
 using GatewayServer.Options;
 using GatewayServer.Protocols;
 using GatewayServer.Services;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
+using MasterServer.ControlPlane;
 using Microsoft.Extensions.Logging.Abstractions;
 using PacketCore;
 using Xunit;
@@ -2196,83 +2195,6 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
-    public async Task StartAsync_FailsWhenTlsCertificateCannotBeLoaded()
-    {
-        var routeManager = new RecordingBackendRouteManager();
-        var expected = new InvalidOperationException("missing certificate");
-        var connectionManager = CreateConnectionManager(
-            routeManager,
-            new BackendRouteOptions
-            {
-            },
-            out _,
-            certificateLoader: new ThrowingCertificateLoader(expected));
-
-        var actual = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await connectionManager.StartAsync(CancellationToken.None));
-
-        Assert.Same(expected, actual);
-    }
-
-    [Fact]
-    public async Task StartAsync_AllowsUntrustedCertificateOnlyInDevelopment()
-    {
-        var routeManager = new RecordingBackendRouteManager();
-        var certificateLoader = new StaticCertificateLoader(CreateServerCertificate());
-        var connectionManager = CreateConnectionManager(
-            routeManager,
-            new BackendRouteOptions
-            {
-            },
-            out _,
-            hostEnvironment: new TestHostEnvironment
-            {
-                EnvironmentName = Environments.Development
-            },
-            certificateLoader: certificateLoader);
-
-        await connectionManager.StartAsync(CancellationToken.None);
-
-        try
-        {
-            Assert.True(certificateLoader.AllowUntrustedCertificate);
-        }
-        finally
-        {
-            await connectionManager.StopAsync(CancellationToken.None);
-        }
-    }
-
-    [Fact]
-    public async Task StartAsync_RequiresTrustedCertificateOutsideDevelopment()
-    {
-        var routeManager = new RecordingBackendRouteManager();
-        var certificateLoader = new StaticCertificateLoader(CreateServerCertificate());
-        var connectionManager = CreateConnectionManager(
-            routeManager,
-            new BackendRouteOptions
-            {
-            },
-            out _,
-            hostEnvironment: new TestHostEnvironment
-            {
-                EnvironmentName = Environments.Production
-            },
-            certificateLoader: certificateLoader);
-
-        await connectionManager.StartAsync(CancellationToken.None);
-
-        try
-        {
-            Assert.False(certificateLoader.AllowUntrustedCertificate);
-        }
-        finally
-        {
-            await connectionManager.StopAsync(CancellationToken.None);
-        }
-    }
-
-    [Fact]
     public async Task ClientIdleTimeout_DisconnectsIdleClient()
     {
         var routeManager = new RecordingBackendRouteManager();
@@ -2352,8 +2274,7 @@ public sealed class ConnectionManagerBackendRouteTests
         BackendRouteOptions backendRouteOptions,
         out int port,
         ConnectionManagerOptions? connectionOptions = null,
-        IHostEnvironment? hostEnvironment = null,
-        IGatewayClientCertificateLoader? certificateLoader = null,
+        IGatewayClientCertificateProvider? certificateProvider = null,
         IGatewayClientStreamAuthenticator? streamAuthenticator = null,
         bool authenticateClients = true,
         IGatewayClientTokenValidator? clientTokenValidator = null,
@@ -2370,13 +2291,12 @@ public sealed class ConnectionManagerBackendRouteTests
             Microsoft.Extensions.Options.Options.Create(backendRouteOptions),
             routeManager,
             new StaticGatewayBackendRoutePolicyProvider(allowedBackendKinds ?? ["alpha"]),
-            certificateLoader ?? new StaticCertificateLoader(CreateServerCertificate()),
+            certificateProvider ?? new StaticCertificateProvider(CreateServerCertificate()),
             streamAuthenticator ?? new PassThroughStreamAuthenticator(),
             new StaticGatewayClientAuthenticationContextFactory(authenticateClients),
             clientTokenValidator ?? new RejectingGatewayClientTokenValidator(),
             new GatewayBackendRouteTokenGenerator(),
-            NullLogger<ConnectionManager>.Instance,
-            hostEnvironment ?? new TestHostEnvironment());
+            NullLogger<ConnectionManager>.Instance);
     }
 
     private sealed class StaticGatewayBackendRoutePolicyProvider(string[] allowedBackendKinds)
@@ -2961,28 +2881,29 @@ public sealed class ConnectionManagerBackendRouteTests
         }
     }
 
-    private sealed class StaticCertificateLoader(X509Certificate2 certificate) : IGatewayClientCertificateLoader
+    private sealed class StaticCertificateProvider(X509Certificate2 certificate) : IGatewayClientCertificateProvider
     {
-        public bool? AllowUntrustedCertificate { get; private set; }
-
-        public Task<X509Certificate2> LoadAsync(
-            ConnectionManagerOptions options,
-            bool allowUntrustedCertificate,
-            CancellationToken cancellationToken)
+        public GatewayClientCertificateLease AcquireLease()
         {
-            AllowUntrustedCertificate = allowUntrustedCertificate;
-            return Task.FromResult(certificate);
+            var provider = new GatewayClientCertificateProvider.CertificateEntry(certificate);
+            provider.AddLease();
+            return new GatewayClientCertificateLease(provider);
         }
-    }
 
-    private sealed class ThrowingCertificateLoader(Exception exception) : IGatewayClientCertificateLoader
-    {
-        public Task<X509Certificate2> LoadAsync(
-            ConnectionManagerOptions options,
-            bool allowUntrustedCertificate,
-            CancellationToken cancellationToken)
+        public GatewayClientCertificateStatus GetStatus()
         {
-            return Task.FromException<X509Certificate2>(exception);
+            return new GatewayClientCertificateStatus(
+                certificate.Thumbprint,
+                new DateTimeOffset(certificate.NotBefore.ToUniversalTime(), TimeSpan.Zero),
+                new DateTimeOffset(certificate.NotAfter.ToUniversalTime(), TimeSpan.Zero),
+                DateTimeOffset.UtcNow,
+                null,
+                false);
+        }
+
+        public ServiceAdminStatusItem[] GetStatusItems()
+        {
+            return [];
         }
     }
 
@@ -3031,14 +2952,4 @@ public sealed class ConnectionManagerBackendRouteTests
         }
     }
 
-    private sealed class TestHostEnvironment : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = Environments.Production;
-
-        public string ApplicationName { get; set; } = "GatewayServer.Tests";
-
-        public string ContentRootPath { get; set; } = Directory.GetCurrentDirectory();
-
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
-    }
 }

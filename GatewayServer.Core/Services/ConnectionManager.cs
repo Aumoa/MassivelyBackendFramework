@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using GatewayServer.Behaviors;
 using GatewayServer.Options;
@@ -25,13 +24,12 @@ internal class ConnectionManager(
     IOptions<BackendRouteOptions> backendRouteOptions,
     IBackendRouteManager backendRouteManager,
     IGatewayBackendRoutePolicyProvider gatewayBackendRoutePolicy,
-    IGatewayClientCertificateLoader certificateLoader,
+    IGatewayClientCertificateProvider certificateProvider,
     IGatewayClientStreamAuthenticator streamAuthenticator,
     IGatewayClientAuthenticationContextFactory authenticationContextFactory,
     IGatewayClientTokenValidator clientTokenValidator,
     IGatewayBackendRouteTokenGenerator routeTokenGenerator,
-    ILogger<ConnectionManager> logger,
-    IHostEnvironment env) : IHostedService, IConnectionManager, IBackendRouteStatusProvider
+    ILogger<ConnectionManager> logger) : IHostedService, IConnectionManager, IBackendRouteStatusProvider
 {
     private readonly CancellationTokenSource m_GracefulCancellation = new();
     private readonly BackendRouteOptions m_BackendRouteOptions = backendRouteOptions.Value;
@@ -45,7 +43,6 @@ internal class ConnectionManager(
 
     private Socket? m_Socket;
     private Task? m_AcceptTask;
-    private X509Certificate2? m_Cert;
     private readonly HashSet<Client> m_Clients = [];
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -55,10 +52,6 @@ internal class ConnectionManager(
         {
             throw new InvalidOperationException("Gateway client listener requires TLS. Development may use a private or self-signed certificate, but plaintext TCP is not supported.");
         }
-
-        m_Cert = await certificateLoader
-            .LoadAsync(connectionOptions, env.IsDevelopment(), cancellationToken)
-            .ConfigureAwait(false);
 
         try
         {
@@ -80,8 +73,6 @@ internal class ConnectionManager(
         {
             m_Socket?.Dispose();
             m_Socket = null;
-            m_Cert?.Dispose();
-            m_Cert = null;
             throw;
         }
 
@@ -108,8 +99,6 @@ internal class ConnectionManager(
         }
 
         await DisposeClientsAsync().ConfigureAwait(false);
-        m_Cert?.Dispose();
-        m_Cert = null;
     }
 
     private async Task StartAcceptAsync(CancellationToken cancellationToken)
@@ -121,7 +110,7 @@ internal class ConnectionManager(
             try
             {
                 clientSocket = await m_Socket!.AcceptAsync(cancellationToken).ConfigureAwait(false);
-                StartHandshakeAsync(clientSocket, m_Cert!, cancellationToken);
+                StartHandshakeAsync(clientSocket, cancellationToken);
                 clientSocket = null;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -147,18 +136,22 @@ internal class ConnectionManager(
         }
     }
 
-    private async void StartHandshakeAsync(Socket socket, X509Certificate2 serverCert, CancellationToken cancellationToken)
+    private async void StartHandshakeAsync(Socket socket, CancellationToken cancellationToken)
     {
         socket.NoDelay = true;
 
         var networkStream = new NetworkStream(socket, ownsSocket: true);
         Stream? s = null;
+        GatewayClientCertificateLease? certificateLease = null;
 
         try
         {
+            certificateLease = certificateProvider.AcquireLease();
             s = await streamAuthenticator
-                .AuthenticateAsync(networkStream, serverCert, cancellationToken)
+                .AuthenticateAsync(networkStream, certificateLease.Certificate, cancellationToken)
                 .ConfigureAwait(false);
+            certificateLease.Dispose();
+            certificateLease = null;
 
             var handshakeNotify = new GatewayHandshakeNotify("https://accounts.ayla.r-e.kr/authorize");
             using var handshakeFrame = PacketCodec.Encode(
@@ -172,6 +165,7 @@ internal class ConnectionManager(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            certificateLease?.Dispose();
             await DisposeHandshakeStreamsAsync(networkStream, s).ConfigureAwait(false);
             socket.Dispose();
 
@@ -179,6 +173,7 @@ internal class ConnectionManager(
         }
         catch (Exception e)
         {
+            certificateLease?.Dispose();
             logger.LogError("Error during handshake: {Message}", e.Message);
 
             await DisposeHandshakeStreamsAsync(networkStream, s).ConfigureAwait(false);
@@ -1144,6 +1139,7 @@ internal class ConnectionManager(
     {
         return
         [
+            .. certificateProvider.GetStatusItems(),
             .. m_PersistentBackendRouteRegistry.GetStatusItems()
         ];
     }
