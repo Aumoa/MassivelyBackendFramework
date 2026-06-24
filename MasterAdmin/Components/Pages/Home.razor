@@ -75,7 +75,22 @@
                                     <code>@connection.ConnectionId.ToString("N")[..8]</code>
                                 }
                             </td>
-                            <td>@GetNodeKindText(connection.NodeKind)</td>
+                            <td>
+                                <div class="node-identity">
+                                    <strong class="node-title">@GetConnectionTitle(connection)</strong>
+                                    <div class="node-meta-row">
+                                        <span>@GetNodeKindText(connection.NodeKind)</span>
+                                        @if (ShouldShowBackendKind(connection))
+                                        {
+                                            <span class="node-badge">@connection.BackendKind</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(connection.NodeId))
+                                        {
+                                            <code>@connection.NodeId</code>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
                             <td>@connection.RemoteEndPoint</td>
                             <td>@connection.ConnectedAt.LocalDateTime</td>
                             <td>@connection.LastSeenAt.LocalDateTime</td>
@@ -171,6 +186,27 @@
     private static bool CanOpenNodePage(MasterNodeKind nodeKind)
     {
         return nodeKind is MasterNodeKind.Gateway or MasterNodeKind.Dedicated or MasterNodeKind.Backend;
+    }
+
+    private static string GetConnectionTitle(MasterConnectionSnapshot connection)
+    {
+        if (!string.IsNullOrWhiteSpace(connection.DisplayName))
+        {
+            return connection.DisplayName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(connection.BackendKind))
+        {
+            return connection.BackendKind;
+        }
+
+        return GetNodeKindText(connection.NodeKind);
+    }
+
+    private static bool ShouldShowBackendKind(MasterConnectionSnapshot connection)
+    {
+        return !string.IsNullOrWhiteSpace(connection.BackendKind) &&
+               !string.Equals(connection.BackendKind, GetConnectionTitle(connection), StringComparison.Ordinal);
     }
 
     private static string T(string key)

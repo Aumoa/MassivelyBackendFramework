@@ -150,6 +150,42 @@ code {
     color: var(--app-accent);
 }
 
+.node-identity {
+    display: flex;
+    min-width: 12rem;
+    flex-direction: column;
+    gap: 0.32rem;
+    white-space: normal;
+}
+
+.node-title {
+    color: var(--app-text);
+    font-size: 0.95rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.node-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.45rem;
+    align-items: center;
+    color: var(--app-text-muted);
+    font-size: 0.82rem;
+}
+
+.node-badge {
+    display: inline-flex;
+    max-width: 14rem;
+    align-items: center;
+    padding: 0.12rem 0.42rem;
+    border: 1px solid var(--app-border);
+    border-radius: 999px;
+    background: var(--app-surface-muted);
+    color: var(--app-text);
+    overflow-wrap: anywhere;
+}
+
 .connection-link {
     color: var(--app-accent);
     text-decoration: none;
