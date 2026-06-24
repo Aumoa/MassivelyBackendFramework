@@ -21,8 +21,8 @@
     </article>
     <article class="metric-card">
         <span class="metric-label">@Strings.CONNECTIONS_TABLE_ROLE</span>
-        <strong>@GetNodeKindText(NodeConnection?.NodeKind ?? Status?.NodeKind ?? MasterNodeKind.Unknown)</strong>
-        <span class="metric-detail">@NodeConnection?.RemoteEndPoint</span>
+        <strong>@NodeRoleText</strong>
+        <span class="metric-detail">@NodeRoleDetail</span>
     </article>
     <article class="metric-card">
         <span class="metric-label">@Strings.NODE_STATUS_RELAY</span>
@@ -177,8 +177,55 @@
 
             var connection = NodeConnection;
             return connection != null
-                ? GetNodeKindText(connection.NodeKind)
+                ? GetConnectionTitle(connection)
                 : Strings.NODE_UNKNOWN_CONNECTION;
+        }
+    }
+
+    private string NodeRoleText
+    {
+        get
+        {
+            var connection = NodeConnection;
+            return connection != null
+                ? GetNodeKindText(connection.NodeKind)
+                : GetNodeKindText(Status?.NodeKind ?? MasterNodeKind.Unknown);
+        }
+    }
+
+    private string NodeRoleDetail
+    {
+        get
+        {
+            var connection = NodeConnection;
+            if (connection == null)
+            {
+                return string.Empty;
+            }
+
+            var details = new List<string>();
+            if (!string.IsNullOrWhiteSpace(connection.BackendKind))
+            {
+                details.Add(connection.BackendKind);
+            }
+
+            if (!string.IsNullOrWhiteSpace(connection.DisplayName) &&
+                !string.Equals(connection.DisplayName, NodeTitle, StringComparison.Ordinal))
+            {
+                details.Add(connection.DisplayName);
+            }
+
+            if (!string.IsNullOrWhiteSpace(connection.NodeId))
+            {
+                details.Add(connection.NodeId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(connection.RemoteEndPoint))
+            {
+                details.Add(connection.RemoteEndPoint);
+            }
+
+            return string.Join(" / ", details);
         }
     }
 
@@ -280,6 +327,21 @@
             MasterNodeKind.Backend => T("NODE_KIND_BACKEND"),
             _ => Strings.NODE_KIND_UNKNOWN
         };
+    }
+
+    private static string GetConnectionTitle(MasterConnectionSnapshot connection)
+    {
+        if (!string.IsNullOrWhiteSpace(connection.DisplayName))
+        {
+            return connection.DisplayName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(connection.BackendKind))
+        {
+            return connection.BackendKind;
+        }
+
+        return GetNodeKindText(connection.NodeKind);
     }
 
     private static string T(string key)

@@ -1571,12 +1571,28 @@ internal sealed class ConnectionManager(
 
         public MasterConnectionSnapshot ToSnapshot()
         {
+            var isTrusted = IsTrusted;
+            var nodeKind = isTrusted ? NodeKind : MasterNodeKind.Unknown;
+            var backendKind = isTrusted && BackendNodeEndpoint.IsBackendNodeKind(NodeKind)
+                ? GetSnapshotBackendKind()
+                : string.Empty;
+
             return new MasterConnectionSnapshot(
                 ConnectionId,
                 RemoteEndPoint,
-                IsTrusted ? NodeKind : MasterNodeKind.Unknown,
+                nodeKind,
+                isTrusted ? NodeId : string.Empty,
+                isTrusted ? DisplayName : string.Empty,
+                backendKind,
                 ConnectedAt,
                 DateTimeOffset.FromUnixTimeMilliseconds(Interlocked.Read(ref m_LastSeenAt)));
+        }
+
+        private string GetSnapshotBackendKind()
+        {
+            return !string.IsNullOrWhiteSpace(AuthorizedBackendKind)
+                ? AuthorizedBackendKind
+                : BackendKind;
         }
 
         public DedicatedNodeEndpoint? TryCreateDedicatedNodeEndpoint()

@@ -100,6 +100,9 @@ public sealed class MasterOverviewSnapshot
             return 16 +
                    PacketWriter.GetStringSize(value.RemoteEndPoint) +
                    sizeof(byte) +
+                   PacketWriter.GetStringSize(value.NodeId) +
+                   PacketWriter.GetStringSize(value.DisplayName) +
+                   PacketWriter.GetStringSize(value.BackendKind) +
                    sizeof(long) +
                    sizeof(long);
         }
@@ -109,6 +112,9 @@ public sealed class MasterOverviewSnapshot
             writer.WriteGuid(value.ConnectionId);
             writer.WriteString(value.RemoteEndPoint);
             writer.WriteByte((byte)value.NodeKind);
+            writer.WriteString(value.NodeId);
+            writer.WriteString(value.DisplayName);
+            writer.WriteString(value.BackendKind);
             writer.WriteInt64(value.ConnectedAt.ToUnixTimeMilliseconds());
             writer.WriteInt64(value.LastSeenAt.ToUnixTimeMilliseconds());
         }
@@ -118,10 +124,21 @@ public sealed class MasterOverviewSnapshot
             var connectionId = reader.ReadGuid();
             string remoteEndPoint = reader.ReadString();
             var nodeKind = (MasterNodeKind)reader.ReadByte();
+            string nodeId = reader.ReadString();
+            string displayName = reader.ReadString();
+            string backendKind = reader.ReadString();
             var connectedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.ReadInt64());
             var lastSeenAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.ReadInt64());
 
-            return new MasterConnectionSnapshot(connectionId, remoteEndPoint, nodeKind, connectedAt, lastSeenAt);
+            return new MasterConnectionSnapshot(
+                connectionId,
+                remoteEndPoint,
+                nodeKind,
+                nodeId,
+                displayName,
+                backendKind,
+                connectedAt,
+                lastSeenAt);
         }
     }
 }
