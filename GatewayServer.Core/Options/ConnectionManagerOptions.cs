@@ -24,6 +24,12 @@ public record ConnectionManagerOptions
 
     public string? CertificatePassword { get; set; }
 
+    public bool CertificateReloadEnabled { get; set; } = true;
+
+    public int CertificateReloadDebounceMilliseconds { get; set; } = 2000;
+
+    public int CertificateReloadPollIntervalMilliseconds { get; set; } = 300000;
+
     public StoreName CertificateStoreName { get; set; } = StoreName.My;
 
     public StoreLocation CertificateStoreLocation { get; set; } = StoreLocation.CurrentUser;

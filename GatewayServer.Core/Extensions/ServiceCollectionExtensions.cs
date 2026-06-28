@@ -15,9 +15,6 @@ public static class ServiceCollectionExtensions
         s.Configure<BackendConnectionOptions>(config.GetSection("BackendConnection"));
         s.Configure<BackendRouteOptions>(config.GetSection("BackendRoute"));
 
-        s.AddSingleton<IConnectionManager, ConnectionManager>();
-        s.AddSingleton<IBackendRouteStatusProvider>(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
-        s.AddHostedService(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
         s.AddSingleton<IGatewayClientAuthenticationContextFactory, GatewayClientAuthenticationContextFactory>();
         s.AddSingleton<GatewayClientSecretCredentialCatalog>();
         s.TryAddSingleton<IGatewayClientTokenValidator>(p => p.GetRequiredService<GatewayClientSecretCredentialCatalog>());
@@ -26,6 +23,12 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<IGatewayBackendRoutePolicyProvider>(p => p.GetRequiredService<GatewayBackendRoutePolicyCatalog>());
         s.AddSingleton<IGatewayBackendRoutePolicyWriter>(p => p.GetRequiredService<GatewayBackendRoutePolicyCatalog>());
         s.AddSingleton<IGatewayClientCertificateLoader, GatewayClientCertificateLoader>();
+        s.AddSingleton<GatewayClientCertificateProvider>();
+        s.AddSingleton<IGatewayClientCertificateProvider>(p => p.GetRequiredService<GatewayClientCertificateProvider>());
+        s.AddHostedService(p => p.GetRequiredService<GatewayClientCertificateProvider>());
+        s.AddSingleton<IConnectionManager, ConnectionManager>();
+        s.AddSingleton<IBackendRouteStatusProvider>(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
+        s.AddHostedService(p => (ConnectionManager)p.GetRequiredService<IConnectionManager>());
         s.AddSingleton<IGatewayClientStreamAuthenticator, GatewayClientTlsStreamAuthenticator>();
         s.AddSingleton<IGatewayBackendRouteTokenGenerator, GatewayBackendRouteTokenGenerator>();
         s.AddSingleton<DedicatedNodeCatalog>();
