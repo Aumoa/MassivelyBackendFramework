@@ -324,6 +324,21 @@
   <data name="NEWCLIENT_FORM_LABEL_NAME" xml:space="preserve">
     <value>이름</value>
   </data>
+  <data name="NEWCLIENT_FORM_LABEL_CLIENT_ID" xml:space="preserve">
+    <value>애플리케이션 ID</value>
+  </data>
+  <data name="NEWCLIENT_FORM_HELP_CLIENT_ID" xml:space="preserve">
+    <value>영문자, 숫자, '.', '_' 또는 '-'를 사용할 수 있습니다.</value>
+  </data>
+  <data name="NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_REQUIRED" xml:space="preserve">
+    <value>애플리케이션 ID는 필수입니다.</value>
+  </data>
+  <data name="NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_INVALID" xml:space="preserve">
+    <value>애플리케이션 ID에는 영문자, 숫자, '.', '_' 또는 '-'만 사용할 수 있습니다.</value>
+  </data>
+  <data name="NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_TOO_LONG" xml:space="preserve">
+    <value>애플리케이션 ID는 {0}자 이하여야 합니다.</value>
+  </data>
   <data name="NEWCLIENT_BUTTONS_NEW" xml:space="preserve">
     <value>새 클라이언트 생성</value>
   </data>

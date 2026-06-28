@@ -23,6 +23,25 @@
                         <FloatingInput Type="text" Placeholder="@Strings.NEWCLIENT_FORM_LABEL_NAME" Value="@Name" ValueChanged="@NameChanged" />
                     </div>
                 </div>
+                <div class="field-row">
+                    <label class="field-label">@Strings.NEWCLIENT_FORM_LABEL_CLIENT_ID</label>
+                    <div class="field-input">
+                        <FloatingInput Type="text"
+                                       Placeholder="@Strings.NEWCLIENT_FORM_LABEL_CLIENT_ID"
+                                       Value="@NewClientId"
+                                       ValueChanged="@NewClientIdChanged"
+                                       HasError="@(!string.IsNullOrEmpty(NewClientIdErrorMessage))"
+                                       AutoComplete="off" />
+                    </div>
+                    <div class="field-help">@Strings.NEWCLIENT_FORM_HELP_CLIENT_ID</div>
+                    @if (!string.IsNullOrEmpty(NewClientIdErrorMessage))
+                    {
+                        <div class="field-error">
+                            <span class="material-symbols-outlined field-error-icon">error</span>
+                            <span>@NewClientIdErrorMessage</span>
+                        </div>
+                    }
+                </div>
             </div>
         </div>
         <div class="form-actions">
@@ -228,6 +247,15 @@
 
     [Parameter]
     public EventCallback<string?> NameChanged { get; set; }
+
+    [Parameter]
+    public string? NewClientId { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> NewClientIdChanged { get; set; }
+
+    [Parameter]
+    public string? NewClientIdErrorMessage { get; set; }
 
     [Parameter]
     public string? Id { get; set; }

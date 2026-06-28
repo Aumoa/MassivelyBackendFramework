@@ -11,12 +11,17 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
 {
     public async ValueTask<string> AddClientAsync(string name, string ownerId, string[] redirectUris, CancellationToken cancellationToken = default)
     {
+        return await AddClientAsync(CreateClientId(), name, ownerId, redirectUris, cancellationToken);
+    }
+
+    public async ValueTask<string> AddClientAsync(string clientId, string name, string ownerId, string[] redirectUris, CancellationToken cancellationToken = default)
+    {
         using var connection = GetConnection();
         await connection.OpenAsync();
 
         await using var tx = await connection.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
 
-        string id = CreateClientId();
+        string id = ClientIdPolicy.NormalizeOrThrow(clientId);
         const string QUERY1 = "INSERT INTO `client` (`id`, `owner_id`, `name`) VALUES(@id, @ownerId, @name)";
         var command = new CommandDefinition(QUERY1, new { id, ownerId, name }, tx, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);

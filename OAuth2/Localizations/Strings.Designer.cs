@@ -1472,6 +1472,51 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("NEWCLIENT_FORM_LABEL_NAME", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Application ID과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NEWCLIENT_FORM_LABEL_CLIENT_ID {
+            get {
+                return ResourceManager.GetString("NEWCLIENT_FORM_LABEL_CLIENT_ID", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Use letters, numbers, '.', '_' or '-'.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NEWCLIENT_FORM_HELP_CLIENT_ID {
+            get {
+                return ResourceManager.GetString("NEWCLIENT_FORM_HELP_CLIENT_ID", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Application ID is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_REQUIRED {
+            get {
+                return ResourceManager.GetString("NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_REQUIRED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Application ID can only contain letters, numbers, '.', '_' and '-'.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_INVALID {
+            get {
+                return ResourceManager.GetString("NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_INVALID", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Application ID must be {0} characters or fewer.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_TOO_LONG {
+            get {
+                return ResourceManager.GetString("NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_TOO_LONG", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   New Client과(와) 유사한 지역화된 문자열을 찾습니다.

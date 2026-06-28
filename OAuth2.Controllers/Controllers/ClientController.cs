@@ -13,11 +13,41 @@ public class ClientController(IClients clients, IAccesses accesses) : Authorized
     {
         return await VerifiedAsync(async access =>
         {
-            string clientId = await clients.AddClientAsync(request.Name, access.Id, [], cancellationToken);
+            if (string.IsNullOrWhiteSpace(request.Name))
+            {
+                return BadRequest(new { error = "invalid_request", error_description = "name is required" });
+            }
+
+            string clientId;
+            if (string.IsNullOrWhiteSpace(request.ClientId))
+            {
+                clientId = await clients.AddClientAsync(request.Name, access.Id, [], cancellationToken);
+            }
+            else
+            {
+                if (!ClientIdPolicy.TryNormalize(request.ClientId, out var normalizedClientId, out var validationError))
+                {
+                    return BadRequest(new { error = "invalid_request", error_description = GetClientIdValidationMessage(validationError) });
+                }
+
+                clientId = await clients.AddClientAsync(normalizedClientId, request.Name, access.Id, [], cancellationToken);
+            }
+
             return Ok(new CreateClientResponse
             {
                 Id = clientId
             });
         }, null, cancellationToken);
+    }
+
+    private static string GetClientIdValidationMessage(ClientIdValidationError error)
+    {
+        return error switch
+        {
+            ClientIdValidationError.Required => "client_id is required",
+            ClientIdValidationError.TooLong => $"client_id must be {ClientIdPolicy.MaxLength} characters or fewer",
+            ClientIdValidationError.InvalidCharacter => "client_id can only contain letters, numbers, '.', '_' and '-'",
+            _ => "client_id is invalid"
+        };
     }
 }

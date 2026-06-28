@@ -1,5 +1,6 @@
 ﻿@using OAuth2.Services
 @using OAuth2.Utility
+@using OAuth2
 @layout AuthorizedLayout
 @inject IClients Clients
 @inject IClientClaims ClientClaims
@@ -35,6 +36,9 @@
     <div class="manage-content">
         <ClientForm @bind-Name="m_Name"
                     Id="@m_Id"
+                    NewClientId="@m_NewClientId"
+                    NewClientIdChanged="@OnNewClientIdChanged"
+                    NewClientIdErrorMessage="@m_NewClientIdErrorMessage"
                     IsNewMode="@(ViewType == ManageApplications.ViewTypes.New)"
                     IsSubmitting="@m_IsSubmitting"
                     OnSubmit="@OnContinueAsync" />
@@ -47,6 +51,8 @@
     private IJSObjectReference? m_Module;
     private string? m_Name;
     private string? m_Id;
+    private string? m_NewClientId;
+    private string? m_NewClientIdErrorMessage;
     private bool m_IsSubmitting = false;
     private DlgNewClientSecret m_DlgNewSecret = null!;
     private string? m_PendingNavigate;
@@ -87,6 +93,8 @@
         {
             m_Name = null;
             m_Id = null;
+            m_NewClientId = null;
+            m_NewClientIdErrorMessage = null;
         }
     }
 
@@ -103,12 +111,19 @@
             return;
         }
 
+        if (!ClientIdPolicy.TryNormalize(m_NewClientId, out var normalizedClientId, out var validationError))
+        {
+            m_NewClientIdErrorMessage = GetClientIdValidationMessage(validationError);
+            StateHasChanged();
+            return;
+        }
+
         m_IsSubmitting = true;
         StateHasChanged();
 
         try
         {
-            var clientId = await Clients.AddClientAsync(m_Name, Auth.Sub, []);
+            var clientId = await Clients.AddClientAsync(normalizedClientId, m_Name, Auth.Sub, []);
             var secret = await Clients.NewClientSecretAsync(clientId);
 
             // Show the secret dialog before navigating away so the user can copy it
@@ -121,6 +136,24 @@
             StateHasChanged();
             throw;
         }
+    }
+
+    private Task OnNewClientIdChanged(string? value)
+    {
+        m_NewClientId = value;
+        m_NewClientIdErrorMessage = null;
+        return Task.CompletedTask;
+    }
+
+    private static string GetClientIdValidationMessage(ClientIdValidationError error)
+    {
+        return error switch
+        {
+            ClientIdValidationError.Required => Strings.NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_REQUIRED,
+            ClientIdValidationError.TooLong => string.Format(Strings.NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_TOO_LONG, ClientIdPolicy.MaxLength),
+            ClientIdValidationError.InvalidCharacter => Strings.NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_INVALID,
+            _ => Strings.ERRORS_INVALID_CLIENT_ID
+        };
     }
 
     private Task OnNewSecretDialogClosedAsync()
