@@ -18,25 +18,32 @@ public class ClientController(IClients clients, IAccesses accesses) : Authorized
                 return BadRequest(new { error = "invalid_request", error_description = "name is required" });
             }
 
-            string clientId;
-            if (string.IsNullOrWhiteSpace(request.ClientId))
+            try
             {
-                clientId = await clients.AddClientAsync(request.Name, access.Id, [], cancellationToken);
-            }
-            else
-            {
-                if (!ClientIdPolicy.TryNormalize(request.ClientId, out var normalizedClientId, out var validationError))
+                string clientId;
+                if (string.IsNullOrWhiteSpace(request.ClientId))
                 {
-                    return BadRequest(new { error = "invalid_request", error_description = GetClientIdValidationMessage(validationError) });
+                    clientId = await clients.AddClientAsync(request.Name, access.Id, [], cancellationToken);
+                }
+                else
+                {
+                    if (!ClientIdPolicy.TryNormalize(request.ClientId, out var normalizedClientId, out var validationError))
+                    {
+                        return BadRequest(new { error = "invalid_request", error_description = GetClientIdValidationMessage(validationError) });
+                    }
+
+                    clientId = await clients.AddClientAsync(normalizedClientId, request.Name, access.Id, [], cancellationToken);
                 }
 
-                clientId = await clients.AddClientAsync(normalizedClientId, request.Name, access.Id, [], cancellationToken);
+                return Ok(new CreateClientResponse
+                {
+                    Id = clientId
+                });
             }
-
-            return Ok(new CreateClientResponse
+            catch (ClientIdAlreadyExistsException)
             {
-                Id = clientId
-            });
+                return Conflict(new { error = "client_id_already_exists", error_description = "client_id already exists" });
+            }
         }, null, cancellationToken);
     }
 

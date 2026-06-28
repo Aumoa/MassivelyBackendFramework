@@ -2,6 +2,7 @@
 using System.Security.Cryptography;
 using Dapper;
 using Microsoft.Extensions.Options;
+using MySql.Data.MySqlClient;
 using OAuth2.DTO;
 using OAuth2.Options;
 
@@ -9,9 +10,25 @@ namespace OAuth2.Services;
 
 internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(options.Value), IClients
 {
+    private const int DuplicateEntryErrorNumber = 1062;
+    private const int CreateClientIdMaxAttempts = 3;
+
     public async ValueTask<string> AddClientAsync(string name, string ownerId, string[] redirectUris, CancellationToken cancellationToken = default)
     {
-        return await AddClientAsync(CreateClientId(), name, ownerId, redirectUris, cancellationToken);
+        ClientIdAlreadyExistsException? lastException = null;
+        for (var attempt = 0; attempt < CreateClientIdMaxAttempts; attempt++)
+        {
+            try
+            {
+                return await AddClientAsync(CreateClientId(), name, ownerId, redirectUris, cancellationToken);
+            }
+            catch (ClientIdAlreadyExistsException e)
+            {
+                lastException = e;
+            }
+        }
+
+        throw new InvalidOperationException("Generated client ID collided too many times.", lastException);
     }
 
     public async ValueTask<string> AddClientAsync(string clientId, string name, string ownerId, string[] redirectUris, CancellationToken cancellationToken = default)
@@ -24,7 +41,14 @@ internal class MySqlClients(IOptions<MySqlOptions> options) : MySqlDbContext(opt
         string id = ClientIdPolicy.NormalizeOrThrow(clientId);
         const string QUERY1 = "INSERT INTO `client` (`id`, `owner_id`, `name`) VALUES(@id, @ownerId, @name)";
         var command = new CommandDefinition(QUERY1, new { id, ownerId, name }, tx, cancellationToken: cancellationToken);
-        await connection.ExecuteAsync(command);
+        try
+        {
+            await connection.ExecuteAsync(command);
+        }
+        catch (MySqlException e) when (e.Number == DuplicateEntryErrorNumber)
+        {
+            throw new ClientIdAlreadyExistsException(id);
+        }
 
         const string QUERY2 = "INSERT INTO `client_claim` (`client_id`, `name`, `value`) VALUES(@id, 'redirect_uri', @value)";
         command = new CommandDefinition(QUERY2, redirectUris.Select(value => new { id, value }), tx, cancellationToken: cancellationToken);

@@ -130,6 +130,12 @@
             m_PendingNavigate = "/manage-applications";
             await m_DlgNewSecret.ShowAsync(secret);
         }
+        catch (ClientIdAlreadyExistsException)
+        {
+            m_IsSubmitting = false;
+            m_NewClientIdErrorMessage = Strings.NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_DUPLICATE;
+            StateHasChanged();
+        }
         catch
         {
             m_IsSubmitting = false;

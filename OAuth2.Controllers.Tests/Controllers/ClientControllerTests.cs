@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using OAuth2;
 using OAuth2.Controllers;
 using OAuth2.DTO;
 using OAuth2.Services;
@@ -62,6 +63,26 @@ public sealed class ClientControllerTests
         Assert.Null(clients.ExplicitClientId);
     }
 
+    [Fact]
+    public async Task PostAsync_ReturnsConflictWhenExplicitClientIdAlreadyExists()
+    {
+        var clients = new ClientsStub();
+        clients.DuplicateClientIds.Add("example-app");
+        var controller = CreateController(clients);
+
+        var result = await controller.PostAsync(new CreateClientRequest
+        {
+            Name = "Example",
+            ClientId = "example-app"
+        }, CancellationToken.None);
+
+        var conflict = Assert.IsType<ConflictObjectResult>(result);
+        Assert.Equal("client_id_already_exists", GetResponseProperty(conflict.Value, "error"));
+        Assert.Equal("client_id already exists", GetResponseProperty(conflict.Value, "error_description"));
+        Assert.Equal("example-app", clients.ExplicitClientId);
+        Assert.False(clients.GeneratedClientCreated);
+    }
+
     private static ClientController CreateController(ClientsStub clients)
     {
         var controller = new ClientController(clients, new AccessesStub())
@@ -76,9 +97,19 @@ public sealed class ClientControllerTests
         return controller;
     }
 
+    private static object? GetResponseProperty(object? value, string name)
+    {
+        Assert.NotNull(value);
+        var property = value.GetType().GetProperty(name);
+        Assert.NotNull(property);
+        return property.GetValue(value);
+    }
+
     private sealed class ClientsStub : IClients
     {
         public const string GeneratedClientId = "generated-client-id";
+
+        public HashSet<string> DuplicateClientIds { get; } = [];
 
         public bool GeneratedClientCreated { get; private set; }
 
@@ -93,6 +124,11 @@ public sealed class ClientControllerTests
         public ValueTask<string> AddClientAsync(string clientId, string name, string ownerId, string[] redirectUris, CancellationToken cancellationToken = default)
         {
             ExplicitClientId = clientId;
+            if (DuplicateClientIds.Contains(clientId))
+            {
+                throw new ClientIdAlreadyExistsException(clientId);
+            }
+
             return ValueTask.FromResult(clientId);
         }
 

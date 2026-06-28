@@ -339,6 +339,9 @@
   <data name="NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_TOO_LONG" xml:space="preserve">
     <value>애플리케이션 ID는 {0}자 이하여야 합니다.</value>
   </data>
+  <data name="NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_DUPLICATE" xml:space="preserve">
+    <value>이미 사용 중인 애플리케이션 ID입니다.</value>
+  </data>
   <data name="NEWCLIENT_BUTTONS_NEW" xml:space="preserve">
     <value>새 클라이언트 생성</value>
   </data>

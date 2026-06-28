@@ -1517,6 +1517,15 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_TOO_LONG", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Application ID is already in use.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_DUPLICATE {
+            get {
+                return ResourceManager.GetString("NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_DUPLICATE", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   New Client과(와) 유사한 지역화된 문자열을 찾습니다.
