@@ -80,6 +80,7 @@
 - Always get final user approval before operations that publish, push, deploy, release, upload, create or update remote pull requests, or otherwise change online state on protected shared targets or production-like environments.
 - If final approval cannot be requested or received for a protected shared target, do not perform the online operation.
 - Branches that are clearly isolated work branches, such as `codex/*`, may use a more flexible approval model for pushing, draft pull request updates, and other collaboration or validation tasks when doing so is useful for the requested work.
+- Treat `codex/*`, `feature/*`, `claude/*`, `copilot/*`, and similarly isolated task branches as work branches where Codex-created commits are expected to use the GitHub App/bot commit identity by default.
 - When choosing credentials for GitHub commit-adjacent or online operations such as push, pull request creation or updates, branch publication, or remote validation, read and follow `.codex/skills/github-app-credential-policy/SKILL.md`.
 - Even on work branches, avoid destructive remote operations, production-impacting changes, or changes that can affect other users without explicit user approval.
 - When an online operation is blocked by missing approval, re-check the written code and local changes as thoroughly as practical to identify real issues before reporting back.
@@ -99,7 +100,8 @@
 - If the working tree already contains unrelated changes, isolate only Codex-made changes in the commit.
 - If a clean feature-sized commit is not possible, stop and explain why.
 - Do not amend commits unless the user explicitly requests an amend; create a follow-up commit instead when prior commits may already be shared.
-- For commits on isolated work branches intended to participate in a GitHub App-authenticated or bot-authored pull request workflow, use the broker-provided App identity by default unless the user explicitly directs using an ordinary user account; follow `.codex/skills/github-app-credential-policy/SKILL.md` before creating the commit identity.
+- On isolated work branches, assume Codex-created commits will participate in a GitHub App-authenticated or bot-authored workflow unless the user explicitly says the commit is local-only. Resolve the broker-provided App identity before creating each Codex commit and use it as both author and committer by default.
+- If the broker App identity is unavailable on an isolated work branch, stop before committing and report the blocker. Do not silently fall back to the ordinary local git identity unless the user explicitly asks for that identity for the specific commit.
 
 ## Commit Message Format
 
