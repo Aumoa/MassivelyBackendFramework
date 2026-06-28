@@ -72,6 +72,24 @@
     padding: 4px 0;
 }
 
+.field-help {
+    font-size: 0.75rem;
+    color: #5f6368;
+    line-height: 1.4;
+}
+
+.field-error {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8125rem;
+    color: #d93025;
+}
+
+.field-error-icon {
+    font-size: 16px;
+}
+
 .redirect-uris-container {
     display: flex;
     flex-direction: column;

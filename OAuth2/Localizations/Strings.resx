@@ -324,6 +324,24 @@
   <data name="NEWCLIENT_FORM_LABEL_NAME" xml:space="preserve">
     <value>Name</value>
   </data>
+  <data name="NEWCLIENT_FORM_LABEL_CLIENT_ID" xml:space="preserve">
+    <value>Application ID</value>
+  </data>
+  <data name="NEWCLIENT_FORM_HELP_CLIENT_ID" xml:space="preserve">
+    <value>Use letters, numbers, '.', '_' or '-'.</value>
+  </data>
+  <data name="NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_REQUIRED" xml:space="preserve">
+    <value>Application ID is required.</value>
+  </data>
+  <data name="NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_INVALID" xml:space="preserve">
+    <value>Application ID can only contain letters, numbers, '.', '_' and '-'.</value>
+  </data>
+  <data name="NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_TOO_LONG" xml:space="preserve">
+    <value>Application ID must be {0} characters or fewer.</value>
+  </data>
+  <data name="NEWCLIENT_VALIDATION_ERROR_CLIENT_ID_DUPLICATE" xml:space="preserve">
+    <value>Application ID is already in use.</value>
+  </data>
   <data name="NEWCLIENT_BUTTONS_NEW" xml:space="preserve">
     <value>Create new client</value>
   </data>
