@@ -1294,6 +1294,60 @@ namespace OAuth2.Localizations {
         }
         
         /// <summary>
+        ///   Edit과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PROFILE_EDIT {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PROFILE_EDIT", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Website must be a valid http or https URL.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PROFILE_EDIT_INVALID_WEBSITE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PROFILE_EDIT_INVALID_WEBSITE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Display name is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PROFILE_EDIT_NAME_REQUIRED {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PROFILE_EDIT_NAME_REQUIRED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   No changes.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PROFILE_EDIT_NOCHANGE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PROFILE_EDIT_NOCHANGE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Your profile has been successfully changed. You will be logged out for refresh.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PROFILE_EDIT_SUCCESS_MESSAGE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PROFILE_EDIT_SUCCESS_MESSAGE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Edit Profile과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PROFILE_EDIT_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PROFILE_EDIT_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Change과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string MANAGEACCOUNTS_PICTURE_CHANGE {

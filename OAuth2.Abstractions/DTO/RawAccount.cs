@@ -6,4 +6,5 @@ public record struct RawAccount
     public string Name;
     public string Email;
     public DateTime CreatedAt;
+    public DateTime UpdatedAt;
 }

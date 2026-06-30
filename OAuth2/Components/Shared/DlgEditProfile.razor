@@ -1,0 +1,229 @@
+@using System.IdentityModel.Tokens.Jwt
+@using OAuth2.Services
+@inject IAccounts Accounts
+@inject IAccesses Accesses
+@inject IAccountClaims AccountClaims
+@inject JwtAuthenticationStateProvider Auth
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<Dialog @ref="m_Ref">
+    <div class="dlg-header">
+        <div class="dlg-header-icon">
+            <span class="material-symbols-outlined">edit</span>
+        </div>
+        <div class="dlg-header-text">
+            <h2 class="dlg-title">@Strings.MANAGEACCOUNTS_PROFILE_EDIT_TITLE</h2>
+        </div>
+    </div>
+    <hr class="dlg-divider" />
+    <div class="dlg-body">
+        <FloatingInput Type="text"
+                       Placeholder="@Strings.MANAGEACCOUNTS_HEAD_NAME"
+                       Value="@m_Name"
+                       ValueChanged="@((value) => { m_Name = value; ClearErrors(); })"
+                       HasError="@m_HasNameError"
+                       AutoComplete="name" />
+        <FloatingInput Type="text"
+                       Placeholder="@Strings.MANAGEACCOUNTS_HEAD_GIVEN_NAME"
+                       Value="@m_GivenName"
+                       ValueChanged="@((value) => { m_GivenName = value; ClearErrors(); })"
+                       AutoComplete="given-name" />
+        <FloatingInput Type="text"
+                       Placeholder="@Strings.MANAGEACCOUNTS_HEAD_FAMILY_NAME"
+                       Value="@m_FamilyName"
+                       ValueChanged="@((value) => { m_FamilyName = value; ClearErrors(); })"
+                       AutoComplete="family-name" />
+        <FloatingInput Type="text"
+                       Placeholder="@Strings.MANAGEACCOUNTS_HEAD_NICKNAME"
+                       Value="@m_Nickname"
+                       ValueChanged="@((value) => { m_Nickname = value; ClearErrors(); })"
+                       AutoComplete="nickname" />
+        <FloatingInput Type="text"
+                       Placeholder="@Strings.MANAGEACCOUNTS_HEAD_PREFERRED_USERNAME"
+                       Value="@m_PreferredUsername"
+                       ValueChanged="@((value) => { m_PreferredUsername = value; ClearErrors(); })"
+                       AutoComplete="username" />
+        <FloatingInput Type="url"
+                       Placeholder="@Strings.MANAGEACCOUNTS_HEAD_WEBSITE"
+                       Value="@m_Website"
+                       ValueChanged="@((value) => { m_Website = value; ClearErrors(); })"
+                       HasError="@m_HasWebsiteError"
+                       AutoComplete="url" />
+        @if (!string.IsNullOrEmpty(m_Error))
+        {
+            <div class="dlg-error">
+                <span class="material-symbols-outlined dlg-error-icon">error</span>
+                <span>@m_Error</span>
+            </div>
+        }
+    </div>
+    <div class="dlg-footer">
+        <button @onclick="CloseAsync" class="btn-ghost" disabled="@m_IsSubmitting">
+            @Strings.MANAGEACCOUNTS_CHANGE_CANCEL
+        </button>
+        <button @onclick="OnConfirmAsync" class="btn-primary" disabled="@m_IsSubmitting">
+            @Strings.MANAGEACCOUNTS_CHANGE_CONFIRM
+        </button>
+    </div>
+</Dialog>
+
+@code {
+    private Dialog m_Ref = null!;
+    private string? m_Name;
+    private string? m_GivenName;
+    private string? m_FamilyName;
+    private string? m_Nickname;
+    private string? m_PreferredUsername;
+    private string? m_Website;
+    private string m_Error = string.Empty;
+    private bool m_HasNameError;
+    private bool m_HasWebsiteError;
+    private bool m_IsSubmitting;
+
+    public async Task ShowAsync()
+    {
+        m_Name = Auth.Name;
+        m_GivenName = Auth.GivenName;
+        m_FamilyName = Auth.FamilyName;
+        m_Nickname = Auth.Nickname;
+        m_PreferredUsername = Auth.PreferredUsername;
+        m_Website = Auth.Website;
+        ClearErrors();
+        m_IsSubmitting = false;
+        await m_Ref.ShowAsync();
+    }
+
+    private async Task CloseAsync()
+    {
+        await m_Ref.CloseAsync();
+    }
+
+    private void ClearErrors()
+    {
+        m_Error = string.Empty;
+        m_HasNameError = false;
+        m_HasWebsiteError = false;
+    }
+
+    private async Task OnConfirmAsync()
+    {
+        if (m_IsSubmitting)
+        {
+            return;
+        }
+
+        ClearErrors();
+
+        var name = NormalizeRequired(m_Name);
+        var givenName = NormalizeOptional(m_GivenName);
+        var familyName = NormalizeOptional(m_FamilyName);
+        var nickname = NormalizeOptional(m_Nickname);
+        var preferredUsername = NormalizeOptional(m_PreferredUsername);
+        var website = NormalizeOptional(m_Website);
+
+        if (string.IsNullOrEmpty(name))
+        {
+            m_Error = Strings.MANAGEACCOUNTS_PROFILE_EDIT_NAME_REQUIRED;
+            m_HasNameError = true;
+            return;
+        }
+
+        if (!IsSafeOptionalUrl(website))
+        {
+            m_Error = Strings.MANAGEACCOUNTS_PROFILE_EDIT_INVALID_WEBSITE;
+            m_HasWebsiteError = true;
+            return;
+        }
+
+        var hasChanges =
+            !IsEqual(name, NormalizeRequired(Auth.Name)) ||
+            !IsEqual(givenName, NormalizeOptional(Auth.GivenName)) ||
+            !IsEqual(familyName, NormalizeOptional(Auth.FamilyName)) ||
+            !IsEqual(nickname, NormalizeOptional(Auth.Nickname)) ||
+            !IsEqual(preferredUsername, NormalizeOptional(Auth.PreferredUsername)) ||
+            !IsEqual(website, NormalizeOptional(Auth.Website));
+
+        if (!hasChanges)
+        {
+            m_Error = Strings.MANAGEACCOUNTS_PROFILE_EDIT_NOCHANGE;
+            return;
+        }
+
+        m_IsSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var verified = await Accesses.VerifyAsync(Auth.AccessToken ?? string.Empty);
+            if (verified.HasValue == false || verified.Value.Id != Auth.Id)
+            {
+                await JS.InvokeVoidAsync("alert", Strings.ERROR_COMMON_AUTHENTICATION_EXPIRED);
+                Nav.NavigateTo("/auth/logout", forceLoad: true);
+                return;
+            }
+
+            var accountId = Auth.Id;
+            if (string.IsNullOrEmpty(accountId) ||
+                !await Accounts.UpdateNameAsync(accountId, name))
+            {
+                await JS.InvokeVoidAsync("alert", Strings.ERROR_COMMON_AUTHENTICATION_EXPIRED);
+                Nav.NavigateTo("/auth/logout", forceLoad: true);
+                return;
+            }
+
+            await SetOptionalClaimAsync(accountId, JwtRegisteredClaimNames.GivenName, givenName, NormalizeOptional(Auth.GivenName));
+            await SetOptionalClaimAsync(accountId, JwtRegisteredClaimNames.FamilyName, familyName, NormalizeOptional(Auth.FamilyName));
+            await SetOptionalClaimAsync(accountId, JwtRegisteredClaimNames.Nickname, nickname, NormalizeOptional(Auth.Nickname));
+            await SetOptionalClaimAsync(accountId, JwtRegisteredClaimNames.PreferredUsername, preferredUsername, NormalizeOptional(Auth.PreferredUsername));
+            await SetOptionalClaimAsync(accountId, JwtRegisteredClaimNames.Website, website, NormalizeOptional(Auth.Website));
+
+            await JS.InvokeVoidAsync("alert", Strings.MANAGEACCOUNTS_PROFILE_EDIT_SUCCESS_MESSAGE);
+            Nav.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        finally
+        {
+            m_IsSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async ValueTask SetOptionalClaimAsync(string accountId, string claimName, string? value, string? currentValue)
+    {
+        if (IsEqual(value, currentValue))
+        {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(value))
+        {
+            await AccountClaims.RemoveClaimsAsync(accountId, claimName);
+            return;
+        }
+
+        await AccountClaims.SetUniqueClaimAsync(accountId, claimName, value);
+    }
+
+    private static string NormalizeRequired(string? value)
+    {
+        return value?.Trim() ?? string.Empty;
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed) ? null : trimmed;
+    }
+
+    private static bool IsEqual(string? left, string? right)
+    {
+        return string.Equals(left, right, StringComparison.Ordinal);
+    }
+
+    private static bool IsSafeOptionalUrl(string? url)
+    {
+        return string.IsNullOrEmpty(url) ||
+               (Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps));
+    }
+}

@@ -429,6 +429,24 @@
   <data name="MANAGEACCOUNTS_CHANGE_CANCEL" xml:space="preserve">
     <value>Cancel</value>
   </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT_TITLE" xml:space="preserve">
+    <value>Edit Profile</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT_NOCHANGE" xml:space="preserve">
+    <value>No changes.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT_NAME_REQUIRED" xml:space="preserve">
+    <value>Display name is required.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT_INVALID_WEBSITE" xml:space="preserve">
+    <value>Website must be a valid http or https URL.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT_SUCCESS_MESSAGE" xml:space="preserve">
+    <value>Your profile has been successfully changed. You will be logged out for refresh.</value>
+  </data>
   <data name="MANAGEACCOUNTS_HEAD_PICTURE" xml:space="preserve">
     <value>Picture</value>
   </data>

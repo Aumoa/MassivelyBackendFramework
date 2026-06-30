@@ -1,0 +1,121 @@
+.dlg-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.dlg-header-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background-color: #e8f0fe;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+    .dlg-header-icon .material-symbols-outlined {
+        font-size: 24px;
+        color: #1a73e8;
+    }
+
+.dlg-title {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 500;
+    color: #202124;
+}
+
+.dlg-divider {
+    margin: 0 0 20px;
+    border: none;
+    border-top: 1px solid #dadce0;
+}
+
+.dlg-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 420px;
+}
+
+.dlg-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #d93025;
+    font-size: 0.875rem;
+}
+
+    .dlg-error .dlg-error-icon {
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+.dlg-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 24px;
+}
+
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    min-width: unset;
+    border-radius: 4px;
+    background-color: #1a73e8;
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+    .btn-primary:hover:not(:disabled) {
+        background-color: #1765cc;
+        color: #fff;
+    }
+
+    .btn-primary:disabled {
+        background-color: #bdc1c6;
+        cursor: not-allowed;
+        color: #fff;
+    }
+
+.btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    min-width: unset;
+    border-radius: 4px;
+    background-color: transparent;
+    color: #1a73e8;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border: 1px solid #dadce0;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+    .btn-ghost:hover:not(:disabled) {
+        background-color: var(--oauth-surface-muted);
+        color: #1a73e8;
+    }
+
+    .btn-ghost:disabled {
+        color: #bdc1c6;
+        cursor: not-allowed;
+    }
+
+@media (max-width: 600px) {
+    .dlg-body {
+        min-width: 0;
+    }
+}

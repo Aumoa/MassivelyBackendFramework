@@ -429,6 +429,24 @@
   <data name="MANAGEACCOUNTS_CHANGE_CANCEL" xml:space="preserve">
     <value>취소</value>
   </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT" xml:space="preserve">
+    <value>편집</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT_TITLE" xml:space="preserve">
+    <value>프로필 편집</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT_NOCHANGE" xml:space="preserve">
+    <value>변경 내용이 없습니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT_NAME_REQUIRED" xml:space="preserve">
+    <value>표시 이름은 필수입니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT_INVALID_WEBSITE" xml:space="preserve">
+    <value>웹사이트는 올바른 http 또는 https URL이어야 합니다.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PROFILE_EDIT_SUCCESS_MESSAGE" xml:space="preserve">
+    <value>프로필이 성공적으로 변경되었습니다. 갱신을 위해 로그아웃됩니다.</value>
+  </data>
   <data name="MANAGEACCOUNTS_HEAD_PICTURE" xml:space="preserve">
     <value>사진</value>
   </data>

@@ -122,6 +122,11 @@ public sealed class UserInfoControllerTests
             throw new NotSupportedException();
         }
 
+        public ValueTask<bool> UpdateNameAsync(string id, string name, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
         public ValueTask<bool> ChangePasswordAsync(string sub, string previousPassword, string newPassword, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();

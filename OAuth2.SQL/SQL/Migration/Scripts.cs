@@ -18,5 +18,6 @@ public partial class Scripts : IScripts
         yield return new _9__Add_api_key_scope_and_client_restriction();
         yield return new _10__Add_client_default_scopes();
         yield return new _11__Add_oauth_grant();
+        yield return new _12__Add_account_updated_at();
     }
 }

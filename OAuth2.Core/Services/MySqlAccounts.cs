@@ -100,10 +100,10 @@ internal class MySqlAccounts(IOptions<MySqlOptions> options) : MySqlDbContext(op
     {
         using var connection = GetConnection();
 
-        const string QUERY1 = "SELECT `sub`, `name`, `email`, `created_at` FROM `account` WHERE `id` = @id";
+        const string QUERY1 = "SELECT `sub`, `name`, `email`, `created_at`, `updated_at` FROM `account` WHERE `id` = @id";
 
         var command = new CommandDefinition(QUERY1, new { id }, cancellationToken: cancellationToken);
-        var (sub, name, email, created_at) = await connection.QuerySingleOrDefaultAsync<(string sub, string name, string email, DateTime created_at)>(command);
+        var (sub, name, email, created_at, updated_at) = await connection.QuerySingleOrDefaultAsync<(string sub, string name, string email, DateTime created_at, DateTime updated_at)>(command);
         if (string.IsNullOrEmpty(sub))
         {
             return null;
@@ -114,7 +114,8 @@ internal class MySqlAccounts(IOptions<MySqlOptions> options) : MySqlDbContext(op
             Sub = sub,
             Name = name,
             Email = email,
-            CreatedAt = created_at
+            CreatedAt = created_at,
+            UpdatedAt = updated_at
         };
     }
 
@@ -144,6 +145,19 @@ internal class MySqlAccounts(IOptions<MySqlOptions> options) : MySqlDbContext(op
 
         var command = new CommandDefinition(QUERY, new { identifier }, cancellationToken: cancellationToken);
         return await connection.QueryFirstOrDefaultAsync<string?>(command);
+    }
+
+    public async ValueTask<bool> UpdateNameAsync(string id, string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        using var connection = GetConnection();
+
+        const string QUERY1 = "UPDATE `account` SET `name` = @name, `updated_at` = NOW() WHERE `id` = @id";
+        var command = new CommandDefinition(QUERY1, new { id, name }, cancellationToken: cancellationToken);
+        int aff = await connection.ExecuteAsync(command);
+        return aff == 1;
     }
 
     public async ValueTask<bool> ChangePasswordAsync(string sub, string previousPassword, string newPassword, CancellationToken cancellationToken = default)
