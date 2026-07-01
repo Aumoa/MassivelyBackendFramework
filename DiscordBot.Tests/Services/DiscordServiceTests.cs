@@ -197,6 +197,28 @@ MessageId: 111
     }
 
     [Fact]
+    public void BuildPromptContentWithReferencedMessage_AddsReferencedImageNotice()
+    {
+        var referenced = new ChatLogData(
+            1,
+            "111",
+            "guild",
+            "channel",
+            "user-1",
+            "왔냐",
+            new DateTime(2026, 6, 14, 1, 2, 3, DateTimeKind.Utc));
+
+        var prompt = DiscordService.BuildPromptContentWithReferencedMessage(
+            "이 캐릭터는 어떤 성격일 것 같아?",
+            referenced,
+            "bot",
+            referencedImageCount: 1);
+
+        Assert.Contains("첨부 이미지: 1장이 현재 사용자 입력 이미지로 함께 포함되었습니다.", prompt);
+        Assert.Contains("내용:\n왔냐", prompt);
+    }
+
+    [Fact]
     public void BuildPromptContentWithReferencedMessage_ReturnsPromptWithoutReference()
     {
         var prompt = DiscordService.BuildPromptContentWithReferencedMessage(
@@ -205,5 +227,69 @@ MessageId: 111
             "bot");
 
         Assert.Equal("그냥 질문입니다.", prompt);
+    }
+
+    [Fact]
+    public void BuildPromptImages_ReturnsNullWithoutImages()
+    {
+        var images = DiscordService.BuildPromptImages(
+            Array.Empty<AI.ChatImage>(),
+            Array.Empty<ChatImageData>());
+
+        Assert.Null(images);
+    }
+
+    [Fact]
+    public void BuildPromptImages_AppendsReferencedImagesAfterCurrentImages()
+    {
+        var currentImage = new AI.ChatImage
+        {
+            Base64 = "current",
+            MediaType = "image/png"
+        };
+        var referencedImage = CreateImage(
+            contentType: "image/jpeg",
+            data: [1, 2, 3]);
+
+        var images = DiscordService.BuildPromptImages(
+            [currentImage],
+            [referencedImage]);
+
+        Assert.NotNull(images);
+        Assert.Equal(2, images.Count);
+        Assert.Same(currentImage, images[0]);
+        Assert.Equal(Convert.ToBase64String([1, 2, 3]), images[1].Base64);
+        Assert.Equal("image/jpeg", images[1].MediaType);
+    }
+
+    private static ChatImageData CreateImage(
+        long id = 1,
+        long chatLogId = 2,
+        string? messageId = "333",
+        string? guildId = "111",
+        string channelId = "222",
+        string userId = "user",
+        string content = "content",
+        string? fileName = "image.png",
+        string contentType = "image/png",
+        int width = 320,
+        int height = 240,
+        byte[]? data = null,
+        DateTime? createdAt = null)
+    {
+        return new ChatImageData(
+            id,
+            chatLogId,
+            messageId,
+            guildId,
+            channelId,
+            userId,
+            content,
+            fileName,
+            contentType,
+            width,
+            height,
+            data ?? [1, 2, 3],
+            createdAt ?? new DateTime(2026, 6, 14, 1, 2, 3, DateTimeKind.Utc));
     }
 }
