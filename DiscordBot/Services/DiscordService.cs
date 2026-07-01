@@ -50,6 +50,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
     private static readonly Emoji s_Emoji = "✍️";
     private static readonly TimeSpan s_ResponseEditInterval = TimeSpan.FromSeconds(5);
     private const int DiscordSafeMessageLength = 1900;
+    private const int MaxReferencedImageCount = 4;
 
     private async Task OnMessageReceived(SocketMessage message)
     {
@@ -166,9 +167,9 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         var toolSettings = scope.ServiceProvider.GetRequiredService<IToolSettingsService>();
         await toolSettings.ApplyAsync(toolsProvider);
 
-        var imageData = processedImages.Count > 0
-            ? processedImages.Select(image => image.ChatImage).ToList()
-            : null;
+        var currentMessageImages = processedImages
+            .Select(image => image.ChatImage)
+            .ToList();
 
         IDisposable? typingState = message.Channel.EnterTypingState();
         string thinkingTicker = "";
@@ -181,10 +182,16 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                 message,
                 chatLogRepository,
                 channelId);
+            var referencedImages = await GetReferencedChatImagesAsync(
+                message,
+                chatImageRepository,
+                channelId);
+            var imageData = BuildPromptImages(currentMessageImages, referencedImages);
             promptContent = BuildPromptContentWithReferencedMessage(
                 promptContent,
                 referencedChatLog,
-                m_Socket.CurrentUser.Id.ToString());
+                m_Socket.CurrentUser.Id.ToString(),
+                referencedImages.Count);
 
             var prompt = isChessMode
                 ? BuildChessModePrompt(chessGameService, message, promptContent)
@@ -402,7 +409,8 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
     internal static string BuildPromptContentWithReferencedMessage(
         string promptContent,
         ChatLogData? referencedChatLog,
-        string selfUserId)
+        string selfUserId,
+        int referencedImageCount = 0)
     {
         if (referencedChatLog == null)
         {
@@ -412,17 +420,39 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         var author = referencedChatLog.UserId == selfUserId
             ? "봇의 이전 응답"
             : $"사용자 {referencedChatLog.UserId}의 메시지";
+        var imageNotice = referencedImageCount > 0
+            ? $"첨부 이미지: {referencedImageCount}장이 현재 사용자 입력 이미지로 함께 포함되었습니다.\n"
+            : string.Empty;
 
         return $"""
 [사용자가 답장으로 참조한 메시지]
 작성자: {author}
 MessageId: {referencedChatLog.MessageId ?? "(unknown)"}
-내용:
+{imageNotice}내용:
 {referencedChatLog.Content}
 
 [사용자 메시지]
 {promptContent}
 """;
+    }
+
+    internal static IReadOnlyList<AI.ChatImage>? BuildPromptImages(
+        IReadOnlyList<AI.ChatImage> currentMessageImages,
+        IReadOnlyList<ChatImageData> referencedImages)
+    {
+        if (currentMessageImages.Count == 0 && referencedImages.Count == 0)
+        {
+            return null;
+        }
+
+        List<AI.ChatImage> images = [.. currentMessageImages];
+        images.AddRange(referencedImages.Select(static image => new AI.ChatImage
+        {
+            Base64 = Convert.ToBase64String(image.Data),
+            MediaType = image.ContentType
+        }));
+
+        return images;
     }
 
     private static async Task<RestUserMessage?> SendDiscordResponseAsync(ISocketMessageChannel channel, string content)
@@ -648,6 +678,29 @@ MessageId: {referencedChatLog.MessageId ?? "(unknown)"}
         return await chatLogRepository.GetByMessageIdAsync(
             currentChannelId,
             referencedMessageId);
+    }
+
+    private static async ValueTask<IReadOnlyList<ChatImageData>> GetReferencedChatImagesAsync(
+        SocketMessage message,
+        IChatImageRepository chatImageRepository,
+        string currentChannelId)
+    {
+        var referencedMessageId = GetReferencedMessageId(message);
+        if (string.IsNullOrWhiteSpace(referencedMessageId))
+        {
+            return [];
+        }
+
+        var referencedChannelId = GetReferencedChannelId(message) ?? currentChannelId;
+        if (!string.Equals(referencedChannelId, currentChannelId, StringComparison.Ordinal))
+        {
+            return [];
+        }
+
+        return await chatImageRepository.GetByMessageIdsAsync(
+            currentChannelId,
+            [referencedMessageId],
+            MaxReferencedImageCount);
     }
 
     private static string? GetReferencedMessageId(SocketMessage message)
