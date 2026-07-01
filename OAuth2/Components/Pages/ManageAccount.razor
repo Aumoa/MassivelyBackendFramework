@@ -25,8 +25,12 @@
     </div>
 
     <div class="info-section">
-        <div class="section-header">
+        <div class="section-header section-header-action">
             <span class="section-title">@Strings.MANAGEACCOUNTS_SECTION_PROFILE</span>
+            <button type="button" class="section-action-btn" @onclick="OnEditProfileAsync" title="@Strings.MANAGEACCOUNTS_PROFILE_EDIT">
+                <span class="material-symbols-outlined">edit</span>
+                @Strings.MANAGEACCOUNTS_PROFILE_EDIT
+            </button>
         </div>
         <div class="info-card">
             <div class="info-row picture-row-container">
@@ -283,6 +287,7 @@
 
 <DlgChangePassword @ref="m_DlgChangePassword" />
 <DlgChangePicture @ref="m_DlgChangePicture" />
+<DlgEditProfile @ref="m_DlgEditProfile" />
 <DlgNewApiKey @ref="m_DlgNewApiKey" OnClose="OnNewApiKeyDialogClosedAsync" />
 
 @code {
@@ -290,6 +295,7 @@
 
     private DlgChangePassword m_DlgChangePassword = null!;
     private DlgChangePicture m_DlgChangePicture = null!;
+    private DlgEditProfile m_DlgEditProfile = null!;
     private DlgNewApiKey m_DlgNewApiKey = null!;
 
     private ApiKeyInfo[] m_ApiKeys = [];
@@ -403,6 +409,11 @@
     private async Task OnChangePictureAsync()
     {
         await m_DlgChangePicture.ShowAsync();
+    }
+
+    private async Task OnEditProfileAsync()
+    {
+        await m_DlgEditProfile.ShowAsync();
     }
 
     private static bool IsSafeUrl(string url)

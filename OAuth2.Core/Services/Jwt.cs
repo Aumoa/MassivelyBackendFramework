@@ -201,7 +201,7 @@ internal class Jwt : IJwt
                     idTokenClaims.Add(new(JwtRegisteredClaimNames.Name, account.Name));
                     break;
                 case JwtRegisteredClaimNames.UpdatedAt:
-                    var updatedAt = (DateTimeOffset)accountClaims.Select(p => p.CreatedAt).Append(account.CreatedAt).Max();
+                    var updatedAt = (DateTimeOffset)accountClaims.Select(p => p.CreatedAt).Append(account.UpdatedAt).Max();
                     idTokenClaims.Add(new Claim(JwtRegisteredClaimNames.UpdatedAt, updatedAt.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
                     break;
                 default:
