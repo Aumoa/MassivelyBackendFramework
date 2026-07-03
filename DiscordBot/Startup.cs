@@ -92,6 +92,7 @@ if (app.Environment.IsDevelopment())
 }
 
 await InitializeClaudeSettingsAsync(app.Lifetime.ApplicationStopping);
+await InitializeAiSkillsAsync(app.Lifetime.ApplicationStopping);
 
 app.Run();
 
@@ -133,6 +134,11 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     });
 
     sc.Configure<OllamaService.Configuration>(conf.GetRequiredSection("Claude"));
+    sc.Configure<AiSkillOptions>(conf.GetSection("AiSkills"));
+    sc.Configure<AiConfigurationManagementOptions>(conf.GetSection("AiConfigurationManagement"));
+    sc.AddSingleton<IAiSkillTemplateProvider, FileAiSkillTemplateProvider>();
+    sc.AddSingleton<IAiSkillProvider, AiSkillProvider>();
+    sc.AddScoped<IAiSkillManagementService, AiSkillManagementService>();
     sc.AddSingleton<OllamaService>();
     sc.AddSingleton<IChessGameStore, InMemoryChessGameStore>();
     sc.AddSingleton<IChessEngine, GeraChessEngine>();
@@ -160,6 +166,7 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddScoped<IToolSettingsService, ToolSettingsService>();
     sc.AddSingleton<IClaudeSettingsRepository, MySqlClaudeSettingsRepository>();
     sc.AddSingleton<IClaudeSettingsService, ClaudeSettingsService>();
+    sc.AddSingleton<IAiSkillRepository, MySqlAiSkillRepository>();
 }
 
 async ValueTask StartMigrationAsync(CancellationToken cancellationToken)
@@ -176,4 +183,11 @@ async ValueTask InitializeClaudeSettingsAsync(CancellationToken cancellationToke
     using var scope = app.Services.CreateScope();
     var settings = scope.ServiceProvider.GetRequiredService<IClaudeSettingsService>();
     await settings.GetAsync(cancellationToken);
+}
+
+async ValueTask InitializeAiSkillsAsync(CancellationToken cancellationToken)
+{
+    using var scope = app.Services.CreateScope();
+    var skills = scope.ServiceProvider.GetRequiredService<IAiSkillProvider>();
+    await skills.GetActiveSkillsAsync(cancellationToken);
 }

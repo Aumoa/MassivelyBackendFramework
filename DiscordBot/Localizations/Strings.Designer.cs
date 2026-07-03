@@ -430,7 +430,7 @@ namespace DiscordBot.Localizations {
         }
 
         /// <summary>
-        ///   Runtime model configuration과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Runtime model and instruction configuration과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string CLAUDE_SETTINGS_SUBTITLE {
             get {
@@ -462,6 +462,15 @@ namespace DiscordBot.Localizations {
         internal static string CLAUDE_SETTINGS_LABEL_DEFAULT_MAX_TOKENS {
             get {
                 return ResourceManager.GetString("CLAUDE_SETTINGS_LABEL_DEFAULT_MAX_TOKENS", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Instructions과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string CLAUDE_SETTINGS_LABEL_INSTRUCTIONS {
+            get {
+                return ResourceManager.GetString("CLAUDE_SETTINGS_LABEL_INSTRUCTIONS", resourceCulture);
             }
         }
 

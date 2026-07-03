@@ -1,0 +1,173 @@
+@page "/ai-skills"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IAiSkillManagementService AiSkillManagement
+@inject NavigationManager Navigation
+
+<PageTitle>@T("AI_SKILLS_TITLE") - @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">@T("AI_SKILLS_TITLE")</h1>
+    <p class="page-subtitle">@T("AI_SKILLS_SUBTITLE")</p>
+</div>
+
+<form class="skill-create-form" @onsubmit="AddSkillAsync" @onsubmit:preventDefault>
+    <label>
+        <span>@T("AI_SKILLS_LABEL_NAME")</span>
+        <input class="mono" @bind="newSkillName" disabled="@isBusy" required maxlength="64" />
+    </label>
+    <label>
+        <span>@T("AI_SKILLS_LABEL_DESCRIPTION")</span>
+        <input @bind="newSkillDescription" disabled="@isBusy" required maxlength="1024" />
+    </label>
+    <label>
+        <span>@T("AI_SKILLS_LABEL_TRIGGER_PHRASE")</span>
+        <input @bind="newSkillTriggerPhrase" disabled="@isBusy" required maxlength="256" />
+    </label>
+    <button class="btn-primary add-button" type="submit" disabled="@isBusy">
+        <span class="material-symbols-outlined">add</span>
+        @T("AI_SKILLS_BUTTON_ADD")
+    </button>
+</form>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@if (isLoading)
+{
+    <p class="empty-state">@T("AI_SKILLS_STATUS_LOADING")</p>
+}
+else if (skills.Count == 0)
+{
+    <p class="empty-state">@T("AI_SKILLS_EMPTY")</p>
+}
+else
+{
+    <div class="skill-table-wrap">
+        <table class="skill-table">
+            <thead>
+                <tr>
+                    <th>@T("AI_SKILLS_LABEL_NAME")</th>
+                    <th>@T("AI_SKILLS_LABEL_SOURCE")</th>
+                    <th>@T("AI_SKILLS_LABEL_DESCRIPTION")</th>
+                    <th>@T("AI_SKILLS_LABEL_PRIORITY")</th>
+                    <th>@T("AI_SKILLS_LABEL_STATUS")</th>
+                    <th>@T("AI_SKILLS_LABEL_EDITABLE")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var skill in skills)
+                {
+                    <tr @key="skill.Name">
+                        <td>
+                            <a class="skill-name-link mono" href="@($"/ai-skills/{Uri.EscapeDataString(skill.Name)}")">@skill.Name</a>
+                        </td>
+                        <td>
+                            <span class="source-badge @(skill.Source == AiSkillSource.Local ? "local" : "database")">
+                                @FormatSource(skill.Source)
+                            </span>
+                        </td>
+                        <td class="description-cell">@skill.Description</td>
+                        <td>@skill.Priority</td>
+                        <td>
+                            <span class="status-badge @(skill.Enabled ? "enabled" : "disabled")">
+                                @(skill.Enabled ? T("AI_SKILLS_LABEL_ENABLED") : T("AI_SKILLS_LABEL_DISABLED"))
+                            </span>
+                        </td>
+                        <td>@(skill.IsEditable ? T("AI_SKILLS_LABEL_YES") : T("AI_SKILLS_LABEL_NO"))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<AiSkillManagementView> skills = [];
+    private string newSkillName = string.Empty;
+    private string newSkillDescription = string.Empty;
+    private string newSkillTriggerPhrase = string.Empty;
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            skills = await AiSkillManagement.GetAllAsync();
+        }
+        catch
+        {
+            SetStatus("error", T("AI_SKILLS_ERROR_LOAD_FAILED"));
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AddSkillAsync()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await AiSkillManagement.SaveDatabaseSkillAsync(new AiSkillSaveRequest(
+                newSkillName,
+                newSkillDescription,
+                0,
+                [newSkillTriggerPhrase],
+                string.Empty,
+                true));
+
+            var createdName = newSkillName.Trim();
+            newSkillName = string.Empty;
+            newSkillDescription = string.Empty;
+            newSkillTriggerPhrase = string.Empty;
+            Navigation.NavigateTo($"/ai-skills/{Uri.EscapeDataString(createdName)}");
+        }
+        catch
+        {
+            SetStatus("error", T("AI_SKILLS_ERROR_SAVE_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private static string FormatSource(AiSkillSource source)
+    {
+        return source == AiSkillSource.Local
+            ? T("AI_SKILLS_SOURCE_LOCAL")
+            : T("AI_SKILLS_SOURCE_DATABASE");
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+}

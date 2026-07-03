@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using AI;
+using DiscordBot.Games.Chess;
+using DiscordBot.Games.Othello;
 using DiscordBot.Localizations;
 using DiscordBot.Repositories;
 using Microsoft.Extensions.Caching.Memory;
@@ -45,6 +47,9 @@ internal sealed class ToolSettingsService(
         typeof(DiscordImageTools),
         typeof(DiscordChatImageTools),
         typeof(DiscordChatAttachmentTools),
+        typeof(DiscordChessTools),
+        typeof(DiscordOthelloTools),
+        typeof(DiscordAiConfigurationTools),
         typeof(AI.Tools.CalculationTools)
     ];
     private static readonly Lazy<IReadOnlyList<ToolCatalogItem>> Catalog = new(BuildCatalog);

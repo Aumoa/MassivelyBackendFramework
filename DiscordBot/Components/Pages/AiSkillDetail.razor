@@ -1,0 +1,275 @@
+@page "/ai-skills/{Name}"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IAiSkillManagementService AiSkillManagement
+@inject NavigationManager Navigation
+
+<PageTitle>@T("AI_SKILLS_DETAIL_TITLE") - @Strings.APP_TITLE</PageTitle>
+
+<div class="detail-toolbar">
+    <a class="btn-ghost back-link" href="/ai-skills" title="@T("AI_SKILLS_BUTTON_BACK")">
+        <span class="material-symbols-outlined">arrow_back</span>
+        <span>@T("AI_SKILLS_BUTTON_BACK")</span>
+    </a>
+</div>
+
+<div class="page-header">
+    <h1 class="page-title">@T("AI_SKILLS_DETAIL_TITLE")</h1>
+    <p class="page-subtitle">@T("AI_SKILLS_DETAIL_SUBTITLE")</p>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@if (isLoading)
+{
+    <p class="empty-state">@T("AI_SKILLS_STATUS_LOADING")</p>
+}
+else if (form is null && !loadFailed)
+{
+    <p class="empty-state">@T("AI_SKILLS_STATUS_NOT_FOUND")</p>
+}
+else if (form is not null)
+{
+    @if (!isEditable)
+    {
+        <div class="readonly-notice">@T("AI_SKILLS_NOTICE_LOCAL_READONLY")</div>
+    }
+
+    <form class="skill-detail-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <label>
+            <span>@T("AI_SKILLS_LABEL_NAME")</span>
+            <input class="mono" @bind="form.Name" disabled="@(!isEditable || isBusy)" required maxlength="64" />
+        </label>
+        <label>
+            <span>@T("AI_SKILLS_LABEL_SOURCE")</span>
+            <input value="@FormatSource(source)" disabled />
+        </label>
+        <label>
+            <span>@T("AI_SKILLS_LABEL_PRIORITY")</span>
+            <input type="number" @bind="form.Priority" disabled="@(!isEditable || isBusy)" />
+        </label>
+        <label class="enabled-field">
+            <input type="checkbox" @bind="form.Enabled" disabled="@(!isEditable || isBusy)" />
+            <span>@T("AI_SKILLS_LABEL_ENABLED")</span>
+        </label>
+        <label class="description-field">
+            <span>@T("AI_SKILLS_LABEL_DESCRIPTION")</span>
+            <textarea @bind="form.Description" disabled="@(!isEditable || isBusy)" required maxlength="1024"></textarea>
+        </label>
+        <label class="trigger-field">
+            <span>@T("AI_SKILLS_LABEL_TRIGGER_PHRASES")</span>
+            <textarea @bind="form.TriggerPhrases" disabled="@(!isEditable || isBusy)" required></textarea>
+        </label>
+        @if (toolNames.Count > 0)
+        {
+            <div class="readonly-field tool-field">
+                <span>@T("AI_SKILLS_LABEL_TOOL_NAMES")</span>
+                <div class="readonly-box mono">@string.Join(", ", toolNames)</div>
+            </div>
+        }
+        <label class="instructions-field">
+            <span>@T("AI_SKILLS_LABEL_INSTRUCTIONS")</span>
+            <textarea @bind="form.Instructions" disabled="@(!isEditable || isBusy)" rows="18"></textarea>
+        </label>
+
+        <dl class="metadata-list">
+            <div>
+                <dt>@T("AI_SKILLS_LABEL_CREATED_AT")</dt>
+                <dd>@DisplayDate(skill?.CreatedAt)</dd>
+            </div>
+            <div>
+                <dt>@T("AI_SKILLS_LABEL_UPDATED_AT")</dt>
+                <dd>@DisplayDate(skill?.UpdatedAt)</dd>
+            </div>
+            <div>
+                <dt>@T("AI_SKILLS_LABEL_EDITABLE")</dt>
+                <dd>@(isEditable ? T("AI_SKILLS_LABEL_YES") : T("AI_SKILLS_LABEL_NO"))</dd>
+            </div>
+        </dl>
+
+        @if (isEditable)
+        {
+            <div class="form-actions">
+                <button class="btn-primary" type="submit" disabled="@isBusy">
+                    <span class="material-symbols-outlined">save</span>
+                    @T("AI_SKILLS_BUTTON_SAVE")
+                </button>
+                <button class="btn-danger" type="button" disabled="@isBusy" @onclick="DeleteAsync">
+                    <span class="material-symbols-outlined">delete</span>
+                    @T("AI_SKILLS_BUTTON_DELETE")
+                </button>
+            </div>
+        }
+    </form>
+}
+
+@code {
+    [Parameter]
+    public string Name { get; set; } = string.Empty;
+
+    private AiSkillManagementView? skill;
+    private SkillForm? form;
+    private IReadOnlyList<string> toolNames = [];
+    private AiSkillSource source;
+    private bool isEditable;
+    private bool isLoading = true;
+    private bool isBusy;
+    private bool loadFailed;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        loadFailed = false;
+        try
+        {
+            skill = await AiSkillManagement.GetAsync(Name);
+            form = skill is null ? null : SkillForm.From(skill);
+            toolNames = skill?.ToolNames ?? [];
+            source = skill?.Source ?? AiSkillSource.Database;
+            isEditable = skill?.IsEditable ?? false;
+        }
+        catch
+        {
+            loadFailed = true;
+            form = null;
+            SetStatus("error", T("AI_SKILLS_ERROR_LOAD_FAILED"));
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (isBusy || form is null || skill is null || !isEditable)
+        {
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            var triggerPhrases = SplitTriggerPhrases(form.TriggerPhrases);
+            var normalizedName = form.Name.Trim();
+            if (!string.Equals(skill.Name, normalizedName, StringComparison.Ordinal))
+            {
+                await AiSkillManagement.RenameDatabaseSkillAsync(skill.Name, normalizedName);
+            }
+
+            await AiSkillManagement.SaveDatabaseSkillAsync(new AiSkillSaveRequest(
+                normalizedName,
+                form.Description,
+                form.Priority,
+                triggerPhrases,
+                form.Instructions,
+                form.Enabled));
+
+            SetStatus("success", T("AI_SKILLS_STATUS_SAVED"));
+            if (!string.Equals(Name, normalizedName, StringComparison.Ordinal))
+            {
+                Navigation.NavigateTo($"/ai-skills/{Uri.EscapeDataString(normalizedName)}");
+                return;
+            }
+
+            await LoadAsync();
+        }
+        catch
+        {
+            SetStatus("error", T("AI_SKILLS_ERROR_SAVE_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (isBusy || skill is null || !isEditable)
+        {
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await AiSkillManagement.DeleteDatabaseSkillAsync(skill.Name);
+            Navigation.NavigateTo("/ai-skills");
+        }
+        catch
+        {
+            SetStatus("error", T("AI_SKILLS_ERROR_ACTION_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private static IReadOnlyList<string> SplitTriggerPhrases(string value)
+    {
+        return value
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split(['\n', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    private static string DisplayDate(DateTime? value)
+    {
+        return value?.ToLocalTime().ToString("G", CultureInfo.CurrentCulture) ?? string.Empty;
+    }
+
+    private static string FormatSource(AiSkillSource value)
+    {
+        return value == AiSkillSource.Local
+            ? T("AI_SKILLS_SOURCE_LOCAL")
+            : T("AI_SKILLS_SOURCE_DATABASE");
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+
+    private sealed class SkillForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public int Priority { get; set; }
+        public string TriggerPhrases { get; set; } = string.Empty;
+        public string Instructions { get; set; } = string.Empty;
+        public bool Enabled { get; set; }
+
+        public static SkillForm From(AiSkillManagementView skill)
+        {
+            return new SkillForm
+            {
+                Name = skill.Name,
+                Description = skill.Description,
+                Priority = skill.Priority,
+                TriggerPhrases = string.Join("\n", skill.TriggerPhrases),
+                Instructions = skill.Instructions,
+                Enabled = skill.Enabled
+            };
+        }
+    }
+}

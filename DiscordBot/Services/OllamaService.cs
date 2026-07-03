@@ -8,7 +8,8 @@ public class OllamaService(
     ILogger<OllamaService> logger,
     IOptions<OllamaService.Configuration> options,
     IChatClient chatClient,
-    IClaudeSettingsService claudeSettings)
+    IClaudeSettingsService claudeSettings,
+    IAiSkillProvider aiSkillProvider)
 {
     public record Configuration
     {
@@ -26,7 +27,7 @@ public class OllamaService(
         {
             if (m_Chats.TryGetValue(channel.Id, out var chatHistory) == false)
             {
-                chatHistory = new OllamaChatHistory(logger, options.Value, chatClient, claudeSettings);
+                chatHistory = new OllamaChatHistory(logger, options.Value, chatClient, claudeSettings, aiSkillProvider);
                 m_Chats.Add(channel.Id, chatHistory);
             }
 
