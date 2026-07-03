@@ -26,7 +26,13 @@ public class OllamaChatHistory(
     private readonly List<ChatMessage> m_Messages = [];
     private readonly SemaphoreSlim m_Semaphore = new(1);
 
-    public async IAsyncEnumerable<ChatResponseChunk> AddAsync(IUser author, string prompt, ToolsProvider toolsProvider, IReadOnlyList<ChatImage>? images = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    public async IAsyncEnumerable<ChatResponseChunk> AddAsync(
+        IUser author,
+        string prompt,
+        ToolsProvider toolsProvider,
+        IReadOnlyList<ChatImage>? images = null,
+        bool filterToolsBySelectedSkills = true,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (author.IsBot)
         {
@@ -53,8 +59,13 @@ public class OllamaChatHistory(
                 Content = DefaultBehaviorInstruction
             });
 
-            var selectedSkills = await aiSkillProvider.SelectSkillsAsync(prompt, cancellationToken);
-            var skillInstruction = AiSkillProvider.BuildSystemInstruction(selectedSkills);
+            var skillSelection = await aiSkillProvider.SelectSkillsAsync(prompt, cancellationToken);
+            if (filterToolsBySelectedSkills)
+            {
+                ApplySkillToolFilter(toolsProvider, skillSelection.ToolNames);
+            }
+
+            var skillInstruction = AiSkillProvider.BuildSystemInstruction(skillSelection.Skills);
             if (!string.IsNullOrWhiteSpace(skillInstruction))
             {
                 recentHistory.Add(new ChatMessage
@@ -207,6 +218,16 @@ public class OllamaChatHistory(
         {
             m_Semaphore.Release();
         }
+    }
+
+    internal static void ApplySkillToolFilter(ToolsProvider toolsProvider, IReadOnlySet<string> allowedToolNames)
+    {
+        var removedToolNames = toolsProvider.GetToolFunctions()
+            .Select(tool => tool.Name)
+            .Where(toolName => !allowedToolNames.Contains(toolName))
+            .ToArray();
+
+        toolsProvider.RemoveFunctions(removedToolNames);
     }
 
     private static async Task<ToolExecutionResult> NormalizeToolResultAsync(object? result)

@@ -199,7 +199,12 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                     ? BuildOthelloModePrompt(othelloGameService, message, promptContent)
                     : promptContent;
 
-            await foreach (var responseMessage in channel.AddAsync(message.Author, prompt, toolsProvider, imageData))
+            await foreach (var responseMessage in channel.AddAsync(
+                message.Author,
+                prompt,
+                toolsProvider,
+                imageData,
+                filterToolsBySelectedSkills: !isChessMode && !isOthelloMode))
             {
                 totalReasoning += responseMessage.Thinking;
                 if (!string.IsNullOrEmpty(responseMessage.Content) && pendingToolUseCount > 0)

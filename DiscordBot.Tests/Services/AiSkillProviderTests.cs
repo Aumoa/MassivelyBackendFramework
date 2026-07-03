@@ -1,7 +1,7 @@
 using System.Text.Json;
+using AI;
 using DiscordBot.Repositories;
 using DiscordBot.Services;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DiscordBot.Tests.Services;
@@ -16,10 +16,14 @@ public sealed class AiSkillProviderTests
 ---
 name: test-skill
 description: Test skill.
+source: local
 priority: 10
 trigger_phrases:
   - 전문적으로
   - "$test-skill"
+tool_names:
+  - calculate
+  - get_current_date
 ---
 # Test Skill
 
@@ -29,10 +33,54 @@ trigger_phrases:
 
         Assert.Equal("test-skill", skill.Name);
         Assert.Equal("Test skill.", skill.Description);
+        Assert.Equal(AiSkillSource.Local, skill.Source);
         Assert.Equal(10, skill.Priority);
         Assert.Contains("전문적으로", skill.TriggerPhrases);
         Assert.Contains("$test-skill", skill.TriggerPhrases);
+        Assert.Contains("calculate", skill.ToolNames);
+        Assert.Contains("get_current_date", skill.ToolNames);
         Assert.Contains("응답을 구조화하세요.", skill.Instructions);
+    }
+
+    [Fact]
+    public void ParseSkillTemplate_RejectsToolNamesForDatabaseSkill()
+    {
+        Assert.Throws<FormatException>(() => AiSkillProvider.ParseSkillTemplate(
+            """
+---
+name: test-skill
+description: Test skill.
+source: database
+trigger_phrases:
+  - 테스트
+tool_names:
+  - calculate
+---
+도구 이름은 DB Skill에 둘 수 없습니다.
+""",
+            "test-skill.md"));
+    }
+
+    [Fact]
+    public void TemplateFiles_ParseSuccessfully()
+    {
+        var templateDirectory = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "DiscordBot",
+            "AiSkillTemplates"));
+
+        var templates = Directory
+            .EnumerateFiles(templateDirectory, "*.md", SearchOption.TopDirectoryOnly)
+            .Select(path => AiSkillProvider.ParseSkillTemplate(File.ReadAllText(path), Path.GetFileName(path)))
+            .ToArray();
+
+        Assert.NotEmpty(templates);
+        Assert.Contains(templates, template => template.Source == AiSkillSource.Database);
+        Assert.Contains(templates, template => template.Source == AiSkillSource.Local && template.ToolNames.Count > 0);
     }
 
     [Fact]
@@ -52,8 +100,34 @@ trigger_phrases:
 
         var skill = Assert.Single(skills);
         Assert.Equal("professional-answer", skill.Name);
+        Assert.Equal(AiSkillSource.Database, skill.Source);
         Assert.Equal("전문 답변 지침입니다.", repository.Data.Single().Instructions);
         Assert.Equal(1, repository.UpsertCount);
+    }
+
+    [Fact]
+    public async Task GetActiveSkillsAsync_DoesNotSeedLocalTemplatesIntoRepository()
+    {
+        var repository = new FakeAiSkillRepository();
+        var provider = CreateProvider(
+            repository,
+            new AiSkillDefinition(
+                "image-generation",
+                "Image generation tools.",
+                95,
+                ["그림 그려"],
+                "이미지 생성 지침입니다.",
+                AiSkillSource.Local,
+                ["generate_image"]));
+
+        var skills = await provider.GetActiveSkillsAsync();
+
+        var skill = Assert.Single(skills);
+        Assert.Equal("image-generation", skill.Name);
+        Assert.Equal(AiSkillSource.Local, skill.Source);
+        Assert.Contains("generate_image", skill.ToolNames);
+        Assert.Empty(repository.Data);
+        Assert.Equal(0, repository.UpsertCount);
     }
 
     [Fact]
@@ -94,10 +168,11 @@ trigger_phrases:
             "전문 답변 지침입니다."));
         var provider = CreateProvider(repository);
 
-        var skills = await provider.SelectSkillsAsync("이 설계를 전문적으로 분석해줘.");
+        var selection = await provider.SelectSkillsAsync("이 설계를 전문적으로 분석해줘.");
 
-        var skill = Assert.Single(skills);
+        var skill = Assert.Single(selection.Skills);
         Assert.Equal("professional-answer", skill.Name);
+        Assert.Empty(selection.ToolNames);
     }
 
     [Fact]
@@ -112,9 +187,10 @@ trigger_phrases:
             enabled: false));
         var provider = CreateProvider(repository);
 
-        var skills = await provider.SelectSkillsAsync("이 설계를 전문적으로 분석해줘.");
+        var selection = await provider.SelectSkillsAsync("이 설계를 전문적으로 분석해줘.");
 
-        Assert.Empty(skills);
+        Assert.Empty(selection.Skills);
+        Assert.Empty(selection.ToolNames);
     }
 
     [Fact]
@@ -128,9 +204,9 @@ trigger_phrases:
             "전문 답변 지침입니다."));
         var provider = CreateProvider(repository);
 
-        var skills = await provider.SelectSkillsAsync("$professional-answer 로 답해줘.");
+        var selection = await provider.SelectSkillsAsync("$professional-answer 로 답해줘.");
 
-        var skill = Assert.Single(skills);
+        var skill = Assert.Single(selection.Skills);
         Assert.Equal("professional-answer", skill.Name);
     }
 
@@ -145,9 +221,35 @@ trigger_phrases:
             "전문 답변 지침입니다."));
         var provider = CreateProvider(repository);
 
-        var skills = await provider.SelectSkillsAsync("$admin-skill 로 답해줘.");
+        var selection = await provider.SelectSkillsAsync("$admin-skill 로 답해줘.");
 
-        Assert.Empty(skills);
+        Assert.Empty(selection.Skills);
+    }
+
+    [Fact]
+    public async Task SelectSkillsAsync_ReturnsToolNamesOnlyFromSelectedLocalSkills()
+    {
+        var repository = new FakeAiSkillRepository();
+        repository.Data.Add(CreateData(
+            "professional-answer",
+            "Professional answer mode.",
+            ["전문적으로"],
+            "전문 답변 지침입니다."));
+        var provider = CreateProvider(
+            repository,
+            new AiSkillDefinition(
+                "image-generation",
+                "Image generation tools.",
+                95,
+                ["그림 그려"],
+                "이미지 생성 지침입니다.",
+                AiSkillSource.Local,
+                ["generate_image"]));
+
+        var selection = await provider.SelectSkillsAsync("전문적으로 그림 그려줘.");
+
+        Assert.Equal(new[] { "professional-answer", "image-generation" }, selection.Skills.Select(skill => skill.Name));
+        Assert.Equal(new[] { "generate_image" }, selection.ToolNames.OrderBy(name => name, StringComparer.Ordinal));
     }
 
     [Fact]
@@ -161,7 +263,7 @@ trigger_phrases:
             "전문 답변 지침입니다."));
         var provider = CreateProvider(repository);
 
-        var skills = await provider.SelectSkillsAsync(
+        var selection = await provider.SelectSkillsAsync(
             """
 [사용자가 답장으로 참조한 메시지]
 내용:
@@ -171,7 +273,7 @@ trigger_phrases:
 그냥 짧게 답해줘.
 """);
 
-        Assert.Empty(skills);
+        Assert.Empty(selection.Skills);
     }
 
     [Fact]
@@ -185,7 +287,7 @@ trigger_phrases:
             "전문 답변 지침입니다."));
         var provider = CreateProvider(repository);
 
-        var skills = await provider.SelectSkillsAsync(
+        var selection = await provider.SelectSkillsAsync(
             """
 요약해줘
 
@@ -195,7 +297,7 @@ File: note.txt
 이 문서는 전문적으로 분석한다는 문장을 포함합니다.
 """);
 
-        Assert.Empty(skills);
+        Assert.Empty(selection.Skills);
     }
 
     [Fact]
@@ -217,6 +319,19 @@ File: note.txt
         Assert.Contains("결론을 먼저 제시하세요.", instruction);
     }
 
+    [Fact]
+    public void ApplySkillToolFilter_RemovesToolsOutsideSelectedLocalSkills()
+    {
+        var toolsProvider = ToolsProvider.CreateFrom(new FakeTools());
+
+        OllamaChatHistory.ApplySkillToolFilter(
+            toolsProvider,
+            new HashSet<string>(StringComparer.Ordinal) { "allowed_tool" });
+
+        Assert.NotNull(toolsProvider.FindFunction("allowed_tool"));
+        Assert.Null(toolsProvider.FindFunction("removed_tool"));
+    }
+
     private static AiSkillProvider CreateProvider(
         FakeAiSkillRepository repository,
         params AiSkillDefinition[] templates)
@@ -224,7 +339,6 @@ File: note.txt
         return new AiSkillProvider(
             repository,
             new FakeAiSkillTemplateProvider(templates),
-            new MemoryCache(new MemoryCacheOptions()),
             NullLogger<AiSkillProvider>.Instance);
     }
 
@@ -280,6 +394,21 @@ File: note.txt
         public IReadOnlyList<AiSkillDefinition> LoadTemplates()
         {
             return templates;
+        }
+    }
+
+    private sealed class FakeTools
+    {
+        [ToolFunction(Name = "allowed_tool")]
+        private string Allowed()
+        {
+            return "allowed";
+        }
+
+        [ToolFunction(Name = "removed_tool")]
+        private string Removed()
+        {
+            return "removed";
         }
     }
 }

@@ -1,6 +1,7 @@
 ---
 name: professional-answer
 description: Adds a professional answer mode when the user explicitly asks for expert-level, detailed, structured, technical, architectural, security, or review-oriented answers.
+source: database
 priority: 100
 trigger_phrases:
   - 전문적으로

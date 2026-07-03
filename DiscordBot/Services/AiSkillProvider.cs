@@ -3,23 +3,45 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DiscordBot.Options;
 using DiscordBot.Repositories;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
+
+public enum AiSkillSource
+{
+    Database,
+    Local
+}
 
 public sealed record AiSkillDefinition(
     string Name,
     string Description,
     int Priority,
     IReadOnlyList<string> TriggerPhrases,
-    string Instructions);
+    string Instructions,
+    AiSkillSource Source,
+    IReadOnlyList<string> ToolNames)
+{
+    public AiSkillDefinition(
+        string name,
+        string description,
+        int priority,
+        IReadOnlyList<string> triggerPhrases,
+        string instructions)
+        : this(name, description, priority, triggerPhrases, instructions, AiSkillSource.Database, [])
+    {
+    }
+}
+
+public sealed record AiSkillSelection(
+    IReadOnlyList<AiSkillDefinition> Skills,
+    IReadOnlySet<string> ToolNames);
 
 public interface IAiSkillProvider
 {
     ValueTask<IReadOnlyList<AiSkillDefinition>> GetActiveSkillsAsync(CancellationToken cancellationToken = default);
 
-    ValueTask<IReadOnlyList<AiSkillDefinition>> SelectSkillsAsync(
+    ValueTask<AiSkillSelection> SelectSkillsAsync(
         string prompt,
         CancellationToken cancellationToken = default);
 }
@@ -32,33 +54,22 @@ internal interface IAiSkillTemplateProvider
 internal sealed partial class AiSkillProvider(
     IAiSkillRepository repository,
     IAiSkillTemplateProvider templateProvider,
-    IMemoryCache cache,
     ILogger<AiSkillProvider> logger) : IAiSkillProvider
 {
-    private const string CacheKey = "DiscordBot.AiSkills";
     private const int MaxSelectedSkills = 3;
 
     public async ValueTask<IReadOnlyList<AiSkillDefinition>> GetActiveSkillsAsync(CancellationToken cancellationToken = default)
     {
-        if (cache.TryGetValue<IReadOnlyList<AiSkillDefinition>>(CacheKey, out var cachedSkills) && cachedSkills != null)
-        {
-            return cachedSkills;
-        }
-
-        var skills = await LoadAndSeedSkillsAsync(cancellationToken);
-        var activeSkills = skills
-            .Where(skill => skill.Enabled)
-            .Select(ToDefinition)
-            .OfType<AiSkillDefinition>()
+        var activeSkills = await LoadAndSeedSkillsAsync(cancellationToken);
+        activeSkills = activeSkills
             .OrderByDescending(skill => skill.Priority)
             .ThenBy(skill => skill.Name, StringComparer.Ordinal)
             .ToArray();
 
-        cache.Set(CacheKey, activeSkills);
         return activeSkills;
     }
 
-    public async ValueTask<IReadOnlyList<AiSkillDefinition>> SelectSkillsAsync(
+    public async ValueTask<AiSkillSelection> SelectSkillsAsync(
         string prompt,
         CancellationToken cancellationToken = default)
     {
@@ -66,17 +77,25 @@ internal sealed partial class AiSkillProvider(
         var selectionText = ExtractSelectionText(prompt);
         if (string.IsNullOrWhiteSpace(selectionText))
         {
-            return [];
+            return new AiSkillSelection([], new HashSet<string>(StringComparer.Ordinal));
         }
 
         var requestedSkillNames = ExtractRequestedSkillNames(selectionText);
 
-        return skills
+        var selectedSkills = skills
             .Where(skill => requestedSkillNames.Contains(skill.Name) || MatchesTriggerPhrase(selectionText, skill))
             .OrderByDescending(skill => skill.Priority)
             .ThenBy(skill => skill.Name, StringComparer.Ordinal)
             .Take(MaxSelectedSkills)
             .ToArray();
+
+        var selectedToolNames = selectedSkills
+            .Where(skill => skill.Source == AiSkillSource.Local)
+            .SelectMany(skill => skill.ToolNames)
+            .Where(toolName => !string.IsNullOrWhiteSpace(toolName))
+            .ToHashSet(StringComparer.Ordinal);
+
+        return new AiSkillSelection(selectedSkills, selectedToolNames);
     }
 
     public static string BuildSystemInstruction(IReadOnlyList<AiSkillDefinition> skills)
@@ -90,6 +109,7 @@ internal sealed partial class AiSkillProvider(
         sb.AppendLine("[요청 기반 추가 Skill 지침]");
         sb.AppendLine("- 이 지침은 사용자가 해당 답변 방식을 요청한 현재 응답에만 적용합니다.");
         sb.AppendLine("- 전역 AI 지침, 기본 응답 방침, 도구 권한, 채널 범위, 안전성, 사실성 지침보다 낮은 우선순위입니다.");
+        sb.AppendLine("- DB에서 관리되는 Skill 지침은 tool 권한을 추가하지 않습니다. tool 노출은 로컬 source-of-truth Skill의 허용 목록과 서버 설정만 따릅니다.");
         sb.AppendLine("- 여러 Skill이 함께 선택되면 서로 충돌하지 않는 범위에서만 적용하고, 충돌 시 더 구체적인 사용자 요청과 상위 지침을 우선합니다.");
 
         foreach (var skill in skills)
@@ -152,6 +172,14 @@ internal sealed partial class AiSkillProvider(
         }
 
         var description = GetRequiredValue(values, "description", sourceName);
+        var source = AiSkillSource.Database;
+        if (values.TryGetValue("source", out var sourceValues)
+            && sourceValues.Count > 0
+            && !string.IsNullOrWhiteSpace(sourceValues[0]))
+        {
+            source = ParseSource(sourceValues[0], sourceName);
+        }
+
         var priority = 0;
         if (values.TryGetValue("priority", out var priorityValues)
             && priorityValues.Count > 0
@@ -169,16 +197,49 @@ internal sealed partial class AiSkillProvider(
             throw new FormatException($"AI Skill template '{sourceName}' must include at least one trigger phrase.");
         }
 
-        return new AiSkillDefinition(name, description, priority, triggerPhrases, instructions);
+        var toolNames = values.TryGetValue("tool_names", out var toolNameValues)
+            ? toolNameValues
+                .Where(toolName => !string.IsNullOrWhiteSpace(toolName))
+                .Select(toolName => toolName.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray()
+            : [];
+
+        foreach (var toolName in toolNames)
+        {
+            if (!ToolNameRegex().IsMatch(toolName))
+            {
+                throw new FormatException($"AI Skill template '{sourceName}' has an invalid tool name '{toolName}'.");
+            }
+        }
+
+        if (source == AiSkillSource.Database && toolNames.Length > 0)
+        {
+            throw new FormatException($"AI Skill template '{sourceName}' cannot define tool_names unless source is local.");
+        }
+
+        return new AiSkillDefinition(name, description, priority, triggerPhrases, instructions, source, toolNames);
     }
 
-    private async ValueTask<IReadOnlyList<AiSkillData>> LoadAndSeedSkillsAsync(CancellationToken cancellationToken)
+    private async ValueTask<IReadOnlyList<AiSkillDefinition>> LoadAndSeedSkillsAsync(CancellationToken cancellationToken)
     {
+        var templates = templateProvider.LoadTemplates();
+        var localTemplates = templates
+            .Where(template => template.Source == AiSkillSource.Local)
+            .ToArray();
+        var localSkillNames = localTemplates
+            .Select(template => template.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var databaseTemplates = templates
+            .Where(template => template.Source == AiSkillSource.Database)
+            .Where(template => !localSkillNames.Contains(template.Name))
+            .ToArray();
+
         var skills = await repository.GetAllAsync(cancellationToken);
         var existingSkillNames = skills.Select(skill => skill.Name).ToHashSet(StringComparer.Ordinal);
-        var defaultTemplates = templateProvider.LoadTemplates();
+        var seededAnySkill = false;
 
-        foreach (var template in defaultTemplates)
+        foreach (var template in databaseTemplates)
         {
             if (existingSkillNames.Contains(template.Name))
             {
@@ -194,14 +255,21 @@ internal sealed partial class AiSkillProvider(
                 enabled: true,
                 cancellationToken);
             existingSkillNames.Add(template.Name);
+            seededAnySkill = true;
         }
 
-        if (existingSkillNames.Count != skills.Count)
+        if (seededAnySkill)
         {
             skills = await repository.GetAllAsync(cancellationToken);
         }
 
-        return skills;
+        var databaseSkills = skills
+            .Where(skill => skill.Enabled)
+            .Where(skill => !localSkillNames.Contains(skill.Name))
+            .Select(ToDefinition)
+            .OfType<AiSkillDefinition>();
+
+        return databaseSkills.Concat(localTemplates).ToArray();
     }
 
     private AiSkillDefinition? ToDefinition(AiSkillData data)
@@ -214,7 +282,9 @@ internal sealed partial class AiSkillProvider(
                 data.Description,
                 data.Priority,
                 triggerPhrases,
-                data.Instructions);
+                data.Instructions,
+                AiSkillSource.Database,
+                []);
         }
         catch (Exception e)
         {
@@ -301,6 +371,16 @@ internal sealed partial class AiSkillProvider(
         return keyValues[0].Trim();
     }
 
+    private static AiSkillSource ParseSource(string value, string sourceName)
+    {
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "database" or "db" => AiSkillSource.Database,
+            "local" or "file" or "static" or "appsettings" => AiSkillSource.Local,
+            _ => throw new FormatException($"AI Skill template '{sourceName}' has an invalid source '{value}'.")
+        };
+    }
+
     private static string Unquote(string value)
     {
         if (value.Length >= 2
@@ -318,6 +398,9 @@ internal sealed partial class AiSkillProvider(
 
     [GeneratedRegex(@"^[a-z0-9][a-z0-9-]{0,63}$", RegexOptions.CultureInvariant)]
     private static partial Regex SkillNameRegex();
+
+    [GeneratedRegex(@"^[a-z0-9][a-z0-9_]{0,127}$", RegexOptions.CultureInvariant)]
+    private static partial Regex ToolNameRegex();
 }
 
 internal sealed class FileAiSkillTemplateProvider(
@@ -326,8 +409,24 @@ internal sealed class FileAiSkillTemplateProvider(
     ILogger<FileAiSkillTemplateProvider> logger) : IAiSkillTemplateProvider
 {
     private readonly AiSkillOptions m_Options = options.Value;
+    private readonly object m_CacheLock = new();
+    private IReadOnlyList<AiSkillDefinition>? m_CachedTemplates;
 
     public IReadOnlyList<AiSkillDefinition> LoadTemplates()
+    {
+        if (m_CachedTemplates != null)
+        {
+            return m_CachedTemplates;
+        }
+
+        lock (m_CacheLock)
+        {
+            m_CachedTemplates ??= LoadTemplatesCore();
+            return m_CachedTemplates;
+        }
+    }
+
+    private IReadOnlyList<AiSkillDefinition> LoadTemplatesCore()
     {
         var templateDirectoryPath = m_Options.TemplateDirectoryPath;
         if (!Path.IsPathRooted(templateDirectoryPath))
