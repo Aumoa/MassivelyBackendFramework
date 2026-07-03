@@ -253,6 +253,30 @@ tool_names:
     }
 
     [Fact]
+    public async Task SelectSkillsAsync_PreservesToolNamesFromLocalSkillsDisplacedBySkillCap()
+    {
+        var repository = new FakeAiSkillRepository();
+        repository.Data.Add(CreateData("first-db-skill", "First DB skill.", ["그림"], "첫 번째 DB 지침입니다.", priority: 300));
+        repository.Data.Add(CreateData("second-db-skill", "Second DB skill.", ["그림"], "두 번째 DB 지침입니다.", priority: 290));
+        repository.Data.Add(CreateData("third-db-skill", "Third DB skill.", ["그림"], "세 번째 DB 지침입니다.", priority: 280));
+        var provider = CreateProvider(
+            repository,
+            new AiSkillDefinition(
+                "image-generation",
+                "Image generation tools.",
+                95,
+                ["그림"],
+                "이미지 생성 지침입니다.",
+                AiSkillSource.Local,
+                ["generate_image"]));
+
+        var selection = await provider.SelectSkillsAsync("그림 그려줘.");
+
+        Assert.Equal(new[] { "first-db-skill", "second-db-skill", "third-db-skill" }, selection.Skills.Select(skill => skill.Name));
+        Assert.Equal(new[] { "generate_image" }, selection.ToolNames);
+    }
+
+    [Fact]
     public async Task SelectSkillsAsync_UsesCurrentUserMessageInsteadOfReferencedContext()
     {
         var repository = new FakeAiSkillRepository();

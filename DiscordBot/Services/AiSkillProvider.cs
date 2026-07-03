@@ -82,14 +82,17 @@ internal sealed partial class AiSkillProvider(
 
         var requestedSkillNames = ExtractRequestedSkillNames(selectionText);
 
-        var selectedSkills = skills
+        var matchedSkills = skills
             .Where(skill => requestedSkillNames.Contains(skill.Name) || MatchesTriggerPhrase(selectionText, skill))
             .OrderByDescending(skill => skill.Priority)
             .ThenBy(skill => skill.Name, StringComparer.Ordinal)
+            .ToArray();
+
+        var selectedSkills = matchedSkills
             .Take(MaxSelectedSkills)
             .ToArray();
 
-        var selectedToolNames = selectedSkills
+        var selectedToolNames = matchedSkills
             .Where(skill => skill.Source == AiSkillSource.Local)
             .SelectMany(skill => skill.ToolNames)
             .Where(toolName => !string.IsNullOrWhiteSpace(toolName))
