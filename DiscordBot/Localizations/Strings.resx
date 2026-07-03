@@ -216,7 +216,7 @@
     <value>Claude Settings</value>
   </data>
   <data name="CLAUDE_SETTINGS_SUBTITLE" xml:space="preserve">
-    <value>Runtime model configuration</value>
+    <value>Runtime model and instruction configuration</value>
   </data>
   <data name="CLAUDE_SETTINGS_LABEL_MODEL" xml:space="preserve">
     <value>Model</value>
@@ -226,6 +226,9 @@
   </data>
   <data name="CLAUDE_SETTINGS_LABEL_DEFAULT_MAX_TOKENS" xml:space="preserve">
     <value>Default Max Tokens</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_LABEL_INSTRUCTIONS" xml:space="preserve">
+    <value>Instructions</value>
   </data>
   <data name="CLAUDE_SETTINGS_BUTTON_SAVE" xml:space="preserve">
     <value>Save</value>

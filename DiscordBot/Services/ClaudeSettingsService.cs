@@ -13,6 +13,7 @@ public interface IClaudeSettingsService
         string model,
         string summaryModel,
         int defaultMaxTokens,
+        string instructions,
         CancellationToken cancellationToken = default);
 }
 
@@ -41,7 +42,24 @@ internal sealed class ClaudeSettingsService(
                 settings.Model,
                 settings.SummaryModel,
                 settings.DefaultMaxTokens,
+                settings.Instructions ?? string.Empty,
                 cancellationToken);
+        }
+        else if (settings.Instructions == null)
+        {
+            var defaultInstructions = BuildDefaultInstructions();
+            await repository.UpsertAsync(
+                settings.Model,
+                settings.SummaryModel,
+                settings.DefaultMaxTokens,
+                defaultInstructions,
+                cancellationToken);
+
+            settings = settings with
+            {
+                Instructions = defaultInstructions,
+                UpdatedAt = DateTime.Now
+            };
         }
 
         cache.Set(CacheKey, settings);
@@ -52,22 +70,26 @@ internal sealed class ClaudeSettingsService(
         string model,
         string summaryModel,
         int defaultMaxTokens,
+        string instructions,
         CancellationToken cancellationToken = default)
     {
         var normalizedModel = NormalizeRequired(model, nameof(model));
         var normalizedSummaryModel = NormalizeRequired(summaryModel, nameof(summaryModel));
         var normalizedMaxTokens = NormalizeMaxTokens(defaultMaxTokens);
+        var normalizedInstructions = NormalizeInstructions(instructions);
 
         await repository.UpsertAsync(
             normalizedModel,
             normalizedSummaryModel,
             normalizedMaxTokens,
+            normalizedInstructions,
             cancellationToken);
 
         cache.Set(CacheKey, new ClaudeSettingsData(
             normalizedModel,
             normalizedSummaryModel,
             normalizedMaxTokens,
+            normalizedInstructions,
             DateTime.Now,
             DateTime.Now));
     }
@@ -78,8 +100,14 @@ internal sealed class ClaudeSettingsService(
         var model = NormalizeRequired(options.Model, nameof(options.Model));
         var summaryModel = NormalizeRequired(options.SummaryModel, nameof(options.SummaryModel));
         var defaultMaxTokens = NormalizeMaxTokens(claudeOptions.Value.DefaultMaxTokens);
+        var instructions = BuildDefaultInstructions();
 
-        return new ClaudeSettingsData(model, summaryModel, defaultMaxTokens, DateTime.Now, null);
+        return new ClaudeSettingsData(model, summaryModel, defaultMaxTokens, instructions, DateTime.Now, null);
+    }
+
+    private string BuildDefaultInstructions()
+    {
+        return NormalizeInstructions(botOptions.Value.Persona);
     }
 
     private static string NormalizeRequired(string? value, string parameterName)
@@ -91,6 +119,11 @@ internal sealed class ClaudeSettingsService(
         }
 
         return normalized;
+    }
+
+    private static string NormalizeInstructions(string? value)
+    {
+        return value?.Trim() ?? string.Empty;
     }
 
     private static int NormalizeMaxTokens(int value)

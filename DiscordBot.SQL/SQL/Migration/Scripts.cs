@@ -21,5 +21,6 @@ public partial class Scripts : IScripts
         yield return new _12__AddChatLogMessageReferences();
         yield return new _13__AddChannelNotes();
         yield return new _14__AddAppointmentItems();
+        yield return new _15__AddClaudeInstructions();
     }
 }

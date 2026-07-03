@@ -35,13 +35,14 @@ public class OllamaChatHistory(
         await m_Semaphore.WaitAsync(cancellationToken);
         try
         {
+            var settings = await claudeSettings.GetAsync(cancellationToken);
             List<ChatMessage> recentHistory = [];
-            if (!string.IsNullOrWhiteSpace(options.Persona))
+            if (!string.IsNullOrWhiteSpace(settings.Instructions))
             {
                 recentHistory.Add(new ChatMessage
                 {
                     Role = ChatRole.System,
-                    Content = options.Persona
+                    Content = settings.Instructions
                 });
             }
 
@@ -66,7 +67,7 @@ public class OllamaChatHistory(
 
             while (true)
             {
-                var settings = await claudeSettings.GetAsync(cancellationToken);
+                settings = await claudeSettings.GetAsync(cancellationToken);
                 var allMessages = recentHistory.Concat(messagesAppend).ToList();
                 var chatOptions = new ChatCompletionOptions
                 {
@@ -294,13 +295,13 @@ public class OllamaChatHistory(
         }
 
         var summaryContent = string.Join("\n", m_Messages.Take(summaryRange).Select(m => $"({m.Role}): {m.Content}"));
+        var settings = await claudeSettings.GetAsync(cancellationToken);
         var summarySystem = $@"
 너는 대화 요약 전문가야. 아래 내용을 참고해서 사용자가 원하는 요약을 진행해주어야 해.
 
 [시스템 정보]
-- 페르소나: {options.Persona}
+- 지시사항: {settings.Instructions}
 - 현재 시간: {DateTimeOffset.UtcNow}
-- 지시사항: 
 
 [데이터 형식 규칙]
 - 대화는 'Role: (작성자님의 메시지): 내용' 형태야.
@@ -317,7 +318,6 @@ public class OllamaChatHistory(
 
         try
         {
-            var settings = await claudeSettings.GetAsync(cancellationToken);
             var summaryOptions = new ChatCompletionOptions
             {
                 Model = settings.SummaryModel,

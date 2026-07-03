@@ -216,7 +216,7 @@
     <value>Claude 설정</value>
   </data>
   <data name="CLAUDE_SETTINGS_SUBTITLE" xml:space="preserve">
-    <value>런타임 모델 설정</value>
+    <value>런타임 모델 및 지침 설정</value>
   </data>
   <data name="CLAUDE_SETTINGS_LABEL_MODEL" xml:space="preserve">
     <value>모델</value>
@@ -226,6 +226,9 @@
   </data>
   <data name="CLAUDE_SETTINGS_LABEL_DEFAULT_MAX_TOKENS" xml:space="preserve">
     <value>기본 최대 토큰</value>
+  </data>
+  <data name="CLAUDE_SETTINGS_LABEL_INSTRUCTIONS" xml:space="preserve">
+    <value>지침</value>
   </data>
   <data name="CLAUDE_SETTINGS_BUTTON_SAVE" xml:space="preserve">
     <value>저장</value>

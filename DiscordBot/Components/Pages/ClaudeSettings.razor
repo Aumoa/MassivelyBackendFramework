@@ -31,6 +31,10 @@ else
             <span>@Strings.CLAUDE_SETTINGS_LABEL_DEFAULT_MAX_TOKENS</span>
             <input type="number" min="1" max="200000" @bind="defaultMaxTokens" disabled="@isBusy" required />
         </label>
+        <label class="settings-form-full">
+            <span>@Strings.CLAUDE_SETTINGS_LABEL_INSTRUCTIONS</span>
+            <textarea @bind="instructions" disabled="@isBusy" rows="14" maxlength="64000"></textarea>
+        </label>
         <button class="btn-primary save-button" type="submit" disabled="@isBusy">
             <span class="material-symbols-outlined">save</span>
             @Strings.CLAUDE_SETTINGS_BUTTON_SAVE
@@ -46,6 +50,7 @@ else
 @code {
     private string model = string.Empty;
     private string summaryModel = string.Empty;
+    private string instructions = string.Empty;
     private int defaultMaxTokens;
     private bool isLoading = true;
     private bool isBusy;
@@ -66,6 +71,7 @@ else
             model = settings.Model;
             summaryModel = settings.SummaryModel;
             defaultMaxTokens = settings.DefaultMaxTokens;
+            instructions = settings.Instructions ?? string.Empty;
         }
         catch
         {
@@ -105,7 +111,7 @@ else
         isBusy = true;
         try
         {
-            await ClaudeSettingsService.SaveAsync(model, summaryModel, defaultMaxTokens);
+            await ClaudeSettingsService.SaveAsync(model, summaryModel, defaultMaxTokens, instructions);
             SetStatus("success", Strings.CLAUDE_SETTINGS_STATUS_SAVED);
         }
         catch

@@ -4,6 +4,7 @@ public record ClaudeSettingsData(
     string Model,
     string SummaryModel,
     int DefaultMaxTokens,
+    string? Instructions,
     DateTime CreatedAt,
     DateTime? UpdatedAt);
 
@@ -15,5 +16,6 @@ public interface IClaudeSettingsRepository
         string model,
         string summaryModel,
         int defaultMaxTokens,
+        string instructions,
         CancellationToken cancellationToken = default);
 }
