@@ -9,7 +9,8 @@ public class OllamaChatHistory(
     ILogger logger,
     OllamaService.Configuration options,
     IChatClient chatClient,
-    IClaudeSettingsService claudeSettings)
+    IClaudeSettingsService claudeSettings,
+    IAiSkillProvider aiSkillProvider)
 {
     private const string DefaultBehaviorInstruction = """
 [기본 응답 방침]
@@ -51,6 +52,17 @@ public class OllamaChatHistory(
                 Role = ChatRole.System,
                 Content = DefaultBehaviorInstruction
             });
+
+            var selectedSkills = aiSkillProvider.SelectSkills(prompt);
+            var skillInstruction = FileAiSkillProvider.BuildSystemInstruction(selectedSkills);
+            if (!string.IsNullOrWhiteSpace(skillInstruction))
+            {
+                recentHistory.Add(new ChatMessage
+                {
+                    Role = ChatRole.System,
+                    Content = skillInstruction
+                });
+            }
 
             PruneRememberedMessages();
             recentHistory.AddRange(m_Messages);
