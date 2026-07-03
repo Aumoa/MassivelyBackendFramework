@@ -22,5 +22,6 @@ public partial class Scripts : IScripts
         yield return new _13__AddChannelNotes();
         yield return new _14__AddAppointmentItems();
         yield return new _15__AddClaudeInstructions();
+        yield return new _16__AddAiSkills();
     }
 }

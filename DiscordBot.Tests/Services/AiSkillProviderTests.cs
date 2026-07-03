@@ -1,6 +1,7 @@
+using System.Text.Json;
+using DiscordBot.Repositories;
 using DiscordBot.Services;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DiscordBot.Tests.Services;
@@ -8,9 +9,9 @@ namespace DiscordBot.Tests.Services;
 public sealed class AiSkillProviderTests
 {
     [Fact]
-    public void ParseSkill_ReadsFrontmatterAndInstructionBody()
+    public void ParseSkillTemplate_ReadsFrontmatterAndInstructionBody()
     {
-        var skill = FileAiSkillProvider.ParseSkill(
+        var skill = AiSkillProvider.ParseSkillTemplate(
             """
 ---
 name: test-skill
@@ -26,7 +27,6 @@ trigger_phrases:
 """,
             "test-skill.md");
 
-        Assert.NotNull(skill);
         Assert.Equal("test-skill", skill.Name);
         Assert.Equal("Test skill.", skill.Description);
         Assert.Equal(10, skill.Priority);
@@ -36,99 +36,132 @@ trigger_phrases:
     }
 
     [Fact]
-    public void SelectSkills_LoadsMatchingTriggerPhrase()
+    public async Task GetActiveSkillsAsync_SeedsMissingTemplatesIntoRepository()
     {
-        using var skillRoot = TemporarySkillRoot.Create();
-        skillRoot.WriteSkill(
-            "professional-answer.md",
-            """
----
-name: professional-answer
-description: Professional answer mode.
-priority: 100
-trigger_phrases:
-  - 전문적으로
----
-전문 답변 지침입니다.
-""");
+        var repository = new FakeAiSkillRepository();
+        var provider = CreateProvider(
+            repository,
+            new AiSkillDefinition(
+                "professional-answer",
+                "Professional answer mode.",
+                100,
+                ["전문적으로"],
+                "전문 답변 지침입니다."));
 
-        var provider = CreateProvider(skillRoot.RootPath);
+        var skills = await provider.GetActiveSkillsAsync();
 
-        var skills = provider.SelectSkills("이 설계를 전문적으로 분석해줘.");
+        var skill = Assert.Single(skills);
+        Assert.Equal("professional-answer", skill.Name);
+        Assert.Equal("전문 답변 지침입니다.", repository.Data.Single().Instructions);
+        Assert.Equal(1, repository.UpsertCount);
+    }
+
+    [Fact]
+    public async Task GetActiveSkillsAsync_DoesNotOverwriteExistingDatabaseSkillWithTemplate()
+    {
+        var repository = new FakeAiSkillRepository();
+        repository.Data.Add(CreateData(
+            "professional-answer",
+            "DB description.",
+            ["전문적으로"],
+            "DB에서 수정한 지침입니다."));
+
+        var provider = CreateProvider(
+            repository,
+            new AiSkillDefinition(
+                "professional-answer",
+                "Template description.",
+                100,
+                ["전문적으로"],
+                "템플릿 지침입니다."));
+
+        var skills = await provider.GetActiveSkillsAsync();
+
+        var skill = Assert.Single(skills);
+        Assert.Equal("DB description.", skill.Description);
+        Assert.Equal("DB에서 수정한 지침입니다.", skill.Instructions);
+        Assert.Equal(0, repository.UpsertCount);
+    }
+
+    [Fact]
+    public async Task SelectSkillsAsync_LoadsMatchingTriggerPhraseFromDatabase()
+    {
+        var repository = new FakeAiSkillRepository();
+        repository.Data.Add(CreateData(
+            "professional-answer",
+            "Professional answer mode.",
+            ["전문적으로"],
+            "전문 답변 지침입니다."));
+        var provider = CreateProvider(repository);
+
+        var skills = await provider.SelectSkillsAsync("이 설계를 전문적으로 분석해줘.");
 
         var skill = Assert.Single(skills);
         Assert.Equal("professional-answer", skill.Name);
     }
 
     [Fact]
-    public void SelectSkills_LoadsExplicitExistingSkillName()
+    public async Task SelectSkillsAsync_IgnoresDisabledDatabaseSkill()
     {
-        using var skillRoot = TemporarySkillRoot.Create();
-        skillRoot.WriteSkill(
-            "professional-answer.md",
-            """
----
-name: professional-answer
-description: Professional answer mode.
-priority: 100
-trigger_phrases:
-  - 전문적으로
----
-전문 답변 지침입니다.
-""");
+        var repository = new FakeAiSkillRepository();
+        repository.Data.Add(CreateData(
+            "professional-answer",
+            "Professional answer mode.",
+            ["전문적으로"],
+            "전문 답변 지침입니다.",
+            enabled: false));
+        var provider = CreateProvider(repository);
 
-        var provider = CreateProvider(skillRoot.RootPath);
-
-        var skills = provider.SelectSkills("$professional-answer 로 답해줘.");
-
-        var skill = Assert.Single(skills);
-        Assert.Equal("professional-answer", skill.Name);
-    }
-
-    [Fact]
-    public void SelectSkills_IgnoresUnknownExplicitSkillName()
-    {
-        using var skillRoot = TemporarySkillRoot.Create();
-        skillRoot.WriteSkill(
-            "professional-answer.md",
-            """
----
-name: professional-answer
-description: Professional answer mode.
-priority: 100
-trigger_phrases:
-  - 전문적으로
----
-전문 답변 지침입니다.
-""");
-
-        var provider = CreateProvider(skillRoot.RootPath);
-
-        var skills = provider.SelectSkills("$admin-skill 로 답해줘.");
+        var skills = await provider.SelectSkillsAsync("이 설계를 전문적으로 분석해줘.");
 
         Assert.Empty(skills);
     }
 
     [Fact]
-    public void SelectSkills_UsesCurrentUserMessageInsteadOfReferencedContext()
+    public async Task SelectSkillsAsync_LoadsExplicitExistingSkillName()
     {
-        using var skillRoot = TemporarySkillRoot.Create();
-        skillRoot.WriteSkill(
-            "professional-answer.md",
-            """
----
-name: professional-answer
-description: Professional answer mode.
-priority: 100
-trigger_phrases:
-  - 전문적으로
----
-전문 답변 지침입니다.
-""");
+        var repository = new FakeAiSkillRepository();
+        repository.Data.Add(CreateData(
+            "professional-answer",
+            "Professional answer mode.",
+            ["전문적으로"],
+            "전문 답변 지침입니다."));
+        var provider = CreateProvider(repository);
 
-        var provider = CreateProvider(skillRoot.RootPath);
+        var skills = await provider.SelectSkillsAsync("$professional-answer 로 답해줘.");
 
-        var skills = provider.SelectSkills(
+        var skill = Assert.Single(skills);
+        Assert.Equal("professional-answer", skill.Name);
+    }
+
+    [Fact]
+    public async Task SelectSkillsAsync_IgnoresUnknownExplicitSkillName()
+    {
+        var repository = new FakeAiSkillRepository();
+        repository.Data.Add(CreateData(
+            "professional-answer",
+            "Professional answer mode.",
+            ["전문적으로"],
+            "전문 답변 지침입니다."));
+        var provider = CreateProvider(repository);
+
+        var skills = await provider.SelectSkillsAsync("$admin-skill 로 답해줘.");
+
+        Assert.Empty(skills);
+    }
+
+    [Fact]
+    public async Task SelectSkillsAsync_UsesCurrentUserMessageInsteadOfReferencedContext()
+    {
+        var repository = new FakeAiSkillRepository();
+        repository.Data.Add(CreateData(
+            "professional-answer",
+            "Professional answer mode.",
+            ["전문적으로"],
+            "전문 답변 지침입니다."));
+        var provider = CreateProvider(repository);
+
+        var skills = await provider.SelectSkillsAsync(
             """
 [사용자가 답장으로 참조한 메시지]
 내용:
@@ -142,25 +175,17 @@ trigger_phrases:
     }
 
     [Fact]
-    public void SelectSkills_UsesPromptBeforeAttachmentContent()
+    public async Task SelectSkillsAsync_UsesPromptBeforeAttachmentContent()
     {
-        using var skillRoot = TemporarySkillRoot.Create();
-        skillRoot.WriteSkill(
-            "professional-answer.md",
-            """
----
-name: professional-answer
-description: Professional answer mode.
-priority: 100
-trigger_phrases:
-  - 전문적으로
----
-전문 답변 지침입니다.
-""");
+        var repository = new FakeAiSkillRepository();
+        repository.Data.Add(CreateData(
+            "professional-answer",
+            "Professional answer mode.",
+            ["전문적으로"],
+            "전문 답변 지침입니다."));
+        var provider = CreateProvider(repository);
 
-        var provider = CreateProvider(skillRoot.RootPath);
-
-        var skills = provider.SelectSkills(
+        var skills = await provider.SelectSkillsAsync(
             """
 요약해줘
 
@@ -176,7 +201,7 @@ File: note.txt
     [Fact]
     public void BuildSystemInstruction_AddsPriorityGuardAndSkillBody()
     {
-        var instruction = FileAiSkillProvider.BuildSystemInstruction(
+        var instruction = AiSkillProvider.BuildSystemInstruction(
             [
                 new AiSkillDefinition(
                     "professional-answer",
@@ -192,51 +217,69 @@ File: note.txt
         Assert.Contains("결론을 먼저 제시하세요.", instruction);
     }
 
-    private static FileAiSkillProvider CreateProvider(string rootPath)
+    private static AiSkillProvider CreateProvider(
+        FakeAiSkillRepository repository,
+        params AiSkillDefinition[] templates)
     {
-        return new FileAiSkillProvider(
-            new FakeHostEnvironment(rootPath),
-            NullLogger<FileAiSkillProvider>.Instance);
+        return new AiSkillProvider(
+            repository,
+            new FakeAiSkillTemplateProvider(templates),
+            new MemoryCache(new MemoryCacheOptions()),
+            NullLogger<AiSkillProvider>.Instance);
     }
 
-    private sealed class FakeHostEnvironment(string contentRootPath) : IHostEnvironment
+    private static AiSkillData CreateData(
+        string name,
+        string description,
+        IReadOnlyList<string> triggerPhrases,
+        string instructions,
+        int priority = 100,
+        bool enabled = true)
     {
-        public string EnvironmentName { get; set; } = "Development";
-
-        public string ApplicationName { get; set; } = "DiscordBot.Tests";
-
-        public string ContentRootPath { get; set; } = contentRootPath;
-
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+        return new AiSkillData(
+            name,
+            description,
+            priority,
+            JsonSerializer.Serialize(triggerPhrases),
+            instructions,
+            enabled,
+            new DateTime(2026, 7, 1),
+            null);
     }
 
-    private sealed class TemporarySkillRoot : IDisposable
+    private sealed class FakeAiSkillRepository : IAiSkillRepository
     {
-        private TemporarySkillRoot(string rootPath)
+        public List<AiSkillData> Data { get; } = [];
+
+        public int UpsertCount { get; private set; }
+
+        public ValueTask<IReadOnlyList<AiSkillData>> GetAllAsync(CancellationToken cancellationToken = default)
         {
-            RootPath = rootPath;
-            Directory.CreateDirectory(Path.Combine(rootPath, "AiSkills"));
+            return ValueTask.FromResult<IReadOnlyList<AiSkillData>>([.. Data]);
         }
 
-        public string RootPath { get; }
-
-        public static TemporarySkillRoot Create()
+        public ValueTask UpsertAsync(
+            string name,
+            string description,
+            int priority,
+            IReadOnlyList<string> triggerPhrases,
+            string instructions,
+            bool enabled,
+            CancellationToken cancellationToken = default)
         {
-            var rootPath = Path.Combine(Path.GetTempPath(), "DiscordBot.Tests", Guid.NewGuid().ToString("N"));
-            return new TemporarySkillRoot(rootPath);
+            UpsertCount++;
+            Data.RemoveAll(skill => skill.Name == name);
+            Data.Add(CreateData(name, description, triggerPhrases, instructions, priority, enabled));
+            return ValueTask.CompletedTask;
         }
+    }
 
-        public void WriteSkill(string fileName, string content)
+    private sealed class FakeAiSkillTemplateProvider(
+        IReadOnlyList<AiSkillDefinition> templates) : IAiSkillTemplateProvider
+    {
+        public IReadOnlyList<AiSkillDefinition> LoadTemplates()
         {
-            File.WriteAllText(Path.Combine(RootPath, "AiSkills", fileName), content);
-        }
-
-        public void Dispose()
-        {
-            if (Directory.Exists(RootPath))
-            {
-                Directory.Delete(RootPath, recursive: true);
-            }
+            return templates;
         }
     }
 }

@@ -1,5 +1,10 @@
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
+using DiscordBot.Options;
+using DiscordBot.Repositories;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
@@ -12,18 +17,52 @@ public sealed record AiSkillDefinition(
 
 public interface IAiSkillProvider
 {
-    IReadOnlyList<AiSkillDefinition> SelectSkills(string prompt);
+    ValueTask<IReadOnlyList<AiSkillDefinition>> GetActiveSkillsAsync(CancellationToken cancellationToken = default);
+
+    ValueTask<IReadOnlyList<AiSkillDefinition>> SelectSkillsAsync(
+        string prompt,
+        CancellationToken cancellationToken = default);
 }
 
-internal sealed partial class FileAiSkillProvider(
-    IHostEnvironment environment,
-    ILogger<FileAiSkillProvider> logger) : IAiSkillProvider
+internal interface IAiSkillTemplateProvider
 {
-    private const string SkillsDirectoryName = "AiSkills";
+    IReadOnlyList<AiSkillDefinition> LoadTemplates();
+}
+
+internal sealed partial class AiSkillProvider(
+    IAiSkillRepository repository,
+    IAiSkillTemplateProvider templateProvider,
+    IMemoryCache cache,
+    ILogger<AiSkillProvider> logger) : IAiSkillProvider
+{
+    private const string CacheKey = "DiscordBot.AiSkills";
     private const int MaxSelectedSkills = 3;
 
-    public IReadOnlyList<AiSkillDefinition> SelectSkills(string prompt)
+    public async ValueTask<IReadOnlyList<AiSkillDefinition>> GetActiveSkillsAsync(CancellationToken cancellationToken = default)
     {
+        if (cache.TryGetValue<IReadOnlyList<AiSkillDefinition>>(CacheKey, out var cachedSkills) && cachedSkills != null)
+        {
+            return cachedSkills;
+        }
+
+        var skills = await LoadAndSeedSkillsAsync(cancellationToken);
+        var activeSkills = skills
+            .Where(skill => skill.Enabled)
+            .Select(ToDefinition)
+            .OfType<AiSkillDefinition>()
+            .OrderByDescending(skill => skill.Priority)
+            .ThenBy(skill => skill.Name, StringComparer.Ordinal)
+            .ToArray();
+
+        cache.Set(CacheKey, activeSkills);
+        return activeSkills;
+    }
+
+    public async ValueTask<IReadOnlyList<AiSkillDefinition>> SelectSkillsAsync(
+        string prompt,
+        CancellationToken cancellationToken = default)
+    {
+        var skills = await GetActiveSkillsAsync(cancellationToken);
         var selectionText = ExtractSelectionText(prompt);
         if (string.IsNullOrWhiteSpace(selectionText))
         {
@@ -31,7 +70,6 @@ internal sealed partial class FileAiSkillProvider(
         }
 
         var requestedSkillNames = ExtractRequestedSkillNames(selectionText);
-        var skills = LoadSkills();
 
         return skills
             .Where(skill => requestedSkillNames.Contains(skill.Name) || MatchesTriggerPhrase(selectionText, skill))
@@ -84,33 +122,33 @@ internal sealed partial class FileAiSkillProvider(
         return prompt.Trim();
     }
 
-    internal static AiSkillDefinition? ParseSkill(string content, string sourceName)
+    internal static AiSkillDefinition ParseSkillTemplate(string content, string sourceName)
     {
         var normalized = content.Replace("\r\n", "\n", StringComparison.Ordinal)
             .Replace('\r', '\n');
         if (!normalized.StartsWith("---\n", StringComparison.Ordinal))
         {
-            throw new FormatException($"AI Skill '{sourceName}' must start with frontmatter.");
+            throw new FormatException($"AI Skill template '{sourceName}' must start with frontmatter.");
         }
 
         var endIndex = normalized.IndexOf("\n---\n", 4, StringComparison.Ordinal);
         if (endIndex < 0)
         {
-            throw new FormatException($"AI Skill '{sourceName}' frontmatter was not closed.");
+            throw new FormatException($"AI Skill template '{sourceName}' frontmatter was not closed.");
         }
 
         var frontmatter = normalized[4..endIndex];
         var instructions = normalized[(endIndex + "\n---\n".Length)..].Trim();
         if (string.IsNullOrWhiteSpace(instructions))
         {
-            throw new FormatException($"AI Skill '{sourceName}' must include instruction body content.");
+            throw new FormatException($"AI Skill template '{sourceName}' must include instruction body content.");
         }
 
         var values = ParseFrontmatter(frontmatter);
         var name = GetRequiredValue(values, "name", sourceName);
         if (!SkillNameRegex().IsMatch(name))
         {
-            throw new FormatException($"AI Skill '{sourceName}' has an invalid name '{name}'.");
+            throw new FormatException($"AI Skill template '{sourceName}' has an invalid name '{name}'.");
         }
 
         var description = GetRequiredValue(values, "description", sourceName);
@@ -119,7 +157,7 @@ internal sealed partial class FileAiSkillProvider(
             && priorityValues.Count > 0
             && !int.TryParse(priorityValues[0], out priority))
         {
-            throw new FormatException($"AI Skill '{sourceName}' has an invalid priority.");
+            throw new FormatException($"AI Skill template '{sourceName}' has an invalid priority.");
         }
 
         var triggerPhrases = values.TryGetValue("trigger_phrases", out var phrases)
@@ -128,40 +166,61 @@ internal sealed partial class FileAiSkillProvider(
 
         if (triggerPhrases.Length == 0)
         {
-            throw new FormatException($"AI Skill '{sourceName}' must include at least one trigger phrase.");
+            throw new FormatException($"AI Skill template '{sourceName}' must include at least one trigger phrase.");
         }
 
         return new AiSkillDefinition(name, description, priority, triggerPhrases, instructions);
     }
 
-    private IReadOnlyList<AiSkillDefinition> LoadSkills()
+    private async ValueTask<IReadOnlyList<AiSkillData>> LoadAndSeedSkillsAsync(CancellationToken cancellationToken)
     {
-        var skillsDirectory = Path.Combine(environment.ContentRootPath, SkillsDirectoryName);
-        if (!Directory.Exists(skillsDirectory))
+        var skills = await repository.GetAllAsync(cancellationToken);
+        var existingSkillNames = skills.Select(skill => skill.Name).ToHashSet(StringComparer.Ordinal);
+        var defaultTemplates = templateProvider.LoadTemplates();
+
+        foreach (var template in defaultTemplates)
         {
-            logger.LogDebug("AI Skill directory was not found: {Path}", skillsDirectory);
-            return [];
+            if (existingSkillNames.Contains(template.Name))
+            {
+                continue;
+            }
+
+            await repository.UpsertAsync(
+                template.Name,
+                template.Description,
+                template.Priority,
+                template.TriggerPhrases,
+                template.Instructions,
+                enabled: true,
+                cancellationToken);
+            existingSkillNames.Add(template.Name);
         }
 
-        var skills = new List<AiSkillDefinition>();
-        foreach (var path in Directory.EnumerateFiles(skillsDirectory, "*.md", SearchOption.TopDirectoryOnly))
+        if (existingSkillNames.Count != skills.Count)
         {
-            try
-            {
-                var content = File.ReadAllText(path);
-                var skill = ParseSkill(content, Path.GetFileName(path));
-                if (skill != null)
-                {
-                    skills.Add(skill);
-                }
-            }
-            catch (Exception e)
-            {
-                logger.LogWarning(e, "Failed to load AI Skill: {Path}", path);
-            }
+            skills = await repository.GetAllAsync(cancellationToken);
         }
 
         return skills;
+    }
+
+    private AiSkillDefinition? ToDefinition(AiSkillData data)
+    {
+        try
+        {
+            var triggerPhrases = JsonSerializer.Deserialize<string[]>(data.TriggerPhrasesJson) ?? [];
+            return new AiSkillDefinition(
+                data.Name,
+                data.Description,
+                data.Priority,
+                triggerPhrases,
+                data.Instructions);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Failed to parse AI Skill trigger phrases from database: {SkillName}", data.Name);
+            return null;
+        }
     }
 
     private static bool MatchesTriggerPhrase(string selectionText, AiSkillDefinition skill)
@@ -236,7 +295,7 @@ internal sealed partial class FileAiSkillProvider(
             || keyValues.Count == 0
             || string.IsNullOrWhiteSpace(keyValues[0]))
         {
-            throw new FormatException($"AI Skill '{sourceName}' must include '{key}'.");
+            throw new FormatException($"AI Skill template '{sourceName}' must include '{key}'.");
         }
 
         return keyValues[0].Trim();
@@ -259,4 +318,43 @@ internal sealed partial class FileAiSkillProvider(
 
     [GeneratedRegex(@"^[a-z0-9][a-z0-9-]{0,63}$", RegexOptions.CultureInvariant)]
     private static partial Regex SkillNameRegex();
+}
+
+internal sealed class FileAiSkillTemplateProvider(
+    IOptions<AiSkillOptions> options,
+    IHostEnvironment environment,
+    ILogger<FileAiSkillTemplateProvider> logger) : IAiSkillTemplateProvider
+{
+    private readonly AiSkillOptions m_Options = options.Value;
+
+    public IReadOnlyList<AiSkillDefinition> LoadTemplates()
+    {
+        var templateDirectoryPath = m_Options.TemplateDirectoryPath;
+        if (!Path.IsPathRooted(templateDirectoryPath))
+        {
+            templateDirectoryPath = Path.Combine(environment.ContentRootPath, templateDirectoryPath);
+        }
+
+        if (!Directory.Exists(templateDirectoryPath))
+        {
+            logger.LogDebug("AI Skill template directory was not found: {Path}", templateDirectoryPath);
+            return [];
+        }
+
+        var templates = new List<AiSkillDefinition>();
+        foreach (var path in Directory.EnumerateFiles(templateDirectoryPath, "*.md", SearchOption.TopDirectoryOnly))
+        {
+            try
+            {
+                var content = File.ReadAllText(path);
+                templates.Add(AiSkillProvider.ParseSkillTemplate(content, Path.GetFileName(path)));
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Failed to load AI Skill template: {Path}", path);
+            }
+        }
+
+        return templates;
+    }
 }

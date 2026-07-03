@@ -53,8 +53,8 @@ public class OllamaChatHistory(
                 Content = DefaultBehaviorInstruction
             });
 
-            var selectedSkills = aiSkillProvider.SelectSkills(prompt);
-            var skillInstruction = FileAiSkillProvider.BuildSystemInstruction(selectedSkills);
+            var selectedSkills = await aiSkillProvider.SelectSkillsAsync(prompt, cancellationToken);
+            var skillInstruction = AiSkillProvider.BuildSystemInstruction(selectedSkills);
             if (!string.IsNullOrWhiteSpace(skillInstruction))
             {
                 recentHistory.Add(new ChatMessage
