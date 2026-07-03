@@ -150,20 +150,24 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         var chatAttachmentToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChatAttachmentTools>>();
         var chessToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordChessTools>>();
         var othelloToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordOthelloTools>>();
+        var aiConfigurationToolsLogger = scope.ServiceProvider.GetRequiredService<ILogger<DiscordAiConfigurationTools>>();
         var promptProfileProvider = scope.ServiceProvider.GetRequiredService<ImagePromptProfileProvider>();
         var chatClient = scope.ServiceProvider.GetRequiredService<AI.IChatClient>();
         var claudeSettings = scope.ServiceProvider.GetRequiredService<IClaudeSettingsService>();
+        var aiSkillManagement = scope.ServiceProvider.GetRequiredService<IAiSkillManagementService>();
+        var aiConfigurationOptions = scope.ServiceProvider.GetRequiredService<IOptions<AiConfigurationManagementOptions>>();
         var imageTools = new DiscordImageTools(message, chatClient, claudeSettings, imageGenerationClient, promptProfileProvider, imageToolsLogger);
         var chatImageTools = new DiscordChatImageTools(message, chatImageRepository, chatImageToolsLogger);
         var chatAttachmentTools = new DiscordChatAttachmentTools(message, chatAttachmentRepository, chatAttachmentToolsLogger);
         var chessTools = new DiscordChessTools(m_Socket.CurrentUser, message, chessGameService, othelloGameService, chatLogRepository, chessToolsLogger);
         var othelloTools = new DiscordOthelloTools(m_Socket.CurrentUser, message, othelloGameService, chessGameService, chatLogRepository, othelloToolsLogger);
+        var aiConfigurationTools = new DiscordAiConfigurationTools(message, claudeSettings, aiSkillManagement, aiConfigurationOptions, aiConfigurationToolsLogger);
         var calculationTools = new AI.Tools.CalculationTools();
         var toolsProvider = isChessMode
             ? AI.ToolsProvider.CreateFrom(chessTools)
             : isOthelloMode
                 ? AI.ToolsProvider.CreateFrom(othelloTools)
-                : AI.ToolsProvider.CreateFrom(discordTools, imageTools, chatImageTools, chatAttachmentTools, chessTools, othelloTools, calculationTools);
+                : AI.ToolsProvider.CreateFrom(discordTools, imageTools, chatImageTools, chatAttachmentTools, chessTools, othelloTools, aiConfigurationTools, calculationTools);
         var toolSettings = scope.ServiceProvider.GetRequiredService<IToolSettingsService>();
         await toolSettings.ApplyAsync(toolsProvider);
 

@@ -49,6 +49,7 @@ internal sealed class ToolSettingsService(
         typeof(DiscordChatAttachmentTools),
         typeof(DiscordChessTools),
         typeof(DiscordOthelloTools),
+        typeof(DiscordAiConfigurationTools),
         typeof(AI.Tools.CalculationTools)
     ];
     private static readonly Lazy<IReadOnlyList<ToolCatalogItem>> Catalog = new(BuildCatalog);

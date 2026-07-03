@@ -82,6 +82,9 @@
   <data name="NAVMENU_LABEL_TOOLS" xml:space="preserve">
     <value>Tools</value>
   </data>
+  <data name="NAVMENU_LABEL_AI_SKILLS" xml:space="preserve">
+    <value>AI Skills</value>
+  </data>
   <data name="NAVMENU_LABEL_SERVER_LOGS" xml:space="preserve">
     <value>Logs</value>
   </data>
@@ -253,6 +256,110 @@
   </data>
   <data name="CLAUDE_SETTINGS_ERROR_MAX_TOKENS_RANGE" xml:space="preserve">
     <value>Default max tokens must be greater than 0.</value>
+  </data>
+
+  <!-- AISkills -->
+  <data name="AI_SKILLS_TITLE" xml:space="preserve">
+    <value>AI Skills</value>
+  </data>
+  <data name="AI_SKILLS_SUBTITLE" xml:space="preserve">
+    <value>Runtime instructions and skill configuration</value>
+  </data>
+  <data name="AI_SKILLS_DETAIL_TITLE" xml:space="preserve">
+    <value>AI Skill Details</value>
+  </data>
+  <data name="AI_SKILLS_DETAIL_SUBTITLE" xml:space="preserve">
+    <value>Database skills are editable; local tool skills are read-only.</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_NAME" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_SOURCE" xml:space="preserve">
+    <value>Source</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_DESCRIPTION" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_TRIGGER_PHRASE" xml:space="preserve">
+    <value>Trigger Phrase</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_TRIGGER_PHRASES" xml:space="preserve">
+    <value>Trigger Phrases</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_PRIORITY" xml:space="preserve">
+    <value>Priority</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_STATUS" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_ENABLED" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_DISABLED" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_EDITABLE" xml:space="preserve">
+    <value>Editable</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_YES" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_NO" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_TOOL_NAMES" xml:space="preserve">
+    <value>Tool Names</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_INSTRUCTIONS" xml:space="preserve">
+    <value>Instructions</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_CREATED_AT" xml:space="preserve">
+    <value>Created At</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_UPDATED_AT" xml:space="preserve">
+    <value>Updated At</value>
+  </data>
+  <data name="AI_SKILLS_SOURCE_LOCAL" xml:space="preserve">
+    <value>Local</value>
+  </data>
+  <data name="AI_SKILLS_SOURCE_DATABASE" xml:space="preserve">
+    <value>Database</value>
+  </data>
+  <data name="AI_SKILLS_BUTTON_ADD" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="AI_SKILLS_BUTTON_BACK" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="AI_SKILLS_BUTTON_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="AI_SKILLS_BUTTON_DELETE" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="AI_SKILLS_STATUS_LOADING" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="AI_SKILLS_EMPTY" xml:space="preserve">
+    <value>No AI Skills configured.</value>
+  </data>
+  <data name="AI_SKILLS_STATUS_NOT_FOUND" xml:space="preserve">
+    <value>AI Skill not found.</value>
+  </data>
+  <data name="AI_SKILLS_STATUS_SAVED" xml:space="preserve">
+    <value>AI Skill saved.</value>
+  </data>
+  <data name="AI_SKILLS_NOTICE_LOCAL_READONLY" xml:space="preserve">
+    <value>This Skill is loaded from local files or appsettings and is read-only at runtime.</value>
+  </data>
+  <data name="AI_SKILLS_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>Failed to load AI Skills.</value>
+  </data>
+  <data name="AI_SKILLS_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>Failed to save AI Skill.</value>
+  </data>
+  <data name="AI_SKILLS_ERROR_ACTION_FAILED" xml:space="preserve">
+    <value>Failed to update AI Skill.</value>
   </data>
 
   <!-- Tools -->

@@ -82,6 +82,9 @@
   <data name="NAVMENU_LABEL_TOOLS" xml:space="preserve">
     <value>도구</value>
   </data>
+  <data name="NAVMENU_LABEL_AI_SKILLS" xml:space="preserve">
+    <value>AI Skill</value>
+  </data>
   <data name="NAVMENU_LABEL_SERVER_LOGS" xml:space="preserve">
     <value>로그</value>
   </data>
@@ -253,6 +256,110 @@
   </data>
   <data name="CLAUDE_SETTINGS_ERROR_MAX_TOKENS_RANGE" xml:space="preserve">
     <value>기본 최대 토큰은 0보다 커야 합니다.</value>
+  </data>
+
+  <!-- AISkills -->
+  <data name="AI_SKILLS_TITLE" xml:space="preserve">
+    <value>AI Skill</value>
+  </data>
+  <data name="AI_SKILLS_SUBTITLE" xml:space="preserve">
+    <value>런타임 지침 및 Skill 설정</value>
+  </data>
+  <data name="AI_SKILLS_DETAIL_TITLE" xml:space="preserve">
+    <value>AI Skill 상세</value>
+  </data>
+  <data name="AI_SKILLS_DETAIL_SUBTITLE" xml:space="preserve">
+    <value>DB Skill은 수정 가능하고, 로컬 tool Skill은 읽기 전용입니다.</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_NAME" xml:space="preserve">
+    <value>이름</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_SOURCE" xml:space="preserve">
+    <value>소스</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_DESCRIPTION" xml:space="preserve">
+    <value>설명</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_TRIGGER_PHRASE" xml:space="preserve">
+    <value>트리거 문구</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_TRIGGER_PHRASES" xml:space="preserve">
+    <value>트리거 문구</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_PRIORITY" xml:space="preserve">
+    <value>우선순위</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_STATUS" xml:space="preserve">
+    <value>상태</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_ENABLED" xml:space="preserve">
+    <value>활성</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_DISABLED" xml:space="preserve">
+    <value>비활성</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_EDITABLE" xml:space="preserve">
+    <value>수정 가능</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_YES" xml:space="preserve">
+    <value>예</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_NO" xml:space="preserve">
+    <value>아니오</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_TOOL_NAMES" xml:space="preserve">
+    <value>도구 이름</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_INSTRUCTIONS" xml:space="preserve">
+    <value>지침</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_CREATED_AT" xml:space="preserve">
+    <value>생성일</value>
+  </data>
+  <data name="AI_SKILLS_LABEL_UPDATED_AT" xml:space="preserve">
+    <value>수정일</value>
+  </data>
+  <data name="AI_SKILLS_SOURCE_LOCAL" xml:space="preserve">
+    <value>로컬</value>
+  </data>
+  <data name="AI_SKILLS_SOURCE_DATABASE" xml:space="preserve">
+    <value>DB</value>
+  </data>
+  <data name="AI_SKILLS_BUTTON_ADD" xml:space="preserve">
+    <value>추가</value>
+  </data>
+  <data name="AI_SKILLS_BUTTON_BACK" xml:space="preserve">
+    <value>뒤로</value>
+  </data>
+  <data name="AI_SKILLS_BUTTON_SAVE" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="AI_SKILLS_BUTTON_DELETE" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="AI_SKILLS_STATUS_LOADING" xml:space="preserve">
+    <value>불러오는 중...</value>
+  </data>
+  <data name="AI_SKILLS_EMPTY" xml:space="preserve">
+    <value>설정된 AI Skill이 없습니다.</value>
+  </data>
+  <data name="AI_SKILLS_STATUS_NOT_FOUND" xml:space="preserve">
+    <value>AI Skill을 찾을 수 없습니다.</value>
+  </data>
+  <data name="AI_SKILLS_STATUS_SAVED" xml:space="preserve">
+    <value>AI Skill을 저장했습니다.</value>
+  </data>
+  <data name="AI_SKILLS_NOTICE_LOCAL_READONLY" xml:space="preserve">
+    <value>이 Skill은 로컬 파일 또는 appsettings에서 로드되며 런타임에는 읽기 전용입니다.</value>
+  </data>
+  <data name="AI_SKILLS_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>AI Skill 목록을 불러오지 못했습니다.</value>
+  </data>
+  <data name="AI_SKILLS_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>AI Skill을 저장하지 못했습니다.</value>
+  </data>
+  <data name="AI_SKILLS_ERROR_ACTION_FAILED" xml:space="preserve">
+    <value>AI Skill을 업데이트하지 못했습니다.</value>
   </data>
 
   <!-- Tools -->

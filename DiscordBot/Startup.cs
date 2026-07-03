@@ -135,8 +135,10 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
 
     sc.Configure<OllamaService.Configuration>(conf.GetRequiredSection("Claude"));
     sc.Configure<AiSkillOptions>(conf.GetSection("AiSkills"));
+    sc.Configure<AiConfigurationManagementOptions>(conf.GetSection("AiConfigurationManagement"));
     sc.AddSingleton<IAiSkillTemplateProvider, FileAiSkillTemplateProvider>();
     sc.AddSingleton<IAiSkillProvider, AiSkillProvider>();
+    sc.AddScoped<IAiSkillManagementService, AiSkillManagementService>();
     sc.AddSingleton<OllamaService>();
     sc.AddSingleton<IChessGameStore, InMemoryChessGameStore>();
     sc.AddSingleton<IChessEngine, GeraChessEngine>();

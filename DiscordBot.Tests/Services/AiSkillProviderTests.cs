@@ -372,6 +372,11 @@ File: note.txt
             return ValueTask.FromResult<IReadOnlyList<AiSkillData>>([.. Data]);
         }
 
+        public ValueTask<AiSkillData?> GetAsync(string name, CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult(Data.FirstOrDefault(skill => skill.Name == name));
+        }
+
         public ValueTask UpsertAsync(
             string name,
             string description,
@@ -384,6 +389,24 @@ File: note.txt
             UpsertCount++;
             Data.RemoveAll(skill => skill.Name == name);
             Data.Add(CreateData(name, description, triggerPhrases, instructions, priority, enabled));
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask RenameAsync(string name, string newName, CancellationToken cancellationToken = default)
+        {
+            var index = Data.FindIndex(skill => skill.Name == name);
+            if (index >= 0)
+            {
+                var skill = Data[index];
+                Data[index] = skill with { Name = newName, UpdatedAt = new DateTime(2026, 7, 2) };
+            }
+
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask DeleteAsync(string name, CancellationToken cancellationToken = default)
+        {
+            Data.RemoveAll(skill => skill.Name == name);
             return ValueTask.CompletedTask;
         }
     }

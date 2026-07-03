@@ -14,6 +14,8 @@ public interface IAiSkillRepository
 {
     ValueTask<IReadOnlyList<AiSkillData>> GetAllAsync(CancellationToken cancellationToken = default);
 
+    ValueTask<AiSkillData?> GetAsync(string name, CancellationToken cancellationToken = default);
+
     ValueTask UpsertAsync(
         string name,
         string description,
@@ -22,4 +24,11 @@ public interface IAiSkillRepository
         string instructions,
         bool enabled,
         CancellationToken cancellationToken = default);
+
+    ValueTask RenameAsync(
+        string name,
+        string newName,
+        CancellationToken cancellationToken = default);
+
+    ValueTask DeleteAsync(string name, CancellationToken cancellationToken = default);
 }

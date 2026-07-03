@@ -30,6 +30,27 @@ ORDER BY `priority` DESC, `name` ASC";
         return [.. skills];
     }
 
+    public async ValueTask<AiSkillData?> GetAsync(string name, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = @"
+SELECT
+    `name` AS Name,
+    `description` AS Description,
+    `priority` AS Priority,
+    `trigger_phrases_json` AS TriggerPhrasesJson,
+    `instructions` AS Instructions,
+    `enabled` AS Enabled,
+    `created_at` AS CreatedAt,
+    `updated_at` AS UpdatedAt
+FROM `ai_skill`
+WHERE `name` = @name";
+
+        var command = new CommandDefinition(QUERY, new { name }, cancellationToken: cancellationToken);
+        return await connection.QuerySingleOrDefaultAsync<AiSkillData>(command);
+    }
+
     public async ValueTask UpsertAsync(
         string name,
         string description,
@@ -66,6 +87,39 @@ ON DUPLICATE KEY UPDATE
                 enabled
             },
             cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
+    }
+
+    public async ValueTask RenameAsync(
+        string name,
+        string newName,
+        CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = @"
+UPDATE `ai_skill`
+SET
+    `name` = @newName,
+    `updated_at` = NOW()
+WHERE `name` = @name";
+
+        var command = new CommandDefinition(
+            QUERY,
+            new { name, newName },
+            cancellationToken: cancellationToken);
+        await connection.ExecuteAsync(command);
+    }
+
+    public async ValueTask DeleteAsync(string name, CancellationToken cancellationToken = default)
+    {
+        using var connection = GetConnection();
+
+        const string QUERY = @"
+DELETE FROM `ai_skill`
+WHERE `name` = @name";
+
+        var command = new CommandDefinition(QUERY, new { name }, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);
     }
 }

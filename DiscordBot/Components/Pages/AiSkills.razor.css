@@ -1,0 +1,157 @@
+.skill-create-form {
+    display: grid;
+    grid-template-columns: minmax(10rem, 14rem) minmax(14rem, 1fr) minmax(10rem, 16rem) auto;
+    gap: var(--space-4);
+    align-items: end;
+    max-width: 980px;
+    margin-bottom: var(--space-4);
+}
+
+.skill-create-form label {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    color: var(--color-text-secondary);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    margin: 0;
+}
+
+.skill-create-form input {
+    width: 100%;
+    min-width: 0;
+    height: 2.25rem;
+    border: 1px solid var(--color-border-dark);
+    border-radius: var(--radius-md);
+    padding: 0 var(--space-3);
+    color: var(--color-text-primary);
+    background: var(--color-bg);
+    font: inherit;
+}
+
+.skill-create-form input:focus {
+    outline: 2px solid var(--color-accent-border);
+    border-color: var(--color-accent);
+}
+
+.add-button {
+    height: 2.25rem;
+    justify-content: center;
+}
+
+.status-message {
+    margin: var(--space-4) 0;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+}
+
+.status-message.success {
+    color: var(--color-success);
+    background: var(--color-success-bg);
+}
+
+.status-message.error {
+    color: var(--color-danger);
+    background: var(--color-danger-bg);
+}
+
+.empty-state {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+}
+
+.skill-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border-top: 1px solid var(--color-border);
+}
+
+.skill-table {
+    width: 100%;
+    min-width: 860px;
+    border-collapse: collapse;
+}
+
+.skill-table th,
+.skill-table td {
+    padding: var(--space-3) var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+}
+
+.skill-table th {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-align: left;
+}
+
+.skill-table td {
+    color: var(--color-text-primary);
+    font-size: var(--text-sm);
+}
+
+.skill-name-link {
+    color: var(--color-accent);
+    font-weight: 700;
+}
+
+.skill-name-link:hover {
+    text-decoration: underline;
+}
+
+.description-cell {
+    max-width: 34rem;
+    color: var(--color-text-secondary) !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.status-badge,
+.source-badge {
+    display: inline-flex;
+    align-items: center;
+    min-width: 4.5rem;
+    height: 1.75rem;
+    border-radius: var(--radius-md);
+    padding: 0 var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 700;
+}
+
+.status-badge.enabled {
+    color: var(--color-success);
+    background: var(--color-success-bg);
+}
+
+.status-badge.disabled {
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+}
+
+.source-badge.local {
+    color: var(--color-accent);
+    background: var(--color-accent-light);
+}
+
+.source-badge.database {
+    color: var(--color-text-secondary);
+    background: var(--color-surface);
+}
+
+.material-symbols-outlined {
+    font-size: 18px;
+}
+
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--text-sm);
+}
+
+@media (max-width: 920px) {
+    .skill-create-form {
+        grid-template-columns: 1fr;
+    }
+}
