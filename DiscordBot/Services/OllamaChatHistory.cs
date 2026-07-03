@@ -65,6 +65,18 @@ public class OllamaChatHistory(
                 ApplySkillToolFilter(toolsProvider, skillSelection.ToolNames);
             }
 
+            if (skillSelection.Skills.Count > 0)
+            {
+                yield return new ChatResponseChunk
+                {
+                    Content = "",
+                    Thinking = "",
+                    SkillNames = skillSelection.Skills
+                        .Select(skill => skill.Name)
+                        .ToArray()
+                };
+            }
+
             var skillInstruction = AiSkillProvider.BuildSystemInstruction(skillSelection.Skills);
             if (!string.IsNullOrWhiteSpace(skillInstruction))
             {

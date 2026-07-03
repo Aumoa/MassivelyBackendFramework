@@ -211,6 +211,14 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                 filterToolsBySelectedSkills: !isChessMode && !isOthelloMode))
             {
                 totalReasoning += responseMessage.Thinking;
+                if (responseMessage.SkillNames.Count > 0)
+                {
+                    totalMessage = AppendSkillUseNotice(
+                        totalMessage,
+                        responseMessage.SkillNames,
+                        ref shouldSeparateNextAssistantContent);
+                }
+
                 if (!string.IsNullOrEmpty(responseMessage.Content) && pendingToolUseCount > 0)
                 {
                     totalMessage = AppendToolUseNotice(
@@ -390,9 +398,43 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         return currentMessage.TrimEnd('\r', '\n') + "\n\n" + notice;
     }
 
+    internal static string AppendSkillUseNotice(
+        string currentMessage,
+        IReadOnlyList<string> skillNames,
+        ref bool shouldSeparateBeforeContent)
+    {
+        var notice = BuildSkillUseNotice(skillNames);
+        if (string.IsNullOrEmpty(notice))
+        {
+            return currentMessage;
+        }
+
+        shouldSeparateBeforeContent = true;
+        if (string.IsNullOrWhiteSpace(currentMessage))
+        {
+            return notice;
+        }
+
+        return currentMessage.TrimEnd('\r', '\n') + "\n\n" + notice;
+    }
+
     internal static string BuildToolUseNotice(int toolUseCount)
     {
         return $"{toolUseCount}개 도구 사용됨";
+    }
+
+    internal static string BuildSkillUseNotice(IReadOnlyList<string> skillNames)
+    {
+        var normalizedSkillNames = skillNames
+            .Where(skillName => !string.IsNullOrWhiteSpace(skillName))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (normalizedSkillNames.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        return $"사용된 Skill: {string.Join(", ", normalizedSkillNames)}";
     }
 
     internal static bool ShouldRespondToMessage(bool isMentioned, bool isDirectMessage)
