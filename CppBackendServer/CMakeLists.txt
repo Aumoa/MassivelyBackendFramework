@@ -17,6 +17,10 @@ else()
     target_compile_options(cpp_backend_packet_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+if (WIN32)
+    target_link_libraries(cpp_backend_packet_core PUBLIC ws2_32)
+endif()
+
 enable_testing()
 
 add_executable(cpp_backend_packet_core_tests
@@ -28,3 +32,13 @@ target_link_libraries(cpp_backend_packet_core_tests
 
 add_test(NAME cpp_backend_packet_core_tests
     COMMAND cpp_backend_packet_core_tests)
+
+add_executable(cpp_backend_sidecar_client_tests
+    tests/sidecar_client_tests.cpp)
+
+target_link_libraries(cpp_backend_sidecar_client_tests
+    PRIVATE
+        cpp_backend_packet_core)
+
+add_test(NAME cpp_backend_sidecar_client_tests
+    COMMAND cpp_backend_sidecar_client_tests)

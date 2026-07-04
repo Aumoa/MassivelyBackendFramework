@@ -113,7 +113,9 @@ constexpr std::uint16_t pid_gate_backend_channel_close = 9;
 constexpr std::uint16_t pid_gate_backend_channel_open = 10;
 
 constexpr std::uint16_t sidecar_control_schema_version = 1;
+constexpr std::uint32_t sidecar_control_max_payload_length = 1024 * 1024;
 constexpr std::uint16_t sidecar_pid_direct_connect_validation_request = 1;
+constexpr std::uint16_t sidecar_pid_direct_connect_validation_response = 2;
 constexpr std::uint16_t sidecar_pid_manifest_snapshot_request = 11;
 
 struct gateway_backend_channel_open {
@@ -187,6 +189,24 @@ public:
         const std::string& code,
         const std::string& gateway_node_id,
         const std::string& gateway_master_connection_id) = 0;
+};
+
+struct sidecar_control_endpoint {
+    std::string host = "127.0.0.1";
+    std::uint16_t port = 0;
+};
+
+class sidecar_direct_connect_code_validator final : public direct_connect_code_validator {
+public:
+    explicit sidecar_direct_connect_code_validator(sidecar_control_endpoint endpoint);
+
+    direct_connect_code_validation_response validate(
+        const std::string& code,
+        const std::string& gateway_node_id,
+        const std::string& gateway_master_connection_id) override;
+
+private:
+    sidecar_control_endpoint m_endpoint;
 };
 
 struct gateway_direct_handshake_result {

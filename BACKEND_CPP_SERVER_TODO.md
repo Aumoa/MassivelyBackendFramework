@@ -63,7 +63,7 @@ Implemented local validation callout: set `SidecarControl:Enabled` to `true`. Th
 - [x] Implement a C++ `PacketCore` reader/writer compatible with the C# implementation.
 - [ ] Implement Gateway direct connection accept/listen logic in C++.
 - [x] Implement Gateway handshake handling in C++.
-- [ ] Call the sidecar for direct-connect code validation during handshake.
+- [x] Call the sidecar for direct-connect code validation during handshake.
 - [x] Accept trusted Gateway sessions only after validation succeeds.
 - [x] Implement channel open/data/close envelope parsing.
 - [ ] Implement server-origin notify/request/response writes directly to Gateway.
@@ -72,7 +72,9 @@ Implemented local validation callout: set `SidecarControl:Enabled` to `true`. Th
 
 Implemented C++ codec foundation: `CppBackendServer` provides a CMake-built C++20 PacketCore reader/writer plus Gateway Backend channel open/data/close and sidecar request codecs. `cpp_backend_packet_core_tests` verifies the same full-frame wire vectors as the C# tests.
 
-Implemented C++ direct handshake state machine: C++ decodes Gateway `NodeHello` and `DirectConnectCode` frames, calls a direct-connect validation interface, rejects non-Gateway or mismatched validation identities, and emits `NodeAccepted` only after validation succeeds. The concrete sidecar TCP client and listener accept loop are still pending.
+Implemented C++ direct handshake state machine: C++ decodes Gateway `NodeHello` and `DirectConnectCode` frames, calls a direct-connect validation interface, rejects non-Gateway or mismatched validation identities, and emits `NodeAccepted` only after validation succeeds.
+
+Implemented C++ sidecar validation client: `sidecar_direct_connect_code_validator` connects to the sidecar loopback PacketCore control endpoint, sends `DirectConnectCodeValidationRequest`, reads `DirectConnectCodeValidationResponse`, and rejects mismatched response ids. The Gateway listener accept loop is still pending.
 
 ## Phase 4: Sidecar And C++ Local Contract
 
@@ -119,7 +121,7 @@ Implemented manifest snapshot sharing: Master sends approved `BackendPacketManif
 - [x] Add C# and C++ wire codec compatibility test vectors.
 - [x] Add integration tests for sidecar Master registration with a C++ endpoint advertisement.
 - [ ] Add integration tests for Gateway direct connection to a C++ Backend test server.
-- [ ] Add handshake rejection tests for invalid direct-connect codes.
+- [x] Add handshake rejection tests for invalid direct-connect codes.
 - [ ] Add channel open/data/close tests against the C++ data-plane implementation.
 - [ ] Add shutdown and reconnect tests for sidecar and C++ server coordination.
 - [ ] Add performance tests that confirm sidecar IPC is not on the gameplay packet hot path.

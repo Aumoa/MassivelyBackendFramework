@@ -1,7 +1,24 @@
 #include "cpp_backend/packet_core.hpp"
 
 #include <algorithm>
+#include <cstring>
 #include <limits>
+#include <random>
+#include <string>
+#include <utility>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <cerrno>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 
 namespace cpp_backend {
 
@@ -9,6 +26,14 @@ namespace {
 
 constexpr std::uint8_t kind_shift = 6;
 constexpr std::uint8_t flags_mask = 0x3F;
+
+#ifdef _WIN32
+using socket_handle = SOCKET;
+constexpr socket_handle invalid_socket_handle = INVALID_SOCKET;
+#else
+using socket_handle = int;
+constexpr socket_handle invalid_socket_handle = -1;
+#endif
 
 bool is_valid_kind(packet_kind kind) noexcept
 {
@@ -77,11 +102,280 @@ void require_control_frame(
     }
 }
 
+class socket_runtime {
+public:
+    socket_runtime()
+    {
+#ifdef _WIN32
+        WSADATA data {};
+        if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
+            throw packet_error("WSAStartup failed.");
+        }
+#endif
+    }
+
+    ~socket_runtime()
+    {
+#ifdef _WIN32
+        WSACleanup();
+#endif
+    }
+};
+
+class socket_owner {
+public:
+    socket_owner() = default;
+
+    explicit socket_owner(socket_handle handle)
+        : m_handle(handle)
+    {
+    }
+
+    socket_owner(const socket_owner&) = delete;
+    socket_owner& operator=(const socket_owner&) = delete;
+
+    socket_owner(socket_owner&& other) noexcept
+        : m_handle(other.m_handle)
+    {
+        other.m_handle = invalid_socket_handle;
+    }
+
+    socket_owner& operator=(socket_owner&& other) noexcept
+    {
+        if (this != &other) {
+            reset();
+            m_handle = other.m_handle;
+            other.m_handle = invalid_socket_handle;
+        }
+
+        return *this;
+    }
+
+    ~socket_owner()
+    {
+        reset();
+    }
+
+    socket_handle get() const noexcept
+    {
+        return m_handle;
+    }
+
+    explicit operator bool() const noexcept
+    {
+        return m_handle != invalid_socket_handle;
+    }
+
+    void reset(socket_handle handle = invalid_socket_handle) noexcept
+    {
+        if (m_handle != invalid_socket_handle) {
+#ifdef _WIN32
+            closesocket(m_handle);
+#else
+            close(m_handle);
+#endif
+        }
+
+        m_handle = handle;
+    }
+
+private:
+    socket_handle m_handle = invalid_socket_handle;
+};
+
+std::string socket_error_message(const std::string& prefix)
+{
+#ifdef _WIN32
+    return prefix + " WSAError=" + std::to_string(WSAGetLastError());
+#else
+    return prefix + " errno=" + std::to_string(errno);
+#endif
+}
+
+socket_owner connect_tcp(const sidecar_control_endpoint& endpoint)
+{
+    if (endpoint.host.empty()) {
+        throw packet_error("Sidecar host is required.");
+    }
+
+    if (endpoint.port == 0) {
+        throw packet_error("Sidecar port is required.");
+    }
+
+    static socket_runtime runtime;
+
+    addrinfo hints {};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    addrinfo* results = nullptr;
+    auto port = std::to_string(endpoint.port);
+    int resolve_result = getaddrinfo(endpoint.host.c_str(), port.c_str(), &hints, &results);
+    if (resolve_result != 0) {
+        throw packet_error("Failed to resolve sidecar endpoint.");
+    }
+
+    struct addrinfo_owner {
+        addrinfo* value = nullptr;
+        ~addrinfo_owner()
+        {
+            if (value != nullptr) {
+                freeaddrinfo(value);
+            }
+        }
+    } result_owner { results };
+
+    for (auto* current = results; current != nullptr; current = current->ai_next) {
+        socket_owner socket(::socket(current->ai_family, current->ai_socktype, current->ai_protocol));
+        if (!socket) {
+            continue;
+        }
+
+        if (::connect(socket.get(), current->ai_addr, static_cast<int>(current->ai_addrlen)) == 0) {
+            return socket;
+        }
+    }
+
+    throw packet_error(socket_error_message("Failed to connect to sidecar endpoint."));
+}
+
+void send_all(socket_handle socket, std::span<const std::uint8_t> bytes)
+{
+    std::size_t sent = 0;
+    while (sent < bytes.size()) {
+        auto remaining = bytes.size() - sent;
+        auto chunk_size = remaining > static_cast<std::size_t>(std::numeric_limits<int>::max())
+            ? std::numeric_limits<int>::max()
+            : static_cast<int>(remaining);
+#ifdef _WIN32
+        int result = ::send(
+            socket,
+            reinterpret_cast<const char*>(bytes.data() + sent),
+            chunk_size,
+            0);
+#else
+        int result = static_cast<int>(::send(
+            socket,
+            bytes.data() + sent,
+            static_cast<std::size_t>(chunk_size),
+            0));
+#endif
+        if (result <= 0) {
+            throw packet_error(socket_error_message("Socket send failed."));
+        }
+
+        sent += static_cast<std::size_t>(result);
+    }
+}
+
+void receive_exact(socket_handle socket, std::span<std::uint8_t> bytes)
+{
+    std::size_t received = 0;
+    while (received < bytes.size()) {
+        auto remaining = bytes.size() - received;
+        auto chunk_size = remaining > static_cast<std::size_t>(std::numeric_limits<int>::max())
+            ? std::numeric_limits<int>::max()
+            : static_cast<int>(remaining);
+#ifdef _WIN32
+        int result = ::recv(
+            socket,
+            reinterpret_cast<char*>(bytes.data() + received),
+            chunk_size,
+            0);
+#else
+        int result = static_cast<int>(::recv(
+            socket,
+            bytes.data() + received,
+            static_cast<std::size_t>(chunk_size),
+            0));
+#endif
+        if (result <= 0) {
+            throw packet_error(socket_error_message("Socket receive failed."));
+        }
+
+        received += static_cast<std::size_t>(result);
+    }
+}
+
+void write_socket_frame(socket_handle socket, const packet_frame& frame)
+{
+    auto bytes = encode_frame(frame);
+    send_all(socket, bytes);
+}
+
+packet_frame read_socket_frame(socket_handle socket, std::uint32_t max_payload_length)
+{
+    std::array<std::uint8_t, packet_header::size> header_bytes {};
+    receive_exact(socket, header_bytes);
+    auto header = decode_header(header_bytes, max_payload_length);
+    std::vector<std::uint8_t> payload(header.payload_length);
+    if (!payload.empty()) {
+        receive_exact(socket, payload);
+    }
+
+    return packet_frame { header, std::move(payload) };
+}
+
+guid_bytes create_request_id()
+{
+    std::random_device random;
+    guid_bytes value {};
+    for (auto& byte : value) {
+        byte = static_cast<std::uint8_t>(random());
+    }
+
+    if (std::all_of(value.begin(), value.end(), [](std::uint8_t byte) { return byte == 0; })) {
+        value.back() = 1;
+    }
+
+    return value;
+}
+
 } // namespace
 
 packet_error::packet_error(const std::string& message)
     : std::runtime_error(message)
 {
+}
+
+sidecar_direct_connect_code_validator::sidecar_direct_connect_code_validator(sidecar_control_endpoint endpoint)
+    : m_endpoint(std::move(endpoint))
+{
+}
+
+direct_connect_code_validation_response sidecar_direct_connect_code_validator::validate(
+    const std::string& code,
+    const std::string& gateway_node_id,
+    const std::string& gateway_master_connection_id)
+{
+    direct_connect_code_validation_request request {
+        create_request_id(),
+        code,
+        gateway_node_id,
+        gateway_master_connection_id,
+    };
+
+    auto socket = connect_tcp(m_endpoint);
+    auto request_frame = make_frame(
+        packet_kind::control,
+        sidecar_pid_direct_connect_validation_request,
+        sidecar_control_schema_version,
+        encode_direct_connect_code_validation_request(request));
+    write_socket_frame(socket.get(), request_frame);
+
+    auto response_frame = read_socket_frame(socket.get(), sidecar_control_max_payload_length);
+    require_control_frame(
+        response_frame,
+        sidecar_pid_direct_connect_validation_response,
+        sidecar_control_schema_version);
+
+    auto response = decode_direct_connect_code_validation_response(response_frame.payload);
+    if (response.request_id != request.request_id) {
+        throw packet_error("Sidecar validation response used a different request id.");
+    }
+
+    return response;
 }
 
 void packet_writer::write_byte(std::uint8_t value)
