@@ -30,6 +30,9 @@ namespace cpp_backend
 
         constexpr std::uint8_t kind_shift = 6;
         constexpr std::uint8_t flags_mask = 0x3F;
+        constexpr std::int32_t backend_packet_verifier_max_instruction_count = 256;
+        constexpr int backend_packet_verifier_max_nesting_depth = 8;
+        constexpr std::uint8_t backend_packet_verifier_repeat_operation = 4;
 
 #ifdef _WIN32
         using socket_handle = SOCKET;
@@ -125,6 +128,132 @@ namespace cpp_backend
             return reader.read_byte() != 0;
         }
 
+        void skip_backend_packet_verifier_value_constraint(packet_reader& reader)
+        {
+            if (!read_bool(reader))
+            {
+                return;
+            }
+
+            if (read_bool(reader))
+            {
+                reader.read_int64();
+            }
+
+            if (read_bool(reader))
+            {
+                reader.read_int64();
+            }
+
+            if (read_bool(reader))
+            {
+                reader.read_int64();
+            }
+
+            auto allowed_value_count = reader.read_int32();
+            if (allowed_value_count < 0 ||
+                allowed_value_count > backend_packet_verifier_max_instruction_count)
+            {
+                throw packet_error("Invalid Backend packet verifier enum value count.");
+            }
+
+            for (std::int32_t index = 0; index < allowed_value_count; ++index)
+            {
+                reader.read_int64();
+            }
+        }
+
+        void skip_backend_packet_verifier_length_constraint(packet_reader& reader)
+        {
+            if (!read_bool(reader))
+            {
+                return;
+            }
+
+            reader.read_int32();
+            reader.read_int32();
+            reader.read_int32();
+            reader.read_int32();
+        }
+
+        void skip_backend_packet_verifier_instructions(packet_reader& reader, int depth, bool allow_empty,
+                                                       std::int32_t& total_instruction_count);
+
+        void skip_backend_packet_verifier_instruction(packet_reader& reader, int depth,
+                                                      std::int32_t& total_instruction_count)
+        {
+            auto operation = reader.read_byte();
+            reader.read_byte();
+            reader.read_int32();
+            skip_backend_packet_verifier_value_constraint(reader);
+            skip_backend_packet_verifier_length_constraint(reader);
+            reader.read_int32();
+            reader.read_int32();
+            reader.read_int32();
+            if (operation == backend_packet_verifier_repeat_operation)
+            {
+                skip_backend_packet_verifier_instructions(reader, depth + 1, false, total_instruction_count);
+            }
+            else
+            {
+                auto body_instruction_count = reader.read_int32();
+                if (body_instruction_count != 0)
+                {
+                    throw packet_error("Only repeat Backend packet verifier instructions can contain a body.");
+                }
+            }
+
+            reader.read_int32();
+            reader.read_int64();
+        }
+
+        void skip_backend_packet_verifier_instructions(packet_reader& reader, int depth, bool allow_empty,
+                                                       std::int32_t& total_instruction_count)
+        {
+            if (depth > backend_packet_verifier_max_nesting_depth)
+            {
+                throw packet_error("Backend packet verifier instruction nesting is too deep.");
+            }
+
+            auto instruction_count = reader.read_int32();
+            if (instruction_count < 0 ||
+                instruction_count > backend_packet_verifier_max_instruction_count ||
+                (!allow_empty && instruction_count == 0))
+            {
+                throw packet_error("Invalid Backend packet verifier instruction count.");
+            }
+
+            total_instruction_count += instruction_count;
+            if (total_instruction_count > backend_packet_verifier_max_instruction_count)
+            {
+                throw packet_error("Backend packet verifier program contains too many instructions.");
+            }
+
+            for (std::int32_t index = 0; index < instruction_count; ++index)
+            {
+                skip_backend_packet_verifier_instruction(reader, depth, total_instruction_count);
+            }
+        }
+
+        void skip_nullable_backend_packet_verifier_program(packet_reader& reader)
+        {
+            if (!read_bool(reader))
+            {
+                return;
+            }
+
+            reader.read_byte();
+            require_non_negative(reader.read_int32(), "Backend packet verifier max trailing byte count");
+            auto instruction_budget = reader.read_int32();
+            if (instruction_budget <= 0)
+            {
+                throw packet_error("Backend packet verifier instruction budget must be positive.");
+            }
+
+            std::int32_t total_instruction_count = 0;
+            skip_backend_packet_verifier_instructions(reader, 0, true, total_instruction_count);
+        }
+
         void validate_backend_packet_manifest_entry(const backend_packet_manifest_entry& entry)
         {
             if (!is_valid_manifest_direction(entry.direction))
@@ -181,6 +310,7 @@ namespace cpp_backend
 
             writer.write_string(entry.payload_constraint.schema_id);
             writer.write_string(entry.payload_constraint.schema_hash.value_or(""));
+            writer.write_byte(0);
         }
 
         backend_packet_manifest_entry read_backend_packet_manifest_entry(packet_reader& reader)
@@ -205,6 +335,7 @@ namespace cpp_backend
                 entry.payload_constraint.schema_hash = std::move(schema_hash);
             }
 
+            skip_nullable_backend_packet_verifier_program(reader);
             validate_backend_packet_manifest_entry(entry);
             return entry;
         }

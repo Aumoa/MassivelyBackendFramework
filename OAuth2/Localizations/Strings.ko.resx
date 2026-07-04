@@ -168,6 +168,9 @@
   <data name="LOGIN_VALIDATION_ERROR_PW_INVALID" xml:space="preserve">
     <value>암호가 올바르지 않습니다.</value>
   </data>
+  <data name="LOGIN_VALIDATION_ERROR_TOO_MANY_ATTEMPTS" xml:space="preserve">
+    <value>로그인 시도가 너무 많습니다. 잠시 후 다시 시도하세요.</value>
+  </data>
   <data name="LOGIN_VALIDATION_ERROR_PW_REQUIRED" xml:space="preserve">
     <value>암호는 필수 요소입니다.</value>
   </data>

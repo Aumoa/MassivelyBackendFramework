@@ -11,7 +11,7 @@ namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/token")]
-public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IClientUserGroups groups, ITokenIssuer tokenIssuer, IOptions<HostOptions> hostOptions, IApiKeys apiKeys, ILogger<TokenController> logger) : ControllerBase
+public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IClientUserGroups groups, ITokenIssuer tokenIssuer, IOptions<HostOptions> hostOptions, IApiKeys apiKeys, IClients clients, ILogger<TokenController> logger) : ControllerBase
 {
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] TokenRequest request, CancellationToken cancellationToken)
@@ -340,14 +340,17 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             idToken = jwt.Issue(newAccess.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, newAccess.Value.Scope, [.. claims, .. groupsClaim], null, true, newAccess.Value.AuthTime));
         }
 
+        var canReturnRefreshToken = newAccess.Value.ClientId == hostOptions.Value.ClientId ||
+                                    ScopePolicy.HasOfflineAccess(newAccess.Value.Scope);
+
         var response = new TokenResponse
         {
             AccessToken = newAccess.Value.AccessToken,
             TokenType = "Bearer",
             ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
             Scope = newAccess.Value.Scope,
-            RefreshToken = newAccess.Value.RefreshToken,
-            RefreshExpiresIn = (int)jwt.RefreshTokenExpiresIn.TotalSeconds,
+            RefreshToken = canReturnRefreshToken ? newAccess.Value.RefreshToken : null,
+            RefreshExpiresIn = canReturnRefreshToken ? (int)jwt.RefreshTokenExpiresIn.TotalSeconds : null,
             IdToken = idToken
         };
 
@@ -374,11 +377,28 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_grant", error_description = "api_key is invalid or does not exist" });
         }
 
-        // Validate client restriction: if the key is restricted to a specific client, enforce it
-        if (apiKeyInfo.Value.AllowedClientId != null && apiKeyInfo.Value.AllowedClientId != request.ClientId)
+        if (string.IsNullOrWhiteSpace(apiKeyInfo.Value.AllowedClientId))
+        {
+            logger.LogWarning("API key without a client restriction was rejected. ApiKeyId: {ApiKeyId}", apiKeyInfo.Value.Id);
+            return BadRequest(new { error = "invalid_grant", error_description = "api_key is missing a required client restriction" });
+        }
+
+        if (apiKeyInfo.Value.AllowedClientId != request.ClientId)
         {
             logger.LogWarning("API key client restriction violated. Allowed: {Allowed}, Requested: {Requested}", apiKeyInfo.Value.AllowedClientId, request.ClientId);
             return BadRequest(new { error = "invalid_grant", error_description = "api_key is not allowed for this client" });
+        }
+
+        if (request.ClientId == hostOptions.Value.ClientId)
+        {
+            logger.LogWarning("API key attempted to target the internal OAuth2 client. ApiKeyId: {ApiKeyId}", apiKeyInfo.Value.Id);
+            return BadRequest(new { error = "invalid_grant", error_description = "api_key cannot target the internal OAuth2 client" });
+        }
+
+        var targetClient = await clients.GetClientAsync(request.ClientId, cancellationToken);
+        if (!targetClient.HasValue)
+        {
+            return BadRequest(new { error = "invalid_client", error_description = "client_id is unknown" });
         }
 
         var accountId = apiKeyInfo.Value.AccountId;
@@ -389,12 +409,24 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             return BadRequest(new { error = "invalid_grant", error_description = "associated account not found" });
         }
 
-        // Use the scope defined on the API key; fall back to "all" if unrestricted
-        var scope = apiKeyInfo.Value.AllowedScope ?? "all";
-        if (!ScopePolicy.TryNormalize(scope, true, out var normalizedScope, out _))
+        if (string.IsNullOrWhiteSpace(apiKeyInfo.Value.AllowedScope))
+        {
+            logger.LogWarning("API key without a scope restriction was rejected. ApiKeyId: {ApiKeyId}", apiKeyInfo.Value.Id);
+            return BadRequest(new { error = "invalid_grant", error_description = "api_key is missing a required scope restriction" });
+        }
+
+        if (!ScopePolicy.TryNormalize(apiKeyInfo.Value.AllowedScope, false, out var normalizedScope, out _))
         {
             logger.LogWarning("API key contains invalid scope configuration. ApiKeyId: {ApiKeyId}", apiKeyInfo.Value.Id);
             return BadRequest(new { error = "invalid_grant", error_description = "api_key scope is invalid" });
+        }
+
+        var claims = await clientClaims.GetClaimsAsync(request.ClientId, cancellationToken);
+        var allowedScopes = claims.Where(c => c.Name == "scope").Select(c => c.Value);
+        if (!ScopePolicy.IsAllowedByClient(normalizedScope, allowedScopes))
+        {
+            logger.LogWarning("API key scope exceeds target client policy. ApiKeyId: {ApiKeyId}, ClientId: {ClientId}", apiKeyInfo.Value.Id, request.ClientId);
+            return BadRequest(new { error = "invalid_scope", error_description = "api_key scope is not allowed for this client" });
         }
 
         var tokenResponse = await GenerateTokenResponseAsync(accountId, rawAccount.Value, request.ClientId, normalizedScope, null, null, null, null, cancellationToken);

@@ -23,7 +23,7 @@ namespace
         };
     }
 
-    constexpr const char* manifest_hash = "9924291a1ab4004e914ad25469916ec496da9def0689aea76003b230da521031";
+    constexpr const char* manifest_hash = "af369db2e71fd543ac449aea36b702cacab2799fe1017bec50e84c868453da05";
 
     backend_packet_manifest_snapshot create_manifest_snapshot()
     {
@@ -215,7 +215,7 @@ namespace
         };
 
         auto bytes = encode_header(header);
-        require_equal("c000640008000000", to_hex(bytes), "PacketCore header");
+        require_equal("c00064000a000000", to_hex(bytes), "PacketCore header");
 
         auto decoded = decode_header(bytes, packet_header::max_payload_length);
         require(decoded.kind == packet_kind::control, "Decoded header kind mismatch.");
@@ -233,7 +233,7 @@ namespace
             challenge.nonce[index] = static_cast<std::uint8_t>(index);
         }
 
-        constexpr auto expected = "c0006400080000330000000b6368616c6c656e67652d6100000020000102030405060708090a0b0c0d0e"
+        constexpr auto expected = "c00064000a0000330000000b6368616c6c656e67652d6100000020000102030405060708090a0b0c0d0e"
                                   "0f101112131415161718191a1b1c1d1e1f";
         require_equal(expected,
                       encode_frame_hex(packet_kind::control, master_pid_node_auth_challenge,
@@ -252,7 +252,7 @@ namespace
             master_node_kind::gateway, master_control_schema_version, "gateway-a", "Gateway A", "gateway-master-a",
         };
 
-        constexpr auto expected = "c00065000800003101000800000009676174657761792d61000000094761746577617920410000001067"
+        constexpr auto expected = "c00065000a00003101000a00000009676174657761792d61000000094761746577617920410000001067"
                                   "6174657761792d6d61737465722d61";
         require_equal(expected,
                       encode_frame_hex(packet_kind::control, master_pid_node_hello, master_control_schema_version,
@@ -274,7 +274,7 @@ namespace
             "code-1",
         };
 
-        constexpr auto expected = "c00073000800000a00000006636f64652d31";
+        constexpr auto expected = "c00073000a00000a00000006636f64652d31";
         require_equal(expected,
                       encode_frame_hex(packet_kind::control, master_pid_direct_connect_code,
                                        master_control_schema_version, encode_direct_connect_code(code)),
@@ -293,7 +293,7 @@ namespace
         };
 
         constexpr auto expected =
-            "c00067000800002500000009676174657761792d61000000146261636b656e642d636f6e6e656374696f6e2d61";
+            "c00067000a00002500000009676174657761792d61000000146261636b656e642d636f6e6e656374696f6e2d61";
         require_equal(expected,
                       encode_frame_hex(packet_kind::control, master_pid_node_accepted, master_control_schema_version,
                                        encode_node_accepted(accepted)),
@@ -492,8 +492,8 @@ namespace
         };
 
         constexpr auto expected = "c00009000100006433221100554477668899aabbccddeeff0000000c6370702d776f726c643a76320000"
-                                  "004039393234323931613161623430303465393134616432353436393931366563343936646139646566"
-                                  "303638396165613736303033623233306461353231303331";
+                                  "004061663336396462326537316664353433616334343961656133366237303263616361623237393966"
+                                  "653130313762656335306538346338363834353364613035";
         require_equal(expected,
                       encode_frame_hex(packet_kind::control, sidecar_pid_manifest_declaration_update,
                                        sidecar_control_schema_version,
@@ -570,10 +570,10 @@ namespace
             "",
         };
 
-        constexpr auto expected = "c0000c000100009f33221100554477668899aabbccddeeff010100000001000000096370702d776f726c"
-                                  "640000000c6370702d776f726c643a763200000040393932343239316131616234303034653931346164"
-                                  "323534363939313665633439366461396465663036383961656137363030336232333064613532313033"
-                                  "31000000010100006500010100000004000000400000000000000000000000019f2314e60000000000";
+        constexpr auto expected = "c0000c00010000a033221100554477668899aabbccddeeff010100000001000000096370702d776f726c"
+                                  "640000000c6370702d776f726c643a763200000040616633363964623265373166643534336163343439"
+                                  "616561333662373032636163616232373939666531303137626563353065383463383638343533646130"
+                                  "3500000001010000650001010000000400000040000000000000000000000000019f2314e60000000000";
         require_equal(expected,
                       encode_frame_hex(packet_kind::control, sidecar_pid_manifest_snapshot_response,
                                        sidecar_control_schema_version,

@@ -315,7 +315,10 @@ internal sealed class MasterConnectionManager(
                 m_GatewayListenerOptions.Port,
                 m_GatewayListenerOptions.UseTls),
             new BackendPacketManifestId(manifestId),
-            new BackendPacketManifestHash(manifestHash));
+            new BackendPacketManifestHash(manifestHash),
+            m_Options.ServerState,
+            m_Options.ServerDescriptorVersion,
+            m_Options.ServerDescriptorJson);
         using var frame = PacketCodec.Encode(
             PacketKind.Control,
             MasterControlPacketIds.BackendEndpointAdvertise,
@@ -324,13 +327,16 @@ internal sealed class MasterConnectionManager(
             BackendEndpointAdvertise.Codec);
         await WriteFrameAsync(stream, frame, cancellationToken).ConfigureAwait(false);
         logger.LogInformation(
-            "Backend advertised Gateway endpoint to Master. BackendKind={BackendKind}, Endpoint={Address}:{Port}, UseTls={UseTls}, ManifestId={ManifestId}, ManifestHash={ManifestHash}.",
+            "Backend advertised Gateway endpoint to Master. BackendKind={BackendKind}, Endpoint={Address}:{Port}, UseTls={UseTls}, ManifestId={ManifestId}, ManifestHash={ManifestHash}, State={State}, DescriptorVersion={DescriptorVersion}, DescriptorHash={DescriptorHash}.",
             advertise.BackendKind,
             advertise.GatewayEndpoint.IPAddress,
             advertise.GatewayEndpoint.Port,
             advertise.GatewayEndpoint.UseTls,
             advertise.ManifestId.Value,
-            advertise.ManifestHash.Value);
+            advertise.ManifestHash.Value,
+            advertise.Descriptor.State,
+            advertise.Descriptor.DescriptorVersion,
+            advertise.Descriptor.DescriptorHash);
     }
 
     private static async Task<PacketFrame> ReadRequiredHandshakeFrameAsync(
@@ -538,6 +544,10 @@ internal sealed class MasterConnectionManager(
 
         _ = new BackendPacketManifestId(m_Options.BackendPacketManifestId);
         _ = new BackendPacketManifestHash(m_Options.BackendPacketManifestHash);
+        _ = BackendServerDescriptor.Create(
+            m_Options.ServerState,
+            m_Options.ServerDescriptorVersion,
+            m_Options.ServerDescriptorJson);
     }
 
     private void SetStatus(

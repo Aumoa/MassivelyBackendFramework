@@ -87,6 +87,8 @@ A Backend server needs `MasterConnection` and `GatewayListener` configuration.
 
 `MasterConnection:BackendPacketManifestId` and `MasterConnection:BackendPacketManifestHash` identify the active packet manifest that this Backend binary or configuration expects. Master accepts the Backend advertisement only when that id/hash is approved for the authorized `BackendKind`, then publishes the approved manifest snapshot to Gateways.
 
+`MasterConnection:ServerState`, `MasterConnection:ServerDescriptorVersion`, and `MasterConnection:ServerDescriptorJson` advertise the client-visible server directory entry for this Backend node. Master validates the descriptor as bounded JSON, computes the SHA-256 descriptor hash, and rejects descriptors that look like they contain private endpoints, credentials, tokens, or other infrastructure details. Gateway forwards only the opaque descriptor JSON, state, version, hash, and an opaque `ServerHandle` to authenticated clients; internal Gateway-facing endpoints stay private.
+
 `MasterConnection:SharedSecret` must use the Backend service connection credential issued by MasterAdmin. Do not commit this value to the repository.
 
 `GatewayListener` is the Backend-side listener that Gateway connects to after receiving a direct-connect code. In production, configure this together with private networking and TLS.
@@ -279,3 +281,9 @@ The sidecar status surface includes the latest C++ runtime health and Gateway se
 Shutdown state updates are control-plane coordination only. Existing Gateway data-plane sessions are still owned by the C++ process, which must close or drain them according to its own gameplay rules.
 
 If no manifest declaration is required or received, the sidecar keeps using `MasterConnection:BackendPacketManifestId` and `MasterConnection:BackendPacketManifestHash`.
+
+## Server Directory Flow
+
+Authenticated Gateway clients can request `GATE_BACKEND_SERVER_LIST` for an allowed `BackendKind`. The response contains client-safe entries with `ServerHandle`, node state, descriptor version, descriptor hash, and opaque descriptor JSON. Clients may display or parse descriptor JSON as a game-specific contract, but Gateway and Master do not interpret its game meaning.
+
+Clients can open a route by sending `GatewayBackendRouteOpenRequest` with the selected `ServerHandle`. Gateway resolves the handle against its current Master snapshot, rejects stale or non-open handles, and binds the route to the selected Backend node identity. `BackendKind`-only route open remains supported for simple clients and tests.

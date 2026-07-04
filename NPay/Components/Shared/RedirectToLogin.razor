@@ -7,7 +7,7 @@
     {
         if (firstRender)
         {
-            Auth.NavigateToLogin(Nav, "auth/redirect", "openid profile email");
+            Auth.NavigateToLogin(Nav, "auth/redirect", "openid profile email offline_access");
         }
         return base.OnAfterRenderAsync(firstRender);
     }

@@ -10,6 +10,25 @@ public sealed class BackendEndpointAdvertise
         MasterSocketEndpoint gatewayEndpoint,
         BackendPacketManifestId manifestId,
         BackendPacketManifestHash manifestHash)
+        : this(
+            backendKind,
+            gatewayEndpoint,
+            manifestId,
+            manifestHash,
+            BackendServerDescriptor.DefaultOpen.State,
+            BackendServerDescriptor.DefaultOpen.DescriptorVersion,
+            BackendServerDescriptor.DefaultOpen.DescriptorJson)
+    {
+    }
+
+    public BackendEndpointAdvertise(
+        string backendKind,
+        MasterSocketEndpoint gatewayEndpoint,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash manifestHash,
+        BackendNodeState state,
+        string descriptorVersion,
+        string descriptorJson)
     {
         if (string.IsNullOrWhiteSpace(backendKind))
         {
@@ -20,6 +39,7 @@ public sealed class BackendEndpointAdvertise
         GatewayEndpoint = gatewayEndpoint ?? throw new ArgumentNullException(nameof(gatewayEndpoint));
         ManifestId = manifestId;
         ManifestHash = manifestHash;
+        Descriptor = BackendServerDescriptor.Create(state, descriptorVersion, descriptorJson);
     }
 
     public string BackendKind { get; }
@@ -30,6 +50,8 @@ public sealed class BackendEndpointAdvertise
 
     public BackendPacketManifestHash ManifestHash { get; }
 
+    public BackendServerDescriptor Descriptor { get; }
+
     public static IPacketCodec<BackendEndpointAdvertise> Codec { get; } = new BackendEndpointAdvertiseCodec();
 
     private sealed class BackendEndpointAdvertiseCodec : IPacketCodec<BackendEndpointAdvertise>
@@ -39,7 +61,10 @@ public sealed class BackendEndpointAdvertise
             return PacketWriter.GetStringSize(value.BackendKind) +
                    GetEndpointSize(value.GatewayEndpoint) +
                    PacketWriter.GetStringSize(value.ManifestId.Value) +
-                   PacketWriter.GetStringSize(value.ManifestHash.Value);
+                   PacketWriter.GetStringSize(value.ManifestHash.Value) +
+                   sizeof(byte) +
+                   PacketWriter.GetStringSize(value.Descriptor.DescriptorVersion) +
+                   PacketWriter.GetStringSize(value.Descriptor.DescriptorJson);
         }
 
         public void Encode(BackendEndpointAdvertise value, ref PacketWriter writer)
@@ -48,6 +73,9 @@ public sealed class BackendEndpointAdvertise
             WriteEndpoint(value.GatewayEndpoint, ref writer);
             writer.WriteString(value.ManifestId.Value);
             writer.WriteString(value.ManifestHash.Value);
+            writer.WriteByte((byte)value.Descriptor.State);
+            writer.WriteString(value.Descriptor.DescriptorVersion);
+            writer.WriteString(value.Descriptor.DescriptorJson);
         }
 
         public BackendEndpointAdvertise Decode(ref PacketReader reader)
@@ -58,7 +86,10 @@ public sealed class BackendEndpointAdvertise
                 backendKind,
                 endpoint,
                 new BackendPacketManifestId(reader.ReadString()),
-                new BackendPacketManifestHash(reader.ReadString()));
+                new BackendPacketManifestHash(reader.ReadString()),
+                (BackendNodeState)reader.ReadByte(),
+                reader.ReadString(),
+                reader.ReadString());
         }
 
         private static int GetEndpointSize(MasterSocketEndpoint value)

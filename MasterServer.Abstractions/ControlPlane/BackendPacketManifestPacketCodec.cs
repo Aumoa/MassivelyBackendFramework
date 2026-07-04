@@ -132,7 +132,8 @@ internal static class BackendPacketManifestPacketCodec
                sizeof(byte) +
                (entry.PayloadConstraint.FixedLength.HasValue ? sizeof(int) : 0) +
                PacketWriter.GetStringSize(entry.PayloadConstraint.SchemaId) +
-               PacketWriter.GetStringSize(entry.PayloadConstraint.SchemaHash?.Value ?? string.Empty);
+               PacketWriter.GetStringSize(entry.PayloadConstraint.SchemaHash?.Value ?? string.Empty) +
+               BackendPacketVerifierProgramCodec.GetNullableProgramSize(entry.PayloadConstraint.VerifierProgram);
     }
 
     public static void WriteEntry(BackendPacketManifestEntry entry, ref PacketWriter writer)
@@ -152,6 +153,7 @@ internal static class BackendPacketManifestPacketCodec
 
         writer.WriteString(entry.PayloadConstraint.SchemaId);
         writer.WriteString(entry.PayloadConstraint.SchemaHash?.Value ?? string.Empty);
+        BackendPacketVerifierProgramCodec.WriteNullableProgram(entry.PayloadConstraint.VerifierProgram, ref writer);
     }
 
     public static BackendPacketManifestEntry ReadEntry(ref PacketReader reader)
@@ -172,6 +174,7 @@ internal static class BackendPacketManifestPacketCodec
         var schemaHash = string.IsNullOrWhiteSpace(schemaHashValue)
             ? (BackendPacketManifestHash?)null
             : new BackendPacketManifestHash(schemaHashValue);
+        var verifierProgram = BackendPacketVerifierProgramCodec.ReadNullableProgram(ref reader);
         return new BackendPacketManifestEntry(
             direction,
             packetKind,
@@ -182,7 +185,8 @@ internal static class BackendPacketManifestPacketCodec
                 maximumLength,
                 fixedLength,
                 schemaId,
-                schemaHash),
+                schemaHash,
+                verifierProgram),
             status);
     }
 }

@@ -25,6 +25,12 @@ internal class TokenRefreshService(
             return null;
         }
 
+        if (httpContext.Response.HasStarted)
+        {
+            logger.LogDebug("Response headers were already sent; token refresh was skipped to avoid losing rotated refresh-token cookies.");
+            return null;
+        }
+
         var refreshToken = cookieManager.ReadRefreshToken(httpContext);
         if (string.IsNullOrEmpty(refreshToken))
         {
@@ -95,12 +101,12 @@ internal class TokenRefreshService(
                     DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn));
             }
 
-            if (!string.IsNullOrEmpty(tokenResponse.RefreshToken))
+            if (!string.IsNullOrEmpty(tokenResponse.RefreshToken) && tokenResponse.RefreshExpiresIn.HasValue)
             {
                 cookieManager.AppendRefreshToken(
                     httpContext,
                     tokenResponse.RefreshToken,
-                    DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn));
+                    DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn.Value));
             }
 
             logger.LogTrace("Token refreshed successfully");

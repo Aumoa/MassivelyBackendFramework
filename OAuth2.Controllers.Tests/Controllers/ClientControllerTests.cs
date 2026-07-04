@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using OAuth2;
 using OAuth2.Controllers;
 using OAuth2.DTO;
+using OAuth2.Options;
 using OAuth2.Services;
 
 namespace OAuth2.Controllers.Tests.Controllers;
@@ -85,7 +87,12 @@ public sealed class ClientControllerTests
 
     private static ClientController CreateController(ClientsStub clients)
     {
-        var controller = new ClientController(clients, new AccessesStub())
+        var controller = new ClientController(clients, new AccessesStub(), Microsoft.Extensions.Options.Options.Create(new HostOptions
+        {
+            ClientId = "oauth2",
+            Secret = "secret",
+            Uri = "https://oauth.example.test"
+        }))
         {
             ControllerContext = new ControllerContext
             {

@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.JSInterop;
 using OAuth2.DTO;
 using OAuth2.Localizations;
@@ -24,9 +23,12 @@ public partial class Login(
     NavigationManager nav,
     IHttpContextAccessor accessor,
     ILogger<Login> logger,
-    IJwt jwt,
+    ILoginAttemptLimiter loginAttemptLimiter,
+    CachedAuthorizationSessionService cachedSessions,
     IJSRuntime js)
 {
+    private static readonly TimeSpan kFailedLoginDelay = TimeSpan.FromMilliseconds(500);
+
     private enum RenderStates
     {
         Id,
@@ -229,33 +231,17 @@ public partial class Login(
             var httpContext = accessor.HttpContext;
             if (httpContext != null)
             {
-                const string CachedJwtPrefix = "cached_jwt_";
                 foreach (var cookie in httpContext.Request.Cookies)
                 {
-                    if (!cookie.Key.StartsWith(CachedJwtPrefix, StringComparison.Ordinal))
+                    if (!cachedSessions.TryGetAccountId(cookie.Key, out _))
                     {
                         continue;
                     }
 
-                    var accountId = cookie.Key[CachedJwtPrefix.Length..];
-                    try
+                    var session = await cachedSessions.TryGetSessionAsync(httpContext, cookie.Key, cookie.Value);
+                    if (session != null && IsAuthenticationFresh(session.AuthTime))
                     {
-                        var handler = new JwtSecurityTokenHandler();
-                        var validationParams = jwt.GetValidationParameters();
-                        var principal = handler.ValidateToken(cookie.Value, validationParams, out var validatedToken);
-                        var cachedJwt = (JwtSecurityToken)validatedToken;
-                        if (IsAuthenticationFresh(GetCachedAuthTime(cachedJwt)))
-                        {
-                            m_CachedJwts.Add(cachedJwt);
-                        }
-                    }
-                    catch (SecurityTokenException e)
-                    {
-                        logger.LogWarning("{Key} token validation failed: {Message}", cookie.Key, e.Message);
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogWarning("Failed to export cached jwt token. {Message}", e.Message);
+                        m_CachedJwts.Add(session.Token);
                     }
                 }
             }
@@ -333,9 +319,20 @@ public partial class Login(
             return;
         }
 
+        var origin = GetLoginOrigin();
+        if (!loginAttemptLimiter.IsAllowed(m_ID, origin, out var retryAfter))
+        {
+            logger.LogWarning("Login password step rate limited. Identifier: {Identifier}, Origin: {Origin}, RetryAfter: {RetryAfter}", m_ID, origin, retryAfter);
+            m_ErrorMessagePassword = Strings.LOGIN_VALIDATION_ERROR_TOO_MANY_ATTEMPTS;
+            return;
+        }
+
         var verified = await accounts.LoginAsync(m_ID, m_Password);
         if (verified == null)
         {
+            loginAttemptLimiter.RecordFailure(m_ID, origin);
+            logger.LogWarning("Login password verification failed. Identifier: {Identifier}, Origin: {Origin}", m_ID, origin);
+            await DelayFailedLoginAsync();
             m_ErrorMessagePassword = Strings.LOGIN_VALIDATION_ERROR_PW_INVALID;
             return;
         }
@@ -346,6 +343,7 @@ public partial class Login(
             return;
         }
 
+        loginAttemptLimiter.RecordSuccess(m_ID, origin);
         await ContinueWithAsync(m_ID, true, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
     }
 
@@ -422,7 +420,7 @@ public partial class Login(
         var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query);
         if (refreshCache)
         {
-            var cacheCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", "/authorize/int", null, AuthTime: authTime));
+            var cacheCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", redirect_uri, null, AuthTime: authTime));
 
             nav.NavigateTo($"/authorize/int?redirect_uri={Uri.EscapeDataString(redirect_uri)}&code={Uri.EscapeDataString(cacheCode)}", forceLoad: true);
         }
@@ -462,8 +460,19 @@ public partial class Login(
             return;
         }
 
+        var origin = GetLoginOrigin();
+        if (!loginAttemptLimiter.IsAllowed(m_ID, origin, out var retryAfter))
+        {
+            logger.LogWarning("Login identifier step rate limited. Identifier: {Identifier}, Origin: {Origin}, RetryAfter: {RetryAfter}", m_ID, origin, retryAfter);
+            m_ErrorMessageId = Strings.LOGIN_VALIDATION_ERROR_TOO_MANY_ATTEMPTS;
+            return;
+        }
+
         if (await accounts.ExistsAsync(m_ID) == false)
         {
+            loginAttemptLimiter.RecordFailure(m_ID, origin);
+            logger.LogInformation("Login identifier was not found. Identifier: {Identifier}, Origin: {Origin}", m_ID, origin);
+            await DelayFailedLoginAsync();
             m_ErrorMessageId = Strings.LOGIN_VALIDATION_ERROR_ID_NOT_FOUND;
             return;
         }
@@ -483,6 +492,17 @@ public partial class Login(
         m_ErrorMessageId = string.Empty;
         m_ErrorMessagePassword = string.Empty;
         return Task.CompletedTask;
+    }
+
+    private string? GetLoginOrigin()
+    {
+        var httpContext = accessor.HttpContext;
+        return httpContext?.Connection.RemoteIpAddress?.ToString();
+    }
+
+    private static Task DelayFailedLoginAsync()
+    {
+        return Task.Delay(kFailedLoginDelay);
     }
 
     private async ValueTask<string[]> GetConsentScopesAsync(string accountId)

@@ -1,12 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using OAuth2.DTO;
 using OAuth2.Services;
+using HostOptions = OAuth2.Options.HostOptions;
 
 namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/client")]
-public class ClientController(IClients clients, IAccesses accesses) : AuthorizedControllerBase(accesses)
+public class ClientController(IClients clients, IAccesses accesses, Microsoft.Extensions.Options.IOptions<HostOptions> hostOptions) : AuthorizedControllerBase(accesses)
 {
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] CreateClientRequest request, CancellationToken cancellationToken)
@@ -44,7 +45,7 @@ public class ClientController(IClients clients, IAccesses accesses) : Authorized
             {
                 return Conflict(new { error = "client_id_already_exists", error_description = "client_id already exists" });
             }
-        }, null, cancellationToken);
+        }, null, cancellationToken, hostOptions.Value.ClientId);
     }
 
     private static string GetClientIdValidationMessage(ClientIdValidationError error)

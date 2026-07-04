@@ -9,7 +9,7 @@ namespace GatewayServer.Tests.Protocols;
 public sealed class BackendCppWireVectorTests
 {
     private static readonly Guid s_VectorGuid = Guid.Parse("00112233-4455-6677-8899-aabbccddeeff");
-    private const string s_ManifestHash = "9924291a1ab4004e914ad25469916ec496da9def0689aea76003b230da521031";
+    private const string s_ManifestHash = "af369db2e71fd543ac449aea36b702cacab2799fe1017bec50e84c868453da05";
 
     [Fact]
     public void PacketCoreHeader_UsesExpectedPackedBigEndianLayout()
@@ -23,14 +23,14 @@ public sealed class BackendCppWireVectorTests
         Span<byte> bytes = stackalloc byte[PacketHeader.Size];
         header.Write(bytes);
 
-        Assert.Equal("c000640008000000", ToHex(bytes));
+        Assert.Equal("c00064000a000000", ToHex(bytes));
     }
 
     [Fact]
     public void NodeAuthChallenge_VectorMatchesWireContract()
     {
         Assert.Equal(
-            "c0006400080000330000000b6368616c6c656e67652d6100000020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "c00064000a0000330000000b6368616c6c656e67652d6100000020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
             EncodeFrameHex(
                 PacketKind.Control,
                 MasterControlPacketIds.NodeAuthChallenge,
@@ -50,7 +50,7 @@ public sealed class BackendCppWireVectorTests
             "gateway-master-a");
 
         Assert.Equal(
-            "c00065000800003101000800000009676174657761792d610000000947617465776179204100000010676174657761792d6d61737465722d61",
+            "c00065000a00003101000a00000009676174657761792d610000000947617465776179204100000010676174657761792d6d61737465722d61",
             EncodeFrameHex(
                 PacketKind.Control,
                 MasterControlPacketIds.NodeHello,
@@ -65,7 +65,7 @@ public sealed class BackendCppWireVectorTests
         var code = new DirectConnectCode("code-1");
 
         Assert.Equal(
-            "c00073000800000a00000006636f64652d31",
+            "c00073000a00000a00000006636f64652d31",
             EncodeFrameHex(
                 PacketKind.Control,
                 MasterControlPacketIds.DirectConnectCode,
@@ -80,7 +80,7 @@ public sealed class BackendCppWireVectorTests
         var accepted = new NodeAccepted("gateway-a", "backend-connection-a");
 
         Assert.Equal(
-            "c00067000800002500000009676174657761792d61000000146261636b656e642d636f6e6e656374696f6e2d61",
+            "c00067000a00002500000009676174657761792d61000000146261636b656e642d636f6e6e656374696f6e2d61",
             EncodeFrameHex(
                 PacketKind.Control,
                 MasterControlPacketIds.NodeAccepted,
@@ -293,7 +293,7 @@ public sealed class BackendCppWireVectorTests
             s_ManifestHash);
 
         Assert.Equal(
-            "c00009000100006433221100554477668899aabbccddeeff0000000c6370702d776f726c643a76320000004039393234323931613161623430303465393134616432353436393931366563343936646139646566303638396165613736303033623233306461353231303331",
+            "c00009000100006433221100554477668899aabbccddeeff0000000c6370702d776f726c643a76320000004061663336396462326537316664353433616334343961656133366237303263616361623237393966653130313762656335306538346338363834353364613035",
             EncodeFrameHex(
                 PacketKind.Control,
                 BackendSidecarControlPacketIds.ManifestDeclarationUpdate,
@@ -340,7 +340,7 @@ public sealed class BackendCppWireVectorTests
             CreateManifestSnapshot());
 
         Assert.Equal(
-            "c0000c000100009f33221100554477668899aabbccddeeff010100000001000000096370702d776f726c640000000c6370702d776f726c643a76320000004039393234323931613161623430303465393134616432353436393931366563343936646139646566303638396165613736303033623233306461353231303331000000010100006500010100000004000000400000000000000000000000019f2314e60000000000",
+            "c0000c00010000a033221100554477668899aabbccddeeff010100000001000000096370702d776f726c640000000c6370702d776f726c643a7632000000406166333639646232653731666435343361633434396165613336623730326361636162323739396665313031376265633530653834633836383435336461303500000001010000650001010000000400000040000000000000000000000000019f2314e60000000000",
             EncodeFrameHex(
                 PacketKind.Control,
                 BackendSidecarControlPacketIds.ManifestSnapshotResponse,
