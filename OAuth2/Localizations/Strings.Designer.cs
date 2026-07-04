@@ -23,7 +23,7 @@ namespace OAuth2.Localizations {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class Strings {
-        
+
         private static global::System.Resources.ResourceManager resourceMan;
         
         private static global::System.Globalization.CultureInfo resourceCulture;
@@ -554,7 +554,7 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("LOGIN_VALIDATION_ERROR_TOO_MANY_ATTEMPTS", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   The password is required.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
