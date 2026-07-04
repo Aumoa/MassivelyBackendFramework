@@ -70,14 +70,13 @@ public sealed class SecretShareServiceTests
             return Task.CompletedTask;
         }
 
-        public Task ReplaceVaultEncryptionAsync(
+        public Task<bool> ReplaceVaultEncryptionAsync(
             string ownerSubject,
-            SecretEncryptionEnvelope profileEnvelope,
-            IReadOnlyList<VaultSecretEncryptionUpdate> secretUpdates,
+            Func<VaultProfileRecord, IReadOnlyList<StoredSecretRecord>, VaultEncryptionReplacement?> replacementFactory,
             DateTime nowUtc,
             CancellationToken cancellationToken = default)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(false);
         }
 
         public Task ResetVaultAsync(
@@ -94,23 +93,25 @@ public sealed class SecretShareServiceTests
             return Task.FromResult<IReadOnlyList<StoredSecretRecord>>([]);
         }
 
-        public Task AddVaultSecretAsync(
+        public Task<bool> AddVaultSecretAsync(
             string ownerSubject,
+            Func<VaultProfileRecord, bool> profileValidator,
             Guid id,
             string name,
             SecretEncryptionEnvelope envelope,
             DateTime nowUtc,
             CancellationToken cancellationToken = default)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(false);
         }
 
-        public Task DeleteVaultSecretAsync(
+        public Task<bool> DeleteVaultSecretAsync(
             string ownerSubject,
+            Func<VaultProfileRecord, bool> profileValidator,
             Guid id,
             CancellationToken cancellationToken = default)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(false);
         }
 
         public Task AddShareSecretAsync(

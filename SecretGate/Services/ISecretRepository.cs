@@ -14,10 +14,9 @@ public interface ISecretRepository
         DateTime nowUtc,
         CancellationToken cancellationToken = default);
 
-    Task ReplaceVaultEncryptionAsync(
+    Task<bool> ReplaceVaultEncryptionAsync(
         string ownerSubject,
-        SecretEncryptionEnvelope profileEnvelope,
-        IReadOnlyList<VaultSecretEncryptionUpdate> secretUpdates,
+        Func<VaultProfileRecord, IReadOnlyList<StoredSecretRecord>, VaultEncryptionReplacement?> replacementFactory,
         DateTime nowUtc,
         CancellationToken cancellationToken = default);
 
@@ -29,16 +28,18 @@ public interface ISecretRepository
         string ownerSubject,
         CancellationToken cancellationToken = default);
 
-    Task AddVaultSecretAsync(
+    Task<bool> AddVaultSecretAsync(
         string ownerSubject,
+        Func<VaultProfileRecord, bool> profileValidator,
         Guid id,
         string name,
         SecretEncryptionEnvelope envelope,
         DateTime nowUtc,
         CancellationToken cancellationToken = default);
 
-    Task DeleteVaultSecretAsync(
+    Task<bool> DeleteVaultSecretAsync(
         string ownerSubject,
+        Func<VaultProfileRecord, bool> profileValidator,
         Guid id,
         CancellationToken cancellationToken = default);
 

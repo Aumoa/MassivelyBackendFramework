@@ -116,15 +116,25 @@ public sealed class SecretVaultServiceTests
             return Task.CompletedTask;
         }
 
-        public Task ReplaceVaultEncryptionAsync(
+        public Task<bool> ReplaceVaultEncryptionAsync(
             string ownerSubject,
-            SecretEncryptionEnvelope profileEnvelope,
-            IReadOnlyList<VaultSecretEncryptionUpdate> secretUpdates,
+            Func<VaultProfileRecord, IReadOnlyList<StoredSecretRecord>, VaultEncryptionReplacement?> replacementFactory,
             DateTime nowUtc,
             CancellationToken cancellationToken = default)
         {
-            m_Profile = CreateProfile(ownerSubject, profileEnvelope, nowUtc);
-            foreach (var update in secretUpdates)
+            if (m_Profile == null)
+            {
+                return Task.FromResult(false);
+            }
+
+            var replacement = replacementFactory(m_Profile, [.. m_Records]);
+            if (replacement == null)
+            {
+                return Task.FromResult(false);
+            }
+
+            m_Profile = CreateProfile(ownerSubject, replacement.ProfileEnvelope, nowUtc);
+            foreach (var update in replacement.SecretUpdates)
             {
                 var index = m_Records.FindIndex(record => record.Id == update.Id);
                 if (index < 0)
@@ -143,7 +153,7 @@ public sealed class SecretVaultServiceTests
                 };
             }
 
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
         public Task ResetVaultAsync(
@@ -162,14 +172,20 @@ public sealed class SecretVaultServiceTests
             return Task.FromResult<IReadOnlyList<StoredSecretRecord>>([.. m_Records]);
         }
 
-        public Task AddVaultSecretAsync(
+        public Task<bool> AddVaultSecretAsync(
             string ownerSubject,
+            Func<VaultProfileRecord, bool> profileValidator,
             Guid id,
             string name,
             SecretEncryptionEnvelope envelope,
             DateTime nowUtc,
             CancellationToken cancellationToken = default)
         {
+            if (m_Profile == null || !profileValidator(m_Profile))
+            {
+                return Task.FromResult(false);
+            }
+
             m_Records.Add(new StoredSecretRecord(
                 id,
                 name,
@@ -180,16 +196,22 @@ public sealed class SecretVaultServiceTests
                 nowUtc,
                 nowUtc));
 
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
-        public Task DeleteVaultSecretAsync(
+        public Task<bool> DeleteVaultSecretAsync(
             string ownerSubject,
+            Func<VaultProfileRecord, bool> profileValidator,
             Guid id,
             CancellationToken cancellationToken = default)
         {
+            if (m_Profile == null || !profileValidator(m_Profile))
+            {
+                return Task.FromResult(false);
+            }
+
             m_Records.RemoveAll(record => record.Id == id);
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
         public Task AddShareSecretAsync(

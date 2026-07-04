@@ -20,27 +20,12 @@ public sealed class MySqlSecretRepository(IOptions<MySqlOptions> options) : ISec
         using var connection = GetConnection();
         await connection.OpenAsync(cancellationToken);
 
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
-SELECT `owner_subject`, `salt`, `nonce`, `cipher_text`, `tag`, `created_at`, `updated_at`
-FROM `secretgate_vault_profile`
-WHERE `owner_subject` = @ownerSubject;";
-        command.Parameters.Add("@ownerSubject", MySqlDbType.VarChar).Value = ownerSubject;
-
-        using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
-        {
-            return null;
-        }
-
-        return new VaultProfileRecord(
-            reader.GetString(0),
-            (byte[])reader["salt"],
-            (byte[])reader["nonce"],
-            (byte[])reader["cipher_text"],
-            (byte[])reader["tag"],
-            DateTime.SpecifyKind(reader.GetDateTime(5), DateTimeKind.Utc),
-            DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc));
+        return await ReadVaultProfileAsync(
+            connection,
+            transaction: null,
+            ownerSubject,
+            forUpdate: false,
+            cancellationToken);
     }
 
     public async Task InitializeVaultAsync(
@@ -93,20 +78,38 @@ VALUES
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public async Task ReplaceVaultEncryptionAsync(
+    public async Task<bool> ReplaceVaultEncryptionAsync(
         string ownerSubject,
-        SecretEncryptionEnvelope profileEnvelope,
-        IReadOnlyList<VaultSecretEncryptionUpdate> secretUpdates,
+        Func<VaultProfileRecord, IReadOnlyList<StoredSecretRecord>, VaultEncryptionReplacement?> replacementFactory,
         DateTime nowUtc,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerSubject);
-        ArgumentNullException.ThrowIfNull(profileEnvelope);
-        ArgumentNullException.ThrowIfNull(secretUpdates);
+        ArgumentNullException.ThrowIfNull(replacementFactory);
 
         using var connection = GetConnection();
         await connection.OpenAsync(cancellationToken);
         using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        var profile = await ReadVaultProfileAsync(
+            connection,
+            transaction,
+            ownerSubject,
+            forUpdate: true,
+            cancellationToken);
+        if (profile == null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return false;
+        }
+
+        var records = await ReadVaultSecretsAsync(connection, transaction, ownerSubject, cancellationToken);
+        var replacement = replacementFactory(profile, records);
+        if (replacement == null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return false;
+        }
 
         using (var updateProfile = connection.CreateCommand())
         {
@@ -120,15 +123,15 @@ SET `salt` = @salt,
     `updated_at` = @updatedAt
 WHERE `owner_subject` = @ownerSubject;";
             updateProfile.Parameters.Add("@ownerSubject", MySqlDbType.VarChar).Value = ownerSubject;
-            AddBinary(updateProfile, "@salt", profileEnvelope.Salt);
-            AddBinary(updateProfile, "@nonce", profileEnvelope.Nonce);
-            AddBinary(updateProfile, "@cipherText", profileEnvelope.CipherText);
-            AddBinary(updateProfile, "@tag", profileEnvelope.Tag);
+            AddBinary(updateProfile, "@salt", replacement.ProfileEnvelope.Salt);
+            AddBinary(updateProfile, "@nonce", replacement.ProfileEnvelope.Nonce);
+            AddBinary(updateProfile, "@cipherText", replacement.ProfileEnvelope.CipherText);
+            AddBinary(updateProfile, "@tag", replacement.ProfileEnvelope.Tag);
             updateProfile.Parameters.Add("@updatedAt", MySqlDbType.DateTime).Value = nowUtc;
             await updateProfile.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        foreach (var update in secretUpdates)
+        foreach (var update in replacement.SecretUpdates)
         {
             using var updateSecret = connection.CreateCommand();
             updateSecret.Transaction = transaction;
@@ -151,6 +154,7 @@ WHERE `owner_subject` = @ownerSubject AND `id` = @id;";
         }
 
         await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     public async Task ResetVaultAsync(
@@ -191,34 +195,12 @@ WHERE `owner_subject` = @ownerSubject AND `id` = @id;";
         using var connection = GetConnection();
         await connection.OpenAsync(cancellationToken);
 
-        using var command = connection.CreateCommand();
-        command.CommandText = @"
-SELECT `id`, `name`, `salt`, `nonce`, `cipher_text`, `tag`, `created_at`, `updated_at`
-FROM `secretgate_vault_secret`
-WHERE `owner_subject` = @ownerSubject
-ORDER BY `updated_at` DESC;";
-        command.Parameters.Add("@ownerSubject", MySqlDbType.VarChar).Value = ownerSubject;
-
-        var records = new List<StoredSecretRecord>();
-        using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            records.Add(new StoredSecretRecord(
-                ReadGuid(reader.GetValue(0)),
-                reader.GetString(1),
-                (byte[])reader["salt"],
-                (byte[])reader["nonce"],
-                (byte[])reader["cipher_text"],
-                (byte[])reader["tag"],
-                DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc),
-                DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc)));
-        }
-
-        return records;
+        return await ReadVaultSecretsAsync(connection, transaction: null, ownerSubject, cancellationToken);
     }
 
-    public async Task AddVaultSecretAsync(
+    public async Task<bool> AddVaultSecretAsync(
         string ownerSubject,
+        Func<VaultProfileRecord, bool> profileValidator,
         Guid id,
         string name,
         SecretEncryptionEnvelope envelope,
@@ -226,13 +208,28 @@ ORDER BY `updated_at` DESC;";
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerSubject);
+        ArgumentNullException.ThrowIfNull(profileValidator);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(envelope);
 
         using var connection = GetConnection();
         await connection.OpenAsync(cancellationToken);
+        using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        var profile = await ReadVaultProfileAsync(
+            connection,
+            transaction,
+            ownerSubject,
+            forUpdate: true,
+            cancellationToken);
+        if (profile == null || !profileValidator(profile))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return false;
+        }
 
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = @"
 INSERT INTO `secretgate_vault_secret`
 (`id`, `owner_subject`, `name`, `salt`, `nonce`, `cipher_text`, `tag`, `created_at`, `updated_at`)
@@ -249,19 +246,37 @@ VALUES
         command.Parameters.Add("@updatedAt", MySqlDbType.DateTime).Value = nowUtc;
 
         await command.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
-    public async Task DeleteVaultSecretAsync(
+    public async Task<bool> DeleteVaultSecretAsync(
         string ownerSubject,
+        Func<VaultProfileRecord, bool> profileValidator,
         Guid id,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(ownerSubject);
+        ArgumentNullException.ThrowIfNull(profileValidator);
 
         using var connection = GetConnection();
         await connection.OpenAsync(cancellationToken);
+        using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        var profile = await ReadVaultProfileAsync(
+            connection,
+            transaction,
+            ownerSubject,
+            forUpdate: true,
+            cancellationToken);
+        if (profile == null || !profileValidator(profile))
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return false;
+        }
 
         using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = @"
 DELETE FROM `secretgate_vault_secret`
 WHERE `owner_subject` = @ownerSubject AND `id` = @id;";
@@ -269,6 +284,8 @@ WHERE `owner_subject` = @ownerSubject AND `id` = @id;";
         command.Parameters.Add("@id", MySqlDbType.VarChar).Value = id.ToString("D");
 
         await command.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     public async Task AddShareSecretAsync(
@@ -418,6 +435,70 @@ WHERE `id` = @id;";
         }
 
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<VaultProfileRecord?> ReadVaultProfileAsync(
+        MySqlConnection connection,
+        MySqlTransaction? transaction,
+        string ownerSubject,
+        bool forUpdate,
+        CancellationToken cancellationToken)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = @"
+SELECT `owner_subject`, `salt`, `nonce`, `cipher_text`, `tag`, `created_at`, `updated_at`
+FROM `secretgate_vault_profile`
+WHERE `owner_subject` = @ownerSubject" + (forUpdate ? "\nFOR UPDATE;" : ";");
+        command.Parameters.Add("@ownerSubject", MySqlDbType.VarChar).Value = ownerSubject;
+
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new VaultProfileRecord(
+            reader.GetString(0),
+            (byte[])reader["salt"],
+            (byte[])reader["nonce"],
+            (byte[])reader["cipher_text"],
+            (byte[])reader["tag"],
+            DateTime.SpecifyKind(reader.GetDateTime(5), DateTimeKind.Utc),
+            DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc));
+    }
+
+    private static async Task<IReadOnlyList<StoredSecretRecord>> ReadVaultSecretsAsync(
+        MySqlConnection connection,
+        MySqlTransaction? transaction,
+        string ownerSubject,
+        CancellationToken cancellationToken)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = @"
+SELECT `id`, `name`, `salt`, `nonce`, `cipher_text`, `tag`, `created_at`, `updated_at`
+FROM `secretgate_vault_secret`
+WHERE `owner_subject` = @ownerSubject
+ORDER BY `updated_at` DESC;";
+        command.Parameters.Add("@ownerSubject", MySqlDbType.VarChar).Value = ownerSubject;
+
+        var records = new List<StoredSecretRecord>();
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            records.Add(new StoredSecretRecord(
+                ReadGuid(reader.GetValue(0)),
+                reader.GetString(1),
+                (byte[])reader["salt"],
+                (byte[])reader["nonce"],
+                (byte[])reader["cipher_text"],
+                (byte[])reader["tag"],
+                DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc),
+                DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc)));
+        }
+
+        return records;
     }
 
     private MySqlConnection GetConnection()
