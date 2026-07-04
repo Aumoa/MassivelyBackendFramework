@@ -57,6 +57,26 @@ public sealed class LoginAttemptLimiterTests
     }
 
     [Fact]
+    public void RecordSuccess_DoesNotClearOriginFailures()
+    {
+        var limiter = new LoginAttemptLimiter(new ManualTimeProvider());
+        const string origin = "203.0.113.12";
+
+        for (var i = 0; i < LoginAttemptLimiter.MaxOriginFailures - 1; i++)
+        {
+            limiter.RecordFailure("user-" + i, origin);
+        }
+
+        limiter.RecordSuccess("known-good-user", origin);
+
+        Assert.True(limiter.IsAllowed("final-user", origin, out _));
+        limiter.RecordFailure("final-user", origin);
+
+        Assert.False(limiter.IsAllowed("another-user", origin, out var retryAfter));
+        Assert.True(retryAfter > TimeSpan.Zero);
+    }
+
+    [Fact]
     public void RecordSuccess_ClearsPriorFailures()
     {
         var limiter = new LoginAttemptLimiter(new ManualTimeProvider());

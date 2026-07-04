@@ -47,12 +47,6 @@ public sealed class LoginAttemptLimiter(TimeProvider timeProvider) : ILoginAttem
     public void RecordSuccess(string identifier, string? origin)
     {
         m_Attempts.TryRemove(CreateKey("id", NormalizeIdentifier(identifier)), out _);
-
-        var normalizedOrigin = NormalizeOrigin(origin);
-        if (normalizedOrigin != null)
-        {
-            m_Attempts.TryRemove(CreateKey("origin", normalizedOrigin), out _);
-        }
     }
 
     private void AddFailure(string key, int maxFailures, DateTimeOffset now)
