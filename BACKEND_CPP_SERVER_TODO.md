@@ -44,13 +44,15 @@ Gateway and the C++ Backend/Dedicated server.
 
 ## Phase 2: Sidecar Responsibilities
 
-- [ ] Create a sidecar mode that connects to Master without opening the Gateway listener itself.
-- [ ] Configure the sidecar with the C++ server's Gateway-facing endpoint.
-- [ ] Advertise `BackendKind`, endpoint, and transport flags to Master on behalf of the C++ server.
-- [ ] Keep Master control-plane reconnect, status, and shutdown behavior equivalent to the C# Backend path.
+- [x] Create a sidecar mode that connects to Master without opening the Gateway listener itself.
+- [x] Configure the sidecar with the C++ server's Gateway-facing endpoint.
+- [x] Advertise `BackendKind`, endpoint, and transport flags to Master on behalf of the C++ server.
+- [x] Keep Master control-plane reconnect, status, and shutdown behavior equivalent to the C# Backend path.
 - [ ] Provide local direct-connect code validation for the C++ server.
 - [ ] Report C++ server health and Gateway session status through Master admin/status flows.
 - [ ] Share approved packet manifests or policy snapshots with the C++ server when needed.
+
+Implemented sidecar entry point: set `GatewayListener:Enabled` to `false`. The sidecar keeps using `MasterConnection` for the control plane and advertises the configured `GatewayListener` endpoint as the external C++ data-plane listener without binding that port itself.
 
 ## Phase 3: C++ Data Plane
 

@@ -46,6 +46,7 @@ A Backend server needs `MasterConnection` and `GatewayListener` configuration.
 ```json
 {
   "GatewayListener": {
+    "Enabled": true,
     "IPAddress": "::1",
     "Port": 11701,
     "UseTls": false,
@@ -80,6 +81,8 @@ A Backend server needs `MasterConnection` and `GatewayListener` configuration.
 `MasterConnection:SharedSecret` must use the Backend service connection credential issued by MasterAdmin. Do not commit this value to the repository.
 
 `GatewayListener` is the Backend-side listener that Gateway connects to after receiving a direct-connect code. In production, configure this together with private networking and TLS.
+
+Set `GatewayListener:Enabled` to `false` for C++ Backend sidecar mode. In that mode the C# sidecar does not open the Gateway listener or load a local TLS certificate. The configured `GatewayListener` address, port, and TLS flag are still advertised to Master as the external data-plane endpoint owned by the C++ Backend/Dedicated process.
 
 ## Runtime Lifecycle
 
@@ -245,3 +248,5 @@ The Backend API provides Gateway direct connection handling and route channel li
 The sender serializes writes to each active Gateway connection. If channel-level gameplay ordering or mailbox dispatch is needed, the runtime should build that execution model around `BackendGatewayChannel`.
 
 Gateway remains the final authority for route token ownership, Backend binding, exchange id matching, and manifest compatibility. Runtime code should still clear closed channel state to avoid unnecessary push attempts.
+
+C++ sidecar mode currently covers Master control-plane registration and endpoint advertisement only. The C++ data-plane process must own the Gateway-facing listener and implement the Gateway handshake, direct-connect code validation callout, channel envelopes, and packet writes.

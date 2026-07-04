@@ -2,6 +2,8 @@ namespace BackendServer.Options;
 
 public sealed record GatewayListenerOptions
 {
+    public bool Enabled { get; set; } = true;
+
     public string IPAddress { get; set; } = "::1";
 
     public int Port { get; set; } = 11701;
