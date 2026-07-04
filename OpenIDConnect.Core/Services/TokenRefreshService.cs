@@ -101,12 +101,12 @@ internal class TokenRefreshService(
                     DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn));
             }
 
-            if (!string.IsNullOrEmpty(tokenResponse.RefreshToken))
+            if (!string.IsNullOrEmpty(tokenResponse.RefreshToken) && tokenResponse.RefreshExpiresIn.HasValue)
             {
                 cookieManager.AppendRefreshToken(
                     httpContext,
                     tokenResponse.RefreshToken,
-                    DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn));
+                    DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn.Value));
             }
 
             logger.LogTrace("Token refreshed successfully");
