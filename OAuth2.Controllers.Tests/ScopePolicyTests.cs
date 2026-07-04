@@ -5,9 +5,15 @@ namespace OAuth2.Controllers.Tests;
 public sealed class ScopePolicyTests
 {
     [Fact]
-    public void DefaultClientScopes_IncludeOfflineAccess()
+    public void SupportedScopes_IncludeOfflineAccess()
     {
-        Assert.Contains(ScopePolicy.OfflineAccessScope, ScopePolicy.DefaultClientScopes);
+        Assert.Contains(ScopePolicy.OfflineAccessScope, ScopePolicy.SupportedScopes);
+    }
+
+    [Fact]
+    public void DefaultClientScopes_DoNotIncludeOfflineAccess()
+    {
+        Assert.DoesNotContain(ScopePolicy.OfflineAccessScope, ScopePolicy.DefaultClientScopes);
     }
 
     [Fact]

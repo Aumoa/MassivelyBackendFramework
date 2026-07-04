@@ -546,11 +546,11 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
 
             cachedSessions.AppendSession(HttpContext, authorizationCode.Value.AccountId, jwtToken);
 
-            HttpContext.Response.Cookies.Append(OpSessionCookieName, jwt.Issue(options.Value.ClientId, DateTime.UtcNow.Add(jwt.RefreshTokenExpiresIn), [
+            HttpContext.Response.Cookies.Append(OpSessionCookieName, jwt.Issue(options.Value.ClientId, [
                 new("id", authorizationCode.Value.AccountId),
                 new(JwtRegisteredClaimNames.Sub, rawAccount.Value.Sub),
                 new("auth_time", authorizationCode.Value.AuthTime?.ToString(CultureInfo.InvariantCulture) ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Integer64)
-            ]), CreateOpSessionCookieOptions(DateTimeOffset.UtcNow.Add(jwt.RefreshTokenExpiresIn)));
+            ]), CreateOpSessionCookieOptions(DateTimeOffset.UtcNow.Add(jwt.ExpiresIn)));
         }
         catch (Exception e)
         {
