@@ -223,6 +223,7 @@ public sealed class BackendPacketVerifierInstruction
         switch (Operation)
         {
             case BackendPacketVerifierOperation.ReadPrimitive:
+                RequireEmptyBody();
                 if (!Enum.IsDefined(typeof(BackendPacketVerifierPrimitive), Primitive))
                 {
                     throw new ArgumentOutOfRangeException(nameof(Primitive));
@@ -242,6 +243,7 @@ public sealed class BackendPacketVerifierInstruction
 
             case BackendPacketVerifierOperation.ReadBytes:
             case BackendPacketVerifierOperation.ReadUtf8String:
+                RequireEmptyBody();
                 if (LengthConstraint == null)
                 {
                     throw new ArgumentNullException(nameof(LengthConstraint));
@@ -276,11 +278,20 @@ public sealed class BackendPacketVerifierInstruction
                 break;
 
             case BackendPacketVerifierOperation.BreakRepeatIfValueEquals:
+                RequireEmptyBody();
                 if (!IsValidSlot(BreakValueSlot))
                 {
                     throw new ArgumentOutOfRangeException(nameof(BreakValueSlot));
                 }
                 break;
+        }
+    }
+
+    private void RequireEmptyBody()
+    {
+        if (Body.Length != 0)
+        {
+            throw new ArgumentException("Only repeat verifier instructions can contain a body.", nameof(Body));
         }
     }
 }

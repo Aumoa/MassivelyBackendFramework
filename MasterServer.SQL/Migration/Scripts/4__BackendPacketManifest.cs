@@ -40,7 +40,6 @@ CREATE TABLE `backend_packet_manifest_entry` (
     `fixed_payload_length` INT,
     `schema_id` VARCHAR(128),
     `schema_hash` CHAR(64),
-    `verifier_program` MEDIUMTEXT,
     `entry_status` TINYINT UNSIGNED NOT NULL DEFAULT 1,
     `created_at` DATETIME NOT NULL DEFAULT NOW(),
     INDEX `IDX__backend_packet_manifest_entry__manifest_record_id` (`manifest_record_id`),

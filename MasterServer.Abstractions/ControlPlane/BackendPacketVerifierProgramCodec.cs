@@ -42,7 +42,8 @@ public static class BackendPacketVerifierProgramCodec
     public static BackendPacketVerifierProgram Decode(ReadOnlySpan<byte> payload)
     {
         var reader = new PacketReader(payload);
-        var program = ReadProgram(ref reader);
+        var readState = new VerifierProgramReadState();
+        var program = ReadProgram(ref reader, readState);
         if (reader.Remaining != 0)
         {
             throw new PacketFormatException(PacketValidationError.InvalidStringLength, "Verifier program has trailing bytes.");
@@ -74,7 +75,7 @@ public static class BackendPacketVerifierProgramCodec
     {
         return reader.ReadByte() == 0
             ? null
-            : ReadProgram(ref reader);
+            : ReadProgram(ref reader, new VerifierProgramReadState());
     }
 
     internal static int GetProgramSize(BackendPacketVerifierProgram program)
@@ -95,12 +96,18 @@ public static class BackendPacketVerifierProgramCodec
         WriteInstructions(program.Instructions, ref writer);
     }
 
-    internal static BackendPacketVerifierProgram ReadProgram(ref PacketReader reader)
+    internal static BackendPacketVerifierProgram ReadProgram(
+        ref PacketReader reader,
+        VerifierProgramReadState readState)
     {
         var trailingBytePolicy = (BackendPacketVerifierTrailingBytePolicy)reader.ReadByte();
         var maxTrailingByteCount = reader.ReadInt32();
         var instructionBudget = reader.ReadInt32();
-        var instructions = ReadInstructions(ref reader);
+        var instructions = ReadInstructions(
+            ref reader,
+            readState,
+            depth: 0,
+            allowEmpty: true);
         return new BackendPacketVerifierProgram(
             instructions,
             trailingBytePolicy,
@@ -130,18 +137,30 @@ public static class BackendPacketVerifierProgramCodec
         }
     }
 
-    private static BackendPacketVerifierInstruction[] ReadInstructions(ref PacketReader reader)
+    private static BackendPacketVerifierInstruction[] ReadInstructions(
+        ref PacketReader reader,
+        VerifierProgramReadState readState,
+        int depth,
+        bool allowEmpty)
     {
+        if (depth > BackendPacketVerifierProgram.MaxNestingDepth)
+        {
+            throw new PacketFormatException(PacketValidationError.InvalidStringLength, "Verifier instruction nesting is too deep.");
+        }
+
         var instructionCount = reader.ReadInt32();
-        if (instructionCount < 0 || instructionCount > BackendPacketVerifierProgram.MaxInstructionCount)
+        if (instructionCount < 0 ||
+            instructionCount > BackendPacketVerifierProgram.MaxInstructionCount ||
+            (!allowEmpty && instructionCount == 0))
         {
             throw new PacketFormatException(PacketValidationError.InvalidStringLength, "Invalid verifier instruction count.");
         }
 
+        readState.AddInstructions(instructionCount);
         var instructions = new BackendPacketVerifierInstruction[instructionCount];
         for (var i = 0; i < instructions.Length; i++)
         {
-            instructions[i] = ReadInstruction(ref reader);
+            instructions[i] = ReadInstruction(ref reader, readState, depth);
         }
 
         return instructions;
@@ -179,7 +198,10 @@ public static class BackendPacketVerifierProgramCodec
         writer.WriteInt64(instruction.BreakValue);
     }
 
-    private static BackendPacketVerifierInstruction ReadInstruction(ref PacketReader reader)
+    private static BackendPacketVerifierInstruction ReadInstruction(
+        ref PacketReader reader,
+        VerifierProgramReadState readState,
+        int depth)
     {
         var operation = (BackendPacketVerifierOperation)reader.ReadByte();
         var primitive = (BackendPacketVerifierPrimitive)reader.ReadByte();
@@ -189,7 +211,11 @@ public static class BackendPacketVerifierProgramCodec
         var repeatCountSlot = reader.ReadInt32();
         var minimumRepeatCount = reader.ReadInt32();
         var maximumRepeatCount = reader.ReadInt32();
-        var body = ReadInstructions(ref reader);
+        var body = ReadInstructionBody(
+            ref reader,
+            readState,
+            operation,
+            depth);
         var breakValueSlot = reader.ReadInt32();
         var breakValue = reader.ReadInt64();
         return new BackendPacketVerifierInstruction(
@@ -204,6 +230,31 @@ public static class BackendPacketVerifierProgramCodec
             body,
             breakValueSlot,
             breakValue);
+    }
+
+    private static BackendPacketVerifierInstruction[] ReadInstructionBody(
+        ref PacketReader reader,
+        VerifierProgramReadState readState,
+        BackendPacketVerifierOperation operation,
+        int depth)
+    {
+        var isRepeat = operation == BackendPacketVerifierOperation.Repeat;
+        if (!isRepeat)
+        {
+            var bodyInstructionCount = reader.ReadInt32();
+            if (bodyInstructionCount != 0)
+            {
+                throw new PacketFormatException(PacketValidationError.InvalidStringLength, "Only repeat verifier instructions can contain a body.");
+            }
+
+            return Array.Empty<BackendPacketVerifierInstruction>();
+        }
+
+        return ReadInstructions(
+            ref reader,
+            readState,
+            depth + 1,
+            allowEmpty: false);
     }
 
     private static int GetValueConstraintSize(BackendPacketVerifierValueConstraint? constraint)
@@ -322,5 +373,24 @@ public static class BackendPacketVerifierProgramCodec
         return fixedLength >= 0
             ? BackendPacketVerifierLengthConstraint.Fixed(fixedLength)
             : BackendPacketVerifierLengthConstraint.Dynamic(sourceSlot, minimumLength, maximumLength);
+    }
+
+    internal sealed class VerifierProgramReadState
+    {
+        private int m_InstructionCount;
+
+        public void AddInstructions(int count)
+        {
+            if (count < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
+
+            m_InstructionCount += count;
+            if (m_InstructionCount > BackendPacketVerifierProgram.MaxInstructionCount)
+            {
+                throw new PacketFormatException(PacketValidationError.InvalidStringLength, "Verifier program contains too many instructions.");
+            }
+        }
     }
 }
