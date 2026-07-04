@@ -26,6 +26,8 @@ public static class ServiceCollectionExtensions
         s.AddTransient<IClientUserGroups, MySqlClientUserGroups>();
         s.AddTransient<IOAuthGrants, MySqlOAuthGrants>();
         s.AddTransient<IApiKeys, MySqlApiKeys>();
+        s.AddSingleton(TimeProvider.System);
+        s.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
 
         s.AddSingleton<RedisConnection>();
         s.AddHostedService(p => p.GetRequiredService<RedisConnection>());

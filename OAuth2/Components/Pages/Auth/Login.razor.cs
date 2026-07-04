@@ -25,8 +25,11 @@ public partial class Login(
     IHttpContextAccessor accessor,
     ILogger<Login> logger,
     IJwt jwt,
+    ILoginAttemptLimiter loginAttemptLimiter,
     IJSRuntime js)
 {
+    private static readonly TimeSpan kFailedLoginDelay = TimeSpan.FromMilliseconds(500);
+
     private enum RenderStates
     {
         Id,
@@ -333,9 +336,20 @@ public partial class Login(
             return;
         }
 
+        var origin = GetLoginOrigin();
+        if (!loginAttemptLimiter.IsAllowed(m_ID, origin, out var retryAfter))
+        {
+            logger.LogWarning("Login password step rate limited. Identifier: {Identifier}, Origin: {Origin}, RetryAfter: {RetryAfter}", m_ID, origin, retryAfter);
+            m_ErrorMessagePassword = Strings.LOGIN_VALIDATION_ERROR_TOO_MANY_ATTEMPTS;
+            return;
+        }
+
         var verified = await accounts.LoginAsync(m_ID, m_Password);
         if (verified == null)
         {
+            loginAttemptLimiter.RecordFailure(m_ID, origin);
+            logger.LogWarning("Login password verification failed. Identifier: {Identifier}, Origin: {Origin}", m_ID, origin);
+            await DelayFailedLoginAsync();
             m_ErrorMessagePassword = Strings.LOGIN_VALIDATION_ERROR_PW_INVALID;
             return;
         }
@@ -346,6 +360,7 @@ public partial class Login(
             return;
         }
 
+        loginAttemptLimiter.RecordSuccess(m_ID, origin);
         await ContinueWithAsync(m_ID, true, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
     }
 
@@ -462,8 +477,19 @@ public partial class Login(
             return;
         }
 
+        var origin = GetLoginOrigin();
+        if (!loginAttemptLimiter.IsAllowed(m_ID, origin, out var retryAfter))
+        {
+            logger.LogWarning("Login identifier step rate limited. Identifier: {Identifier}, Origin: {Origin}, RetryAfter: {RetryAfter}", m_ID, origin, retryAfter);
+            m_ErrorMessageId = Strings.LOGIN_VALIDATION_ERROR_TOO_MANY_ATTEMPTS;
+            return;
+        }
+
         if (await accounts.ExistsAsync(m_ID) == false)
         {
+            loginAttemptLimiter.RecordFailure(m_ID, origin);
+            logger.LogInformation("Login identifier was not found. Identifier: {Identifier}, Origin: {Origin}", m_ID, origin);
+            await DelayFailedLoginAsync();
             m_ErrorMessageId = Strings.LOGIN_VALIDATION_ERROR_ID_NOT_FOUND;
             return;
         }
@@ -483,6 +509,17 @@ public partial class Login(
         m_ErrorMessageId = string.Empty;
         m_ErrorMessagePassword = string.Empty;
         return Task.CompletedTask;
+    }
+
+    private string? GetLoginOrigin()
+    {
+        var httpContext = accessor.HttpContext;
+        return httpContext?.Connection.RemoteIpAddress?.ToString();
+    }
+
+    private static Task DelayFailedLoginAsync()
+    {
+        return Task.Delay(kFailedLoginDelay);
     }
 
     private async ValueTask<string[]> GetConsentScopesAsync(string accountId)
