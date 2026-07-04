@@ -21,6 +21,44 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
         var decoded = PacketCodec.Decode(frame, GatewayBackendRouteOpenRequest.Codec);
 
         Assert.Equal("alpha", decoded.BackendKind);
+        Assert.Null(decoded.ServerHandle);
+    }
+
+    [Fact]
+    public void OpenRequest_LegacyCodec_RoundTrips_BackendKind()
+    {
+        var request = new GatewayBackendRouteOpenRequest(" alpha ");
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Request,
+            Pid.GATE_BACKEND_ROUTE_OPEN,
+            GatewayBackendRouteOpenRequest.LegacyProtocolVersion,
+            request,
+            GatewayBackendRouteOpenRequest.LegacyCodec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendRouteOpenRequest.LegacyCodec);
+
+        Assert.Equal("alpha", decoded.BackendKind);
+        Assert.Null(decoded.ServerHandle);
+    }
+
+    [Fact]
+    public void OpenRequest_Codec_RoundTrips_ServerHandle()
+    {
+        var serverHandle = new GatewayBackendServerHandle("server-alpha");
+        var request = new GatewayBackendRouteOpenRequest(" alpha ", serverHandle);
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Request,
+            Pid.GATE_BACKEND_ROUTE_OPEN,
+            GatewayBackendRouteOpenRequest.ProtocolVersion,
+            request,
+            GatewayBackendRouteOpenRequest.Codec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendRouteOpenRequest.Codec);
+
+        Assert.Equal("alpha", decoded.BackendKind);
+        Assert.Equal(serverHandle, decoded.ServerHandle);
     }
 
     [Fact]
@@ -42,6 +80,114 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
         Assert.Equal("alpha", decoded.BackendKind);
         Assert.Equal(routeToken, decoded.RouteToken);
         Assert.Equal(string.Empty, decoded.ErrorMessage);
+        Assert.Null(decoded.ServerHandle);
+        Assert.Equal(string.Empty, decoded.DescriptorVersion);
+        Assert.Equal(string.Empty, decoded.DescriptorHash);
+    }
+
+    [Fact]
+    public void OpenResponse_LegacyCodec_RoundTrips_CommonFields()
+    {
+        var routeToken = new GatewayBackendRouteToken("route-token-alpha");
+        var response = GatewayBackendRouteOpenResponse.Accepted(
+            routeToken,
+            " alpha ",
+            new GatewayBackendServerHandle("server-alpha"),
+            "v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Response,
+            Pid.GATE_BACKEND_ROUTE_OPEN,
+            GatewayBackendRouteOpenResponse.LegacyProtocolVersion,
+            response,
+            GatewayBackendRouteOpenResponse.LegacyCodec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendRouteOpenResponse.LegacyCodec);
+
+        Assert.True(decoded.Success);
+        Assert.Equal("alpha", decoded.BackendKind);
+        Assert.Equal(routeToken, decoded.RouteToken);
+        Assert.Equal(string.Empty, decoded.ErrorMessage);
+        Assert.Null(decoded.ServerHandle);
+        Assert.Equal(string.Empty, decoded.DescriptorVersion);
+        Assert.Equal(string.Empty, decoded.DescriptorHash);
+    }
+
+    [Fact]
+    public void OpenResponse_Codec_RoundTrips_SelectedServerMetadata()
+    {
+        var routeToken = new GatewayBackendRouteToken("route-token-alpha");
+        var serverHandle = new GatewayBackendServerHandle("server-alpha");
+        var response = GatewayBackendRouteOpenResponse.Accepted(
+            routeToken,
+            " alpha ",
+            serverHandle,
+            "v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Response,
+            Pid.GATE_BACKEND_ROUTE_OPEN,
+            GatewayBackendRouteOpenResponse.ProtocolVersion,
+            response,
+            GatewayBackendRouteOpenResponse.Codec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendRouteOpenResponse.Codec);
+
+        Assert.True(decoded.Success);
+        Assert.Equal("alpha", decoded.BackendKind);
+        Assert.Equal(routeToken, decoded.RouteToken);
+        Assert.Equal(serverHandle, decoded.ServerHandle);
+        Assert.Equal("v1", decoded.DescriptorVersion);
+        Assert.Equal("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", decoded.DescriptorHash);
+    }
+
+    [Fact]
+    public void ServerList_Codec_RoundTripsEntries()
+    {
+        var observedAt = DateTimeOffset.FromUnixTimeMilliseconds(1_774_400_000_000);
+        var request = new GatewayBackendServerListRequest(" alpha ", maximumEntries: 16);
+
+        using var requestFrame = PacketCodec.Encode(
+            PacketKind.Request,
+            Pid.GATE_BACKEND_SERVER_LIST,
+            GatewayBackendServerListRequest.ProtocolVersion,
+            request,
+            GatewayBackendServerListRequest.Codec);
+
+        var decodedRequest = PacketCodec.Decode(requestFrame, GatewayBackendServerListRequest.Codec);
+        Assert.Equal("alpha", decodedRequest.BackendKind);
+        Assert.Equal(16, decodedRequest.MaximumEntries);
+
+        var entry = new GatewayBackendServerListEntry(
+            new GatewayBackendServerHandle("server-alpha"),
+            "alpha",
+            GatewayBackendServerState.Open,
+            "v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "{\"name\":\"Alpha\"}");
+        var response = GatewayBackendServerListResponse.Accepted(
+            " alpha ",
+            [entry],
+            observedAt);
+
+        using var responseFrame = PacketCodec.Encode(
+            PacketKind.Response,
+            Pid.GATE_BACKEND_SERVER_LIST,
+            GatewayBackendServerListRequest.ProtocolVersion,
+            response,
+            GatewayBackendServerListResponse.Codec);
+
+        var decodedResponse = PacketCodec.Decode(responseFrame, GatewayBackendServerListResponse.Codec);
+
+        Assert.True(decodedResponse.Success);
+        Assert.Equal("alpha", decodedResponse.BackendKind);
+        Assert.Equal(observedAt, decodedResponse.ObservedAt);
+        var decodedEntry = Assert.Single(decodedResponse.Entries);
+        Assert.Equal(entry.ServerHandle, decodedEntry.ServerHandle);
+        Assert.Equal(GatewayBackendServerState.Open, decodedEntry.State);
+        Assert.Equal("{\"name\":\"Alpha\"}", decodedEntry.DescriptorJson);
     }
 
     [Fact]
