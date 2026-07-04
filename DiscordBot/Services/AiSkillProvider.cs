@@ -112,7 +112,7 @@ internal sealed partial class AiSkillProvider(
         sb.AppendLine("[요청 기반 추가 Skill 지침]");
         sb.AppendLine("- 이 지침은 사용자가 해당 답변 방식을 요청한 현재 응답에만 적용합니다.");
         sb.AppendLine("- 전역 AI 지침, 기본 응답 방침, 도구 권한, 채널 범위, 안전성, 사실성 지침보다 낮은 우선순위입니다.");
-        sb.AppendLine("- DB에서 관리되는 Skill 지침은 tool 권한을 추가하지 않습니다. tool 노출은 로컬 source-of-truth Skill의 허용 목록과 서버 설정만 따릅니다.");
+        sb.AppendLine("- DB에서 관리되는 Skill 지침은 tool 권한을 추가하지 않습니다. tool 노출은 서버 기본 tool 목록, 로컬 source-of-truth Skill의 허용 목록, 서버 설정만 따릅니다.");
         sb.AppendLine("- 여러 Skill이 함께 선택되면 서로 충돌하지 않는 범위에서만 적용하고, 충돌 시 더 구체적인 사용자 요청과 상위 지침을 우선합니다.");
 
         foreach (var skill in skills)

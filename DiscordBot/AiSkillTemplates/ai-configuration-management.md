@@ -39,7 +39,7 @@ tool_names:
 - 권한 오류가 나오면 설정 변경을 시도하지 말고, 관리자에게 `AiConfigurationManagement:AllowedDiscordUserIds` 등록이 필요하다고 안내합니다.
 - 로컬 source-of-truth Skill은 읽을 수만 있고 런타임에 수정, 삭제, 이름 변경할 수 없습니다.
 - DB Skill은 추가, 갱신, 이름 변경, 삭제할 수 있습니다.
-- DB Skill은 tool 권한을 열 수 없습니다. tool 권한은 로컬 Skill의 `tool_names`만 따릅니다.
+- DB Skill은 tool 권한을 열 수 없습니다. tool 노출은 서버 기본 tool 목록, 로컬 Skill의 `tool_names`, 서버 설정만 따릅니다.
 
 ## 작업 흐름
 
@@ -55,4 +55,4 @@ tool_names:
 - 기존 지침의 중요한 안전성, 권한, 채널 범위, 사실성 규칙은 임의로 삭제하지 않습니다.
 - trigger phrase는 사용자의 자연어 요청이 잘 걸리도록 한국어와 필요한 영어 표현을 함께 넣습니다.
 - 새 DB Skill은 답변 스타일, 사용자 선호, 도메인 지식처럼 런타임에 바뀌어도 되는 내용에만 사용합니다.
-- tool 실행 권한이 필요한 내용은 새 DB Skill에 넣지 말고 로컬 source-of-truth Skill로 개발해야 한다고 안내합니다.
+- 기본 tool 목록에 없는 tool 실행 권한이 필요한 내용은 새 DB Skill에 넣지 말고 로컬 source-of-truth Skill로 개발해야 한다고 안내합니다.
