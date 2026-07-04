@@ -101,6 +101,52 @@ public sealed class BackendSidecarControlServerTests
     }
 
     [Fact]
+    public async Task EndpointStateUpdate_AcknowledgesAndUpdatesStatus()
+    {
+        var port = GetFreeTcpPort();
+        var server = CreateServer(
+            port,
+            new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend),
+            requireEndpointReadyBeforeAdvertise: true);
+        await server.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+
+            var update = new SidecarEndpointStateUpdate(
+                Guid.NewGuid(),
+                ready: true,
+                "cpp listener ready");
+            await WriteEndpointStateUpdateAsync(stream, update);
+
+            var ack = await ReadEndpointStateAckAsync(stream);
+            Assert.True(ack.Success);
+            Assert.Equal(update.RequestId, ack.RequestId);
+
+            var status = server.GetStatusItems();
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Endpoint readiness required" &&
+                item.Value == "Yes");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Endpoint state" &&
+                item.Value == "Ready");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Endpoint detail" &&
+                item.Value.Contains("cpp listener ready", StringComparison.Ordinal));
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task StartAsync_RejectsNonLoopbackEndpoint()
     {
         var server = new SidecarControlServer(
@@ -119,12 +165,14 @@ public sealed class BackendSidecarControlServerTests
 
     private static SidecarControlServer CreateServer(
         int port,
-        IDirectConnectCodeValidator validator)
+        IDirectConnectCodeValidator validator,
+        bool requireEndpointReadyBeforeAdvertise = false)
     {
         return new SidecarControlServer(
             Microsoft.Extensions.Options.Options.Create(new SidecarControlOptions
             {
                 Enabled = true,
+                RequireEndpointReadyBeforeAdvertise = requireEndpointReadyBeforeAdvertise,
                 IPAddress = "127.0.0.1",
                 Port = port,
                 RequestTimeoutMilliseconds = 5000
@@ -146,6 +194,19 @@ public sealed class BackendSidecarControlServerTests
         await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
     }
 
+    private static async Task WriteEndpointStateUpdateAsync(
+        Stream stream,
+        SidecarEndpointStateUpdate update)
+    {
+        using var frame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.EndpointStateUpdate,
+            BackendSidecarControlProtocol.SchemaVersion,
+            update,
+            SidecarEndpointStateUpdate.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+    }
+
     private static async Task<DirectConnectCodeValidationResponse> ReadValidationResponseAsync(Stream stream)
     {
         using var frame = await PacketFrameReader.ReadAsync(
@@ -156,6 +217,18 @@ public sealed class BackendSidecarControlServerTests
             frame,
             BackendSidecarControlPacketIds.DirectConnectCodeValidationResponse);
         return PacketCodec.Decode(frame, DirectConnectCodeValidationResponse.Codec);
+    }
+
+    private static async Task<SidecarEndpointStateAck> ReadEndpointStateAckAsync(Stream stream)
+    {
+        using var frame = await PacketFrameReader.ReadAsync(
+            stream,
+            BackendSidecarControlProtocol.LocalControlPolicy,
+            CancellationToken.None) ?? throw new EndOfStreamException("Sidecar endpoint state ack was not written.");
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.EndpointStateAck);
+        return PacketCodec.Decode(frame, SidecarEndpointStateAck.Codec);
     }
 
     private static int GetFreeTcpPort()

@@ -15,10 +15,19 @@ internal interface ISidecarControlStatusProvider
     ServiceAdminStatusItem[] GetStatusItems();
 }
 
+internal interface IBackendEndpointReadiness
+{
+    bool RequiresEndpointReadyBeforeAdvertise { get; }
+
+    Task WaitUntilReadyForAdvertisementAsync(CancellationToken cancellationToken);
+}
+
 internal static class BackendSidecarControlPacketIds
 {
     public const ushort DirectConnectCodeValidationRequest = 1;
     public const ushort DirectConnectCodeValidationResponse = 2;
+    public const ushort EndpointStateUpdate = 3;
+    public const ushort EndpointStateAck = 4;
 }
 
 internal static class BackendSidecarControlProtocol
@@ -48,17 +57,45 @@ internal static class BackendSidecarControlProtocol
 internal sealed class SidecarControlServer(
     IOptions<SidecarControlOptions> options,
     IDirectConnectCodeValidator directConnectCodeValidator,
-    ILogger<SidecarControlServer> logger) : IHostedService, ISidecarControlStatusProvider
+    ILogger<SidecarControlServer> logger) : IHostedService, ISidecarControlStatusProvider, IBackendEndpointReadiness
 {
     private readonly SidecarControlOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
+    private readonly object m_EndpointReadinessSync = new();
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
     private readonly ConcurrentDictionary<Guid, string> m_ConnectionStates = [];
+    private TaskCompletionSource<bool> m_EndpointReadySignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private bool m_EndpointReady;
+    private string m_EndpointReadinessDetail = "Not signaled";
+    private DateTimeOffset? m_EndpointReadinessChangedAt;
     private long m_ValidationRequestCount;
     private long m_ValidationSuccessCount;
     private long m_ValidationFailureCount;
     private Socket? m_Socket;
     private Task? m_AcceptTask;
+
+    public bool RequiresEndpointReadyBeforeAdvertise => m_Options.Enabled && m_Options.RequireEndpointReadyBeforeAdvertise;
+
+    public Task WaitUntilReadyForAdvertisementAsync(CancellationToken cancellationToken)
+    {
+        if (!RequiresEndpointReadyBeforeAdvertise)
+        {
+            return Task.CompletedTask;
+        }
+
+        Task readyTask;
+        lock (m_EndpointReadinessSync)
+        {
+            if (m_EndpointReady)
+            {
+                return Task.CompletedTask;
+            }
+
+            readyTask = m_EndpointReadySignal.Task;
+        }
+
+        return readyTask.WaitAsync(cancellationToken);
+    }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -121,6 +158,9 @@ internal sealed class SidecarControlServer(
         return
         [
             new("Sidecar Control", "Listener", $"{m_Options.IPAddress}:{m_Options.Port}"),
+            new("Sidecar Control", "Endpoint readiness required", m_Options.RequireEndpointReadyBeforeAdvertise ? "Yes" : "No"),
+            new("Sidecar Control", "Endpoint state", GetEndpointStateStatus()),
+            new("Sidecar Control", "Endpoint detail", GetEndpointReadinessDetail()),
             new("Sidecar Control", "Active connections", m_ConnectionStates.Count.ToString()),
             new("Sidecar Control", "Validation requests", Interlocked.Read(ref m_ValidationRequestCount).ToString()),
             new("Sidecar Control", "Validation succeeded", Interlocked.Read(ref m_ValidationSuccessCount).ToString()),
@@ -215,6 +255,15 @@ internal sealed class SidecarControlServer(
                         continue;
                     }
 
+                    if (frame.Header.PacketId == BackendSidecarControlPacketIds.EndpointStateUpdate)
+                    {
+                        await HandleEndpointStateUpdateAsync(
+                            stream,
+                            frame,
+                            cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+
                     logger.LogWarning(
                         "Backend sidecar control rejected unsupported packet. ConnectionId={ConnectionId}, PacketKind={PacketKind}, PacketId={PacketId}.",
                         connectionId,
@@ -266,6 +315,26 @@ internal sealed class SidecarControlServer(
             BackendSidecarControlProtocol.SchemaVersion,
             response,
             DirectConnectCodeValidationResponse.Codec);
+        await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask HandleEndpointStateUpdateAsync(
+        Stream stream,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.EndpointStateUpdate);
+        var update = PacketCodec.Decode(frame, SidecarEndpointStateUpdate.Codec);
+        SetEndpointReadiness(update.Ready, update.Detail);
+
+        using var responseFrame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.EndpointStateAck,
+            BackendSidecarControlProtocol.SchemaVersion,
+            SidecarEndpointStateAck.SuccessResult(update.RequestId),
+            SidecarEndpointStateAck.Codec);
         await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken).ConfigureAwait(false);
     }
 
@@ -341,6 +410,47 @@ internal sealed class SidecarControlServer(
         if (m_Options.Backlog <= 0)
         {
             throw new InvalidOperationException("SidecarControl:Backlog must be greater than zero.");
+        }
+    }
+
+    private void SetEndpointReadiness(bool ready, string detail)
+    {
+        TaskCompletionSource<bool>? readySignal = null;
+
+        lock (m_EndpointReadinessSync)
+        {
+            m_EndpointReady = ready;
+            m_EndpointReadinessDetail = string.IsNullOrWhiteSpace(detail) ? (ready ? "Ready" : "Not ready") : detail;
+            m_EndpointReadinessChangedAt = DateTimeOffset.UtcNow;
+
+            if (ready)
+            {
+                readySignal = m_EndpointReadySignal;
+            }
+            else if (m_EndpointReadySignal.Task.IsCompleted)
+            {
+                m_EndpointReadySignal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+        }
+
+        readySignal?.TrySetResult(true);
+    }
+
+    private string GetEndpointStateStatus()
+    {
+        lock (m_EndpointReadinessSync)
+        {
+            return m_EndpointReady ? "Ready" : "Not ready";
+        }
+    }
+
+    private string GetEndpointReadinessDetail()
+    {
+        lock (m_EndpointReadinessSync)
+        {
+            return m_EndpointReadinessChangedAt.HasValue
+                ? $"{m_EndpointReadinessDetail} ({m_EndpointReadinessChangedAt.Value.LocalDateTime:O})"
+                : m_EndpointReadinessDetail;
         }
     }
 

@@ -264,6 +264,15 @@ internal sealed class MasterConnectionManager(
 
     private async Task AdvertiseBackendEndpointAsync(Stream stream, CancellationToken cancellationToken)
     {
+        var endpointReadiness = serviceProvider.GetService<IBackendEndpointReadiness>();
+        if (endpointReadiness?.RequiresEndpointReadyBeforeAdvertise == true)
+        {
+            SetStatus("WaitingForEndpointReady");
+            logger.LogInformation("Backend endpoint advertisement is waiting for sidecar endpoint readiness.");
+            await endpointReadiness.WaitUntilReadyForAdvertisementAsync(cancellationToken).ConfigureAwait(false);
+            SetStatus("Trusted");
+        }
+
         var advertise = new BackendEndpointAdvertise(
             m_Options.BackendKind,
             new MasterSocketEndpoint(
