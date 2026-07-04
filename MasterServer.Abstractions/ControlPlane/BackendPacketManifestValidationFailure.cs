@@ -8,5 +8,15 @@ public enum BackendPacketManifestValidationFailure
     PacketKindMismatch,
     PayloadTooSmall,
     PayloadTooLarge,
-    PayloadLengthMismatch
+    PayloadLengthMismatch,
+    VerifierRejected,
+    VerifierPayloadTruncated,
+    VerifierTrailingBytes,
+    VerifierInvalidUtf8,
+    VerifierValueOutOfRange,
+    VerifierValueNotAllowed,
+    VerifierFlagsMaskMismatch,
+    VerifierLengthOutOfRange,
+    VerifierRepeatCountOutOfRange,
+    VerifierInstructionBudgetExceeded
 }

@@ -693,7 +693,7 @@ internal class ConnectionManager(
                 envelope.RoutedKind,
                 envelope.RoutedPacketId,
                 envelope.RoutedVersion,
-                envelope.RoutedPayload.Length);
+                envelope.RoutedPayload);
 
             if (envelope.RoutedKind == PacketKind.Request)
             {
@@ -885,7 +885,7 @@ internal class ConnectionManager(
                 envelope.RoutedKind,
                 envelope.RoutedPacketId,
                 envelope.RoutedVersion,
-                envelope.RoutedPayload.Length);
+                envelope.RoutedPayload);
 
             if (envelope.RoutedKind == PacketKind.Request)
             {
@@ -1071,7 +1071,7 @@ internal class ConnectionManager(
         PacketKind packetKind,
         ushort packetId,
         ushort routedVersion,
-        int payloadLength)
+        ReadOnlySpan<byte> payload)
     {
         var result = backendPacketManifests.ValidatePacket(
             route.BackendKind,
@@ -1081,7 +1081,7 @@ internal class ConnectionManager(
             packetKind,
             packetId,
             routedVersion,
-            payloadLength);
+            payload);
         if (result.Success)
         {
             return;
@@ -1093,7 +1093,7 @@ internal class ConnectionManager(
             static _ => 1,
             static (_, current) => current + 1);
         throw new InvalidOperationException(
-            $"Backend route packet failed manifest validation. Direction={direction}, Failure={result.Failure}, BackendKind={route.BackendKind}, ManifestId={route.ManifestId.Value}, PacketKind={packetKind}, PacketId={packetId}, Version={routedVersion}, PayloadLength={payloadLength}.");
+            $"Backend route packet failed manifest validation. Direction={direction}, Failure={result.Failure}, BackendKind={route.BackendKind}, ManifestId={route.ManifestId.Value}, PacketKind={packetKind}, PacketId={packetId}, Version={routedVersion}, PayloadLength={payload.Length}.");
     }
 
     private async Task EchoPacketAsync(

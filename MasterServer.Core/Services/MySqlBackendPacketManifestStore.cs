@@ -279,6 +279,7 @@ SELECT
     `fixed_payload_length` AS `FixedPayloadLength`,
     `schema_id` AS `SchemaId`,
     `schema_hash` AS `SchemaHash`,
+    `verifier_program` AS `VerifierProgram`,
     `entry_status` AS `EntryStatus`
 FROM `backend_packet_manifest_entry`
 WHERE `manifest_record_id` IN @manifestRecordIds
@@ -349,6 +350,7 @@ INSERT INTO `backend_packet_manifest_entry`
      `fixed_payload_length`,
      `schema_id`,
      `schema_hash`,
+     `verifier_program`,
      `entry_status`)
 VALUES
     (@manifestRecordId,
@@ -361,6 +363,7 @@ VALUES
      @fixedPayloadLength,
      @schemaId,
      @schemaHash,
+     @verifierProgram,
      @entryStatus);
 """;
         foreach (var entry in entries)
@@ -381,6 +384,7 @@ VALUES
                         ? null
                         : entry.PayloadConstraint.SchemaId,
                     schemaHash = entry.PayloadConstraint.SchemaHash?.Value,
+                    verifierProgram = BackendPacketVerifierProgramCodec.EncodeBase64(entry.PayloadConstraint.VerifierProgram),
                     entryStatus = (byte)entry.Status
                 },
                 transaction,
@@ -452,6 +456,7 @@ VALUES
         int? FixedPayloadLength,
         string? SchemaId,
         string? SchemaHash,
+        string? VerifierProgram,
         byte EntryStatus)
     {
         public BackendPacketManifestEntry ToEntry()
@@ -469,6 +474,7 @@ VALUES
             var schemaHash = string.IsNullOrWhiteSpace(SchemaHash)
                 ? (BackendPacketManifestHash?)null
                 : new BackendPacketManifestHash(SchemaHash);
+            var verifierProgram = BackendPacketVerifierProgramCodec.DecodeBase64(VerifierProgram);
             return new BackendPacketManifestEntry(
                 (BackendPacketManifestDirection)Direction,
                 (PacketKind)PacketKind,
@@ -479,7 +485,8 @@ VALUES
                     MaximumPayloadLength,
                     FixedPayloadLength,
                     SchemaId,
-                    schemaHash),
+                    schemaHash,
+                    verifierProgram),
                 (BackendPacketManifestEntryStatus)EntryStatus);
         }
     }

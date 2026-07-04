@@ -130,6 +130,49 @@ public sealed class BackendPacketManifestProtocolTests
         Assert.Equal(manifest.Hash, decoded.ManifestHash);
     }
 
+    [Fact]
+    public void SnapshotCodec_RoundTripsVerifierProgram()
+    {
+        var verifierProgram = new BackendPacketVerifierProgram(
+            [
+                BackendPacketVerifierInstruction.ReadUInt8(targetSlot: 0),
+                BackendPacketVerifierInstruction.ReadUtf8String(
+                    BackendPacketVerifierLengthConstraint.Dynamic(
+                        sourceSlot: 0,
+                        minimumLength: 0,
+                        maximumLength: 16))
+            ]);
+        var manifest = new BackendPacketManifest(
+            "chat",
+            new BackendPacketManifestId("v1"),
+            [
+                new BackendPacketManifestEntry(
+                    BackendPacketManifestDirection.ClientToBackend,
+                    PacketKind.Notify,
+                    501,
+                    1,
+                    new BackendPacketPayloadConstraint(
+                        1,
+                        17,
+                        verifierProgram: verifierProgram))
+            ]);
+        var snapshot = new BackendPacketManifestSnapshot([manifest], DateTimeOffset.UtcNow);
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Control,
+            MasterControlPacketIds.BackendPacketManifestSnapshot,
+            MasterControlProtocol.SchemaVersion,
+            snapshot,
+            BackendPacketManifestSnapshot.Codec);
+
+        var decoded = PacketCodec.Decode(frame, BackendPacketManifestSnapshot.Codec);
+        var decodedEntry = Assert.Single(Assert.Single(decoded.Manifests).Entries);
+
+        Assert.NotNull(decodedEntry.PayloadConstraint.VerifierProgram);
+        Assert.True(decodedEntry.PayloadConstraint.VerifierProgram!.Verify(new byte[] { 2, 65, 66 }).Success);
+        Assert.Equal(manifest.Hash, decoded.Manifests[0].Hash);
+    }
+
     private static BackendPacketManifest CreateManifest()
     {
         return new BackendPacketManifest(

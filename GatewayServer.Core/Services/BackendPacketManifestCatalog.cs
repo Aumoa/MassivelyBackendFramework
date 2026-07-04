@@ -17,7 +17,7 @@ internal interface IBackendPacketManifestProvider
         PacketCore.PacketKind packetKind,
         ushort packetId,
         ushort routedVersion,
-        int payloadLength);
+        ReadOnlySpan<byte> payload);
 
     ServiceAdminStatusItem[] GetStatusItems();
 }
@@ -64,7 +64,7 @@ internal sealed class BackendPacketManifestCatalog :
         PacketCore.PacketKind packetKind,
         ushort packetId,
         ushort routedVersion,
-        int payloadLength)
+        ReadOnlySpan<byte> payload)
     {
         return RequireManifest(backendKind, manifestId, manifestHash)
             .ValidatePacket(
@@ -72,7 +72,7 @@ internal sealed class BackendPacketManifestCatalog :
                 packetKind,
                 packetId,
                 routedVersion,
-                payloadLength);
+                payload);
     }
 
     public ServiceAdminStatusItem[] GetStatusItems()
@@ -116,6 +116,11 @@ internal sealed class BackendPacketManifestCatalog :
         var manifests = new Dictionary<BackendPacketManifestKey, BackendPacketManifest>();
         foreach (var manifest in snapshot.Manifests)
         {
+            foreach (var entry in manifest.Entries)
+            {
+                entry.PayloadConstraint.VerifierProgram?.Validate();
+            }
+
             var key = new BackendPacketManifestKey(
                 manifest.BackendKind,
                 manifest.ManifestId,
