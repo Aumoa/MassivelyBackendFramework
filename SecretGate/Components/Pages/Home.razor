@@ -1,0 +1,310 @@
+@page "/"
+@rendermode InteractiveServer
+@using System.Globalization
+@inject AuthenticationStateProvider AuthState
+@inject SecretVaultService VaultService
+@inject SecretShareService ShareService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>@Strings.HOME_TITLE - @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1>@Strings.HOME_TITLE</h1>
+    <span class="status-pill @(VaultService.IsUnlocked ? "status-unlocked" : "status-locked")">
+        <span class="material-symbols-outlined" aria-hidden="true">@(VaultService.IsUnlocked ? "lock_open" : "lock")</span>
+        @(VaultService.IsUnlocked ? Strings.STATUS_UNLOCKED : Strings.STATUS_LOCKED)
+    </span>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="message @(statusIsError ? "message-error" : "message-success")">@statusMessage</div>
+}
+
+<section class="tool-panel">
+    <div class="panel-header">
+        <h2>@Strings.VAULT_TITLE</h2>
+    </div>
+
+    <form class="inline-form" @onsubmit="UnlockVaultAsync" @onsubmit:preventDefault="true">
+        <label class="field field-grow">
+            <span>@Strings.VAULT_KEY_LABEL</span>
+            <input class="form-input" type="password" autocomplete="current-password" @bind="vaultKey" />
+        </label>
+        <button class="btn-primary" type="submit" disabled="@VaultService.IsUnlocked">
+            <span class="material-symbols-outlined" aria-hidden="true">lock_open</span>
+            @Strings.UNLOCK_BUTTON
+        </button>
+        <button class="btn-secondary" type="button" disabled="@(!VaultService.IsUnlocked)" @onclick="LockVaultAsync">
+            <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+            @Strings.LOCK_BUTTON
+        </button>
+    </form>
+
+    <form class="secret-form" @onsubmit="SaveSecretAsync" @onsubmit:preventDefault="true">
+        <label class="field">
+            <span>@Strings.SECRET_NAME_LABEL</span>
+            <input class="form-input" maxlength="160" @bind="newSecretName" disabled="@(!VaultService.IsUnlocked)" />
+        </label>
+        <label class="field">
+            <span>@Strings.SECRET_VALUE_LABEL</span>
+            <textarea class="form-textarea" rows="4" @bind="newSecretValue" disabled="@(!VaultService.IsUnlocked)"></textarea>
+        </label>
+        <div class="form-actions">
+            <button class="btn-primary" type="submit" disabled="@(!VaultService.IsUnlocked)">
+                <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                @Strings.ADD_SECRET_BUTTON
+            </button>
+        </div>
+    </form>
+</section>
+
+<section class="tool-panel">
+    <div class="panel-header">
+        <h2>@Strings.STORED_SECRETS_TITLE</h2>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="empty-state">@Strings.LOADING</div>
+    }
+    else if (secrets.Count == 0)
+    {
+        <div class="empty-state">@Strings.EMPTY_VAULT</div>
+    }
+    else
+    {
+        <div class="secret-list">
+            @foreach (var secret in secrets)
+            {
+                <article class="secret-row" @key="secret.Id">
+                    <div class="secret-row-main">
+                        <div class="secret-row-title">@secret.Name</div>
+                        <div class="secret-row-meta">
+                            @Strings.UPDATED_AT @FormatLocal(secret.UpdatedAtUtc)
+                        </div>
+                        @if (secret.IsDecrypted)
+                        {
+                            <textarea class="secret-output" readonly rows="3">@secret.Secret</textarea>
+                        }
+                        else
+                        {
+                            <div class="secret-placeholder">
+                                @(VaultService.IsUnlocked ? Strings.DECRYPT_FAILED : Strings.LOCKED_SECRET)
+                            </div>
+                        }
+                    </div>
+                    <div class="secret-row-actions">
+                        @if (secret.IsDecrypted && secret.Secret is not null)
+                        {
+                            <button class="icon-button" type="button" title="@Strings.COPY_BUTTON" @onclick="() => CopyAsync(secret.Secret)">
+                                <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                            </button>
+                        }
+                        <button class="icon-button danger" type="button" title="@Strings.DELETE_BUTTON" @onclick="() => DeleteSecretAsync(secret.Id)">
+                            <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                        </button>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+<section class="tool-panel">
+    <div class="panel-header">
+        <h2>@Strings.SHARE_TITLE</h2>
+    </div>
+
+    <form class="secret-form" @onsubmit="CreateShareAsync" @onsubmit:preventDefault="true">
+        <label class="field">
+            <span>@Strings.SHARE_SECRET_LABEL</span>
+            <textarea class="form-textarea" rows="4" @bind="shareSecret"></textarea>
+        </label>
+        <label class="field field-compact">
+            <span>@Strings.SHARE_EXPIRY_LABEL</span>
+            <input class="form-input" type="number" min="1" max="10080" @bind="shareExpiryMinutes" />
+        </label>
+        <div class="form-actions">
+            <button class="btn-primary" type="submit">
+                <span class="material-symbols-outlined" aria-hidden="true">link</span>
+                @Strings.CREATE_SHARE_BUTTON
+            </button>
+        </div>
+    </form>
+
+    @if (!string.IsNullOrWhiteSpace(shareUrl) && !string.IsNullOrWhiteSpace(shareAccessKey))
+    {
+        <div class="share-result">
+            <label class="field">
+                <span>@Strings.SHARE_LINK_LABEL</span>
+                <div class="copy-field">
+                    <input class="form-input" readonly value="@shareUrl" />
+                    <button class="icon-button" type="button" title="@Strings.COPY_BUTTON" @onclick="() => CopyAsync(shareUrl)">
+                        <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                    </button>
+                </div>
+            </label>
+            <label class="field">
+                <span>@Strings.SHARE_ACCESS_KEY_LABEL</span>
+                <div class="copy-field">
+                    <input class="form-input code-input" readonly value="@shareAccessKey" />
+                    <button class="icon-button" type="button" title="@Strings.COPY_BUTTON" @onclick="() => CopyAsync(shareAccessKey)">
+                        <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                    </button>
+                </div>
+            </label>
+        </div>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<StoredSecretView> secrets = [];
+    private string? ownerSubject;
+    private string vaultKey = string.Empty;
+    private string newSecretName = string.Empty;
+    private string newSecretValue = string.Empty;
+    private string shareSecret = string.Empty;
+    private int shareExpiryMinutes = 60;
+    private string? shareUrl;
+    private string? shareAccessKey;
+    private string? statusMessage;
+    private bool statusIsError;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        ownerSubject = auth.User.FindFirst("sub")?.Value;
+        await RefreshSecretsAsync();
+    }
+
+    private async Task UnlockVaultAsync()
+    {
+        if (string.IsNullOrWhiteSpace(vaultKey))
+        {
+            SetStatus(Strings.MESSAGE_VAULT_KEY_REQUIRED, true);
+            return;
+        }
+
+        VaultService.Unlock(vaultKey);
+        vaultKey = string.Empty;
+        await RefreshSecretsAsync();
+        SetStatus(Strings.MESSAGE_VAULT_UNLOCKED, false);
+    }
+
+    private async Task LockVaultAsync()
+    {
+        VaultService.Lock();
+        await RefreshSecretsAsync();
+        SetStatus(Strings.MESSAGE_VAULT_LOCKED, false);
+    }
+
+    private async Task SaveSecretAsync()
+    {
+        if (!VaultService.IsUnlocked)
+        {
+            SetStatus(Strings.MESSAGE_UNLOCK_REQUIRED, true);
+            return;
+        }
+
+        if (!TryGetOwnerSubject(out var subject))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newSecretName) || string.IsNullOrWhiteSpace(newSecretValue))
+        {
+            SetStatus(Strings.MESSAGE_SECRET_REQUIRED, true);
+            return;
+        }
+
+        await VaultService.AddSecretAsync(subject, newSecretName, newSecretValue);
+        newSecretName = string.Empty;
+        newSecretValue = string.Empty;
+        await RefreshSecretsAsync();
+        SetStatus(Strings.MESSAGE_SECRET_SAVED, false);
+    }
+
+    private async Task DeleteSecretAsync(Guid id)
+    {
+        if (!TryGetOwnerSubject(out var subject))
+        {
+            return;
+        }
+
+        await VaultService.DeleteSecretAsync(subject, id);
+        await RefreshSecretsAsync();
+        SetStatus(Strings.MESSAGE_SECRET_DELETED, false);
+    }
+
+    private async Task CreateShareAsync()
+    {
+        if (string.IsNullOrWhiteSpace(shareSecret))
+        {
+            SetStatus(Strings.MESSAGE_SHARE_SECRET_REQUIRED, true);
+            return;
+        }
+
+        shareExpiryMinutes = Math.Clamp(shareExpiryMinutes, 1, 10_080);
+        var receipt = await ShareService.CreateShareAsync(
+            shareSecret,
+            DateTime.UtcNow.AddMinutes(shareExpiryMinutes));
+
+        shareUrl = new Uri(new Uri(Nav.BaseUri), $"share/{receipt.UrlToken}").ToString();
+        shareAccessKey = receipt.AccessKey;
+        shareSecret = string.Empty;
+        SetStatus(Strings.MESSAGE_SHARE_CREATED, false);
+    }
+
+    private async Task RefreshSecretsAsync()
+    {
+        isLoading = true;
+        if (TryGetOwnerSubject(out var subject, showError: false))
+        {
+            secrets = await VaultService.GetSecretsAsync(subject);
+        }
+        else
+        {
+            secrets = [];
+        }
+
+        isLoading = false;
+    }
+
+    private bool TryGetOwnerSubject(out string subject, bool showError = true)
+    {
+        subject = ownerSubject ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(subject))
+        {
+            return true;
+        }
+
+        if (showError)
+        {
+            SetStatus(Strings.MESSAGE_INVALID_SUBJECT, true);
+        }
+
+        return false;
+    }
+
+    private async Task CopyAsync(string? value)
+    {
+        if (!string.IsNullOrEmpty(value))
+        {
+            await JS.InvokeVoidAsync("secretGate.copyText", value);
+        }
+    }
+
+    private void SetStatus(string message, bool isError)
+    {
+        statusMessage = message;
+        statusIsError = isError;
+    }
+
+    private static string FormatLocal(DateTime utc)
+    {
+        return utc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+    }
+}

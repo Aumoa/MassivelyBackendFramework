@@ -1,0 +1,97 @@
+@page "/share/{Token}"
+@layout PublicLayout
+@rendermode InteractiveServer
+@inject SecretShareService ShareService
+@inject IJSRuntime JS
+
+<PageTitle>@Strings.SHARE_PAGE_TITLE - @Strings.APP_TITLE</PageTitle>
+
+<main class="public-main share-open-main">
+    <section class="tool-panel share-open-panel">
+        <div class="panel-header">
+            <h1>@Strings.SHARE_PAGE_TITLE</h1>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="message @(messageIsError ? "message-error" : "message-success")">@message</div>
+        }
+
+        @if (consumedSecret == null)
+        {
+            <form class="secret-form" @onsubmit="OpenShareAsync" @onsubmit:preventDefault="true">
+                <label class="field">
+                    <span>@Strings.SHARE_ACCESS_KEY_INPUT_LABEL</span>
+                    <input class="form-input code-input" maxlength="9" autocomplete="one-time-code" @bind="accessKey" />
+                </label>
+                <div class="form-actions">
+                    <button class="btn-primary" type="submit">
+                        <span class="material-symbols-outlined" aria-hidden="true">visibility</span>
+                        @Strings.OPEN_SHARE_BUTTON
+                    </button>
+                </div>
+            </form>
+        }
+        else
+        {
+            <label class="field">
+                <span>@Strings.SHARE_SECRET_RESULT_LABEL</span>
+                <textarea class="form-textarea secret-result" rows="7" readonly>@consumedSecret</textarea>
+            </label>
+            <button class="btn-secondary" type="button" @onclick="() => CopyAsync(consumedSecret)">
+                <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                @Strings.COPY_BUTTON
+            </button>
+        }
+    </section>
+</main>
+
+@code {
+    [Parameter]
+    public string? Token { get; set; }
+
+    private string accessKey = string.Empty;
+    private string? consumedSecret;
+    private string? message;
+    private bool messageIsError;
+
+    private async Task OpenShareAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Token))
+        {
+            SetMessage(Strings.SHARE_TOKEN_MISSING, true);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(accessKey))
+        {
+            SetMessage(Strings.MESSAGE_ACCESS_KEY_REQUIRED, true);
+            return;
+        }
+
+        var result = await ShareService.ConsumeShareAsync(Token, accessKey);
+        if (result.Status != ConsumeShareStatus.Consumed || result.Secret == null)
+        {
+            SetMessage(Strings.SHARE_EXPIRED_OR_INVALID, true);
+            return;
+        }
+
+        consumedSecret = result.Secret;
+        accessKey = string.Empty;
+        SetMessage(Strings.SHARE_CONSUMED, false);
+    }
+
+    private async Task CopyAsync(string? value)
+    {
+        if (!string.IsNullOrEmpty(value))
+        {
+            await JS.InvokeVoidAsync("secretGate.copyText", value);
+        }
+    }
+
+    private void SetMessage(string value, bool isError)
+    {
+        message = value;
+        messageIsError = isError;
+    }
+}

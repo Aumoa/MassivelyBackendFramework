@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ADD_SECRET_BUTTON" xml:space="preserve">
+    <value>Save secret</value>
+  </data>
+  <data name="APP_TITLE" xml:space="preserve">
+    <value>Secret Gate</value>
+  </data>
+  <data name="COPY_BUTTON" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="CREATE_SHARE_BUTTON" xml:space="preserve">
+    <value>Create share</value>
+  </data>
+  <data name="DECRYPT_FAILED" xml:space="preserve">
+    <value>Decryption failed</value>
+  </data>
+  <data name="DELETE_BUTTON" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="EMPTY_VAULT" xml:space="preserve">
+    <value>No saved secrets</value>
+  </data>
+  <data name="ERROR_RELOAD" xml:space="preserve">
+    <value>Reload</value>
+  </data>
+  <data name="ERROR_TITLE" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="ERROR_UNHANDLED" xml:space="preserve">
+    <value>An unhandled error occurred.</value>
+  </data>
+  <data name="HOME_TITLE" xml:space="preserve">
+    <value>Vault</value>
+  </data>
+  <data name="LOADING" xml:space="preserve">
+    <value>Loading</value>
+  </data>
+  <data name="LOCK_BUTTON" xml:space="preserve">
+    <value>Lock</value>
+  </data>
+  <data name="LOCKED_SECRET" xml:space="preserve">
+    <value>Locked</value>
+  </data>
+  <data name="MESSAGE_ACCESS_KEY_REQUIRED" xml:space="preserve">
+    <value>Enter the access key.</value>
+  </data>
+  <data name="MESSAGE_INVALID_SUBJECT" xml:space="preserve">
+    <value>OIDC subject is unavailable.</value>
+  </data>
+  <data name="MESSAGE_SECRET_DELETED" xml:space="preserve">
+    <value>Secret deleted.</value>
+  </data>
+  <data name="MESSAGE_SECRET_REQUIRED" xml:space="preserve">
+    <value>Enter a name and secret.</value>
+  </data>
+  <data name="MESSAGE_SECRET_SAVED" xml:space="preserve">
+    <value>Secret saved.</value>
+  </data>
+  <data name="MESSAGE_SHARE_CREATED" xml:space="preserve">
+    <value>Share created.</value>
+  </data>
+  <data name="MESSAGE_SHARE_SECRET_REQUIRED" xml:space="preserve">
+    <value>Enter a secret to share.</value>
+  </data>
+  <data name="MESSAGE_UNLOCK_REQUIRED" xml:space="preserve">
+    <value>Unlock the vault first.</value>
+  </data>
+  <data name="MESSAGE_VAULT_KEY_REQUIRED" xml:space="preserve">
+    <value>Enter the vault key.</value>
+  </data>
+  <data name="MESSAGE_VAULT_LOCKED" xml:space="preserve">
+    <value>Vault locked.</value>
+  </data>
+  <data name="MESSAGE_VAULT_UNLOCKED" xml:space="preserve">
+    <value>Vault unlocked.</value>
+  </data>
+  <data name="NAV_HOME" xml:space="preserve">
+    <value>Vault</value>
+  </data>
+  <data name="NAV_LOGOUT" xml:space="preserve">
+    <value>Logout</value>
+  </data>
+  <data name="NOT_FOUND_TITLE" xml:space="preserve">
+    <value>Not found</value>
+  </data>
+  <data name="OPEN_SHARE_BUTTON" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="SECRET_NAME_LABEL" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="SECRET_VALUE_LABEL" xml:space="preserve">
+    <value>Secret</value>
+  </data>
+  <data name="SHARE_ACCESS_KEY_INPUT_LABEL" xml:space="preserve">
+    <value>Access key</value>
+  </data>
+  <data name="SHARE_ACCESS_KEY_LABEL" xml:space="preserve">
+    <value>Access key</value>
+  </data>
+  <data name="SHARE_CONSUMED" xml:space="preserve">
+    <value>Secret opened.</value>
+  </data>
+  <data name="SHARE_EXPIRED_OR_INVALID" xml:space="preserve">
+    <value>Share expired or key is invalid.</value>
+  </data>
+  <data name="SHARE_EXPIRY_LABEL" xml:space="preserve">
+    <value>Expires in minutes</value>
+  </data>
+  <data name="SHARE_LINK_LABEL" xml:space="preserve">
+    <value>Share URL</value>
+  </data>
+  <data name="SHARE_PAGE_TITLE" xml:space="preserve">
+    <value>Open shared secret</value>
+  </data>
+  <data name="SHARE_SECRET_LABEL" xml:space="preserve">
+    <value>Secret</value>
+  </data>
+  <data name="SHARE_SECRET_RESULT_LABEL" xml:space="preserve">
+    <value>Secret</value>
+  </data>
+  <data name="SHARE_TITLE" xml:space="preserve">
+    <value>One-time share</value>
+  </data>
+  <data name="SHARE_TOKEN_MISSING" xml:space="preserve">
+    <value>Share token is missing.</value>
+  </data>
+  <data name="STATUS_LOCKED" xml:space="preserve">
+    <value>Locked</value>
+  </data>
+  <data name="STATUS_UNLOCKED" xml:space="preserve">
+    <value>Unlocked</value>
+  </data>
+  <data name="STORED_SECRETS_TITLE" xml:space="preserve">
+    <value>Saved secrets</value>
+  </data>
+  <data name="UNLOCK_BUTTON" xml:space="preserve">
+    <value>Unlock</value>
+  </data>
+  <data name="UPDATED_AT" xml:space="preserve">
+    <value>Updated</value>
+  </data>
+  <data name="VAULT_KEY_LABEL" xml:space="preserve">
+    <value>Vault key</value>
+  </data>
+  <data name="VAULT_TITLE" xml:space="preserve">
+    <value>Vault key</value>
+  </data>
+</root>
