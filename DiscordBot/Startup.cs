@@ -104,6 +104,9 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddMemoryCache();
 
     sc.Configure<DiscordService.Configuration>(conf.GetRequiredSection("Discord"));
+    sc.Configure<AutoResponseOptions>(conf.GetSection("AutoResponse"));
+    sc.AddSingleton<IDiscordAutoResponseEvaluator, DiscordAutoResponseEvaluator>();
+    sc.AddSingleton<IDiscordAutoResponseCoordinator, DiscordAutoResponseCoordinator>();
     sc.AddHostedService<DiscordService>();
 
     sc.Configure<ImageGenerationOptions>(conf.GetRequiredSection("ImageGeneration"));
