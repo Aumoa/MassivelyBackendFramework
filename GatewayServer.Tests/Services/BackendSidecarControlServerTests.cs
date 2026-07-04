@@ -198,6 +198,60 @@ public sealed class BackendSidecarControlServerTests
     }
 
     [Fact]
+    public async Task ShutdownStateUpdate_AcknowledgesAndMarksEndpointNotReady()
+    {
+        var port = GetFreeTcpPort();
+        var server = CreateServer(
+            port,
+            new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend),
+            requireEndpointReadyBeforeAdvertise: true);
+        await server.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+
+            await WriteEndpointStateUpdateAsync(
+                stream,
+                new SidecarEndpointStateUpdate(
+                    Guid.NewGuid(),
+                    ready: true,
+                    "cpp listener ready"));
+            _ = await ReadEndpointStateAckAsync(stream);
+
+            var update = new SidecarShutdownStateUpdate(
+                Guid.NewGuid(),
+                shuttingDown: true,
+                "maintenance window");
+            await WriteShutdownStateUpdateAsync(stream, update);
+
+            var ack = await ReadShutdownStateAckAsync(stream);
+            Assert.True(ack.Success);
+            Assert.Equal(update.RequestId, ack.RequestId);
+
+            var status = server.GetStatusItems();
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Endpoint state" &&
+                item.Value == "Not ready");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Shutdown state" &&
+                item.Value == "Requested");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Shutdown detail" &&
+                item.Value.Contains("maintenance window", StringComparison.Ordinal));
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task StartAsync_RejectsNonLoopbackEndpoint()
     {
         var server = new SidecarControlServer(
@@ -242,6 +296,19 @@ public sealed class BackendSidecarControlServerTests
             BackendSidecarControlProtocol.SchemaVersion,
             request,
             DirectConnectCodeValidationRequest.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+    }
+
+    private static async Task WriteShutdownStateUpdateAsync(
+        Stream stream,
+        SidecarShutdownStateUpdate update)
+    {
+        using var frame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.ShutdownStateUpdate,
+            BackendSidecarControlProtocol.SchemaVersion,
+            update,
+            SidecarShutdownStateUpdate.Codec);
         await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
     }
 
@@ -305,6 +372,18 @@ public sealed class BackendSidecarControlServerTests
             frame,
             BackendSidecarControlPacketIds.RuntimeStatusAck);
         return PacketCodec.Decode(frame, SidecarRuntimeStatusAck.Codec);
+    }
+
+    private static async Task<SidecarShutdownStateAck> ReadShutdownStateAckAsync(Stream stream)
+    {
+        using var frame = await PacketFrameReader.ReadAsync(
+            stream,
+            BackendSidecarControlProtocol.LocalControlPolicy,
+            CancellationToken.None) ?? throw new EndOfStreamException("Sidecar shutdown state ack was not written.");
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.ShutdownStateAck);
+        return PacketCodec.Decode(frame, SidecarShutdownStateAck.Codec);
     }
 
     private static int GetFreeTcpPort()

@@ -30,6 +30,8 @@ internal static class BackendSidecarControlPacketIds
     public const ushort EndpointStateAck = 4;
     public const ushort RuntimeStatusUpdate = 5;
     public const ushort RuntimeStatusAck = 6;
+    public const ushort ShutdownStateUpdate = 7;
+    public const ushort ShutdownStateAck = 8;
 }
 
 internal static class BackendSidecarControlProtocol
@@ -65,6 +67,7 @@ internal sealed class SidecarControlServer(
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly object m_EndpointReadinessSync = new();
     private readonly object m_RuntimeStatusSync = new();
+    private readonly object m_ShutdownStateSync = new();
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
     private readonly ConcurrentDictionary<Guid, string> m_ConnectionStates = [];
     private TaskCompletionSource<bool> m_EndpointReadySignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -76,6 +79,9 @@ internal sealed class SidecarControlServer(
     private int? m_RuntimeActiveChannels;
     private string m_RuntimeStatusDetail = "Not reported";
     private DateTimeOffset? m_RuntimeStatusChangedAt;
+    private bool m_CppRuntimeShuttingDown;
+    private string m_CppRuntimeShutdownReason = "Not requested";
+    private DateTimeOffset? m_CppRuntimeShutdownChangedAt;
     private long m_ValidationRequestCount;
     private long m_ValidationSuccessCount;
     private long m_ValidationFailureCount;
@@ -173,6 +179,8 @@ internal sealed class SidecarControlServer(
             new("Sidecar Control", "Gateway sessions", GetRuntimeActiveGatewaySessionsStatus()),
             new("Sidecar Control", "Active channels", GetRuntimeActiveChannelsStatus()),
             new("Sidecar Control", "Runtime detail", GetRuntimeStatusDetail()),
+            new("Sidecar Control", "Shutdown state", GetShutdownStateStatus()),
+            new("Sidecar Control", "Shutdown detail", GetShutdownDetail()),
             new("Sidecar Control", "Active connections", m_ConnectionStates.Count.ToString()),
             new("Sidecar Control", "Validation requests", Interlocked.Read(ref m_ValidationRequestCount).ToString()),
             new("Sidecar Control", "Validation succeeded", Interlocked.Read(ref m_ValidationSuccessCount).ToString()),
@@ -285,6 +293,15 @@ internal sealed class SidecarControlServer(
                         continue;
                     }
 
+                    if (frame.Header.PacketId == BackendSidecarControlPacketIds.ShutdownStateUpdate)
+                    {
+                        await HandleShutdownStateUpdateAsync(
+                            stream,
+                            frame,
+                            cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+
                     logger.LogWarning(
                         "Backend sidecar control rejected unsupported packet. ConnectionId={ConnectionId}, PacketKind={PacketKind}, PacketId={PacketId}.",
                         connectionId,
@@ -336,6 +353,26 @@ internal sealed class SidecarControlServer(
             BackendSidecarControlProtocol.SchemaVersion,
             response,
             DirectConnectCodeValidationResponse.Codec);
+        await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask HandleShutdownStateUpdateAsync(
+        Stream stream,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.ShutdownStateUpdate);
+        var update = PacketCodec.Decode(frame, SidecarShutdownStateUpdate.Codec);
+        SetShutdownState(update.ShuttingDown, update.Reason);
+
+        using var responseFrame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.ShutdownStateAck,
+            BackendSidecarControlProtocol.SchemaVersion,
+            SidecarShutdownStateAck.SuccessResult(update.RequestId),
+            SidecarShutdownStateAck.Codec);
         await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken).ConfigureAwait(false);
     }
 
@@ -509,6 +546,25 @@ internal sealed class SidecarControlServer(
         }
     }
 
+    private void SetShutdownState(bool shuttingDown, string reason)
+    {
+        var detail = string.IsNullOrWhiteSpace(reason)
+            ? (shuttingDown ? "Graceful shutdown requested" : "Shutdown cleared")
+            : reason;
+
+        lock (m_ShutdownStateSync)
+        {
+            m_CppRuntimeShuttingDown = shuttingDown;
+            m_CppRuntimeShutdownReason = detail;
+            m_CppRuntimeShutdownChangedAt = DateTimeOffset.UtcNow;
+        }
+
+        if (shuttingDown)
+        {
+            SetEndpointReadiness(ready: false, detail);
+        }
+    }
+
     private string GetRuntimeHealthStatus()
     {
         lock (m_RuntimeStatusSync)
@@ -542,6 +598,24 @@ internal sealed class SidecarControlServer(
             return m_RuntimeStatusChangedAt.HasValue
                 ? $"{m_RuntimeStatusDetail} ({m_RuntimeStatusChangedAt.Value.LocalDateTime:O})"
                 : m_RuntimeStatusDetail;
+        }
+    }
+
+    private string GetShutdownStateStatus()
+    {
+        lock (m_ShutdownStateSync)
+        {
+            return m_CppRuntimeShuttingDown ? "Requested" : "Not requested";
+        }
+    }
+
+    private string GetShutdownDetail()
+    {
+        lock (m_ShutdownStateSync)
+        {
+            return m_CppRuntimeShutdownChangedAt.HasValue
+                ? $"{m_CppRuntimeShutdownReason} ({m_CppRuntimeShutdownChangedAt.Value.LocalDateTime:O})"
+                : m_CppRuntimeShutdownReason;
         }
     }
 

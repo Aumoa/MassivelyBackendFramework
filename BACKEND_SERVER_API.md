@@ -98,6 +98,8 @@ Set `SidecarControl:RequireEndpointReadyBeforeAdvertise` to `true` when the C++ 
 
 The C++ process can report runtime health through `SidecarRuntimeStatusUpdate` as control packet id `5`. The sidecar acknowledges with `SidecarRuntimeStatusAck` as packet id `6` and includes the latest health, active Gateway session count, active channel count, and detail text in Master admin/status responses.
 
+Before graceful shutdown or draining, the C++ process can send `SidecarShutdownStateUpdate` as control packet id `7`. The sidecar acknowledges with `SidecarShutdownStateAck` as packet id `8`, marks the C++ endpoint not ready, and exposes the shutdown reason through Master admin/status responses.
+
 ## Runtime Lifecycle
 
 Backend runtime code implements `IBackendRuntime`.
@@ -270,3 +272,5 @@ The sidecar now provides a local direct-connect validation callout, but it still
 When endpoint readiness is required, Master advertisement is delayed until the sidecar receives a ready endpoint state update from the C++ data-plane process.
 
 The sidecar status surface includes the latest C++ runtime health and Gateway session counters reported over the local control listener.
+
+Shutdown state updates are control-plane coordination only. Existing Gateway data-plane sessions are still owned by the C++ process, which must close or drain them according to its own gameplay rules.
