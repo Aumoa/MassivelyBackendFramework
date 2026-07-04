@@ -4,6 +4,27 @@ namespace SecretGate.Services;
 
 public interface ISecretRepository
 {
+    Task<VaultProfileRecord?> GetVaultProfileAsync(
+        string ownerSubject,
+        CancellationToken cancellationToken = default);
+
+    Task InitializeVaultAsync(
+        string ownerSubject,
+        SecretEncryptionEnvelope profileEnvelope,
+        DateTime nowUtc,
+        CancellationToken cancellationToken = default);
+
+    Task ReplaceVaultEncryptionAsync(
+        string ownerSubject,
+        SecretEncryptionEnvelope profileEnvelope,
+        IReadOnlyList<VaultSecretEncryptionUpdate> secretUpdates,
+        DateTime nowUtc,
+        CancellationToken cancellationToken = default);
+
+    Task ResetVaultAsync(
+        string ownerSubject,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<StoredSecretRecord>> GetVaultSecretsAsync(
         string ownerSubject,
         CancellationToken cancellationToken = default);

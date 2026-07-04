@@ -183,4 +183,64 @@
   <data name="VAULT_TITLE" xml:space="preserve">
     <value>Vault key</value>
   </data>
+  <data name="CHANGE_VAULT_BUTTON" xml:space="preserve">
+    <value>Change password</value>
+  </data>
+  <data name="CHANGE_VAULT_CONFIRM_LABEL" xml:space="preserve">
+    <value>Confirm new password</value>
+  </data>
+  <data name="CHANGE_VAULT_PASSWORD_LABEL" xml:space="preserve">
+    <value>New vault password</value>
+  </data>
+  <data name="CHANGE_VAULT_TITLE" xml:space="preserve">
+    <value>Change vault password</value>
+  </data>
+  <data name="MESSAGE_CHANGE_REQUIRES_UNLOCK" xml:space="preserve">
+    <value>Unlock the vault before changing the password.</value>
+  </data>
+  <data name="MESSAGE_PASSWORD_CHANGED" xml:space="preserve">
+    <value>Vault password changed.</value>
+  </data>
+  <data name="MESSAGE_PASSWORD_MISMATCH" xml:space="preserve">
+    <value>Passwords do not match.</value>
+  </data>
+  <data name="MESSAGE_PASSWORD_REQUIRED" xml:space="preserve">
+    <value>Enter and confirm the vault password.</value>
+  </data>
+  <data name="MESSAGE_RESET_CONFIRMATION_REQUIRED" xml:space="preserve">
+    <value>Type RESET to reset the vault.</value>
+  </data>
+  <data name="MESSAGE_VAULT_INITIALIZED" xml:space="preserve">
+    <value>Vault password set.</value>
+  </data>
+  <data name="MESSAGE_VAULT_RESET" xml:space="preserve">
+    <value>Vault reset. Set a new password to use it again.</value>
+  </data>
+  <data name="RESET_CONFIRMATION_VALUE" xml:space="preserve">
+    <value>RESET</value>
+  </data>
+  <data name="RESET_VAULT_BUTTON" xml:space="preserve">
+    <value>Reset vault</value>
+  </data>
+  <data name="RESET_VAULT_LABEL" xml:space="preserve">
+    <value>Type RESET to delete all saved secrets and password metadata</value>
+  </data>
+  <data name="RESET_VAULT_TITLE" xml:space="preserve">
+    <value>Reset vault</value>
+  </data>
+  <data name="SETUP_VAULT_BUTTON" xml:space="preserve">
+    <value>Set password</value>
+  </data>
+  <data name="SETUP_VAULT_CONFIRM_LABEL" xml:space="preserve">
+    <value>Confirm vault password</value>
+  </data>
+  <data name="SETUP_VAULT_PASSWORD_LABEL" xml:space="preserve">
+    <value>Vault password</value>
+  </data>
+  <data name="SETUP_VAULT_TITLE" xml:space="preserve">
+    <value>Set vault password</value>
+  </data>
+  <data name="STATUS_UNINITIALIZED" xml:space="preserve">
+    <value>Password not set</value>
+  </data>
 </root>

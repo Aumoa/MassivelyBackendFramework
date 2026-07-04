@@ -33,6 +33,39 @@ public sealed class SecretShareServiceTests
 
         public SecretEncryptionEnvelope? LastShareEnvelope { get; private set; }
 
+        public Task<VaultProfileRecord?> GetVaultProfileAsync(
+            string ownerSubject,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<VaultProfileRecord?>(null);
+        }
+
+        public Task InitializeVaultAsync(
+            string ownerSubject,
+            SecretEncryptionEnvelope profileEnvelope,
+            DateTime nowUtc,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task ReplaceVaultEncryptionAsync(
+            string ownerSubject,
+            SecretEncryptionEnvelope profileEnvelope,
+            IReadOnlyList<VaultSecretEncryptionUpdate> secretUpdates,
+            DateTime nowUtc,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task ResetVaultAsync(
+            string ownerSubject,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
         public Task<IReadOnlyList<StoredSecretRecord>> GetVaultSecretsAsync(
             string ownerSubject,
             CancellationToken cancellationToken = default)

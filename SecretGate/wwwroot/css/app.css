@@ -228,6 +228,10 @@ button:disabled {
     margin-bottom: var(--space-6);
 }
 
+.danger-panel {
+    border-color: color-mix(in srgb, var(--color-danger) 24%, var(--color-border));
+}
+
 .inline-form,
 .secret-form {
     display: grid;
@@ -316,6 +320,11 @@ button:disabled {
 .btn-secondary:hover:not(:disabled),
 .icon-button:hover:not(:disabled) {
     background: var(--color-surface-muted);
+}
+
+.danger-action {
+    color: var(--color-danger);
+    border-color: color-mix(in srgb, var(--color-danger) 36%, var(--color-border));
 }
 
 .icon-button {
