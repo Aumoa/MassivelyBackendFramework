@@ -73,12 +73,14 @@ Implemented local validation callout: set `SidecarControl:Enabled` to `true`. Th
 - [x] Define the local IPC/shared-state protocol between sidecar and C++ server.
 - [x] Keep local IPC off the per-packet gameplay data path.
 - [x] Support direct-connect code validation requests and responses.
-- [ ] Support health/status updates from C++ server to sidecar.
+- [x] Support health/status updates from C++ server to sidecar.
 - [x] Support endpoint readiness signaling so sidecar does not advertise an unreachable C++ listener.
 - [ ] Support graceful shutdown coordination.
 - [x] Decide whether local communication uses named pipes, Unix domain sockets, TCP loopback, shared memory, or platform-specific primitives.
 
 Implemented endpoint readiness signaling: set `SidecarControl:RequireEndpointReadyBeforeAdvertise` to `true`. C++ sends `SidecarEndpointStateUpdate` as control packet id `3`; the sidecar acknowledges with `SidecarEndpointStateAck` as control packet id `4` and delays Master endpoint advertisement until readiness is true.
+
+Implemented runtime status reporting: C++ sends `SidecarRuntimeStatusUpdate` as control packet id `5`; the sidecar acknowledges with `SidecarRuntimeStatusAck` as control packet id `6` and includes the latest health/session/channel counters in Master admin/status output.
 
 ## Phase 5: C# And C++ Backend Framework Compatibility
 

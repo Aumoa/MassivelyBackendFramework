@@ -147,6 +147,57 @@ public sealed class BackendSidecarControlServerTests
     }
 
     [Fact]
+    public async Task RuntimeStatusUpdate_AcknowledgesAndUpdatesStatus()
+    {
+        var port = GetFreeTcpPort();
+        var server = CreateServer(
+            port,
+            new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend));
+        await server.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+
+            var update = new SidecarRuntimeStatusUpdate(
+                Guid.NewGuid(),
+                healthy: true,
+                activeGatewaySessions: 2,
+                activeChannels: 7,
+                "world tick stable");
+            await WriteRuntimeStatusUpdateAsync(stream, update);
+
+            var ack = await ReadRuntimeStatusAckAsync(stream);
+            Assert.True(ack.Success);
+            Assert.Equal(update.RequestId, ack.RequestId);
+
+            var status = server.GetStatusItems();
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Runtime health" &&
+                item.Value == "Healthy");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Gateway sessions" &&
+                item.Value == "2");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Active channels" &&
+                item.Value == "7");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Runtime detail" &&
+                item.Value.Contains("world tick stable", StringComparison.Ordinal));
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task StartAsync_RejectsNonLoopbackEndpoint()
     {
         var server = new SidecarControlServer(
@@ -207,6 +258,19 @@ public sealed class BackendSidecarControlServerTests
         await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
     }
 
+    private static async Task WriteRuntimeStatusUpdateAsync(
+        Stream stream,
+        SidecarRuntimeStatusUpdate update)
+    {
+        using var frame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.RuntimeStatusUpdate,
+            BackendSidecarControlProtocol.SchemaVersion,
+            update,
+            SidecarRuntimeStatusUpdate.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+    }
+
     private static async Task<DirectConnectCodeValidationResponse> ReadValidationResponseAsync(Stream stream)
     {
         using var frame = await PacketFrameReader.ReadAsync(
@@ -229,6 +293,18 @@ public sealed class BackendSidecarControlServerTests
             frame,
             BackendSidecarControlPacketIds.EndpointStateAck);
         return PacketCodec.Decode(frame, SidecarEndpointStateAck.Codec);
+    }
+
+    private static async Task<SidecarRuntimeStatusAck> ReadRuntimeStatusAckAsync(Stream stream)
+    {
+        using var frame = await PacketFrameReader.ReadAsync(
+            stream,
+            BackendSidecarControlProtocol.LocalControlPolicy,
+            CancellationToken.None) ?? throw new EndOfStreamException("Sidecar runtime status ack was not written.");
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.RuntimeStatusAck);
+        return PacketCodec.Decode(frame, SidecarRuntimeStatusAck.Codec);
     }
 
     private static int GetFreeTcpPort()

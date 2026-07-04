@@ -28,6 +28,8 @@ internal static class BackendSidecarControlPacketIds
     public const ushort DirectConnectCodeValidationResponse = 2;
     public const ushort EndpointStateUpdate = 3;
     public const ushort EndpointStateAck = 4;
+    public const ushort RuntimeStatusUpdate = 5;
+    public const ushort RuntimeStatusAck = 6;
 }
 
 internal static class BackendSidecarControlProtocol
@@ -62,12 +64,18 @@ internal sealed class SidecarControlServer(
     private readonly SidecarControlOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly object m_EndpointReadinessSync = new();
+    private readonly object m_RuntimeStatusSync = new();
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
     private readonly ConcurrentDictionary<Guid, string> m_ConnectionStates = [];
     private TaskCompletionSource<bool> m_EndpointReadySignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool m_EndpointReady;
     private string m_EndpointReadinessDetail = "Not signaled";
     private DateTimeOffset? m_EndpointReadinessChangedAt;
+    private bool? m_RuntimeHealthy;
+    private int? m_RuntimeActiveGatewaySessions;
+    private int? m_RuntimeActiveChannels;
+    private string m_RuntimeStatusDetail = "Not reported";
+    private DateTimeOffset? m_RuntimeStatusChangedAt;
     private long m_ValidationRequestCount;
     private long m_ValidationSuccessCount;
     private long m_ValidationFailureCount;
@@ -161,6 +169,10 @@ internal sealed class SidecarControlServer(
             new("Sidecar Control", "Endpoint readiness required", m_Options.RequireEndpointReadyBeforeAdvertise ? "Yes" : "No"),
             new("Sidecar Control", "Endpoint state", GetEndpointStateStatus()),
             new("Sidecar Control", "Endpoint detail", GetEndpointReadinessDetail()),
+            new("Sidecar Control", "Runtime health", GetRuntimeHealthStatus()),
+            new("Sidecar Control", "Gateway sessions", GetRuntimeActiveGatewaySessionsStatus()),
+            new("Sidecar Control", "Active channels", GetRuntimeActiveChannelsStatus()),
+            new("Sidecar Control", "Runtime detail", GetRuntimeStatusDetail()),
             new("Sidecar Control", "Active connections", m_ConnectionStates.Count.ToString()),
             new("Sidecar Control", "Validation requests", Interlocked.Read(ref m_ValidationRequestCount).ToString()),
             new("Sidecar Control", "Validation succeeded", Interlocked.Read(ref m_ValidationSuccessCount).ToString()),
@@ -264,6 +276,15 @@ internal sealed class SidecarControlServer(
                         continue;
                     }
 
+                    if (frame.Header.PacketId == BackendSidecarControlPacketIds.RuntimeStatusUpdate)
+                    {
+                        await HandleRuntimeStatusUpdateAsync(
+                            stream,
+                            frame,
+                            cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+
                     logger.LogWarning(
                         "Backend sidecar control rejected unsupported packet. ConnectionId={ConnectionId}, PacketKind={PacketKind}, PacketId={PacketId}.",
                         connectionId,
@@ -335,6 +356,26 @@ internal sealed class SidecarControlServer(
             BackendSidecarControlProtocol.SchemaVersion,
             SidecarEndpointStateAck.SuccessResult(update.RequestId),
             SidecarEndpointStateAck.Codec);
+        await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask HandleRuntimeStatusUpdateAsync(
+        Stream stream,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.RuntimeStatusUpdate);
+        var update = PacketCodec.Decode(frame, SidecarRuntimeStatusUpdate.Codec);
+        SetRuntimeStatus(update);
+
+        using var responseFrame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.RuntimeStatusAck,
+            BackendSidecarControlProtocol.SchemaVersion,
+            SidecarRuntimeStatusAck.SuccessResult(update.RequestId),
+            SidecarRuntimeStatusAck.Codec);
         await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken).ConfigureAwait(false);
     }
 
@@ -436,6 +477,20 @@ internal sealed class SidecarControlServer(
         readySignal?.TrySetResult(true);
     }
 
+    private void SetRuntimeStatus(SidecarRuntimeStatusUpdate update)
+    {
+        lock (m_RuntimeStatusSync)
+        {
+            m_RuntimeHealthy = update.Healthy;
+            m_RuntimeActiveGatewaySessions = update.ActiveGatewaySessions;
+            m_RuntimeActiveChannels = update.ActiveChannels;
+            m_RuntimeStatusDetail = string.IsNullOrWhiteSpace(update.Detail)
+                ? (update.Healthy ? "Healthy" : "Unhealthy")
+                : update.Detail;
+            m_RuntimeStatusChangedAt = DateTimeOffset.UtcNow;
+        }
+    }
+
     private string GetEndpointStateStatus()
     {
         lock (m_EndpointReadinessSync)
@@ -451,6 +506,42 @@ internal sealed class SidecarControlServer(
             return m_EndpointReadinessChangedAt.HasValue
                 ? $"{m_EndpointReadinessDetail} ({m_EndpointReadinessChangedAt.Value.LocalDateTime:O})"
                 : m_EndpointReadinessDetail;
+        }
+    }
+
+    private string GetRuntimeHealthStatus()
+    {
+        lock (m_RuntimeStatusSync)
+        {
+            return m_RuntimeHealthy.HasValue
+                ? (m_RuntimeHealthy.Value ? "Healthy" : "Unhealthy")
+                : "Unknown";
+        }
+    }
+
+    private string GetRuntimeActiveGatewaySessionsStatus()
+    {
+        lock (m_RuntimeStatusSync)
+        {
+            return m_RuntimeActiveGatewaySessions?.ToString() ?? "Unknown";
+        }
+    }
+
+    private string GetRuntimeActiveChannelsStatus()
+    {
+        lock (m_RuntimeStatusSync)
+        {
+            return m_RuntimeActiveChannels?.ToString() ?? "Unknown";
+        }
+    }
+
+    private string GetRuntimeStatusDetail()
+    {
+        lock (m_RuntimeStatusSync)
+        {
+            return m_RuntimeStatusChangedAt.HasValue
+                ? $"{m_RuntimeStatusDetail} ({m_RuntimeStatusChangedAt.Value.LocalDateTime:O})"
+                : m_RuntimeStatusDetail;
         }
     }
 

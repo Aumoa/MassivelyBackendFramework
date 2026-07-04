@@ -96,6 +96,8 @@ Set `SidecarControl:Enabled` to `true` when a C++ Backend/Dedicated process need
 
 Set `SidecarControl:RequireEndpointReadyBeforeAdvertise` to `true` when the C++ process should explicitly signal that its Gateway-facing listener is reachable before the sidecar advertises the endpoint to Master. The C++ process sends `SidecarEndpointStateUpdate` as control packet id `3`, and the sidecar returns `SidecarEndpointStateAck` as control packet id `4`.
 
+The C++ process can report runtime health through `SidecarRuntimeStatusUpdate` as control packet id `5`. The sidecar acknowledges with `SidecarRuntimeStatusAck` as packet id `6` and includes the latest health, active Gateway session count, active channel count, and detail text in Master admin/status responses.
+
 ## Runtime Lifecycle
 
 Backend runtime code implements `IBackendRuntime`.
@@ -266,3 +268,5 @@ C++ sidecar mode currently covers Master control-plane registration and endpoint
 The sidecar now provides a local direct-connect validation callout, but it still does not relay Gateway channel traffic. The C++ data-plane process remains responsible for accepting Gateway sessions only after a successful local validation response.
 
 When endpoint readiness is required, Master advertisement is delayed until the sidecar receives a ready endpoint state update from the C++ data-plane process.
+
+The sidecar status surface includes the latest C++ runtime health and Gateway session counters reported over the local control listener.
