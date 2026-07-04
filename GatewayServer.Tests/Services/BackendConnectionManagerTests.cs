@@ -163,6 +163,91 @@ public sealed class BackendConnectionManagerTests
     }
 
     [Fact]
+    public async Task SnapshotChanged_ReconnectsPeerWhenManifestChangesForSameEndpoint()
+    {
+        await using var backend = new ReconnectingFakeBackendServer();
+        var issuer = new RecordingDirectConnectCodeIssuer("direct-code");
+        var initialManifestId = new BackendPacketManifestId("test");
+        var initialManifestHash = new BackendPacketManifestHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        var rotatedManifestId = new BackendPacketManifestId("test-rotated");
+        var rotatedManifestHash = new BackendPacketManifestHash("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        var catalog = new FakeBackendNodeCatalog(CreateSnapshot(
+            CreateNode(
+                "alpha",
+                "backend-a",
+                "master-a",
+                backend.Port,
+                initialManifestId,
+                initialManifestHash)));
+        var manager = CreateManager(catalog, issuer);
+        manager.SetMasterConnectionId("gateway-master-a");
+        await manager.StartAsync(CancellationToken.None);
+
+        var sessionClosed = new TaskCompletionSource<BackendRouteSessionClosed>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        manager.RouteSessionClosed += (closed, _) =>
+        {
+            sessionClosed.TrySetResult(closed);
+            return ValueTask.CompletedTask;
+        };
+
+        using var firstRequestFrame = CreateBackendRouteFrame(
+            "alpha",
+            Guid.NewGuid(),
+            PacketKind.Request,
+            routedPacketId: 101,
+            routedVersion: 2,
+            [1, 2, 3]);
+        using var secondRequestFrame = CreateBackendRouteFrame(
+            "alpha",
+            Guid.NewGuid(),
+            PacketKind.Request,
+            routedPacketId: 102,
+            routedVersion: 2,
+            [4, 5, 6]);
+
+        try
+        {
+            await manager.RelayFrameAsync("alpha", firstRequestFrame, CancellationToken.None);
+            var firstConnection = await backend.WaitForConnectionAsync(1);
+            Assert.Equal("backend-direct-1", firstConnection.DirectConnectionId);
+            Assert.Equal((ushort)101, firstConnection.RelayedEnvelope.RoutedPacketId);
+
+            catalog.Publish(CreateSnapshot(
+                CreateNode(
+                    "alpha",
+                    "backend-a",
+                    "master-a",
+                    backend.Port,
+                    rotatedManifestId,
+                    rotatedManifestHash)));
+
+            var closed = await sessionClosed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("backend-direct-1", closed.Binding.DirectConnectionId);
+
+            await manager.RelayFrameAsync("alpha", secondRequestFrame, CancellationToken.None);
+            var secondConnection = await backend.WaitForConnectionAsync(2);
+            Assert.Equal("backend-direct-2", secondConnection.DirectConnectionId);
+            Assert.Equal((ushort)102, secondConnection.RelayedEnvelope.RoutedPacketId);
+            Assert.Equal(2, issuer.Requests.Length);
+
+            var status = manager.GetStatusItems();
+            Assert.Contains(status, item =>
+                item.Group == "Backend alpha/backend-a" &&
+                item.Name == "Manifest id" &&
+                item.Value == rotatedManifestId.Value);
+            Assert.Contains(status, item =>
+                item.Group == "Backend alpha/backend-a" &&
+                item.Name == "Manifest hash" &&
+                item.Value == rotatedManifestHash.Value);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task RelayFrameAsync_RaisesRouteDataFrames()
     {
         var routeDataPayload = new byte[] { 4, 5, 6 };
@@ -452,7 +537,9 @@ public sealed class BackendConnectionManagerTests
         string backendKind,
         string nodeId,
         string masterConnectionId,
-        int port = 18000)
+        int port = 18000,
+        BackendPacketManifestId? manifestId = null,
+        BackendPacketManifestHash? manifestHash = null)
     {
         return new BackendNodeEndpoint(
             backendKind,
@@ -460,8 +547,8 @@ public sealed class BackendConnectionManagerTests
             displayName: nodeId,
             masterConnectionId,
             new MasterSocketEndpoint("127.0.0.1", port, useTls: false),
-            new BackendPacketManifestId("test"),
-            new BackendPacketManifestHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            manifestId ?? new BackendPacketManifestId("test"),
+            manifestHash ?? new BackendPacketManifestHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
             DateTimeOffset.UtcNow);
     }
 
@@ -554,6 +641,230 @@ public sealed class BackendConnectionManagerTests
     private sealed record DirectConnectCodeRequestRecord(
         MasterNodeKind TargetNodeKind,
         string TargetMasterConnectionId);
+
+    private sealed class ReconnectingFakeBackendServer : IAsyncDisposable
+    {
+        private readonly TcpListener m_Listener;
+        private readonly CancellationTokenSource m_Cancellation = new();
+        private readonly List<Task> m_ConnectionTasks = [];
+        private readonly List<TaskCompletionSource<ObservedBackendConnection>> m_Connections = [];
+        private readonly Task m_AcceptTask;
+        private int m_NextConnectionNumber;
+
+        public ReconnectingFakeBackendServer()
+        {
+            m_Listener = new TcpListener(IPAddress.Loopback, 0);
+            m_Listener.Start();
+            Port = ((IPEndPoint)m_Listener.LocalEndpoint).Port;
+            m_AcceptTask = AcceptAsync(m_Cancellation.Token);
+        }
+
+        public int Port { get; }
+
+        public Task<ObservedBackendConnection> WaitForConnectionAsync(int connectionNumber)
+        {
+            return GetConnectionSource(connectionNumber).Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await m_Cancellation.CancelAsync();
+            m_Listener.Stop();
+
+            try
+            {
+                await m_AcceptTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (SocketException)
+            {
+            }
+
+            Task[] connectionTasks;
+            lock (m_ConnectionTasks)
+            {
+                connectionTasks = [.. m_ConnectionTasks];
+            }
+
+            try
+            {
+                await Task.WhenAll(connectionTasks).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (SocketException)
+            {
+            }
+            catch (IOException)
+            {
+            }
+
+            m_Cancellation.Dispose();
+        }
+
+        private async Task AcceptAsync(CancellationToken cancellationToken)
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var tcpClient = await m_Listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);
+                var connectionNumber = Interlocked.Increment(ref m_NextConnectionNumber);
+                var task = HandleConnectionAsync(tcpClient, connectionNumber, cancellationToken);
+                lock (m_ConnectionTasks)
+                {
+                    m_ConnectionTasks.Add(task);
+                }
+            }
+        }
+
+        private async Task HandleConnectionAsync(
+            TcpClient tcpClient,
+            int connectionNumber,
+            CancellationToken cancellationToken)
+        {
+            var connectionSource = GetConnectionSource(connectionNumber);
+            try
+            {
+                using var _ = tcpClient;
+                await using var stream = tcpClient.GetStream();
+
+                    await WriteControlFrameAsync(
+                        stream,
+                        MasterControlPacketIds.NodeAuthChallenge,
+                        new NodeAuthChallenge("challenge-a", new byte[MasterControlProtocol.AuthNonceLength]),
+                        NodeAuthChallenge.Codec,
+                        cancellationToken);
+
+                    var hello = await ReadControlFrameAsync(
+                        stream,
+                        MasterControlPacketIds.NodeHello,
+                        NodeHello.Codec,
+                        cancellationToken);
+                    var directConnectCode = await ReadControlFrameAsync(
+                        stream,
+                        MasterControlPacketIds.DirectConnectCode,
+                        DirectConnectCode.Codec,
+                        cancellationToken);
+                    var directConnectionId = $"backend-direct-{connectionNumber}";
+
+                    await WriteControlFrameAsync(
+                        stream,
+                        MasterControlPacketIds.NodeAccepted,
+                        new NodeAccepted(hello.NodeId, directConnectionId),
+                        NodeAccepted.Codec,
+                        cancellationToken);
+
+                    using var relayedFrame = await ReadRequiredFrameAsync(
+                        stream,
+                        MasterControlProtocol.TrustedControlPlanePolicy,
+                        cancellationToken);
+                    if (relayedFrame.Header.PacketId != Pid.GATE_BACKEND_ROUTE ||
+                        relayedFrame.Header.Version != GatewayBackendRouteEnvelope.ProtocolVersion)
+                    {
+                        throw new InvalidOperationException("Gateway relayed an unexpected Backend route frame.");
+                    }
+
+                    var relayedEnvelope = PacketCodec.Decode(relayedFrame, GatewayBackendRouteEnvelope.Codec);
+                    connectionSource.TrySetResult(new ObservedBackendConnection(
+                        connectionNumber,
+                        new ObservedBackendHandshake(hello, directConnectCode),
+                        directConnectionId,
+                        relayedEnvelope));
+
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        using var frame = await PacketFrameReader.ReadAsync(
+                            stream,
+                            MasterControlProtocol.TrustedControlPlanePolicy,
+                            cancellationToken);
+                        if (frame == null)
+                        {
+                            return;
+                        }
+                    }
+            }
+            catch (Exception) when (cancellationToken.IsCancellationRequested ||
+                                    connectionSource.Task.IsCompletedSuccessfully)
+            {
+            }
+            catch (Exception e)
+            {
+                connectionSource.TrySetException(e);
+            }
+        }
+
+        private TaskCompletionSource<ObservedBackendConnection> GetConnectionSource(int connectionNumber)
+        {
+            if (connectionNumber <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(connectionNumber));
+            }
+
+            lock (m_Connections)
+            {
+                while (m_Connections.Count < connectionNumber)
+                {
+                    m_Connections.Add(new TaskCompletionSource<ObservedBackendConnection>(
+                        TaskCreationOptions.RunContinuationsAsynchronously));
+                }
+
+                return m_Connections[connectionNumber - 1];
+            }
+        }
+
+        private static async Task<TPacket> ReadControlFrameAsync<TPacket>(
+            Stream stream,
+            ushort packetId,
+            IPacketCodec<TPacket> codec,
+            CancellationToken cancellationToken)
+        {
+            using var frame = await ReadRequiredFrameAsync(
+                stream,
+                MasterControlProtocol.UntrustedHandshakePolicy,
+                cancellationToken);
+            MasterControlProtocol.ValidateControlFrame(frame, packetId);
+            return PacketCodec.Decode(frame, codec);
+        }
+
+        private static async Task<PacketFrame> ReadRequiredFrameAsync(
+            Stream stream,
+            PacketReadPolicy policy,
+            CancellationToken cancellationToken)
+        {
+            var frame = await PacketFrameReader.ReadAsync(stream, policy, cancellationToken);
+            return frame ?? throw new EndOfStreamException("Backend test connection closed.");
+        }
+
+        private static async Task WriteControlFrameAsync<TPacket>(
+            Stream stream,
+            ushort packetId,
+            TPacket value,
+            IPacketCodec<TPacket> codec,
+            CancellationToken cancellationToken)
+        {
+            using var frame = PacketCodec.Encode(
+                PacketKind.Control,
+                packetId,
+                MasterControlProtocol.SchemaVersion,
+                value,
+                codec);
+            await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken);
+        }
+    }
+
+    private sealed record ObservedBackendConnection(
+        int ConnectionNumber,
+        ObservedBackendHandshake Handshake,
+        string DirectConnectionId,
+        GatewayBackendRouteEnvelope RelayedEnvelope);
 
     private sealed class FakeBackendServer : IAsyncDisposable
     {

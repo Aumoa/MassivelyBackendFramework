@@ -361,7 +361,8 @@ internal sealed class BackendConnectionManager(
             {
                 if (!desired.TryGetValue(current.Node.MasterConnectionId, out var next) ||
                     !HasSameEndpoint(current.Node, next) ||
-                    !string.Equals(current.Node.BackendKind, next.BackendKind, StringComparison.Ordinal))
+                    !string.Equals(current.Node.BackendKind, next.BackendKind, StringComparison.Ordinal) ||
+                    !HasSameManifest(current.Node, next))
                 {
                     m_Peers.Remove(current.Node.MasterConnectionId);
                     m_PeerStates.TryRemove(current.Node.MasterConnectionId, out _);
@@ -935,6 +936,12 @@ internal sealed class BackendConnectionManager(
         return string.Equals(left.GatewayEndpoint.IPAddress, right.GatewayEndpoint.IPAddress, StringComparison.Ordinal) &&
                left.GatewayEndpoint.Port == right.GatewayEndpoint.Port &&
                left.GatewayEndpoint.UseTls == right.GatewayEndpoint.UseTls;
+    }
+
+    private static bool HasSameManifest(BackendNodeEndpoint left, BackendNodeEndpoint right)
+    {
+        return left.ManifestId == right.ManifestId &&
+               left.ManifestHash == right.ManifestHash;
     }
 
     private static string NormalizeBackendKind(string backendKind)
