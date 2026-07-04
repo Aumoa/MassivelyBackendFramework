@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Options;
 using MySql.Data.MySqlClient;
 using SecretGate.Models;
@@ -200,7 +201,7 @@ ORDER BY `updated_at` DESC;";
         while (await reader.ReadAsync(cancellationToken))
         {
             records.Add(new StoredSecretRecord(
-                Guid.Parse(reader.GetString(0)),
+                ReadGuid(reader.GetValue(0)),
                 reader.GetString(1),
                 (byte[])reader["salt"],
                 (byte[])reader["nonce"],
@@ -341,7 +342,7 @@ FOR UPDATE;";
             if (await reader.ReadAsync(cancellationToken))
             {
                 record = new SharedSecretRecord(
-                    Guid.Parse(reader.GetString(0)),
+                    ReadGuid(reader.GetValue(0)),
                     (byte[])reader["salt"],
                     (byte[])reader["nonce"],
                     (byte[])reader["cipher_text"],
@@ -372,6 +373,36 @@ FOR UPDATE;";
     private MySqlConnection GetConnection()
     {
         return new MySqlConnection(options.Value.ConnectionString);
+    }
+
+    internal static Guid ReadGuid(object value)
+    {
+        if (value is null || value == DBNull.Value)
+        {
+            throw new InvalidCastException("Cannot convert null database value to Guid.");
+        }
+
+        if (value is Guid guid)
+        {
+            return guid;
+        }
+
+        if (value is string text)
+        {
+            return Guid.Parse(text);
+        }
+
+        if (value is byte[] bytes)
+        {
+            if (bytes.Length == 16)
+            {
+                return new Guid(bytes);
+            }
+
+            return Guid.Parse(Encoding.UTF8.GetString(bytes));
+        }
+
+        throw new InvalidCastException($"Cannot convert database value of type '{value.GetType().FullName}' to Guid.");
     }
 
     private static void AddBinary(MySqlCommand command, string name, byte[] value)
