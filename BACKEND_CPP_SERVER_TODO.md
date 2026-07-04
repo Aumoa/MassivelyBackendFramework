@@ -61,7 +61,7 @@ Implemented local validation callout: set `SidecarControl:Enabled` to `true`. Th
 ## Phase 3: C++ Data Plane
 
 - [x] Implement a C++ `PacketCore` reader/writer compatible with the C# implementation.
-- [ ] Implement Gateway direct connection accept/listen logic in C++.
+- [x] Implement Gateway direct connection accept/listen logic in C++.
 - [x] Implement Gateway handshake handling in C++.
 - [x] Call the sidecar for direct-connect code validation during handshake.
 - [x] Accept trusted Gateway sessions only after validation succeeds.
@@ -77,6 +77,8 @@ Implemented C++ direct handshake state machine: C++ decodes Gateway `NodeHello` 
 Implemented C++ sidecar validation client: `sidecar_direct_connect_code_validator` connects to the sidecar loopback PacketCore control endpoint, sends `DirectConnectCodeValidationRequest`, reads `DirectConnectCodeValidationResponse`, and rejects mismatched response ids. The Gateway listener accept loop is still pending.
 
 Implemented C++ trusted Gateway session state: C++ tracks channel open/data/close events, rejects data for unknown channels, clears channel state on disconnect, and serializes Backend-origin channel data/close writes through a per-session write lock.
+
+Implemented C++ Gateway direct listener: `gateway_direct_listener` binds a TCP endpoint, accepts a Gateway connection, sends the Master-compatible auth challenge, reads `NodeHello` and `DirectConnectCode`, validates through the configured validator, and writes `NodeAccepted` after successful validation.
 
 ## Phase 4: Sidecar And C++ Local Contract
 
@@ -122,7 +124,7 @@ Implemented manifest snapshot sharing: Master sends approved `BackendPacketManif
 
 - [x] Add C# and C++ wire codec compatibility test vectors.
 - [x] Add integration tests for sidecar Master registration with a C++ endpoint advertisement.
-- [ ] Add integration tests for Gateway direct connection to a C++ Backend test server.
+- [x] Add integration tests for Gateway direct connection to a C++ Backend test server.
 - [x] Add handshake rejection tests for invalid direct-connect codes.
 - [x] Add channel open/data/close tests against the C++ data-plane implementation.
 - [ ] Add shutdown and reconnect tests for sidecar and C++ server coordination.

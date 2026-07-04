@@ -248,6 +248,33 @@ socket_owner create_listener(std::uint16_t& port)
     return listener;
 }
 
+socket_owner connect_loopback(std::uint16_t port)
+{
+    socket_owner client(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+    if (!client) {
+        throw std::runtime_error("Could not create client socket.");
+    }
+
+    sockaddr_in address {};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(port);
+#ifdef _WIN32
+    if (InetPtonA(AF_INET, "127.0.0.1", &address.sin_addr) != 1) {
+        throw std::runtime_error("Could not parse loopback address.");
+    }
+#else
+    if (inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) != 1) {
+        throw std::runtime_error("Could not parse loopback address.");
+    }
+#endif
+
+    if (::connect(client.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
+        throw std::runtime_error("Could not connect client socket.");
+    }
+
+    return client;
+}
+
 struct observed_validation_request {
     std::string code;
     std::string gateway_node_id;
@@ -308,6 +335,35 @@ std::future<observed_validation_request> accept_one_validation_request(
         });
 }
 
+class recording_validator final : public direct_connect_code_validator {
+public:
+    int call_count = 0;
+    std::string code;
+    std::string gateway_node_id;
+    std::string gateway_master_connection_id;
+
+    direct_connect_code_validation_response validate(
+        const std::string& requested_code,
+        const std::string& requested_gateway_node_id,
+        const std::string& requested_gateway_master_connection_id) override
+    {
+        ++call_count;
+        code = requested_code;
+        gateway_node_id = requested_gateway_node_id;
+        gateway_master_connection_id = requested_gateway_master_connection_id;
+        return direct_connect_code_validation_response {
+            {},
+            true,
+            requested_gateway_node_id,
+            requested_gateway_master_connection_id,
+            master_node_kind::backend,
+            "cpp-backend",
+            "backend-master-a",
+            "",
+        };
+    }
+};
+
 void sidecar_validator_sends_validation_request()
 {
     socket_runtime runtime;
@@ -348,6 +404,75 @@ void sidecar_validator_rejects_mismatched_response_id()
     throw std::runtime_error("Mismatched sidecar response id did not throw.");
 }
 
+void gateway_direct_listener_accepts_gateway_handshake()
+{
+    socket_runtime runtime;
+    node_auth_challenge challenge;
+    challenge.challenge_id = "challenge-a";
+    for (std::size_t index = 0; index < challenge.nonce.size(); ++index) {
+        challenge.nonce[index] = static_cast<std::uint8_t>(index);
+    }
+
+    recording_validator validator;
+    gateway_direct_listener listener(
+        gateway_listener_endpoint {
+            "127.0.0.1",
+            0,
+            1,
+        },
+        challenge,
+        validator);
+
+    auto server = std::async(
+        std::launch::async,
+        [&listener] {
+            return listener.accept_one("backend-connection-a");
+        });
+
+    auto client = connect_loopback(listener.port());
+    auto challenge_frame = read_frame(client.get());
+    require(challenge_frame.header.kind == packet_kind::control, "Challenge frame kind mismatch.");
+    require(challenge_frame.header.packet_id == master_pid_node_auth_challenge, "Challenge packet id mismatch.");
+    auto decoded_challenge = decode_node_auth_challenge(challenge_frame.payload);
+    require(decoded_challenge.challenge_id == challenge.challenge_id, "Challenge id mismatch.");
+    require(decoded_challenge.nonce == challenge.nonce, "Challenge nonce mismatch.");
+
+    auto hello_frame = make_frame(
+        packet_kind::control,
+        master_pid_node_hello,
+        master_control_schema_version,
+        encode_node_hello(node_hello {
+            master_node_kind::gateway,
+            master_control_schema_version,
+            "gateway-a",
+            "Gateway A",
+            "gateway-master-a",
+        }));
+    write_frame(client.get(), hello_frame);
+
+    auto code_frame = make_frame(
+        packet_kind::control,
+        master_pid_direct_connect_code,
+        master_control_schema_version,
+        encode_direct_connect_code(direct_connect_code {
+            "code-1",
+        }));
+    write_frame(client.get(), code_frame);
+
+    auto accepted_frame = read_frame(client.get());
+    require(accepted_frame.header.kind == packet_kind::control, "Accepted frame kind mismatch.");
+    require(accepted_frame.header.packet_id == master_pid_node_accepted, "Accepted packet id mismatch.");
+    auto accepted = decode_node_accepted(accepted_frame.payload);
+    require(accepted.node_id == "gateway-a", "Accepted node id mismatch.");
+    require(accepted.connection_id == "backend-connection-a", "Accepted connection id mismatch.");
+
+    auto result = server.get();
+    require(result.gateway_node_id == "gateway-a", "Server result gateway node mismatch.");
+    require(result.gateway_master_connection_id == "gateway-master-a", "Server result Gateway Master id mismatch.");
+    require(validator.call_count == 1, "Validator call count mismatch.");
+    require(validator.code == "code-1", "Validator code mismatch.");
+}
+
 } // namespace
 
 int main()
@@ -355,6 +480,7 @@ int main()
     try {
         sidecar_validator_sends_validation_request();
         sidecar_validator_rejects_mismatched_response_id();
+        gateway_direct_listener_accepts_gateway_handshake();
     } catch (const std::exception& exception) {
         std::cerr << exception.what() << '\n';
         return 1;

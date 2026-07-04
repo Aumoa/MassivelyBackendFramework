@@ -14,8 +14,10 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #else
+#include <arpa/inet.h>
 #include <cerrno>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #endif
@@ -240,6 +242,66 @@ socket_owner connect_tcp(const sidecar_control_endpoint& endpoint)
     throw packet_error(socket_error_message("Failed to connect to sidecar endpoint."));
 }
 
+socket_owner listen_tcp(const gateway_listener_endpoint& endpoint, std::uint16_t& bound_port)
+{
+    if (endpoint.host.empty()) {
+        throw packet_error("Gateway listener host is required.");
+    }
+
+    if (endpoint.backlog <= 0) {
+        throw packet_error("Gateway listener backlog must be greater than zero.");
+    }
+
+    static socket_runtime runtime;
+
+    socket_owner listener(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+    if (!listener) {
+        throw packet_error(socket_error_message("Failed to create Gateway listener socket."));
+    }
+
+    int enabled = 1;
+    setsockopt(
+        listener.get(),
+        SOL_SOCKET,
+        SO_REUSEADDR,
+        reinterpret_cast<const char*>(&enabled),
+        sizeof(enabled));
+
+    sockaddr_in address {};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(endpoint.port);
+#ifdef _WIN32
+    if (InetPtonA(AF_INET, endpoint.host.c_str(), &address.sin_addr) != 1) {
+        throw packet_error("Failed to parse Gateway listener address.");
+    }
+#else
+    if (inet_pton(AF_INET, endpoint.host.c_str(), &address.sin_addr) != 1) {
+        throw packet_error("Failed to parse Gateway listener address.");
+    }
+#endif
+
+    if (::bind(listener.get(), reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
+        throw packet_error(socket_error_message("Failed to bind Gateway listener socket."));
+    }
+
+    if (::listen(listener.get(), endpoint.backlog) != 0) {
+        throw packet_error(socket_error_message("Failed to listen on Gateway socket."));
+    }
+
+    sockaddr_in bound {};
+#ifdef _WIN32
+    int bound_length = sizeof(bound);
+#else
+    socklen_t bound_length = sizeof(bound);
+#endif
+    if (getsockname(listener.get(), reinterpret_cast<sockaddr*>(&bound), &bound_length) != 0) {
+        throw packet_error(socket_error_message("Failed to read Gateway listener port."));
+    }
+
+    bound_port = ntohs(bound.sin_port);
+    return listener;
+}
+
 void send_all(socket_handle socket, std::span<const std::uint8_t> bytes)
 {
     std::size_t sent = 0;
@@ -376,6 +438,76 @@ direct_connect_code_validation_response sidecar_direct_connect_code_validator::v
     }
 
     return response;
+}
+
+class gateway_direct_listener::impl {
+public:
+    impl(
+        gateway_listener_endpoint endpoint,
+        node_auth_challenge challenge,
+        direct_connect_code_validator& validator)
+        : m_listener(listen_tcp(endpoint, m_port)),
+          m_challenge(std::move(challenge)),
+          m_validator(&validator)
+    {
+    }
+
+    std::uint16_t port() const noexcept
+    {
+        return m_port;
+    }
+
+    gateway_direct_handshake_result accept_one(const std::string& backend_connection_id)
+    {
+        socket_owner client(::accept(m_listener.get(), nullptr, nullptr));
+        if (!client) {
+            throw packet_error(socket_error_message("Gateway listener accept failed."));
+        }
+
+        write_socket_frame(client.get(), create_node_auth_challenge_frame(m_challenge));
+        auto hello_frame = read_socket_frame(client.get(), master_max_handshake_payload_length);
+        auto direct_connect_code_frame = read_socket_frame(client.get(), master_max_handshake_payload_length);
+        auto result = complete_gateway_direct_handshake(
+            hello_frame,
+            direct_connect_code_frame,
+            *m_validator,
+            backend_connection_id);
+        write_socket_frame(client.get(), result.accepted_frame);
+        return result;
+    }
+
+private:
+    std::uint16_t m_port = 0;
+    socket_owner m_listener;
+    node_auth_challenge m_challenge;
+    direct_connect_code_validator* m_validator;
+};
+
+gateway_direct_listener::gateway_direct_listener(
+    gateway_listener_endpoint endpoint,
+    node_auth_challenge challenge,
+    direct_connect_code_validator& validator)
+    : m_impl(std::make_unique<impl>(
+          std::move(endpoint),
+          std::move(challenge),
+          validator))
+{
+}
+
+gateway_direct_listener::~gateway_direct_listener() = default;
+
+gateway_direct_listener::gateway_direct_listener(gateway_direct_listener&&) noexcept = default;
+
+gateway_direct_listener& gateway_direct_listener::operator=(gateway_direct_listener&&) noexcept = default;
+
+std::uint16_t gateway_direct_listener::port() const noexcept
+{
+    return m_impl->port();
+}
+
+gateway_direct_handshake_result gateway_direct_listener::accept_one(const std::string& backend_connection_id)
+{
+    return m_impl->accept_one(backend_connection_id);
 }
 
 void packet_writer::write_byte(std::uint8_t value)

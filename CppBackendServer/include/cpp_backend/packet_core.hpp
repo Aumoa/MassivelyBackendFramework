@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <span>
@@ -100,6 +101,7 @@ constexpr std::uint16_t master_pid_node_hello = 101;
 constexpr std::uint16_t master_pid_node_accepted = 103;
 constexpr std::uint16_t master_pid_direct_connect_code = 115;
 constexpr std::size_t master_auth_nonce_length = 32;
+constexpr std::uint32_t master_max_handshake_payload_length = 16 * 1024;
 
 enum class master_node_kind : std::uint8_t {
     unknown = 0,
@@ -215,6 +217,34 @@ struct gateway_direct_handshake_result {
     std::string gateway_node_id;
     std::string gateway_master_connection_id;
     packet_frame accepted_frame;
+};
+
+struct gateway_listener_endpoint {
+    std::string host = "127.0.0.1";
+    std::uint16_t port = 0;
+    int backlog = 16;
+};
+
+class gateway_direct_listener {
+public:
+    gateway_direct_listener(
+        gateway_listener_endpoint endpoint,
+        node_auth_challenge challenge,
+        direct_connect_code_validator& validator);
+    ~gateway_direct_listener();
+
+    gateway_direct_listener(const gateway_direct_listener&) = delete;
+    gateway_direct_listener& operator=(const gateway_direct_listener&) = delete;
+    gateway_direct_listener(gateway_direct_listener&&) noexcept;
+    gateway_direct_listener& operator=(gateway_direct_listener&&) noexcept;
+
+    std::uint16_t port() const noexcept;
+
+    gateway_direct_handshake_result accept_one(const std::string& backend_connection_id);
+
+private:
+    class impl;
+    std::unique_ptr<impl> m_impl;
 };
 
 enum class gateway_session_event_kind {
