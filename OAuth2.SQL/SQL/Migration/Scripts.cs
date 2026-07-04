@@ -19,5 +19,6 @@ public partial class Scripts : IScripts
         yield return new _10__Add_client_default_scopes();
         yield return new _11__Add_oauth_grant();
         yield return new _12__Add_account_updated_at();
+        yield return new _13__Add_client_offline_access_scope();
     }
 }

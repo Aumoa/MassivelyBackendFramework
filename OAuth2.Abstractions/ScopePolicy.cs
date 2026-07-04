@@ -26,7 +26,7 @@ public static class ScopePolicy
         OfflineAccessScope
     ];
 
-    public static readonly string[] DefaultClientScopes = ClaimScopes;
+    public static readonly string[] DefaultClientScopes = [.. ClaimScopes, OfflineAccessScope];
 
     public static bool TryNormalize(string? scopes, bool allowAll, out string normalized, out string? error)
     {

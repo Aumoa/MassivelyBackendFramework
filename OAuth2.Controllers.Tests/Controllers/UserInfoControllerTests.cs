@@ -218,6 +218,11 @@ public sealed class UserInfoControllerTests
             throw new NotSupportedException();
         }
 
+        public string Issue(string audience, DateTime expires, params Claim[] claims)
+        {
+            throw new NotSupportedException();
+        }
+
         public TokenValidationParameters GetValidationParameters()
         {
             throw new NotSupportedException();

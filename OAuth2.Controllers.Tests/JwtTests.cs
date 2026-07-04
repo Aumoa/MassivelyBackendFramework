@@ -12,6 +12,18 @@ namespace OAuth2.Controllers.Tests;
 
 public sealed class JwtTests
 {
+    [Fact]
+    public void Issue_WithExplicitExpiry_UsesProvidedExpiry()
+    {
+        using var fixture = new JwtFixture();
+        var jwt = fixture.CreateJwt();
+        var expires = new DateTime(2030, 1, 2, 3, 4, 5, DateTimeKind.Utc);
+
+        var token = new JwtSecurityTokenHandler().ReadJwtToken(jwt.Issue("client", expires));
+
+        Assert.Equal(expires, token.ValidTo);
+    }
+
     [Theory]
     [MemberData(nameof(UpdatedAtCases))]
     public void ConfigureClaims_UsesNewestAccountOrClaimTimestamp(

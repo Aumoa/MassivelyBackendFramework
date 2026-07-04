@@ -15,5 +15,6 @@ public interface IJwt
 
     Claim[] ConfigureClaims(in RawAccount account, string scopes, AccountClaim[] accountClaims, string? nonce, bool idToken, long? authTime = null, string? acr = null, string? additionalClaims = null);
     string Issue(string audience, params Claim[] claims);
+    string Issue(string audience, DateTime expires, params Claim[] claims);
     TokenValidationParameters GetValidationParameters();
 }

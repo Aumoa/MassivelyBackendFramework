@@ -7,7 +7,7 @@
     {
         if (firstRender)
         {
-            Auth.NavigateToLogin(Nav, "auth/redirect", "openid profile email groups");
+            Auth.NavigateToLogin(Nav, "auth/redirect", "openid profile email groups offline_access");
         }
 
         return Task.CompletedTask;
