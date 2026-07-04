@@ -139,7 +139,7 @@ internal class JwtAuthenticationStateProvider(
                 return;
             }
 
-            if (!TryUnprotectCodeVerifier(state, out var codeVerifier))
+            if (!TryConsumePkceState(state, out var codeVerifier, out var nonce))
             {
                 logger.LogInformation("Failed to validate PKCE state for authorization code exchange.");
                 m_LastSuccessfullyCode = null;
@@ -186,7 +186,13 @@ internal class JwtAuthenticationStateProvider(
             {
                 try
                 {
-                    await tokenValidator.ValidateAsync(tokenResponse.IdToken, cancellationToken);
+                    var validatedToken = await tokenValidator.ValidateAsync(tokenResponse.IdToken, cancellationToken);
+                    if (!HasExpectedNonce(validatedToken.Token, nonce))
+                    {
+                        logger.LogWarning("Received id_token nonce validation failed.");
+                        m_LastSuccessfullyCode = null;
+                        return;
+                    }
                 }
                 catch (SecurityTokenException ex)
                 {
@@ -241,9 +247,17 @@ internal class JwtAuthenticationStateProvider(
 
     private string CreateLoginUri(string redirectUri, string scope)
     {
+        var httpContext = accessor.HttpContext ?? throw new InvalidOperationException("HttpContext is not available");
         var codeVerifier = CreateCodeVerifier();
-        var state = ProtectCodeVerifier(codeVerifier);
+        var state = CreateCodeVerifier();
+        var nonce = CreateCodeVerifier();
         var codeChallenge = CreateCodeChallenge(codeVerifier);
+        cookieManager.AppendPkceState(
+            httpContext,
+            state,
+            ProtectPkceState(state, codeVerifier, nonce),
+            DateTimeOffset.UtcNow.AddMinutes(PkceStateLifetimeMinutes));
+
         scope = ScopePolicy.ExpandAllForExternalClient(scope);
         if (ScopePolicy.TryNormalize(scope, false, out var normalizedScope, out _))
         {
@@ -257,6 +271,7 @@ internal class JwtAuthenticationStateProvider(
             ["response_type"] = "code",
             ["scope"] = scope,
             ["state"] = state,
+            ["nonce"] = nonce,
             ["code_challenge"] = codeChallenge,
             ["code_challenge_method"] = "S256"
         });
@@ -319,29 +334,50 @@ internal class JwtAuthenticationStateProvider(
         }
     }
 
-    private string ProtectCodeVerifier(string codeVerifier)
+    private string ProtectPkceState(string state, string codeVerifier, string nonce)
     {
-        return m_PkceProtector.Protect($"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.{codeVerifier}");
+        return m_PkceProtector.Protect($"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.{state}.{codeVerifier}.{nonce}");
     }
 
-    private bool TryUnprotectCodeVerifier(string? state, out string codeVerifier)
+    private bool TryConsumePkceState(string? state, out string codeVerifier, out string nonce)
     {
         codeVerifier = string.Empty;
-        if (string.IsNullOrWhiteSpace(state))
+        nonce = string.Empty;
+        if (string.IsNullOrWhiteSpace(state) || !IsValidPkceParameter(state))
+        {
+            return false;
+        }
+
+        var httpContext = accessor.HttpContext;
+        if (httpContext == null)
+        {
+            return false;
+        }
+
+        var protectedValue = cookieManager.ReadPkceState(httpContext, state);
+        cookieManager.DeletePkceState(httpContext, state);
+        return TryUnprotectPkceState(protectedValue, state, out codeVerifier, out nonce);
+    }
+
+    private bool TryUnprotectPkceState(string? protectedValue, string expectedState, out string codeVerifier, out string nonce)
+    {
+        codeVerifier = string.Empty;
+        nonce = string.Empty;
+        if (string.IsNullOrWhiteSpace(protectedValue))
         {
             return false;
         }
 
         try
         {
-            var unprotected = m_PkceProtector.Unprotect(state);
-            var separatorIndex = unprotected.IndexOf('.');
-            if (separatorIndex <= 0 || separatorIndex == unprotected.Length - 1)
+            var unprotected = m_PkceProtector.Unprotect(protectedValue);
+            var values = unprotected.Split('.', 4);
+            if (values.Length != 4)
             {
                 return false;
             }
 
-            if (!long.TryParse(unprotected[..separatorIndex], out var issuedAtSeconds))
+            if (!long.TryParse(values[0], out var issuedAtSeconds))
             {
                 return false;
             }
@@ -353,19 +389,28 @@ internal class JwtAuthenticationStateProvider(
                 return false;
             }
 
-            var verifier = unprotected[(separatorIndex + 1)..];
-            if (!IsValidPkceParameter(verifier))
+            if (!string.Equals(values[1], expectedState, StringComparison.Ordinal) ||
+                !IsValidPkceParameter(values[2]) ||
+                !IsValidPkceParameter(values[3]))
             {
                 return false;
             }
 
-            codeVerifier = verifier;
+            codeVerifier = values[2];
+            nonce = values[3];
             return true;
         }
         catch
         {
             return false;
         }
+    }
+
+    private static bool HasExpectedNonce(JwtSecurityToken token, string expectedNonce)
+    {
+        return token.Claims.Any(claim =>
+            claim.Type == JwtRegisteredClaimNames.Nonce &&
+            string.Equals(claim.Value, expectedNonce, StringComparison.Ordinal));
     }
 
     private static string CreateCodeVerifier()

@@ -14,7 +14,7 @@ internal sealed class OidcTokenCookieManager(IOptions<OIDCOptions> options)
 
     public string RefreshTokenCookieName => CookiePrefix + "-refresh-token";
 
-    private string CookiePrefix => NormalizePrefix(options.Value.CookiePrefix, options.Value.ClientId);
+    internal string CookiePrefix => NormalizePrefix(options.Value.CookiePrefix, options.Value.ClientId);
 
     public string? ReadIdToken(HttpContext httpContext)
     {
@@ -45,6 +45,29 @@ internal sealed class OidcTokenCookieManager(IOptions<OIDCOptions> options)
         httpContext.Response.Cookies.Delete(RefreshTokenCookieName, deleteOptions);
         DeleteLegacyTokenCookie(httpContext, LegacyIdTokenCookieName);
         DeleteLegacyTokenCookie(httpContext, LegacyRefreshTokenCookieName);
+    }
+
+    public void AppendPkceState(HttpContext httpContext, string state, string protectedValue, DateTimeOffset expires)
+    {
+        httpContext.Response.Cookies.Append(GetPkceStateCookieName(state), protectedValue, CreateTokenCookieOptions(expires));
+    }
+
+    public string? ReadPkceState(HttpContext httpContext, string state)
+    {
+        return httpContext.Request.Cookies.TryGetValue(GetPkceStateCookieName(state), out var value) &&
+               !string.IsNullOrWhiteSpace(value)
+            ? value
+            : null;
+    }
+
+    public void DeletePkceState(HttpContext httpContext, string state)
+    {
+        httpContext.Response.Cookies.Delete(GetPkceStateCookieName(state), CreateDeleteCookieOptions());
+    }
+
+    private string GetPkceStateCookieName(string state)
+    {
+        return CookiePrefix + "-pkce-" + state;
     }
 
     private string? ReadCookie(HttpContext httpContext, string cookieName, string legacyCookieName)
