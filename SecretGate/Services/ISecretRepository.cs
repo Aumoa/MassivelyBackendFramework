@@ -8,7 +8,7 @@ public interface ISecretRepository
         string ownerSubject,
         CancellationToken cancellationToken = default);
 
-    Task InitializeVaultAsync(
+    Task<bool> InitializeVaultAsync(
         string ownerSubject,
         SecretEncryptionEnvelope profileEnvelope,
         DateTime nowUtc,

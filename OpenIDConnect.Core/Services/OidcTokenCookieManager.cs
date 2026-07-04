@@ -14,6 +14,8 @@ internal sealed class OidcTokenCookieManager(IOptions<OIDCOptions> options)
 
     public string RefreshTokenCookieName => CookiePrefix + "-refresh-token";
 
+    public string CorrelationCookieName => CookiePrefix + "-oidc-correlation";
+
     private string CookiePrefix => NormalizePrefix(options.Value.CookiePrefix, options.Value.ClientId);
 
     public string? ReadIdToken(HttpContext httpContext)
@@ -38,11 +40,27 @@ internal sealed class OidcTokenCookieManager(IOptions<OIDCOptions> options)
         DeleteLegacyTokenCookie(httpContext, LegacyRefreshTokenCookieName);
     }
 
+    public void AppendCorrelationCookie(HttpContext httpContext, string correlation, DateTimeOffset expires)
+    {
+        httpContext.Response.Cookies.Append(CorrelationCookieName, correlation, CreateTokenCookieOptions(expires));
+    }
+
+    public string? ReadCorrelationCookie(HttpContext httpContext)
+    {
+        return ReadCookie(httpContext, CorrelationCookieName, CorrelationCookieName);
+    }
+
+    public void DeleteCorrelationCookie(HttpContext httpContext)
+    {
+        httpContext.Response.Cookies.Delete(CorrelationCookieName, CreateDeleteCookieOptions());
+    }
+
     public void ClearTokenCookies(HttpContext httpContext)
     {
         var deleteOptions = CreateDeleteCookieOptions();
         httpContext.Response.Cookies.Delete(IdTokenCookieName, deleteOptions);
         httpContext.Response.Cookies.Delete(RefreshTokenCookieName, deleteOptions);
+        httpContext.Response.Cookies.Delete(CorrelationCookieName, deleteOptions);
         DeleteLegacyTokenCookie(httpContext, LegacyIdTokenCookieName);
         DeleteLegacyTokenCookie(httpContext, LegacyRefreshTokenCookieName);
     }

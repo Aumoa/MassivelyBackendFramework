@@ -210,6 +210,9 @@
   <data name="MESSAGE_RESET_CONFIRMATION_REQUIRED" xml:space="preserve">
     <value>Type RESET to reset the vault.</value>
   </data>
+  <data name="MESSAGE_VAULT_ALREADY_INITIALIZED" xml:space="preserve">
+    <value>Vault is already initialized. Refresh and unlock it, or use reset to start over.</value>
+  </data>
   <data name="MESSAGE_VAULT_INITIALIZED" xml:space="preserve">
     <value>Vault password set.</value>
   </data>

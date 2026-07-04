@@ -224,7 +224,15 @@ else
             return;
         }
 
-        await VaultService.InitializeAsync(subject, setupVaultKey);
+        if (!await VaultService.InitializeAsync(subject, setupVaultKey))
+        {
+            setupVaultKey = string.Empty;
+            setupVaultKeyConfirm = string.Empty;
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_VAULT_ALREADY_INITIALIZED, true);
+            return;
+        }
+
         setupVaultKey = string.Empty;
         setupVaultKeyConfirm = string.Empty;
         await RefreshVaultAsync();

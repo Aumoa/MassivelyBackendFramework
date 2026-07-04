@@ -123,7 +123,13 @@ internal class JwtAuthenticationStateProvider(
 
     public string GenerateLoginUri(string redirectUri, string scope)
     {
-        return CreateLoginUri(redirectUri, scope);
+        var httpContext = accessor.HttpContext ?? throw new InvalidOperationException("HttpContext is not available");
+        return GenerateLoginUri(httpContext, redirectUri, scope);
+    }
+
+    public string GenerateLoginUri(HttpContext httpContext, string redirectUri, string scope)
+    {
+        return CreateLoginUri(httpContext, redirectUri, scope);
     }
 
     public async ValueTask AcceptAsync(string code, string redirectUri, string? state, CancellationToken cancellationToken = default)
@@ -139,9 +145,16 @@ internal class JwtAuthenticationStateProvider(
                 return;
             }
 
-            if (!TryUnprotectCodeVerifier(state, out var codeVerifier))
+            if (!TryUnprotectCodeVerifier(state, out var codeVerifier, out var correlation))
             {
                 logger.LogInformation("Failed to validate PKCE state for authorization code exchange.");
+                m_LastSuccessfullyCode = null;
+                return;
+            }
+
+            if (!TryConsumeCorrelationCookie(httpContext, correlation))
+            {
+                logger.LogInformation("Failed to validate OIDC correlation cookie for authorization code exchange.");
                 m_LastSuccessfullyCode = null;
                 return;
             }
@@ -231,14 +244,27 @@ internal class JwtAuthenticationStateProvider(
 
     public void NavigateToLogin(NavigationManager navigation, string redirectRelativeUri, string scope)
     {
-        navigation.NavigateTo(CreateLoginUri(navigation.BaseUri + redirectRelativeUri, scope));
+        var challengeUri = QueryHelpers.AddQueryString(
+            navigation.BaseUri.TrimEnd('/') + "/auth/oidc-login",
+            new Dictionary<string, string?>
+            {
+                ["redirect_path"] = redirectRelativeUri,
+                ["scope"] = scope
+            });
+        navigation.NavigateTo(challengeUri, forceLoad: true);
     }
 
-    private string CreateLoginUri(string redirectUri, string scope)
+    private string CreateLoginUri(HttpContext httpContext, string redirectUri, string scope)
     {
         var codeVerifier = CreateCodeVerifier();
-        var state = ProtectCodeVerifier(codeVerifier);
+        var correlation = CreateCorrelationId();
+        var state = ProtectCodeVerifier(codeVerifier, correlation);
         var codeChallenge = CreateCodeChallenge(codeVerifier);
+        cookieManager.AppendCorrelationCookie(
+            httpContext,
+            correlation,
+            DateTimeOffset.UtcNow.AddMinutes(PkceStateLifetimeMinutes));
+
         scope = ScopePolicy.ExpandAllForExternalClient(scope);
         if (ScopePolicy.TryNormalize(scope, false, out var normalizedScope, out _))
         {
@@ -314,14 +340,15 @@ internal class JwtAuthenticationStateProvider(
         }
     }
 
-    private string ProtectCodeVerifier(string codeVerifier)
+    private string ProtectCodeVerifier(string codeVerifier, string correlation)
     {
-        return m_PkceProtector.Protect($"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.{codeVerifier}");
+        return m_PkceProtector.Protect($"{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}.{correlation}.{codeVerifier}");
     }
 
-    private bool TryUnprotectCodeVerifier(string? state, out string codeVerifier)
+    private bool TryUnprotectCodeVerifier(string? state, out string codeVerifier, out string correlation)
     {
         codeVerifier = string.Empty;
+        correlation = string.Empty;
         if (string.IsNullOrWhiteSpace(state))
         {
             return false;
@@ -330,13 +357,20 @@ internal class JwtAuthenticationStateProvider(
         try
         {
             var unprotected = m_PkceProtector.Unprotect(state);
-            var separatorIndex = unprotected.IndexOf('.');
-            if (separatorIndex <= 0 || separatorIndex == unprotected.Length - 1)
+            var issuedAtSeparatorIndex = unprotected.IndexOf('.');
+            if (issuedAtSeparatorIndex <= 0 || issuedAtSeparatorIndex == unprotected.Length - 1)
             {
                 return false;
             }
 
-            if (!long.TryParse(unprotected[..separatorIndex], out var issuedAtSeconds))
+            var correlationSeparatorIndex = unprotected.IndexOf('.', issuedAtSeparatorIndex + 1);
+            if (correlationSeparatorIndex <= issuedAtSeparatorIndex + 1 ||
+                correlationSeparatorIndex == unprotected.Length - 1)
+            {
+                return false;
+            }
+
+            if (!long.TryParse(unprotected[..issuedAtSeparatorIndex], out var issuedAtSeconds))
             {
                 return false;
             }
@@ -348,12 +382,19 @@ internal class JwtAuthenticationStateProvider(
                 return false;
             }
 
-            var verifier = unprotected[(separatorIndex + 1)..];
+            var correlationValue = unprotected[(issuedAtSeparatorIndex + 1)..correlationSeparatorIndex];
+            if (!IsValidPkceParameter(correlationValue))
+            {
+                return false;
+            }
+
+            var verifier = unprotected[(correlationSeparatorIndex + 1)..];
             if (!IsValidPkceParameter(verifier))
             {
                 return false;
             }
 
+            correlation = correlationValue;
             codeVerifier = verifier;
             return true;
         }
@@ -363,7 +404,35 @@ internal class JwtAuthenticationStateProvider(
         }
     }
 
+    private bool TryConsumeCorrelationCookie(HttpContext httpContext, string expectedCorrelation)
+    {
+        try
+        {
+            var actualCorrelation = cookieManager.ReadCorrelationCookie(httpContext);
+            cookieManager.DeleteCorrelationCookie(httpContext);
+            if (string.IsNullOrWhiteSpace(actualCorrelation) ||
+                !IsValidPkceParameter(actualCorrelation))
+            {
+                return false;
+            }
+
+            var actual = Encoding.ASCII.GetBytes(actualCorrelation);
+            var expected = Encoding.ASCII.GetBytes(expectedCorrelation);
+            return actual.Length == expected.Length &&
+                CryptographicOperations.FixedTimeEquals(actual, expected);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static string CreateCodeVerifier()
+    {
+        return Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+    }
+
+    private static string CreateCorrelationId()
     {
         return Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
     }

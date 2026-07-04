@@ -8,6 +8,8 @@ public interface IAuthenticationStateProvider
 {
     string GenerateLoginUri(string redirectUri, string scope);
 
+    string GenerateLoginUri(HttpContext httpContext, string redirectUri, string scope);
+
     ValueTask AcceptAsync(string code, string redirectUri, string? state, CancellationToken cancellationToken = default);
 
     void Clear();

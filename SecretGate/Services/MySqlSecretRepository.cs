@@ -10,6 +10,7 @@ namespace SecretGate.Services;
 public sealed class MySqlSecretRepository(IOptions<MySqlOptions> options) : ISecretRepository
 {
     internal const int MaxShareAccessFailures = 8;
+    private const int DuplicateKeyErrorNumber = 1062;
 
     public async Task<VaultProfileRecord?> GetVaultProfileAsync(
         string ownerSubject,
@@ -28,7 +29,7 @@ public sealed class MySqlSecretRepository(IOptions<MySqlOptions> options) : ISec
             cancellationToken);
     }
 
-    public async Task InitializeVaultAsync(
+    public async Task<bool> InitializeVaultAsync(
         string ownerSubject,
         SecretEncryptionEnvelope profileEnvelope,
         DateTime nowUtc,
@@ -41,20 +42,16 @@ public sealed class MySqlSecretRepository(IOptions<MySqlOptions> options) : ISec
         await connection.OpenAsync(cancellationToken);
         using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        using (var deleteSecrets = connection.CreateCommand())
+        var existingProfile = await ReadVaultProfileAsync(
+            connection,
+            transaction,
+            ownerSubject,
+            forUpdate: true,
+            cancellationToken);
+        if (existingProfile != null)
         {
-            deleteSecrets.Transaction = transaction;
-            deleteSecrets.CommandText = "DELETE FROM `secretgate_vault_secret` WHERE `owner_subject` = @ownerSubject;";
-            deleteSecrets.Parameters.Add("@ownerSubject", MySqlDbType.VarChar).Value = ownerSubject;
-            await deleteSecrets.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        using (var deleteProfile = connection.CreateCommand())
-        {
-            deleteProfile.Transaction = transaction;
-            deleteProfile.CommandText = "DELETE FROM `secretgate_vault_profile` WHERE `owner_subject` = @ownerSubject;";
-            deleteProfile.Parameters.Add("@ownerSubject", MySqlDbType.VarChar).Value = ownerSubject;
-            await deleteProfile.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return false;
         }
 
         using (var insertProfile = connection.CreateCommand())
@@ -72,10 +69,19 @@ VALUES
             AddBinary(insertProfile, "@tag", profileEnvelope.Tag);
             insertProfile.Parameters.Add("@createdAt", MySqlDbType.DateTime).Value = nowUtc;
             insertProfile.Parameters.Add("@updatedAt", MySqlDbType.DateTime).Value = nowUtc;
-            await insertProfile.ExecuteNonQueryAsync(cancellationToken);
+            try
+            {
+                await insertProfile.ExecuteNonQueryAsync(cancellationToken);
+            }
+            catch (MySqlException ex) when (ex.Number == DuplicateKeyErrorNumber)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return false;
+            }
         }
 
         await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     public async Task<bool> ReplaceVaultEncryptionAsync(

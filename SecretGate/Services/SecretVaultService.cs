@@ -20,7 +20,7 @@ public sealed class SecretVaultService(
         return await repository.GetVaultProfileAsync(ownerSubject, cancellationToken) != null;
     }
 
-    public async Task InitializeAsync(
+    public async Task<bool> InitializeAsync(
         string ownerSubject,
         string vaultKey,
         CancellationToken cancellationToken = default)
@@ -29,13 +29,18 @@ public sealed class SecretVaultService(
         ArgumentException.ThrowIfNullOrWhiteSpace(vaultKey);
 
         var profileEnvelope = CreateProfileEnvelope(ownerSubject, vaultKey);
-        await repository.InitializeVaultAsync(
+        var initialized = await repository.InitializeVaultAsync(
             ownerSubject,
             profileEnvelope,
             DateTime.UtcNow,
             cancellationToken);
+        if (!initialized)
+        {
+            return false;
+        }
 
         session.Unlock(vaultKey);
+        return true;
     }
 
     public async Task<bool> TryUnlockAsync(

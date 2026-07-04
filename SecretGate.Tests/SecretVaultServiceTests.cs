@@ -23,16 +23,39 @@ public sealed class SecretVaultServiceTests
         var repository = new FakeSecretRepository();
         var service = new SecretVaultService(repository, new SecretVaultSession());
 
-        await service.InitializeAsync("user-sub", "correct-password");
+        var initialized = await service.InitializeAsync("user-sub", "correct-password");
         service.Lock();
 
         var wrongPassword = await service.TryUnlockAsync("user-sub", "wrong-password");
         var correctPassword = await service.TryUnlockAsync("user-sub", "correct-password");
 
+        Assert.True(initialized);
         Assert.True(await service.IsInitializedAsync("user-sub"));
         Assert.False(wrongPassword);
         Assert.True(correctPassword);
         Assert.True(service.IsUnlocked);
+    }
+
+    [Fact]
+    public async Task InitializeDoesNotOverwriteExistingVault()
+    {
+        var repository = new FakeSecretRepository();
+        var service = new SecretVaultService(repository, new SecretVaultSession());
+        var staleSetupService = new SecretVaultService(repository, new SecretVaultSession());
+
+        Assert.True(await service.InitializeAsync("user-sub", "correct-password"));
+        Assert.True(await service.AddSecretAsync("user-sub", "database password", "vault secret"));
+
+        var duplicateInitialized = await staleSetupService.InitializeAsync("user-sub", "new-password");
+        service.Lock();
+
+        Assert.False(duplicateInitialized);
+        Assert.False(staleSetupService.IsUnlocked);
+        Assert.False(await service.TryUnlockAsync("user-sub", "new-password"));
+        Assert.True(await service.TryUnlockAsync("user-sub", "correct-password"));
+        var secret = Assert.Single(await service.GetSecretsAsync("user-sub"));
+        Assert.True(secret.IsDecrypted);
+        Assert.Equal("vault secret", secret.Secret);
     }
 
     [Fact]
@@ -105,15 +128,19 @@ public sealed class SecretVaultServiceTests
             return Task.FromResult(m_Profile);
         }
 
-        public Task InitializeVaultAsync(
+        public Task<bool> InitializeVaultAsync(
             string ownerSubject,
             SecretEncryptionEnvelope profileEnvelope,
             DateTime nowUtc,
             CancellationToken cancellationToken = default)
         {
-            m_Records.Clear();
+            if (m_Profile != null)
+            {
+                return Task.FromResult(false);
+            }
+
             m_Profile = CreateProfile(ownerSubject, profileEnvelope, nowUtc);
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
         public Task<bool> ReplaceVaultEncryptionAsync(

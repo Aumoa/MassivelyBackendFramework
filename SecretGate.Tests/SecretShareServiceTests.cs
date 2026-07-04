@@ -61,13 +61,13 @@ public sealed class SecretShareServiceTests
             return Task.FromResult<VaultProfileRecord?>(null);
         }
 
-        public Task InitializeVaultAsync(
+        public Task<bool> InitializeVaultAsync(
             string ownerSubject,
             SecretEncryptionEnvelope profileEnvelope,
             DateTime nowUtc,
             CancellationToken cancellationToken = default)
         {
-            return Task.CompletedTask;
+            return Task.FromResult(false);
         }
 
         public Task<bool> ReplaceVaultEncryptionAsync(

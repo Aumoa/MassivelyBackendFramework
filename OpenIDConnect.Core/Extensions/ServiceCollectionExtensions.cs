@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using OpenIDConnect.Controllers;
 using OpenIDConnect.Services;
 
 namespace OpenIDConnect.Extensions;
@@ -11,6 +12,8 @@ public static class ServiceCollectionExtensions
     {
         s.Configure<OIDCOptions>(config.GetRequiredSection("OIDC"));
 
+        s.AddControllers()
+            .AddApplicationPart(typeof(OpenIdConnectLoginController).Assembly);
         s.AddHttpClient(OidcTokenValidator.HttpClientName);
         s.AddSingleton<OidcTokenValidator>();
         s.AddSingleton<OidcTokenCookieManager>();
