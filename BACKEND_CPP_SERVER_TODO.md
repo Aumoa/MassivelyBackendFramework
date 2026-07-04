@@ -98,17 +98,19 @@ Implemented graceful shutdown coordination: C++ sends `SidecarShutdownStateUpdat
 
 ## Phase 5: C# And C++ Backend Framework Compatibility
 
-- [ ] Treat Backend framework features as cross-language features after C++ Backend support lands.
-- [ ] When adding a Backend framework feature in C#, either implement the C++ equivalent or document the compatibility boundary.
-- [ ] When adding a Backend framework feature in C++, either implement the C# equivalent or document the compatibility boundary.
-- [ ] Keep wire protocol changes backward-compatible during rolling deployments.
+- [x] Treat Backend framework features as cross-language features after C++ Backend support lands.
+- [x] When adding a Backend framework feature in C#, either implement the C++ equivalent or document the compatibility boundary.
+- [x] When adding a Backend framework feature in C++, either implement the C# equivalent or document the compatibility boundary.
+- [x] Keep wire protocol changes backward-compatible during rolling deployments.
 - [x] Add shared protocol/version documentation before changing Gateway, Master, or Backend channel contracts.
 - [x] Add cross-language test vectors for every shared wire codec.
-- [ ] Prefer schema or manifest sources that can generate both C# and C++ code when practical.
-- [ ] Avoid C#-only assumptions in Master/Gateway behavior that would block C++ Backend nodes.
-- [ ] Avoid C++-only assumptions that would make C# Backend nodes second-class implementations.
+- [x] Prefer schema or manifest sources that can generate both C# and C++ code when practical.
+- [x] Avoid C#-only assumptions in Master/Gateway behavior that would block C++ Backend nodes.
+- [x] Avoid C++-only assumptions that would make C# Backend nodes second-class implementations.
 
 Implemented cross-language wire vectors: C# and C++ tests now pin PacketCore framing, Master direct-handshake payloads, Gateway Backend channel envelopes, sidecar validation/status/shutdown/manifest local-control packets, and manifest snapshot responses.
+
+Implemented compatibility policy: see `BACKEND_CPP_COMPATIBILITY.md` for cross-language feature classification, parity rules, rolling protocol change rules, manifest/schema source guidance, Master/Gateway neutrality, C++ neutrality, and review checklist.
 
 ## Phase 6: Packet Manifest Integration
 
@@ -132,10 +134,12 @@ Implemented manifest snapshot sharing: Master sends approved `BackendPacketManif
 - [ ] Add shutdown and reconnect tests for sidecar and C++ server coordination.
 - [ ] Add performance tests that confirm sidecar IPC is not on the gameplay packet hot path.
 
-## Open Questions
+## Decisions
 
-- Should the first implementation use a C# sidecar, a C++ Master client, or support both?
-- Which local IPC primitive gives the best balance of reliability, portability, and operational simplicity?
-- Should the sidecar own all Master-facing admin status, or should the C++ server provide detailed status snapshots?
-- How should the system behave if the sidecar is connected to Master but the C++ listener becomes unhealthy?
-- Should Gateway route-open responses expose any C++ Backend capability or manifest metadata to clients?
+Answered architecture decisions are tracked in `BACKEND_CPP_COMPATIBILITY.md`:
+
+- The first implementation uses a C# sidecar for Master control-plane integration.
+- Local sidecar communication uses TCP loopback PacketCore control frames.
+- The sidecar owns Master-facing admin/status while consuming C++ readiness, runtime, shutdown, and manifest snapshots.
+- If the sidecar is connected to Master but the C++ listener is unhealthy, it reports the endpoint as not ready and does not advertise an unreachable endpoint when readiness is required.
+- Gateway route-open responses do not expose C++-specific runtime capability data to clients.
