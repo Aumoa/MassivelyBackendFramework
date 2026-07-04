@@ -47,6 +47,7 @@ builder.Services.AddDataProtection()
     .SetApplicationName("OAuth2");
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<CachedAuthorizationSessionService>();
 builder.Services.AddScoped<JwtAuthenticationStateProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider>(p => p.GetRequiredService<JwtAuthenticationStateProvider>());
 builder.Services.AddAuthentication("Bearer")
