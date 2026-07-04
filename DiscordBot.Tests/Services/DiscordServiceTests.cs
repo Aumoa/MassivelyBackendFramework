@@ -87,6 +87,53 @@ public sealed class DiscordServiceTests
         Assert.True(shouldSeparateBeforeContent);
     }
 
+    [Fact]
+    public void AppendSkillUseNotice_ListsSelectedSkills()
+    {
+        var shouldSeparateBeforeContent = false;
+
+        var content = DiscordService.AppendSkillUseNotice(
+            string.Empty,
+            ["image-generation", "professional-answer"],
+            ref shouldSeparateBeforeContent);
+
+        Assert.Equal("사용된 Skill: image-generation, professional-answer", content);
+        Assert.True(shouldSeparateBeforeContent);
+    }
+
+    [Fact]
+    public void AppendSkillUseNotice_InsertsSummaryBeforeResponseContent()
+    {
+        var shouldSeparateBeforeContent = false;
+
+        var content = DiscordService.AppendSkillUseNotice(
+            string.Empty,
+            ["image-generation"],
+            ref shouldSeparateBeforeContent);
+        content = DiscordService.AppendResponseContent(
+            content,
+            "이미지를 생성했어요.",
+            ref shouldSeparateBeforeContent);
+
+        Assert.Equal(
+            """
+사용된 Skill: image-generation
+
+이미지를 생성했어요.
+""",
+            content);
+        Assert.False(shouldSeparateBeforeContent);
+    }
+
+    [Fact]
+    public void BuildSkillUseNotice_IgnoresDuplicateOrBlankSkillNames()
+    {
+        var notice = DiscordService.BuildSkillUseNotice(
+            ["image-generation", "", "image-generation", "  ", "professional-answer"]);
+
+        Assert.Equal("사용된 Skill: image-generation, professional-answer", notice);
+    }
+
     [Theory]
     [InlineData(false, false, false)]
     [InlineData(true, false, true)]

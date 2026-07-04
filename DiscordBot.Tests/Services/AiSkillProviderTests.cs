@@ -81,6 +81,10 @@ tool_names:
         Assert.NotEmpty(templates);
         Assert.Contains(templates, template => template.Source == AiSkillSource.Database);
         Assert.Contains(templates, template => template.Source == AiSkillSource.Local && template.ToolNames.Count > 0);
+        Assert.DoesNotContain(templates, template => template.Name == "chat-history-retrieval");
+        Assert.DoesNotContain(templates, template => template.Name == "chat-image-retrieval");
+        Assert.DoesNotContain(templates, template => template.Name == "chat-attachment-retrieval");
+        Assert.DoesNotContain(templates, template => template.Name == "time-and-calculation");
     }
 
     [Fact]
@@ -344,7 +348,7 @@ File: note.txt
     }
 
     [Fact]
-    public void ApplySkillToolFilter_RemovesToolsOutsideSelectedLocalSkills()
+    public void ApplySkillToolFilter_KeepsDefaultToolsAndSelectedLocalSkillTools()
     {
         var toolsProvider = ToolsProvider.CreateFrom(new FakeTools());
 
@@ -353,6 +357,8 @@ File: note.txt
             new HashSet<string>(StringComparer.Ordinal) { "allowed_tool" });
 
         Assert.NotNull(toolsProvider.FindFunction("allowed_tool"));
+        Assert.NotNull(toolsProvider.FindFunction("get_chat_history"));
+        Assert.NotNull(toolsProvider.FindFunction("calculate"));
         Assert.Null(toolsProvider.FindFunction("removed_tool"));
     }
 
@@ -450,6 +456,18 @@ File: note.txt
         private string Allowed()
         {
             return "allowed";
+        }
+
+        [ToolFunction(Name = "get_chat_history")]
+        private string GetChatHistory()
+        {
+            return "history";
+        }
+
+        [ToolFunction(Name = "calculate")]
+        private string Calculate()
+        {
+            return "calculated";
         }
 
         [ToolFunction(Name = "removed_tool")]

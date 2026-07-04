@@ -6,5 +6,7 @@ public record ChatResponseChunk
 
     public required string Thinking { get; set; }
 
+    public IReadOnlyList<string> SkillNames { get; set; } = [];
+
     public string? ToolName { get; set; }
 }

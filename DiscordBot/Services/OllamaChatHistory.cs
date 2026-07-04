@@ -12,6 +12,23 @@ public class OllamaChatHistory(
     IClaudeSettingsService claudeSettings,
     IAiSkillProvider aiSkillProvider)
 {
+    private static readonly HashSet<string> s_DefaultToolNames = new(StringComparer.Ordinal)
+    {
+        "get_chat_history",
+        "search_chat_history",
+        "summarize_recent_discussion",
+        "get_chat_by_message_id",
+        "get_reply_thread_context",
+        "get_chat_context",
+        "load_chat_image",
+        "load_chat_images",
+        "load_chat_attachment",
+        "load_chat_attachments",
+        "search_chat_attachments",
+        "get_current_date",
+        "calculate"
+    };
+
     private const string DefaultBehaviorInstruction = """
 [기본 응답 방침]
 - 사용자가 어떤 형태로 질문하더라도 기본적으로 한국어 존댓말을 사용하세요.
@@ -63,6 +80,18 @@ public class OllamaChatHistory(
             if (filterToolsBySelectedSkills)
             {
                 ApplySkillToolFilter(toolsProvider, skillSelection.ToolNames);
+            }
+
+            if (skillSelection.Skills.Count > 0)
+            {
+                yield return new ChatResponseChunk
+                {
+                    Content = "",
+                    Thinking = "",
+                    SkillNames = skillSelection.Skills
+                        .Select(skill => skill.Name)
+                        .ToArray()
+                };
             }
 
             var skillInstruction = AiSkillProvider.BuildSystemInstruction(skillSelection.Skills);
@@ -224,7 +253,7 @@ public class OllamaChatHistory(
     {
         var removedToolNames = toolsProvider.GetToolFunctions()
             .Select(tool => tool.Name)
-            .Where(toolName => !allowedToolNames.Contains(toolName))
+            .Where(toolName => !allowedToolNames.Contains(toolName) && !s_DefaultToolNames.Contains(toolName))
             .ToArray();
 
         toolsProvider.RemoveFunctions(removedToolNames);
