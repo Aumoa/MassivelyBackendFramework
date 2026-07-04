@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="ADD_SECRET_BUTTON" xml:space="preserve">
+    <value>시크릿 저장</value>
+  </data>
+  <data name="APP_TITLE" xml:space="preserve">
+    <value>Secret Gate</value>
+  </data>
+  <data name="COPY_BUTTON" xml:space="preserve">
+    <value>복사</value>
+  </data>
+  <data name="COPY_SHARE_BUNDLE_BUTTON" xml:space="preserve">
+    <value>URL과 키 복사</value>
+  </data>
+  <data name="CREATE_SHARE_BUTTON" xml:space="preserve">
+    <value>공유 생성</value>
+  </data>
+  <data name="DECRYPT_FAILED" xml:space="preserve">
+    <value>복호화 실패</value>
+  </data>
+  <data name="DELETE_BUTTON" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="EMPTY_VAULT" xml:space="preserve">
+    <value>저장된 시크릿 없음</value>
+  </data>
+  <data name="ERROR_RELOAD" xml:space="preserve">
+    <value>새로고침</value>
+  </data>
+  <data name="ERROR_TITLE" xml:space="preserve">
+    <value>오류</value>
+  </data>
+  <data name="ERROR_UNHANDLED" xml:space="preserve">
+    <value>처리되지 않은 오류가 발생했습니다.</value>
+  </data>
+  <data name="EXPIRES_AT" xml:space="preserve">
+    <value>만료</value>
+  </data>
+  <data name="HOME_TITLE" xml:space="preserve">
+    <value>Vault</value>
+  </data>
+  <data name="LOADING" xml:space="preserve">
+    <value>로딩 중</value>
+  </data>
+  <data name="LOCK_BUTTON" xml:space="preserve">
+    <value>잠금</value>
+  </data>
+  <data name="LOCKED_SECRET" xml:space="preserve">
+    <value>잠김</value>
+  </data>
+  <data name="MESSAGE_ACCESS_KEY_REQUIRED" xml:space="preserve">
+    <value>인증 키를 입력하세요.</value>
+  </data>
+  <data name="MESSAGE_ACCESS_KEY_FORMAT" xml:space="preserve">
+    <value>XXXX-XXXX 형식의 인증 키를 입력하세요.</value>
+  </data>
+  <data name="MESSAGE_INVALID_SUBJECT" xml:space="preserve">
+    <value>OIDC subject를 확인할 수 없습니다.</value>
+  </data>
+  <data name="MESSAGE_SECRET_DELETED" xml:space="preserve">
+    <value>시크릿이 삭제되었습니다.</value>
+  </data>
+  <data name="MESSAGE_SECRET_REQUIRED" xml:space="preserve">
+    <value>이름과 시크릿을 입력하세요.</value>
+  </data>
+  <data name="MESSAGE_SECRET_SAVED" xml:space="preserve">
+    <value>시크릿이 저장되었습니다.</value>
+  </data>
+  <data name="MESSAGE_SHARE_CREATED" xml:space="preserve">
+    <value>공유가 생성되었습니다.</value>
+  </data>
+  <data name="MESSAGE_SHARE_SECRET_REQUIRED" xml:space="preserve">
+    <value>공유할 시크릿을 입력하세요.</value>
+  </data>
+  <data name="MESSAGE_UNLOCK_REQUIRED" xml:space="preserve">
+    <value>먼저 Vault를 열어주세요.</value>
+  </data>
+  <data name="MESSAGE_VAULT_KEY_REQUIRED" xml:space="preserve">
+    <value>Vault 키를 입력하세요.</value>
+  </data>
+  <data name="MESSAGE_VAULT_KEY_INVALID" xml:space="preserve">
+    <value>입력한 Vault 키로 저장된 시크릿을 복호화할 수 없습니다.</value>
+  </data>
+  <data name="MESSAGE_VAULT_LOCKED" xml:space="preserve">
+    <value>Vault가 잠겼습니다.</value>
+  </data>
+  <data name="MESSAGE_VAULT_UNLOCKED" xml:space="preserve">
+    <value>Vault가 열렸습니다.</value>
+  </data>
+  <data name="NAV_HOME" xml:space="preserve">
+    <value>Vault</value>
+  </data>
+  <data name="NAV_LOGOUT" xml:space="preserve">
+    <value>로그아웃</value>
+  </data>
+  <data name="NAV_SHARE" xml:space="preserve">
+    <value>공유</value>
+  </data>
+  <data name="NOT_FOUND_TITLE" xml:space="preserve">
+    <value>찾을 수 없음</value>
+  </data>
+  <data name="OPEN_SHARE_BUTTON" xml:space="preserve">
+    <value>열기</value>
+  </data>
+  <data name="RESET_SHARE_BUTTON" xml:space="preserve">
+    <value>비우기</value>
+  </data>
+  <data name="SECRET_NAME_LABEL" xml:space="preserve">
+    <value>이름</value>
+  </data>
+  <data name="SECRET_VALUE_LABEL" xml:space="preserve">
+    <value>시크릿</value>
+  </data>
+  <data name="SHARE_ACCESS_KEY_INPUT_LABEL" xml:space="preserve">
+    <value>인증 키</value>
+  </data>
+  <data name="SHARE_ACCESS_KEY_LABEL" xml:space="preserve">
+    <value>인증 키</value>
+  </data>
+  <data name="SHARE_CONSUMED" xml:space="preserve">
+    <value>시크릿이 열렸습니다.</value>
+  </data>
+  <data name="SHARE_CREATE_TITLE" xml:space="preserve">
+    <value>일회성 공유 생성</value>
+  </data>
+  <data name="SHARE_EXPIRED_OR_INVALID" xml:space="preserve">
+    <value>공유가 만료되었거나 키가 올바르지 않습니다.</value>
+  </data>
+  <data name="SHARE_EXPIRY_LABEL" xml:space="preserve">
+    <value>만료까지 분</value>
+  </data>
+  <data name="SHARE_LINK_LABEL" xml:space="preserve">
+    <value>공유 URL</value>
+  </data>
+  <data name="SHARE_PAGE_TITLE" xml:space="preserve">
+    <value>공유 시크릿 열기</value>
+  </data>
+  <data name="SHARE_RESULT_TITLE" xml:space="preserve">
+    <value>공유 정보</value>
+  </data>
+  <data name="SHARE_SECRET_LABEL" xml:space="preserve">
+    <value>시크릿</value>
+  </data>
+  <data name="SHARE_SECRET_RESULT_LABEL" xml:space="preserve">
+    <value>시크릿</value>
+  </data>
+  <data name="SHARE_TITLE" xml:space="preserve">
+    <value>일회성 공유</value>
+  </data>
+  <data name="SHARE_TOKEN_MISSING" xml:space="preserve">
+    <value>공유 토큰이 없습니다.</value>
+  </data>
+  <data name="STATUS_LOCKED" xml:space="preserve">
+    <value>잠김</value>
+  </data>
+  <data name="STATUS_UNLOCKED" xml:space="preserve">
+    <value>열림</value>
+  </data>
+  <data name="STORED_SECRETS_TITLE" xml:space="preserve">
+    <value>저장된 시크릿</value>
+  </data>
+  <data name="UNLOCK_BUTTON" xml:space="preserve">
+    <value>열기</value>
+  </data>
+  <data name="UPDATED_AT" xml:space="preserve">
+    <value>수정</value>
+  </data>
+  <data name="VAULT_KEY_LABEL" xml:space="preserve">
+    <value>Vault 키</value>
+  </data>
+  <data name="VAULT_TITLE" xml:space="preserve">
+    <value>Vault 키</value>
+  </data>
+  <data name="CHANGE_VAULT_BUTTON" xml:space="preserve">
+    <value>암호 변경</value>
+  </data>
+  <data name="CHANGE_VAULT_CONFIRM_LABEL" xml:space="preserve">
+    <value>새 Vault 암호 확인</value>
+  </data>
+  <data name="CHANGE_VAULT_PASSWORD_LABEL" xml:space="preserve">
+    <value>새 Vault 암호</value>
+  </data>
+  <data name="CHANGE_VAULT_TITLE" xml:space="preserve">
+    <value>Vault 암호 변경</value>
+  </data>
+  <data name="MESSAGE_CHANGE_REQUIRES_UNLOCK" xml:space="preserve">
+    <value>암호를 변경하려면 먼저 Vault를 열어주세요.</value>
+  </data>
+  <data name="MESSAGE_PASSWORD_CHANGED" xml:space="preserve">
+    <value>Vault 암호가 변경되었습니다.</value>
+  </data>
+  <data name="MESSAGE_PASSWORD_MISMATCH" xml:space="preserve">
+    <value>암호가 일치하지 않습니다.</value>
+  </data>
+  <data name="MESSAGE_PASSWORD_REQUIRED" xml:space="preserve">
+    <value>Vault 암호와 확인 암호를 입력하세요.</value>
+  </data>
+  <data name="MESSAGE_RESET_CONFIRMATION_REQUIRED" xml:space="preserve">
+    <value>Vault를 초기화하려면 RESET을 입력하세요.</value>
+  </data>
+  <data name="MESSAGE_VAULT_INITIALIZED" xml:space="preserve">
+    <value>Vault 암호가 설정되었습니다.</value>
+  </data>
+  <data name="MESSAGE_VAULT_RESET" xml:space="preserve">
+    <value>Vault가 초기화되었습니다. 다시 사용하려면 새 암호를 설정하세요.</value>
+  </data>
+  <data name="RESET_CONFIRMATION_VALUE" xml:space="preserve">
+    <value>RESET</value>
+  </data>
+  <data name="RESET_VAULT_BUTTON" xml:space="preserve">
+    <value>Vault 초기화</value>
+  </data>
+  <data name="RESET_VAULT_LABEL" xml:space="preserve">
+    <value>저장된 모든 시크릿과 암호 메타데이터를 삭제하려면 RESET 입력</value>
+  </data>
+  <data name="RESET_VAULT_TITLE" xml:space="preserve">
+    <value>Vault 초기화</value>
+  </data>
+  <data name="SETUP_VAULT_BUTTON" xml:space="preserve">
+    <value>암호 설정</value>
+  </data>
+  <data name="SETUP_VAULT_CONFIRM_LABEL" xml:space="preserve">
+    <value>Vault 암호 확인</value>
+  </data>
+  <data name="SETUP_VAULT_PASSWORD_LABEL" xml:space="preserve">
+    <value>Vault 암호</value>
+  </data>
+  <data name="SETUP_VAULT_TITLE" xml:space="preserve">
+    <value>Vault 암호 설정</value>
+  </data>
+  <data name="STATUS_UNINITIALIZED" xml:space="preserve">
+    <value>암호 미설정</value>
+  </data>
+</root>

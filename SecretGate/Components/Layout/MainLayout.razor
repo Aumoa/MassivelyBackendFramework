@@ -1,0 +1,39 @@
+@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Routing
+
+<AuthorizeView>
+    <Authorized>
+        <div class="app-shell">
+            <header class="topbar">
+                <a class="brand" href="/">@Strings.APP_TITLE</a>
+                <nav class="topbar-nav">
+                    <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                        <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+                        <span>@Strings.NAV_HOME</span>
+                    </NavLink>
+                    <NavLink class="nav-link" href="/share" Match="NavLinkMatch.All">
+                        <span class="material-symbols-outlined" aria-hidden="true">ios_share</span>
+                        <span>@Strings.NAV_SHARE</span>
+                    </NavLink>
+                </nav>
+                <div class="topbar-end">
+                    <ProfileCard />
+                    <a class="logout-link" href="/auth/logout">@Strings.NAV_LOGOUT</a>
+                </div>
+            </header>
+
+            <main class="app-main">
+                @Body
+            </main>
+        </div>
+
+        <div id="blazor-error-ui">
+            @Strings.ERROR_UNHANDLED
+            <a href="" class="reload">@Strings.ERROR_RELOAD</a>
+            <span class="dismiss">x</span>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <RedirectToLogin />
+    </NotAuthorized>
+</AuthorizeView>
