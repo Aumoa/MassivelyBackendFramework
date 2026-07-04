@@ -62,15 +62,17 @@ Implemented local validation callout: set `SidecarControl:Enabled` to `true`. Th
 
 - [x] Implement a C++ `PacketCore` reader/writer compatible with the C# implementation.
 - [ ] Implement Gateway direct connection accept/listen logic in C++.
-- [ ] Implement Gateway handshake handling in C++.
+- [x] Implement Gateway handshake handling in C++.
 - [ ] Call the sidecar for direct-connect code validation during handshake.
-- [ ] Accept trusted Gateway sessions only after validation succeeds.
+- [x] Accept trusted Gateway sessions only after validation succeeds.
 - [x] Implement channel open/data/close envelope parsing.
 - [ ] Implement server-origin notify/request/response writes directly to Gateway.
 - [ ] Serialize writes per trusted Gateway connection.
 - [ ] Track channel-local state and remove it on channel close or Gateway disconnect.
 
 Implemented C++ codec foundation: `CppBackendServer` provides a CMake-built C++20 PacketCore reader/writer plus Gateway Backend channel open/data/close and sidecar request codecs. `cpp_backend_packet_core_tests` verifies the same full-frame wire vectors as the C# tests.
+
+Implemented C++ direct handshake state machine: C++ decodes Gateway `NodeHello` and `DirectConnectCode` frames, calls a direct-connect validation interface, rejects non-Gateway or mismatched validation identities, and emits `NodeAccepted` only after validation succeeds. The concrete sidecar TCP client and listener accept loop are still pending.
 
 ## Phase 4: Sidecar And C++ Local Contract
 

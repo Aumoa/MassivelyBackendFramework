@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <exception>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -82,6 +83,17 @@ void require_equal(const std::string& expected, const std::string& actual, const
     throw std::runtime_error(message.str());
 }
 
+void require_packet_error(const std::function<void()>& action, const char* name)
+{
+    try {
+        action();
+    } catch (const packet_error&) {
+        return;
+    }
+
+    throw std::runtime_error(std::string(name) + " did not throw packet_error.");
+}
+
 std::string encode_frame_hex(
     packet_kind kind,
     std::uint16_t packet_id,
@@ -103,6 +115,66 @@ packet_frame decode_full_frame(const std::string& hex)
     std::vector<std::uint8_t> payload(payload_begin, bytes.end());
     return packet_frame { header, std::move(payload) };
 }
+
+packet_frame make_hello_frame(
+    master_node_kind node_kind = master_node_kind::gateway,
+    std::string gateway_node_id = "gateway-a",
+    std::string gateway_master_connection_id = "gateway-master-a")
+{
+    node_hello hello {
+        node_kind,
+        master_control_schema_version,
+        std::move(gateway_node_id),
+        "Gateway A",
+        std::move(gateway_master_connection_id),
+    };
+
+    return make_frame(
+        packet_kind::control,
+        master_pid_node_hello,
+        master_control_schema_version,
+        encode_node_hello(hello));
+}
+
+packet_frame make_direct_connect_code_frame(std::string code = "code-1")
+{
+    return make_frame(
+        packet_kind::control,
+        master_pid_direct_connect_code,
+        master_control_schema_version,
+        encode_direct_connect_code(direct_connect_code { std::move(code) }));
+}
+
+class recording_validator final : public direct_connect_code_validator {
+public:
+    direct_connect_code_validation_response response {
+        vector_guid(),
+        true,
+        "gateway-a",
+        "gateway-master-a",
+        master_node_kind::backend,
+        "cpp-backend",
+        "backend-master-a",
+        "",
+    };
+
+    std::string code;
+    std::string gateway_node_id;
+    std::string gateway_master_connection_id;
+    int call_count = 0;
+
+    direct_connect_code_validation_response validate(
+        const std::string& requested_code,
+        const std::string& requested_gateway_node_id,
+        const std::string& requested_gateway_master_connection_id) override
+    {
+        ++call_count;
+        code = requested_code;
+        gateway_node_id = requested_gateway_node_id;
+        gateway_master_connection_id = requested_gateway_master_connection_id;
+        return response;
+    }
+};
 
 void packet_core_header_matches_vector()
 {
@@ -251,6 +323,100 @@ void sidecar_manifest_snapshot_request_matches_vector()
     require(decoded.request_id == request.request_id, "Decoded manifest snapshot request id mismatch.");
 }
 
+void node_auth_challenge_round_trips()
+{
+    node_auth_challenge challenge;
+    challenge.challenge_id = "challenge-a";
+    for (std::size_t index = 0; index < challenge.nonce.size(); ++index) {
+        challenge.nonce[index] = static_cast<std::uint8_t>(index);
+    }
+
+    auto frame = create_node_auth_challenge_frame(challenge);
+    require(frame.header.kind == packet_kind::control, "Challenge frame kind mismatch.");
+    require(frame.header.packet_id == master_pid_node_auth_challenge, "Challenge frame packet id mismatch.");
+    require(frame.header.version == master_control_schema_version, "Challenge frame version mismatch.");
+
+    auto decoded = decode_node_auth_challenge(frame.payload);
+    require(decoded.challenge_id == challenge.challenge_id, "Decoded challenge id mismatch.");
+    require(decoded.nonce == challenge.nonce, "Decoded challenge nonce mismatch.");
+}
+
+void gateway_direct_handshake_accepts_valid_gateway()
+{
+    recording_validator validator;
+    auto result = complete_gateway_direct_handshake(
+        make_hello_frame(),
+        make_direct_connect_code_frame(),
+        validator,
+        "backend-connection-a");
+
+    require(validator.call_count == 1, "Validator call count mismatch.");
+    require(validator.code == "code-1", "Validator code mismatch.");
+    require(validator.gateway_node_id == "gateway-a", "Validator gateway node mismatch.");
+    require(
+        validator.gateway_master_connection_id == "gateway-master-a",
+        "Validator gateway Master connection mismatch.");
+    require(result.gateway_node_id == "gateway-a", "Handshake result gateway node mismatch.");
+    require(
+        result.gateway_master_connection_id == "gateway-master-a",
+        "Handshake result gateway Master connection mismatch.");
+    require(result.accepted_frame.header.kind == packet_kind::control, "Accepted frame kind mismatch.");
+    require(result.accepted_frame.header.packet_id == master_pid_node_accepted, "Accepted frame packet id mismatch.");
+
+    auto accepted = decode_node_accepted(result.accepted_frame.payload);
+    require(accepted.node_id == "gateway-a", "Accepted node id mismatch.");
+    require(accepted.connection_id == "backend-connection-a", "Accepted connection id mismatch.");
+}
+
+void gateway_direct_handshake_rejects_failed_validation()
+{
+    recording_validator validator;
+    validator.response.success = false;
+    validator.response.error_message = "invalid direct-connect code";
+
+    require_packet_error(
+        [&validator] {
+            (void)complete_gateway_direct_handshake(
+                make_hello_frame(),
+                make_direct_connect_code_frame(),
+                validator,
+                "backend-connection-a");
+        },
+        "Failed validation handshake");
+}
+
+void gateway_direct_handshake_rejects_unexpected_validation_identity()
+{
+    recording_validator validator;
+    validator.response.target_node_kind = master_node_kind::dedicated;
+
+    require_packet_error(
+        [&validator] {
+            (void)complete_gateway_direct_handshake(
+                make_hello_frame(),
+                make_direct_connect_code_frame(),
+                validator,
+                "backend-connection-a");
+        },
+        "Unexpected validation identity handshake");
+}
+
+void gateway_direct_handshake_rejects_non_gateway_hello()
+{
+    recording_validator validator;
+
+    require_packet_error(
+        [&validator] {
+            (void)complete_gateway_direct_handshake(
+                make_hello_frame(master_node_kind::backend),
+                make_direct_connect_code_frame(),
+                validator,
+                "backend-connection-a");
+        },
+        "Non-Gateway hello handshake");
+    require(validator.call_count == 0, "Validator should not run for non-Gateway hello.");
+}
+
 } // namespace
 
 int main()
@@ -262,6 +428,11 @@ int main()
         channel_close_matches_vector();
         sidecar_direct_connect_validation_matches_vector();
         sidecar_manifest_snapshot_request_matches_vector();
+        node_auth_challenge_round_trips();
+        gateway_direct_handshake_accepts_valid_gateway();
+        gateway_direct_handshake_rejects_failed_validation();
+        gateway_direct_handshake_rejects_unexpected_validation_identity();
+        gateway_direct_handshake_rejects_non_gateway_hello();
     } catch (const std::exception& exception) {
         std::cerr << exception.what() << '\n';
         return 1;

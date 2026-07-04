@@ -94,6 +94,18 @@ packet_frame make_frame(
 
 constexpr std::uint16_t master_control_schema_version = 8;
 constexpr std::uint16_t master_pid_node_auth_challenge = 100;
+constexpr std::uint16_t master_pid_node_hello = 101;
+constexpr std::uint16_t master_pid_node_accepted = 103;
+constexpr std::uint16_t master_pid_direct_connect_code = 115;
+constexpr std::size_t master_auth_nonce_length = 32;
+
+enum class master_node_kind : std::uint8_t {
+    unknown = 0,
+    gateway = 1,
+    dedicated = 2,
+    master_admin = 3,
+    backend = 4,
+};
 
 constexpr std::uint16_t gateway_backend_channel_version = 1;
 constexpr std::uint16_t pid_gate_backend_channel_data = 8;
@@ -134,6 +146,55 @@ struct sidecar_manifest_snapshot_request {
     guid_bytes request_id {};
 };
 
+struct node_auth_challenge {
+    std::string challenge_id;
+    std::array<std::uint8_t, master_auth_nonce_length> nonce {};
+};
+
+struct node_hello {
+    master_node_kind node_kind = master_node_kind::unknown;
+    std::uint16_t protocol_version = 0;
+    std::string node_id;
+    std::string display_name;
+    std::string master_connection_id;
+};
+
+struct direct_connect_code {
+    std::string code;
+};
+
+struct node_accepted {
+    std::string node_id;
+    std::string connection_id;
+};
+
+struct direct_connect_code_validation_response {
+    guid_bytes request_id {};
+    bool success = false;
+    std::string gateway_node_id;
+    std::string gateway_master_connection_id;
+    master_node_kind target_node_kind = master_node_kind::unknown;
+    std::string target_node_id;
+    std::string target_master_connection_id;
+    std::string error_message;
+};
+
+class direct_connect_code_validator {
+public:
+    virtual ~direct_connect_code_validator() = default;
+
+    virtual direct_connect_code_validation_response validate(
+        const std::string& code,
+        const std::string& gateway_node_id,
+        const std::string& gateway_master_connection_id) = 0;
+};
+
+struct gateway_direct_handshake_result {
+    std::string gateway_node_id;
+    std::string gateway_master_connection_id;
+    packet_frame accepted_frame;
+};
+
 std::vector<std::uint8_t> encode_gateway_backend_channel_open(const gateway_backend_channel_open& value);
 gateway_backend_channel_open decode_gateway_backend_channel_open(std::span<const std::uint8_t> payload);
 
@@ -154,6 +215,31 @@ std::vector<std::uint8_t> encode_sidecar_manifest_snapshot_request(
     const sidecar_manifest_snapshot_request& value);
 sidecar_manifest_snapshot_request decode_sidecar_manifest_snapshot_request(
     std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_node_auth_challenge(const node_auth_challenge& value);
+node_auth_challenge decode_node_auth_challenge(std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_node_hello(const node_hello& value);
+node_hello decode_node_hello(std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_direct_connect_code(const direct_connect_code& value);
+direct_connect_code decode_direct_connect_code(std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_node_accepted(const node_accepted& value);
+node_accepted decode_node_accepted(std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_direct_connect_code_validation_response(
+    const direct_connect_code_validation_response& value);
+direct_connect_code_validation_response decode_direct_connect_code_validation_response(
+    std::span<const std::uint8_t> payload);
+
+packet_frame create_node_auth_challenge_frame(const node_auth_challenge& value);
+
+gateway_direct_handshake_result complete_gateway_direct_handshake(
+    const packet_frame& hello_frame,
+    const packet_frame& direct_connect_code_frame,
+    direct_connect_code_validator& validator,
+    const std::string& backend_connection_id);
 
 bool is_routed_packet_kind(packet_kind kind) noexcept;
 

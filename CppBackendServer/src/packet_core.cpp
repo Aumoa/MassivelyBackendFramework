@@ -55,6 +55,28 @@ void require_non_empty(const std::string& value, const char* name)
     }
 }
 
+bool is_valid_master_node_kind(master_node_kind kind) noexcept
+{
+    return kind == master_node_kind::gateway ||
+           kind == master_node_kind::dedicated ||
+           kind == master_node_kind::master_admin ||
+           kind == master_node_kind::backend;
+}
+
+void require_control_frame(
+    const packet_frame& frame,
+    std::uint16_t packet_id,
+    std::uint16_t version)
+{
+    if (frame.header.kind != packet_kind::control ||
+        frame.header.flags != 0 ||
+        frame.header.packet_id != packet_id ||
+        frame.header.version != version ||
+        frame.header.payload_length != frame.payload.size()) {
+        throw packet_error("Unexpected control frame.");
+    }
+}
+
 } // namespace
 
 packet_error::packet_error(const std::string& message)
@@ -487,6 +509,209 @@ sidecar_manifest_snapshot_request decode_sidecar_manifest_snapshot_request(
     value.request_id = reader.read_guid();
     reader.require_finished();
     return value;
+}
+
+std::vector<std::uint8_t> encode_node_auth_challenge(const node_auth_challenge& value)
+{
+    require_non_empty(value.challenge_id, "Challenge id");
+
+    packet_writer writer;
+    writer.write_string(value.challenge_id);
+    writer.write_int32(static_cast<std::int32_t>(value.nonce.size()));
+    writer.write_bytes(value.nonce);
+    return writer.take_bytes();
+}
+
+node_auth_challenge decode_node_auth_challenge(std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    node_auth_challenge value;
+    value.challenge_id = reader.read_string();
+    auto nonce_length = reader.read_int32();
+    if (nonce_length != static_cast<std::int32_t>(master_auth_nonce_length)) {
+        throw packet_error("Invalid node authentication nonce length.");
+    }
+
+    auto nonce = reader.read_bytes(master_auth_nonce_length);
+    std::copy(nonce.begin(), nonce.end(), value.nonce.begin());
+    reader.require_finished();
+    require_non_empty(value.challenge_id, "Challenge id");
+    return value;
+}
+
+std::vector<std::uint8_t> encode_node_hello(const node_hello& value)
+{
+    if (!is_valid_master_node_kind(value.node_kind)) {
+        throw packet_error("Invalid node kind.");
+    }
+
+    require_non_zero(value.protocol_version, "Protocol version");
+    require_non_empty(value.node_id, "Node id");
+
+    packet_writer writer;
+    writer.write_byte(static_cast<std::uint8_t>(value.node_kind));
+    writer.write_uint16(value.protocol_version);
+    writer.write_string(value.node_id);
+    writer.write_string(value.display_name);
+    writer.write_string(value.master_connection_id);
+    return writer.take_bytes();
+}
+
+node_hello decode_node_hello(std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    node_hello value;
+    value.node_kind = static_cast<master_node_kind>(reader.read_byte());
+    value.protocol_version = reader.read_uint16();
+    value.node_id = reader.read_string();
+    value.display_name = reader.read_string();
+    value.master_connection_id = reader.read_string();
+    reader.require_finished();
+
+    if (!is_valid_master_node_kind(value.node_kind)) {
+        throw packet_error("Invalid node kind.");
+    }
+
+    require_non_zero(value.protocol_version, "Protocol version");
+    require_non_empty(value.node_id, "Node id");
+    return value;
+}
+
+std::vector<std::uint8_t> encode_direct_connect_code(const direct_connect_code& value)
+{
+    require_non_empty(value.code, "Direct connect code");
+
+    packet_writer writer;
+    writer.write_string(value.code);
+    return writer.take_bytes();
+}
+
+direct_connect_code decode_direct_connect_code(std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    direct_connect_code value;
+    value.code = reader.read_string();
+    reader.require_finished();
+    require_non_empty(value.code, "Direct connect code");
+    return value;
+}
+
+std::vector<std::uint8_t> encode_node_accepted(const node_accepted& value)
+{
+    require_non_empty(value.node_id, "Node id");
+    require_non_empty(value.connection_id, "Connection id");
+
+    packet_writer writer;
+    writer.write_string(value.node_id);
+    writer.write_string(value.connection_id);
+    return writer.take_bytes();
+}
+
+node_accepted decode_node_accepted(std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    node_accepted value;
+    value.node_id = reader.read_string();
+    value.connection_id = reader.read_string();
+    reader.require_finished();
+    require_non_empty(value.node_id, "Node id");
+    require_non_empty(value.connection_id, "Connection id");
+    return value;
+}
+
+std::vector<std::uint8_t> encode_direct_connect_code_validation_response(
+    const direct_connect_code_validation_response& value)
+{
+    packet_writer writer;
+    writer.write_guid(value.request_id);
+    writer.write_byte(value.success ? 1 : 0);
+    writer.write_string(value.gateway_node_id);
+    writer.write_string(value.gateway_master_connection_id);
+    writer.write_byte(static_cast<std::uint8_t>(value.target_node_kind));
+    writer.write_string(value.target_node_id);
+    writer.write_string(value.target_master_connection_id);
+    writer.write_string(value.error_message);
+    return writer.take_bytes();
+}
+
+direct_connect_code_validation_response decode_direct_connect_code_validation_response(
+    std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    direct_connect_code_validation_response value;
+    value.request_id = reader.read_guid();
+    value.success = reader.read_byte() != 0;
+    value.gateway_node_id = reader.read_string();
+    value.gateway_master_connection_id = reader.read_string();
+    value.target_node_kind = static_cast<master_node_kind>(reader.read_byte());
+    value.target_node_id = reader.read_string();
+    value.target_master_connection_id = reader.read_string();
+    value.error_message = reader.read_string();
+    reader.require_finished();
+    return value;
+}
+
+packet_frame create_node_auth_challenge_frame(const node_auth_challenge& value)
+{
+    return make_frame(
+        packet_kind::control,
+        master_pid_node_auth_challenge,
+        master_control_schema_version,
+        encode_node_auth_challenge(value));
+}
+
+gateway_direct_handshake_result complete_gateway_direct_handshake(
+    const packet_frame& hello_frame,
+    const packet_frame& direct_connect_code_frame,
+    direct_connect_code_validator& validator,
+    const std::string& backend_connection_id)
+{
+    require_non_empty(backend_connection_id, "Backend connection id");
+    require_control_frame(hello_frame, master_pid_node_hello, master_control_schema_version);
+    require_control_frame(direct_connect_code_frame, master_pid_direct_connect_code, master_control_schema_version);
+
+    auto hello = decode_node_hello(hello_frame.payload);
+    if (hello.node_kind != master_node_kind::gateway) {
+        throw packet_error("Backend direct handshake only accepts Gateway nodes.");
+    }
+
+    if (hello.protocol_version != master_control_schema_version) {
+        throw packet_error("Unsupported Gateway protocol version.");
+    }
+
+    require_non_empty(hello.master_connection_id, "Gateway Master connection id");
+
+    auto code = decode_direct_connect_code(direct_connect_code_frame.payload);
+    auto validation = validator.validate(
+        code.code,
+        hello.node_id,
+        hello.master_connection_id);
+    if (!validation.success) {
+        throw packet_error(validation.error_message.empty()
+            ? "Direct connect code validation failed."
+            : validation.error_message);
+    }
+
+    if (validation.gateway_node_id != hello.node_id ||
+        validation.gateway_master_connection_id != hello.master_connection_id ||
+        validation.target_node_kind != master_node_kind::backend) {
+        throw packet_error("Direct connect code validation returned an unexpected connection identity.");
+    }
+
+    node_accepted accepted {
+        hello.node_id,
+        backend_connection_id,
+    };
+
+    return gateway_direct_handshake_result {
+        hello.node_id,
+        hello.master_connection_id,
+        make_frame(
+            packet_kind::control,
+            master_pid_node_accepted,
+            master_control_schema_version,
+            encode_node_accepted(accepted)),
+    };
 }
 
 bool is_routed_packet_kind(packet_kind kind) noexcept
