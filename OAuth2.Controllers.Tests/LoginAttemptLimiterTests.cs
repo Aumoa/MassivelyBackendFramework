@@ -25,6 +25,20 @@ public sealed class LoginAttemptLimiterTests
     }
 
     [Fact]
+    public void RecordFailure_NormalizesIdentifierCase()
+    {
+        var limiter = new LoginAttemptLimiter(new ManualTimeProvider());
+
+        for (var i = 0; i < LoginAttemptLimiter.MaxIdentifierFailures; i++)
+        {
+            limiter.RecordFailure("alice", null);
+        }
+
+        Assert.False(limiter.IsAllowed("ALICE", null, out var retryAfter));
+        Assert.True(retryAfter > TimeSpan.Zero);
+    }
+
+    [Fact]
     public void RecordFailure_LocksOriginAfterBroadEnumeration()
     {
         var timeProvider = new ManualTimeProvider();

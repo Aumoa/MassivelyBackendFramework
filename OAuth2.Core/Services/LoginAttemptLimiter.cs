@@ -105,7 +105,7 @@ public sealed class LoginAttemptLimiter(TimeProvider timeProvider) : ILoginAttem
 
     private static string NormalizeIdentifier(string identifier)
     {
-        return identifier.Trim();
+        return identifier.Trim().ToUpperInvariant();
     }
 
     private static string? NormalizeOrigin(string? origin)
