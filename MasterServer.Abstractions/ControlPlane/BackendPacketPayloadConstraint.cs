@@ -10,7 +10,8 @@ public sealed class BackendPacketPayloadConstraint
         int maximumLength,
         int? fixedLength = null,
         string? schemaId = null,
-        BackendPacketManifestHash? schemaHash = null)
+        BackendPacketManifestHash? schemaHash = null,
+        BackendPacketVerifierProgram? verifierProgram = null)
     {
         if (minimumLength < 0)
         {
@@ -41,6 +42,7 @@ public sealed class BackendPacketPayloadConstraint
         FixedLength = fixedLength;
         SchemaId = normalizedSchemaId;
         SchemaHash = schemaHash;
+        VerifierProgram = verifierProgram;
     }
 
     public static BackendPacketPayloadConstraint Any { get; } = new(0, PacketHeader.MaxPayloadLength);
@@ -54,6 +56,8 @@ public sealed class BackendPacketPayloadConstraint
     public string SchemaId { get; }
 
     public BackendPacketManifestHash? SchemaHash { get; }
+
+    public BackendPacketVerifierProgram? VerifierProgram { get; }
 
     public BackendPacketManifestValidationFailure ValidatePayloadLength(int payloadLength)
     {
@@ -78,5 +82,24 @@ public sealed class BackendPacketPayloadConstraint
         }
 
         return BackendPacketManifestValidationFailure.None;
+    }
+
+    public BackendPacketManifestValidationFailure ValidatePayload(ReadOnlySpan<byte> payload)
+    {
+        var lengthFailure = ValidatePayloadLength(payload.Length);
+        if (lengthFailure != BackendPacketManifestValidationFailure.None)
+        {
+            return lengthFailure;
+        }
+
+        if (VerifierProgram == null)
+        {
+            return BackendPacketManifestValidationFailure.None;
+        }
+
+        var verifierResult = VerifierProgram.Verify(payload);
+        return verifierResult.Success
+            ? BackendPacketManifestValidationFailure.None
+            : verifierResult.Failure;
     }
 }

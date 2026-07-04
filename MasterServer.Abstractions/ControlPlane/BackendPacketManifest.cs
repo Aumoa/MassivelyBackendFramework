@@ -72,6 +72,31 @@ public sealed class BackendPacketManifest
             : BackendPacketManifestValidationResult.Rejected(payloadFailure);
     }
 
+    public BackendPacketManifestValidationResult ValidatePacket(
+        BackendPacketManifestDirection direction,
+        PacketKind packetKind,
+        ushort packetId,
+        ushort routedVersion,
+        ReadOnlySpan<byte> payload)
+    {
+        var result = ValidatePacket(
+            direction,
+            packetKind,
+            packetId,
+            routedVersion,
+            payload.Length);
+        if (!result.Success)
+        {
+            return result;
+        }
+
+        var entry = result.Entry ?? throw new InvalidOperationException("Accepted Backend packet manifest validation did not include an entry.");
+        var payloadFailure = entry.PayloadConstraint.ValidatePayload(payload);
+        return payloadFailure == BackendPacketManifestValidationFailure.None
+            ? result
+            : BackendPacketManifestValidationResult.Rejected(payloadFailure);
+    }
+
     public bool MatchesAdvertisement(
         string backendKind,
         BackendPacketManifestId manifestId,
@@ -140,6 +165,7 @@ public sealed class BackendPacketManifest
 
                 WriteString(writer, entry.PayloadConstraint.SchemaId);
                 WriteString(writer, entry.PayloadConstraint.SchemaHash?.Value ?? string.Empty);
+                WriteVerifierProgram(writer, entry.PayloadConstraint.VerifierProgram);
             }
         }
 
@@ -196,5 +222,16 @@ public sealed class BackendPacketManifest
         var bytes = Encoding.UTF8.GetBytes(value);
         writer.Write(bytes.Length);
         writer.Write(bytes);
+    }
+
+    private static void WriteVerifierProgram(
+        BinaryWriter writer,
+        BackendPacketVerifierProgram? program)
+    {
+        var encoded = program == null
+            ? Array.Empty<byte>()
+            : BackendPacketVerifierProgramCodec.Encode(program);
+        writer.Write(encoded.Length);
+        writer.Write(encoded);
     }
 }
