@@ -120,7 +120,29 @@ constexpr std::uint16_t sidecar_control_schema_version = 1;
 constexpr std::uint32_t sidecar_control_max_payload_length = 1024 * 1024;
 constexpr std::uint16_t sidecar_pid_direct_connect_validation_request = 1;
 constexpr std::uint16_t sidecar_pid_direct_connect_validation_response = 2;
+constexpr std::uint16_t sidecar_pid_endpoint_state_update = 3;
+constexpr std::uint16_t sidecar_pid_endpoint_state_ack = 4;
+constexpr std::uint16_t sidecar_pid_runtime_status_update = 5;
+constexpr std::uint16_t sidecar_pid_runtime_status_ack = 6;
+constexpr std::uint16_t sidecar_pid_shutdown_state_update = 7;
+constexpr std::uint16_t sidecar_pid_shutdown_state_ack = 8;
+constexpr std::uint16_t sidecar_pid_manifest_declaration_update = 9;
+constexpr std::uint16_t sidecar_pid_manifest_declaration_ack = 10;
 constexpr std::uint16_t sidecar_pid_manifest_snapshot_request = 11;
+constexpr std::uint16_t sidecar_pid_manifest_snapshot_response = 12;
+
+constexpr std::int32_t backend_packet_manifest_max_manifest_count = 2048;
+constexpr std::int32_t backend_packet_manifest_max_entry_count = 4096;
+
+enum class backend_packet_manifest_direction : std::uint8_t {
+    client_to_backend = 1,
+    backend_to_client = 2,
+};
+
+enum class backend_packet_manifest_entry_status : std::uint8_t {
+    active = 1,
+    deprecated = 2,
+};
 
 struct gateway_backend_channel_open {
     std::uint32_t channel_id = 0;
@@ -150,6 +172,74 @@ struct direct_connect_code_validation_request {
 
 struct sidecar_manifest_snapshot_request {
     guid_bytes request_id {};
+};
+
+struct sidecar_endpoint_state_update {
+    guid_bytes request_id {};
+    bool ready = false;
+    std::string detail;
+};
+
+struct sidecar_runtime_status_update {
+    guid_bytes request_id {};
+    bool healthy = false;
+    std::int32_t active_gateway_sessions = 0;
+    std::int32_t active_channels = 0;
+    std::string detail;
+};
+
+struct sidecar_shutdown_state_update {
+    guid_bytes request_id {};
+    bool shutting_down = false;
+    std::string reason;
+};
+
+struct sidecar_manifest_declaration_update {
+    guid_bytes request_id {};
+    std::string manifest_id;
+    std::string manifest_hash;
+};
+
+struct sidecar_control_ack {
+    guid_bytes request_id {};
+    bool success = false;
+    std::string error_message;
+};
+
+struct backend_packet_payload_constraint {
+    std::int32_t minimum_length = 0;
+    std::int32_t maximum_length = 0;
+    std::optional<std::int32_t> fixed_length;
+    std::string schema_id;
+    std::optional<std::string> schema_hash;
+};
+
+struct backend_packet_manifest_entry {
+    backend_packet_manifest_direction direction = backend_packet_manifest_direction::client_to_backend;
+    packet_kind kind = packet_kind::request;
+    std::uint16_t packet_id = 0;
+    std::uint16_t routed_version = 0;
+    backend_packet_payload_constraint payload_constraint;
+    backend_packet_manifest_entry_status status = backend_packet_manifest_entry_status::active;
+};
+
+struct backend_packet_manifest {
+    std::string backend_kind;
+    std::string manifest_id;
+    std::string hash;
+    std::vector<backend_packet_manifest_entry> entries;
+};
+
+struct backend_packet_manifest_snapshot {
+    std::vector<backend_packet_manifest> manifests;
+    std::int64_t observed_at_unix_milliseconds = 0;
+};
+
+struct sidecar_manifest_snapshot_response {
+    guid_bytes request_id {};
+    bool success = false;
+    std::optional<backend_packet_manifest_snapshot> snapshot;
+    std::string error_message;
 };
 
 struct node_auth_challenge {
@@ -327,6 +417,41 @@ direct_connect_code_validation_request decode_direct_connect_code_validation_req
 std::vector<std::uint8_t> encode_sidecar_manifest_snapshot_request(
     const sidecar_manifest_snapshot_request& value);
 sidecar_manifest_snapshot_request decode_sidecar_manifest_snapshot_request(
+    std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_sidecar_endpoint_state_update(
+    const sidecar_endpoint_state_update& value);
+sidecar_endpoint_state_update decode_sidecar_endpoint_state_update(
+    std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_sidecar_runtime_status_update(
+    const sidecar_runtime_status_update& value);
+sidecar_runtime_status_update decode_sidecar_runtime_status_update(
+    std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_sidecar_shutdown_state_update(
+    const sidecar_shutdown_state_update& value);
+sidecar_shutdown_state_update decode_sidecar_shutdown_state_update(
+    std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_sidecar_manifest_declaration_update(
+    const sidecar_manifest_declaration_update& value);
+sidecar_manifest_declaration_update decode_sidecar_manifest_declaration_update(
+    std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_sidecar_control_ack(
+    const sidecar_control_ack& value);
+sidecar_control_ack decode_sidecar_control_ack(
+    std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_backend_packet_manifest_snapshot(
+    const backend_packet_manifest_snapshot& value);
+backend_packet_manifest_snapshot decode_backend_packet_manifest_snapshot(
+    std::span<const std::uint8_t> payload);
+
+std::vector<std::uint8_t> encode_sidecar_manifest_snapshot_response(
+    const sidecar_manifest_snapshot_response& value);
+sidecar_manifest_snapshot_response decode_sidecar_manifest_snapshot_response(
     std::span<const std::uint8_t> payload);
 
 std::vector<std::uint8_t> encode_node_auth_challenge(const node_auth_challenge& value);

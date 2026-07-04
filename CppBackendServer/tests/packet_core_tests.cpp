@@ -25,6 +25,38 @@ guid_bytes vector_guid()
     };
 }
 
+constexpr const char* manifest_hash = "9924291a1ab4004e914ad25469916ec496da9def0689aea76003b230da521031";
+
+backend_packet_manifest_snapshot create_manifest_snapshot()
+{
+    return backend_packet_manifest_snapshot {
+        {
+            backend_packet_manifest {
+                "cpp-world",
+                "cpp-world:v2",
+                manifest_hash,
+                {
+                    backend_packet_manifest_entry {
+                        backend_packet_manifest_direction::client_to_backend,
+                        packet_kind::request,
+                        101,
+                        1,
+                        backend_packet_payload_constraint {
+                            4,
+                            64,
+                            std::nullopt,
+                            "",
+                            std::nullopt,
+                        },
+                        backend_packet_manifest_entry_status::active,
+                    },
+                },
+            },
+        },
+        1'783'000'000'000,
+    };
+}
+
 std::string to_hex(std::span<const std::uint8_t> bytes)
 {
     constexpr char digits[] = "0123456789abcdef";
@@ -207,6 +239,103 @@ void packet_core_header_matches_vector()
     require(decoded.payload_length == 0, "Decoded header payload length mismatch.");
 }
 
+void node_auth_challenge_matches_vector()
+{
+    node_auth_challenge challenge;
+    challenge.challenge_id = "challenge-a";
+    for (std::size_t index = 0; index < challenge.nonce.size(); ++index) {
+        challenge.nonce[index] = static_cast<std::uint8_t>(index);
+    }
+
+    constexpr auto expected = "c0006400080000330000000b6368616c6c656e67652d6100000020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            master_pid_node_auth_challenge,
+            master_control_schema_version,
+            encode_node_auth_challenge(challenge)),
+        "Node auth challenge");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_node_auth_challenge(frame.payload);
+    require(decoded.challenge_id == challenge.challenge_id, "Decoded challenge id mismatch.");
+    require(decoded.nonce == challenge.nonce, "Decoded challenge nonce mismatch.");
+}
+
+void node_hello_matches_vector()
+{
+    node_hello hello {
+        master_node_kind::gateway,
+        master_control_schema_version,
+        "gateway-a",
+        "Gateway A",
+        "gateway-master-a",
+    };
+
+    constexpr auto expected = "c00065000800003101000800000009676174657761792d610000000947617465776179204100000010676174657761792d6d61737465722d61";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            master_pid_node_hello,
+            master_control_schema_version,
+            encode_node_hello(hello)),
+        "Node hello");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_node_hello(frame.payload);
+    require(decoded.node_kind == hello.node_kind, "Decoded node kind mismatch.");
+    require(decoded.protocol_version == hello.protocol_version, "Decoded protocol version mismatch.");
+    require(decoded.node_id == hello.node_id, "Decoded node id mismatch.");
+    require(decoded.display_name == hello.display_name, "Decoded display name mismatch.");
+    require(decoded.master_connection_id == hello.master_connection_id, "Decoded Master connection id mismatch.");
+}
+
+void direct_connect_code_matches_vector()
+{
+    direct_connect_code code {
+        "code-1",
+    };
+
+    constexpr auto expected = "c00073000800000a00000006636f64652d31";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            master_pid_direct_connect_code,
+            master_control_schema_version,
+            encode_direct_connect_code(code)),
+        "Direct connect code");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_direct_connect_code(frame.payload);
+    require(decoded.code == code.code, "Decoded direct connect code mismatch.");
+}
+
+void node_accepted_matches_vector()
+{
+    node_accepted accepted {
+        "gateway-a",
+        "backend-connection-a",
+    };
+
+    constexpr auto expected = "c00067000800002500000009676174657761792d61000000146261636b656e642d636f6e6e656374696f6e2d61";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            master_pid_node_accepted,
+            master_control_schema_version,
+            encode_node_accepted(accepted)),
+        "Node accepted");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_node_accepted(frame.payload);
+    require(decoded.node_id == accepted.node_id, "Decoded accepted node id mismatch.");
+    require(decoded.connection_id == accepted.connection_id, "Decoded accepted connection id mismatch.");
+}
+
 void channel_open_matches_vector()
 {
     gateway_backend_channel_open open {
@@ -313,6 +442,188 @@ void sidecar_direct_connect_validation_matches_vector()
         "Decoded validation gateway Master connection mismatch.");
 }
 
+void sidecar_direct_connect_validation_response_matches_vector()
+{
+    direct_connect_code_validation_response response {
+        vector_guid(),
+        true,
+        "gateway-a",
+        "gateway-master-a",
+        master_node_kind::backend,
+        "cpp-backend",
+        "backend-master-a",
+        "",
+    };
+
+    constexpr auto expected = "c00002000100005a33221100554477668899aabbccddeeff0100000009676174657761792d6100000010676174657761792d6d61737465722d61040000000b6370702d6261636b656e64000000106261636b656e642d6d61737465722d6100000000";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            sidecar_pid_direct_connect_validation_response,
+            sidecar_control_schema_version,
+            encode_direct_connect_code_validation_response(response)),
+        "Sidecar direct-connect validation response");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_direct_connect_code_validation_response(frame.payload);
+    require(decoded.request_id == response.request_id, "Decoded validation response id mismatch.");
+    require(decoded.success == response.success, "Decoded validation response success mismatch.");
+    require(decoded.target_node_kind == response.target_node_kind, "Decoded validation target kind mismatch.");
+    require(decoded.target_node_id == response.target_node_id, "Decoded validation target node mismatch.");
+}
+
+void sidecar_endpoint_state_update_matches_vector()
+{
+    sidecar_endpoint_state_update update {
+        vector_guid(),
+        true,
+        "ready",
+    };
+
+    constexpr auto expected = "c00003000100001a33221100554477668899aabbccddeeff01000000057265616479";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            sidecar_pid_endpoint_state_update,
+            sidecar_control_schema_version,
+            encode_sidecar_endpoint_state_update(update)),
+        "Sidecar endpoint state update");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_sidecar_endpoint_state_update(frame.payload);
+    require(decoded.request_id == update.request_id, "Decoded endpoint state id mismatch.");
+    require(decoded.ready == update.ready, "Decoded endpoint state ready mismatch.");
+    require(decoded.detail == update.detail, "Decoded endpoint state detail mismatch.");
+}
+
+void sidecar_runtime_status_update_matches_vector()
+{
+    sidecar_runtime_status_update update {
+        vector_guid(),
+        true,
+        2,
+        37,
+        "steady",
+    };
+
+    constexpr auto expected = "c00005000100002333221100554477668899aabbccddeeff01000000020000002500000006737465616479";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            sidecar_pid_runtime_status_update,
+            sidecar_control_schema_version,
+            encode_sidecar_runtime_status_update(update)),
+        "Sidecar runtime status update");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_sidecar_runtime_status_update(frame.payload);
+    require(decoded.request_id == update.request_id, "Decoded runtime status id mismatch.");
+    require(decoded.healthy == update.healthy, "Decoded runtime status health mismatch.");
+    require(decoded.active_gateway_sessions == update.active_gateway_sessions, "Decoded runtime sessions mismatch.");
+    require(decoded.active_channels == update.active_channels, "Decoded runtime channels mismatch.");
+    require(decoded.detail == update.detail, "Decoded runtime detail mismatch.");
+}
+
+void sidecar_shutdown_state_update_matches_vector()
+{
+    sidecar_shutdown_state_update update {
+        vector_guid(),
+        true,
+        "rolling restart",
+    };
+
+    constexpr auto expected = "c00007000100002433221100554477668899aabbccddeeff010000000f726f6c6c696e672072657374617274";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            sidecar_pid_shutdown_state_update,
+            sidecar_control_schema_version,
+            encode_sidecar_shutdown_state_update(update)),
+        "Sidecar shutdown state update");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_sidecar_shutdown_state_update(frame.payload);
+    require(decoded.request_id == update.request_id, "Decoded shutdown state id mismatch.");
+    require(decoded.shutting_down == update.shutting_down, "Decoded shutdown state flag mismatch.");
+    require(decoded.reason == update.reason, "Decoded shutdown reason mismatch.");
+}
+
+void sidecar_manifest_declaration_update_matches_vector()
+{
+    sidecar_manifest_declaration_update update {
+        vector_guid(),
+        "cpp-world:v2",
+        manifest_hash,
+    };
+
+    constexpr auto expected = "c00009000100006433221100554477668899aabbccddeeff0000000c6370702d776f726c643a76320000004039393234323931613161623430303465393134616432353436393931366563343936646139646566303638396165613736303033623233306461353231303331";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            sidecar_pid_manifest_declaration_update,
+            sidecar_control_schema_version,
+            encode_sidecar_manifest_declaration_update(update)),
+        "Sidecar manifest declaration update");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_sidecar_manifest_declaration_update(frame.payload);
+    require(decoded.request_id == update.request_id, "Decoded manifest declaration id mismatch.");
+    require(decoded.manifest_id == update.manifest_id, "Decoded manifest declaration id value mismatch.");
+    require(decoded.manifest_hash == update.manifest_hash, "Decoded manifest declaration hash mismatch.");
+}
+
+void sidecar_ack_matches_vector(
+    std::uint16_t packet_id,
+    const std::string& expected,
+    const char* name)
+{
+    sidecar_control_ack ack {
+        vector_guid(),
+        true,
+        "",
+    };
+
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            packet_id,
+            sidecar_control_schema_version,
+            encode_sidecar_control_ack(ack)),
+        name);
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_sidecar_control_ack(frame.payload);
+    require(decoded.request_id == ack.request_id, "Decoded sidecar ack id mismatch.");
+    require(decoded.success == ack.success, "Decoded sidecar ack success mismatch.");
+    require(decoded.error_message == ack.error_message, "Decoded sidecar ack error mismatch.");
+}
+
+void sidecar_ack_payloads_match_vectors()
+{
+    sidecar_ack_matches_vector(
+        sidecar_pid_endpoint_state_ack,
+        "c00004000100001533221100554477668899aabbccddeeff0100000000",
+        "Sidecar endpoint state ack");
+    sidecar_ack_matches_vector(
+        sidecar_pid_runtime_status_ack,
+        "c00006000100001533221100554477668899aabbccddeeff0100000000",
+        "Sidecar runtime status ack");
+    sidecar_ack_matches_vector(
+        sidecar_pid_shutdown_state_ack,
+        "c00008000100001533221100554477668899aabbccddeeff0100000000",
+        "Sidecar shutdown state ack");
+    sidecar_ack_matches_vector(
+        sidecar_pid_manifest_declaration_ack,
+        "c0000a000100001533221100554477668899aabbccddeeff0100000000",
+        "Sidecar manifest declaration ack");
+}
+
 void sidecar_manifest_snapshot_request_matches_vector()
 {
     sidecar_manifest_snapshot_request request {
@@ -332,6 +643,67 @@ void sidecar_manifest_snapshot_request_matches_vector()
     auto frame = decode_full_frame(expected);
     auto decoded = decode_sidecar_manifest_snapshot_request(frame.payload);
     require(decoded.request_id == request.request_id, "Decoded manifest snapshot request id mismatch.");
+}
+
+void sidecar_manifest_snapshot_response_success_matches_vector()
+{
+    sidecar_manifest_snapshot_response response {
+        vector_guid(),
+        true,
+        create_manifest_snapshot(),
+        "",
+    };
+
+    constexpr auto expected = "c0000c000100009f33221100554477668899aabbccddeeff010100000001000000096370702d776f726c640000000c6370702d776f726c643a76320000004039393234323931613161623430303465393134616432353436393931366563343936646139646566303638396165613736303033623233306461353231303331000000010100006500010100000004000000400000000000000000000000019f2314e60000000000";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            sidecar_pid_manifest_snapshot_response,
+            sidecar_control_schema_version,
+            encode_sidecar_manifest_snapshot_response(response)),
+        "Sidecar manifest snapshot success response");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_sidecar_manifest_snapshot_response(frame.payload);
+    require(decoded.request_id == response.request_id, "Decoded snapshot response id mismatch.");
+    require(decoded.success, "Decoded snapshot response success mismatch.");
+    require(decoded.snapshot.has_value(), "Decoded snapshot response missing snapshot.");
+    require(decoded.snapshot->observed_at_unix_milliseconds == response.snapshot->observed_at_unix_milliseconds, "Decoded snapshot observed time mismatch.");
+    auto manifest = decoded.snapshot->manifests.at(0);
+    require(manifest.backend_kind == "cpp-world", "Decoded snapshot backend kind mismatch.");
+    require(manifest.manifest_id == "cpp-world:v2", "Decoded snapshot manifest id mismatch.");
+    require(manifest.hash == manifest_hash, "Decoded snapshot manifest hash mismatch.");
+    require(manifest.entries.size() == 1, "Decoded snapshot entry count mismatch.");
+    require(manifest.entries[0].payload_constraint.minimum_length == 4, "Decoded snapshot minimum length mismatch.");
+    require(manifest.entries[0].payload_constraint.maximum_length == 64, "Decoded snapshot maximum length mismatch.");
+}
+
+void sidecar_manifest_snapshot_response_failure_matches_vector()
+{
+    sidecar_manifest_snapshot_response response {
+        vector_guid(),
+        false,
+        std::nullopt,
+        "not loaded",
+    };
+
+    constexpr auto expected = "c0000c000100002033221100554477668899aabbccddeeff00000000000a6e6f74206c6f61646564";
+    require_equal(
+        expected,
+        encode_frame_hex(
+            packet_kind::control,
+            sidecar_pid_manifest_snapshot_response,
+            sidecar_control_schema_version,
+            encode_sidecar_manifest_snapshot_response(response)),
+        "Sidecar manifest snapshot failure response");
+
+    auto frame = decode_full_frame(expected);
+    auto decoded = decode_sidecar_manifest_snapshot_response(frame.payload);
+    require(decoded.request_id == response.request_id, "Decoded snapshot failure id mismatch.");
+    require(!decoded.success, "Decoded snapshot failure success mismatch.");
+    require(!decoded.snapshot.has_value(), "Decoded snapshot failure should not carry a snapshot.");
+    require(decoded.error_message == response.error_message, "Decoded snapshot failure error mismatch.");
 }
 
 void node_auth_challenge_round_trips()
@@ -565,11 +937,23 @@ int main()
 {
     try {
         packet_core_header_matches_vector();
+        node_auth_challenge_matches_vector();
+        node_hello_matches_vector();
+        direct_connect_code_matches_vector();
+        node_accepted_matches_vector();
         channel_open_matches_vector();
         channel_data_matches_vector();
         channel_close_matches_vector();
         sidecar_direct_connect_validation_matches_vector();
+        sidecar_direct_connect_validation_response_matches_vector();
+        sidecar_endpoint_state_update_matches_vector();
+        sidecar_runtime_status_update_matches_vector();
+        sidecar_shutdown_state_update_matches_vector();
+        sidecar_manifest_declaration_update_matches_vector();
+        sidecar_ack_payloads_match_vectors();
         sidecar_manifest_snapshot_request_matches_vector();
+        sidecar_manifest_snapshot_response_success_matches_vector();
+        sidecar_manifest_snapshot_response_failure_matches_vector();
         node_auth_challenge_round_trips();
         gateway_direct_handshake_accepts_valid_gateway();
         gateway_direct_handshake_rejects_failed_validation();

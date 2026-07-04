@@ -103,10 +103,12 @@ Implemented graceful shutdown coordination: C++ sends `SidecarShutdownStateUpdat
 - [ ] When adding a Backend framework feature in C++, either implement the C# equivalent or document the compatibility boundary.
 - [ ] Keep wire protocol changes backward-compatible during rolling deployments.
 - [x] Add shared protocol/version documentation before changing Gateway, Master, or Backend channel contracts.
-- [ ] Add cross-language test vectors for every shared wire codec.
+- [x] Add cross-language test vectors for every shared wire codec.
 - [ ] Prefer schema or manifest sources that can generate both C# and C++ code when practical.
 - [ ] Avoid C#-only assumptions in Master/Gateway behavior that would block C++ Backend nodes.
 - [ ] Avoid C++-only assumptions that would make C# Backend nodes second-class implementations.
+
+Implemented cross-language wire vectors: C# and C++ tests now pin PacketCore framing, Master direct-handshake payloads, Gateway Backend channel envelopes, sidecar validation/status/shutdown/manifest local-control packets, and manifest snapshot responses.
 
 ## Phase 6: Packet Manifest Integration
 

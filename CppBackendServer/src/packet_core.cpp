@@ -82,12 +82,160 @@ void require_non_empty(const std::string& value, const char* name)
     }
 }
 
+void require_non_negative(std::int32_t value, const char* name)
+{
+    if (value < 0) {
+        throw packet_error(std::string(name) + " cannot be negative.");
+    }
+}
+
 bool is_valid_master_node_kind(master_node_kind kind) noexcept
 {
     return kind == master_node_kind::gateway ||
            kind == master_node_kind::dedicated ||
            kind == master_node_kind::master_admin ||
            kind == master_node_kind::backend;
+}
+
+bool is_valid_manifest_direction(backend_packet_manifest_direction direction) noexcept
+{
+    return direction == backend_packet_manifest_direction::client_to_backend ||
+           direction == backend_packet_manifest_direction::backend_to_client;
+}
+
+bool is_valid_manifest_entry_status(backend_packet_manifest_entry_status status) noexcept
+{
+    return status == backend_packet_manifest_entry_status::active ||
+           status == backend_packet_manifest_entry_status::deprecated;
+}
+
+void write_bool(packet_writer& writer, bool value)
+{
+    writer.write_byte(value ? 1 : 0);
+}
+
+bool read_bool(packet_reader& reader)
+{
+    return reader.read_byte() != 0;
+}
+
+void validate_backend_packet_manifest_entry(const backend_packet_manifest_entry& entry)
+{
+    if (!is_valid_manifest_direction(entry.direction)) {
+        throw packet_error("Invalid Backend packet manifest direction.");
+    }
+
+    if (!is_routed_packet_kind(entry.kind)) {
+        throw packet_error("Invalid Backend packet manifest packet kind.");
+    }
+
+    require_non_zero(entry.packet_id, "Backend packet manifest packet id");
+    require_non_zero(entry.routed_version, "Backend packet manifest routed version");
+    if (!is_valid_manifest_entry_status(entry.status)) {
+        throw packet_error("Invalid Backend packet manifest entry status.");
+    }
+
+    require_non_negative(entry.payload_constraint.minimum_length, "Backend packet minimum payload length");
+    require_non_negative(entry.payload_constraint.maximum_length, "Backend packet maximum payload length");
+    if (entry.payload_constraint.maximum_length < entry.payload_constraint.minimum_length) {
+        throw packet_error("Backend packet maximum payload length is smaller than minimum payload length.");
+    }
+
+    if (entry.payload_constraint.fixed_length.has_value()) {
+        auto fixed_length = *entry.payload_constraint.fixed_length;
+        if (fixed_length < entry.payload_constraint.minimum_length ||
+            fixed_length > entry.payload_constraint.maximum_length) {
+            throw packet_error("Backend packet fixed payload length is outside the allowed range.");
+        }
+    }
+}
+
+void write_backend_packet_manifest_entry(
+    packet_writer& writer,
+    const backend_packet_manifest_entry& entry)
+{
+    validate_backend_packet_manifest_entry(entry);
+
+    writer.write_byte(static_cast<std::uint8_t>(entry.direction));
+    writer.write_byte(static_cast<std::uint8_t>(entry.kind));
+    writer.write_uint16(entry.packet_id);
+    writer.write_uint16(entry.routed_version);
+    writer.write_byte(static_cast<std::uint8_t>(entry.status));
+    writer.write_int32(entry.payload_constraint.minimum_length);
+    writer.write_int32(entry.payload_constraint.maximum_length);
+    write_bool(writer, entry.payload_constraint.fixed_length.has_value());
+    if (entry.payload_constraint.fixed_length.has_value()) {
+        writer.write_int32(*entry.payload_constraint.fixed_length);
+    }
+
+    writer.write_string(entry.payload_constraint.schema_id);
+    writer.write_string(entry.payload_constraint.schema_hash.value_or(""));
+}
+
+backend_packet_manifest_entry read_backend_packet_manifest_entry(packet_reader& reader)
+{
+    backend_packet_manifest_entry entry;
+    entry.direction = static_cast<backend_packet_manifest_direction>(reader.read_byte());
+    entry.kind = static_cast<packet_kind>(reader.read_byte());
+    entry.packet_id = reader.read_uint16();
+    entry.routed_version = reader.read_uint16();
+    entry.status = static_cast<backend_packet_manifest_entry_status>(reader.read_byte());
+    entry.payload_constraint.minimum_length = reader.read_int32();
+    entry.payload_constraint.maximum_length = reader.read_int32();
+    if (read_bool(reader)) {
+        entry.payload_constraint.fixed_length = reader.read_int32();
+    }
+
+    entry.payload_constraint.schema_id = reader.read_string();
+    auto schema_hash = reader.read_string();
+    if (!schema_hash.empty()) {
+        entry.payload_constraint.schema_hash = std::move(schema_hash);
+    }
+
+    validate_backend_packet_manifest_entry(entry);
+    return entry;
+}
+
+void write_backend_packet_manifest(
+    packet_writer& writer,
+    const backend_packet_manifest& manifest)
+{
+    require_non_empty(manifest.backend_kind, "Backend kind");
+    require_non_empty(manifest.manifest_id, "Backend packet manifest id");
+    require_non_empty(manifest.hash, "Backend packet manifest hash");
+    if (manifest.entries.size() > static_cast<std::size_t>(backend_packet_manifest_max_entry_count)) {
+        throw packet_error("Backend packet manifest has too many entries.");
+    }
+
+    writer.write_string(manifest.backend_kind);
+    writer.write_string(manifest.manifest_id);
+    writer.write_string(manifest.hash);
+    writer.write_int32(static_cast<std::int32_t>(manifest.entries.size()));
+    for (const auto& entry : manifest.entries) {
+        write_backend_packet_manifest_entry(writer, entry);
+    }
+}
+
+backend_packet_manifest read_backend_packet_manifest(packet_reader& reader)
+{
+    backend_packet_manifest manifest;
+    manifest.backend_kind = reader.read_string();
+    manifest.manifest_id = reader.read_string();
+    manifest.hash = reader.read_string();
+    auto entry_count = reader.read_int32();
+    if (entry_count < 0 || entry_count > backend_packet_manifest_max_entry_count) {
+        throw packet_error("Invalid Backend packet manifest entry count.");
+    }
+
+    manifest.entries.reserve(static_cast<std::size_t>(entry_count));
+    for (std::int32_t index = 0; index < entry_count; ++index) {
+        manifest.entries.push_back(read_backend_packet_manifest_entry(reader));
+    }
+
+    require_non_empty(manifest.backend_kind, "Backend kind");
+    require_non_empty(manifest.manifest_id, "Backend packet manifest id");
+    require_non_empty(manifest.hash, "Backend packet manifest hash");
+    return manifest;
 }
 
 void require_control_frame(
@@ -934,6 +1082,215 @@ sidecar_manifest_snapshot_request decode_sidecar_manifest_snapshot_request(
     sidecar_manifest_snapshot_request value;
     value.request_id = reader.read_guid();
     reader.require_finished();
+    return value;
+}
+
+std::vector<std::uint8_t> encode_sidecar_endpoint_state_update(
+    const sidecar_endpoint_state_update& value)
+{
+    packet_writer writer;
+    writer.write_guid(value.request_id);
+    write_bool(writer, value.ready);
+    writer.write_string(value.detail);
+    return writer.take_bytes();
+}
+
+sidecar_endpoint_state_update decode_sidecar_endpoint_state_update(
+    std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    sidecar_endpoint_state_update value;
+    value.request_id = reader.read_guid();
+    value.ready = read_bool(reader);
+    value.detail = reader.read_string();
+    reader.require_finished();
+    return value;
+}
+
+std::vector<std::uint8_t> encode_sidecar_runtime_status_update(
+    const sidecar_runtime_status_update& value)
+{
+    require_non_negative(value.active_gateway_sessions, "Active Gateway sessions");
+    require_non_negative(value.active_channels, "Active Gateway channels");
+
+    packet_writer writer;
+    writer.write_guid(value.request_id);
+    write_bool(writer, value.healthy);
+    writer.write_int32(value.active_gateway_sessions);
+    writer.write_int32(value.active_channels);
+    writer.write_string(value.detail);
+    return writer.take_bytes();
+}
+
+sidecar_runtime_status_update decode_sidecar_runtime_status_update(
+    std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    sidecar_runtime_status_update value;
+    value.request_id = reader.read_guid();
+    value.healthy = read_bool(reader);
+    value.active_gateway_sessions = reader.read_int32();
+    value.active_channels = reader.read_int32();
+    value.detail = reader.read_string();
+    reader.require_finished();
+
+    require_non_negative(value.active_gateway_sessions, "Active Gateway sessions");
+    require_non_negative(value.active_channels, "Active Gateway channels");
+    return value;
+}
+
+std::vector<std::uint8_t> encode_sidecar_shutdown_state_update(
+    const sidecar_shutdown_state_update& value)
+{
+    packet_writer writer;
+    writer.write_guid(value.request_id);
+    write_bool(writer, value.shutting_down);
+    writer.write_string(value.reason);
+    return writer.take_bytes();
+}
+
+sidecar_shutdown_state_update decode_sidecar_shutdown_state_update(
+    std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    sidecar_shutdown_state_update value;
+    value.request_id = reader.read_guid();
+    value.shutting_down = read_bool(reader);
+    value.reason = reader.read_string();
+    reader.require_finished();
+    return value;
+}
+
+std::vector<std::uint8_t> encode_sidecar_manifest_declaration_update(
+    const sidecar_manifest_declaration_update& value)
+{
+    packet_writer writer;
+    writer.write_guid(value.request_id);
+    writer.write_string(value.manifest_id);
+    writer.write_string(value.manifest_hash);
+    return writer.take_bytes();
+}
+
+sidecar_manifest_declaration_update decode_sidecar_manifest_declaration_update(
+    std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    sidecar_manifest_declaration_update value;
+    value.request_id = reader.read_guid();
+    value.manifest_id = reader.read_string();
+    value.manifest_hash = reader.read_string();
+    reader.require_finished();
+    return value;
+}
+
+std::vector<std::uint8_t> encode_sidecar_control_ack(
+    const sidecar_control_ack& value)
+{
+    packet_writer writer;
+    writer.write_guid(value.request_id);
+    write_bool(writer, value.success);
+    writer.write_string(value.error_message);
+    return writer.take_bytes();
+}
+
+sidecar_control_ack decode_sidecar_control_ack(
+    std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    sidecar_control_ack value;
+    value.request_id = reader.read_guid();
+    value.success = read_bool(reader);
+    value.error_message = reader.read_string();
+    reader.require_finished();
+    return value;
+}
+
+std::vector<std::uint8_t> encode_backend_packet_manifest_snapshot(
+    const backend_packet_manifest_snapshot& value)
+{
+    if (value.manifests.size() > static_cast<std::size_t>(backend_packet_manifest_max_manifest_count)) {
+        throw packet_error("Backend packet manifest snapshot has too many manifests.");
+    }
+
+    packet_writer writer;
+    writer.write_int32(static_cast<std::int32_t>(value.manifests.size()));
+    for (const auto& manifest : value.manifests) {
+        write_backend_packet_manifest(writer, manifest);
+    }
+
+    writer.write_int64(value.observed_at_unix_milliseconds);
+    return writer.take_bytes();
+}
+
+backend_packet_manifest_snapshot decode_backend_packet_manifest_snapshot(
+    std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    backend_packet_manifest_snapshot value;
+    auto manifest_count = reader.read_int32();
+    if (manifest_count < 0 || manifest_count > backend_packet_manifest_max_manifest_count) {
+        throw packet_error("Invalid Backend packet manifest count.");
+    }
+
+    value.manifests.reserve(static_cast<std::size_t>(manifest_count));
+    for (std::int32_t index = 0; index < manifest_count; ++index) {
+        value.manifests.push_back(read_backend_packet_manifest(reader));
+    }
+
+    value.observed_at_unix_milliseconds = reader.read_int64();
+    reader.require_finished();
+    return value;
+}
+
+std::vector<std::uint8_t> encode_sidecar_manifest_snapshot_response(
+    const sidecar_manifest_snapshot_response& value)
+{
+    if (value.success && !value.snapshot.has_value()) {
+        throw packet_error("Successful manifest snapshot response requires a snapshot.");
+    }
+
+    packet_writer writer;
+    writer.write_guid(value.request_id);
+    write_bool(writer, value.success);
+    write_bool(writer, value.snapshot.has_value());
+    if (value.snapshot.has_value()) {
+        auto snapshot = encode_backend_packet_manifest_snapshot(*value.snapshot);
+        writer.write_bytes(snapshot);
+    }
+
+    writer.write_string(value.error_message);
+    return writer.take_bytes();
+}
+
+sidecar_manifest_snapshot_response decode_sidecar_manifest_snapshot_response(
+    std::span<const std::uint8_t> payload)
+{
+    packet_reader reader(payload);
+    sidecar_manifest_snapshot_response value;
+    value.request_id = reader.read_guid();
+    value.success = read_bool(reader);
+    if (read_bool(reader)) {
+        backend_packet_manifest_snapshot snapshot;
+        auto manifest_count = reader.read_int32();
+        if (manifest_count < 0 || manifest_count > backend_packet_manifest_max_manifest_count) {
+            throw packet_error("Invalid Backend packet manifest count.");
+        }
+
+        snapshot.manifests.reserve(static_cast<std::size_t>(manifest_count));
+        for (std::int32_t index = 0; index < manifest_count; ++index) {
+            snapshot.manifests.push_back(read_backend_packet_manifest(reader));
+        }
+
+        snapshot.observed_at_unix_milliseconds = reader.read_int64();
+        value.snapshot = std::move(snapshot);
+    }
+
+    value.error_message = reader.read_string();
+    reader.require_finished();
+    if (value.success && !value.snapshot.has_value()) {
+        throw packet_error("Successful manifest snapshot response requires a snapshot.");
+    }
+
     return value;
 }
 

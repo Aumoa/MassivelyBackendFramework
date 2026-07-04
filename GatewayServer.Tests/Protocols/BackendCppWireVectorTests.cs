@@ -9,6 +9,7 @@ namespace GatewayServer.Tests.Protocols;
 public sealed class BackendCppWireVectorTests
 {
     private static readonly Guid s_VectorGuid = Guid.Parse("00112233-4455-6677-8899-aabbccddeeff");
+    private const string s_ManifestHash = "9924291a1ab4004e914ad25469916ec496da9def0689aea76003b230da521031";
 
     [Fact]
     public void PacketCoreHeader_UsesExpectedPackedBigEndianLayout()
@@ -23,6 +24,69 @@ public sealed class BackendCppWireVectorTests
         header.Write(bytes);
 
         Assert.Equal("c000640008000000", ToHex(bytes));
+    }
+
+    [Fact]
+    public void NodeAuthChallenge_VectorMatchesWireContract()
+    {
+        Assert.Equal(
+            "c0006400080000330000000b6368616c6c656e67652d6100000020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            EncodeFrameHex(
+                PacketKind.Control,
+                MasterControlPacketIds.NodeAuthChallenge,
+                MasterControlProtocol.SchemaVersion,
+                CreateChallenge(),
+                NodeAuthChallenge.Codec));
+    }
+
+    [Fact]
+    public void NodeHello_VectorMatchesWireContract()
+    {
+        var hello = new NodeHello(
+            MasterNodeKind.Gateway,
+            "gateway-a",
+            "Gateway A",
+            MasterControlProtocol.SchemaVersion,
+            "gateway-master-a");
+
+        Assert.Equal(
+            "c00065000800003101000800000009676174657761792d610000000947617465776179204100000010676174657761792d6d61737465722d61",
+            EncodeFrameHex(
+                PacketKind.Control,
+                MasterControlPacketIds.NodeHello,
+                MasterControlProtocol.SchemaVersion,
+                hello,
+                NodeHello.Codec));
+    }
+
+    [Fact]
+    public void DirectConnectCode_VectorMatchesWireContract()
+    {
+        var code = new DirectConnectCode("code-1");
+
+        Assert.Equal(
+            "c00073000800000a00000006636f64652d31",
+            EncodeFrameHex(
+                PacketKind.Control,
+                MasterControlPacketIds.DirectConnectCode,
+                MasterControlProtocol.SchemaVersion,
+                code,
+                DirectConnectCode.Codec));
+    }
+
+    [Fact]
+    public void NodeAccepted_VectorMatchesWireContract()
+    {
+        var accepted = new NodeAccepted("gateway-a", "backend-connection-a");
+
+        Assert.Equal(
+            "c00067000800002500000009676174657761792d61000000146261636b656e642d636f6e6e656374696f6e2d61",
+            EncodeFrameHex(
+                PacketKind.Control,
+                MasterControlPacketIds.NodeAccepted,
+                MasterControlProtocol.SchemaVersion,
+                accepted,
+                NodeAccepted.Codec));
     }
 
     [Fact]
@@ -100,6 +164,160 @@ public sealed class BackendCppWireVectorTests
     }
 
     [Fact]
+    public void SidecarDirectConnectValidationResponse_VectorMatchesWireContract()
+    {
+        var response = new DirectConnectCodeValidationResponse(
+            s_VectorGuid,
+            success: true,
+            "gateway-a",
+            "gateway-master-a",
+            MasterNodeKind.Backend,
+            "cpp-backend",
+            "backend-master-a",
+            string.Empty);
+
+        Assert.Equal(
+            "c00002000100005a33221100554477668899aabbccddeeff0100000009676174657761792d6100000010676174657761792d6d61737465722d61040000000b6370702d6261636b656e64000000106261636b656e642d6d61737465722d6100000000",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.DirectConnectCodeValidationResponse,
+                BackendSidecarControlProtocol.SchemaVersion,
+                response,
+                DirectConnectCodeValidationResponse.Codec));
+    }
+
+    [Fact]
+    public void SidecarEndpointStateUpdate_VectorMatchesWireContract()
+    {
+        var update = new SidecarEndpointStateUpdate(s_VectorGuid, ready: true, "ready");
+
+        Assert.Equal(
+            "c00003000100001a33221100554477668899aabbccddeeff01000000057265616479",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.EndpointStateUpdate,
+                BackendSidecarControlProtocol.SchemaVersion,
+                update,
+                SidecarEndpointStateUpdate.Codec));
+    }
+
+    [Fact]
+    public void SidecarEndpointStateAck_VectorMatchesWireContract()
+    {
+        var ack = SidecarEndpointStateAck.SuccessResult(s_VectorGuid);
+
+        Assert.Equal(
+            "c00004000100001533221100554477668899aabbccddeeff0100000000",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.EndpointStateAck,
+                BackendSidecarControlProtocol.SchemaVersion,
+                ack,
+                SidecarEndpointStateAck.Codec));
+    }
+
+    [Fact]
+    public void SidecarRuntimeStatusUpdate_VectorMatchesWireContract()
+    {
+        var update = new SidecarRuntimeStatusUpdate(
+            s_VectorGuid,
+            healthy: true,
+            activeGatewaySessions: 2,
+            activeChannels: 37,
+            "steady");
+
+        Assert.Equal(
+            "c00005000100002333221100554477668899aabbccddeeff01000000020000002500000006737465616479",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.RuntimeStatusUpdate,
+                BackendSidecarControlProtocol.SchemaVersion,
+                update,
+                SidecarRuntimeStatusUpdate.Codec));
+    }
+
+    [Fact]
+    public void SidecarRuntimeStatusAck_VectorMatchesWireContract()
+    {
+        var ack = SidecarRuntimeStatusAck.SuccessResult(s_VectorGuid);
+
+        Assert.Equal(
+            "c00006000100001533221100554477668899aabbccddeeff0100000000",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.RuntimeStatusAck,
+                BackendSidecarControlProtocol.SchemaVersion,
+                ack,
+                SidecarRuntimeStatusAck.Codec));
+    }
+
+    [Fact]
+    public void SidecarShutdownStateUpdate_VectorMatchesWireContract()
+    {
+        var update = new SidecarShutdownStateUpdate(
+            s_VectorGuid,
+            shuttingDown: true,
+            "rolling restart");
+
+        Assert.Equal(
+            "c00007000100002433221100554477668899aabbccddeeff010000000f726f6c6c696e672072657374617274",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.ShutdownStateUpdate,
+                BackendSidecarControlProtocol.SchemaVersion,
+                update,
+                SidecarShutdownStateUpdate.Codec));
+    }
+
+    [Fact]
+    public void SidecarShutdownStateAck_VectorMatchesWireContract()
+    {
+        var ack = SidecarShutdownStateAck.SuccessResult(s_VectorGuid);
+
+        Assert.Equal(
+            "c00008000100001533221100554477668899aabbccddeeff0100000000",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.ShutdownStateAck,
+                BackendSidecarControlProtocol.SchemaVersion,
+                ack,
+                SidecarShutdownStateAck.Codec));
+    }
+
+    [Fact]
+    public void SidecarManifestDeclarationUpdate_VectorMatchesWireContract()
+    {
+        var update = new SidecarManifestDeclarationUpdate(
+            s_VectorGuid,
+            "cpp-world:v2",
+            s_ManifestHash);
+
+        Assert.Equal(
+            "c00009000100006433221100554477668899aabbccddeeff0000000c6370702d776f726c643a76320000004039393234323931613161623430303465393134616432353436393931366563343936646139646566303638396165613736303033623233306461353231303331",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.ManifestDeclarationUpdate,
+                BackendSidecarControlProtocol.SchemaVersion,
+                update,
+                SidecarManifestDeclarationUpdate.Codec));
+    }
+
+    [Fact]
+    public void SidecarManifestDeclarationAck_VectorMatchesWireContract()
+    {
+        var ack = SidecarManifestDeclarationAck.SuccessResult(s_VectorGuid);
+
+        Assert.Equal(
+            "c0000a000100001533221100554477668899aabbccddeeff0100000000",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.ManifestDeclarationAck,
+                BackendSidecarControlProtocol.SchemaVersion,
+                ack,
+                SidecarManifestDeclarationAck.Codec));
+    }
+
+    [Fact]
     public void SidecarManifestSnapshotRequest_VectorMatchesWireContract()
     {
         var request = new SidecarManifestSnapshotRequest(s_VectorGuid);
@@ -114,6 +332,38 @@ public sealed class BackendCppWireVectorTests
                 SidecarManifestSnapshotRequest.Codec));
     }
 
+    [Fact]
+    public void SidecarManifestSnapshotResponseSuccess_VectorMatchesWireContract()
+    {
+        var response = SidecarManifestSnapshotResponse.SuccessResult(
+            s_VectorGuid,
+            CreateManifestSnapshot());
+
+        Assert.Equal(
+            "c0000c000100009f33221100554477668899aabbccddeeff010100000001000000096370702d776f726c640000000c6370702d776f726c643a76320000004039393234323931613161623430303465393134616432353436393931366563343936646139646566303638396165613736303033623233306461353231303331000000010100006500010100000004000000400000000000000000000000019f2314e60000000000",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.ManifestSnapshotResponse,
+                BackendSidecarControlProtocol.SchemaVersion,
+                response,
+                SidecarManifestSnapshotResponse.Codec));
+    }
+
+    [Fact]
+    public void SidecarManifestSnapshotResponseFailure_VectorMatchesWireContract()
+    {
+        var response = SidecarManifestSnapshotResponse.Failure(s_VectorGuid, "not loaded");
+
+        Assert.Equal(
+            "c0000c000100002033221100554477668899aabbccddeeff00000000000a6e6f74206c6f61646564",
+            EncodeFrameHex(
+                PacketKind.Control,
+                BackendSidecarControlPacketIds.ManifestSnapshotResponse,
+                BackendSidecarControlProtocol.SchemaVersion,
+                response,
+                SidecarManifestSnapshotResponse.Codec));
+    }
+
     private static string EncodeFrameHex<TPacket>(
         PacketKind kind,
         ushort packetId,
@@ -126,6 +376,36 @@ public sealed class BackendCppWireVectorTests
         frame.Header.Write(bytes.AsSpan(0, PacketHeader.Size));
         frame.Payload.Span.CopyTo(bytes.AsSpan(PacketHeader.Size));
         return ToHex(bytes);
+    }
+
+    private static NodeAuthChallenge CreateChallenge()
+    {
+        var nonce = new byte[MasterControlProtocol.AuthNonceLength];
+        for (int index = 0; index < nonce.Length; index++)
+        {
+            nonce[index] = (byte)index;
+        }
+
+        return new NodeAuthChallenge("challenge-a", nonce);
+    }
+
+    private static BackendPacketManifestSnapshot CreateManifestSnapshot()
+    {
+        return new BackendPacketManifestSnapshot(
+            [
+                new BackendPacketManifest(
+                    "cpp-world",
+                    new BackendPacketManifestId("cpp-world:v2"),
+                    [
+                        new BackendPacketManifestEntry(
+                            BackendPacketManifestDirection.ClientToBackend,
+                            PacketKind.Request,
+                            101,
+                            1,
+                            new BackendPacketPayloadConstraint(4, 64))
+                    ])
+            ],
+            DateTimeOffset.FromUnixTimeMilliseconds(1_783_000_000_000));
     }
 
     private static string ToHex(ReadOnlySpan<byte> bytes)
