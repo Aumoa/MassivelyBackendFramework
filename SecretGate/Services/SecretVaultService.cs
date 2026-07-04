@@ -126,7 +126,8 @@ public sealed class SecretVaultService(
         CancellationToken cancellationToken = default)
     {
         var records = await repository.GetVaultSecretsAsync(ownerSubject, cancellationToken);
-        if (!session.IsUnlocked)
+        var vaultKey = await TryGetVerifiedVaultKeyAsync(ownerSubject, cancellationToken);
+        if (vaultKey == null)
         {
             return records
                 .Select(static record => new StoredSecretView(
@@ -139,7 +140,6 @@ public sealed class SecretVaultService(
                 .ToArray();
         }
 
-        var vaultKey = session.GetVaultKeyOrThrow();
         return records
             .Select(record =>
             {
@@ -161,7 +161,7 @@ public sealed class SecretVaultService(
             .ToArray();
     }
 
-    public async Task AddSecretAsync(
+    public async Task<bool> AddSecretAsync(
         string ownerSubject,
         string name,
         string secret,
@@ -171,10 +171,16 @@ public sealed class SecretVaultService(
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(secret);
 
+        var vaultKey = await TryGetVerifiedVaultKeyAsync(ownerSubject, cancellationToken);
+        if (vaultKey == null)
+        {
+            return false;
+        }
+
         var id = Guid.NewGuid();
         var envelope = SecretCrypto.Encrypt(
             secret,
-            session.GetVaultKeyOrThrow(),
+            vaultKey,
             GetVaultPurpose(ownerSubject, id));
 
         await repository.AddVaultSecretAsync(
@@ -184,14 +190,42 @@ public sealed class SecretVaultService(
             envelope,
             DateTime.UtcNow,
             cancellationToken);
+
+        return true;
     }
 
-    public Task DeleteSecretAsync(
+    public async Task<bool> DeleteSecretAsync(
         string ownerSubject,
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        return repository.DeleteVaultSecretAsync(ownerSubject, id, cancellationToken);
+        if (await TryGetVerifiedVaultKeyAsync(ownerSubject, cancellationToken) == null)
+        {
+            return false;
+        }
+
+        await repository.DeleteVaultSecretAsync(ownerSubject, id, cancellationToken);
+        return true;
+    }
+
+    private async Task<string?> TryGetVerifiedVaultKeyAsync(
+        string ownerSubject,
+        CancellationToken cancellationToken)
+    {
+        if (!session.IsUnlocked)
+        {
+            return null;
+        }
+
+        var vaultKey = session.GetVaultKeyOrThrow();
+        var profile = await repository.GetVaultProfileAsync(ownerSubject, cancellationToken);
+        if (profile == null || !VerifyProfile(ownerSubject, profile, vaultKey))
+        {
+            session.Lock();
+            return null;
+        }
+
+        return vaultKey;
     }
 
     private static string GetVaultPurpose(string ownerSubject, Guid secretId)

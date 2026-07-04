@@ -1,5 +1,4 @@
 ﻿using System.Net.Http.Json;
-using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -54,16 +53,20 @@ internal class TokenRefreshService(
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                if (IsExpectedRefreshTokenRejection(errorContent))
+                var oauthError = OAuthErrorResponse.TryGetError(errorContent);
+                if (IsExpectedRefreshTokenRejection(oauthError))
                 {
                     logger.LogInformation(
                         "Refresh token was rejected by the token endpoint; clearing local login cookies. StatusCode={StatusCode}, OAuthError={OAuthError}.",
                         response.StatusCode,
-                        TryGetOAuthError(errorContent) ?? "unknown");
+                        oauthError ?? "unknown");
                 }
                 else
                 {
-                    logger.LogWarning("Token refresh failed: {StatusCode} - {Content}", response.StatusCode, errorContent);
+                    logger.LogWarning(
+                        "Token refresh failed. StatusCode={StatusCode}, OAuthError={OAuthError}.",
+                        response.StatusCode,
+                        oauthError ?? "unknown");
                 }
 
                 // Refresh token invalid, delete cookies
@@ -119,32 +122,8 @@ internal class TokenRefreshService(
         }
     }
 
-    private static bool IsExpectedRefreshTokenRejection(string errorContent)
+    private static bool IsExpectedRefreshTokenRejection(string? oauthError)
     {
-        return string.Equals(TryGetOAuthError(errorContent), "invalid_grant", StringComparison.Ordinal);
-    }
-
-    private static string? TryGetOAuthError(string errorContent)
-    {
-        if (string.IsNullOrWhiteSpace(errorContent))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(errorContent);
-            if (document.RootElement.ValueKind == JsonValueKind.Object &&
-                document.RootElement.TryGetProperty("error", out var error) &&
-                error.ValueKind == JsonValueKind.String)
-            {
-                return error.GetString();
-            }
-        }
-        catch (JsonException)
-        {
-        }
-
-        return null;
+        return string.Equals(oauthError, "invalid_grant", StringComparison.Ordinal);
     }
 }

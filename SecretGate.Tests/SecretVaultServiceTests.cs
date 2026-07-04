@@ -58,6 +58,27 @@ public sealed class SecretVaultServiceTests
     }
 
     [Fact]
+    public async Task AddSecretRejectsStaleUnlockedVaultKey()
+    {
+        var repository = new FakeSecretRepository();
+        var staleSessionService = new SecretVaultService(repository, new SecretVaultSession());
+        var currentSessionService = new SecretVaultService(repository, new SecretVaultSession());
+
+        await staleSessionService.InitializeAsync("user-sub", "old-password");
+        Assert.True(await currentSessionService.TryUnlockAsync("user-sub", "old-password"));
+        Assert.True(await currentSessionService.ChangePasswordAsync("user-sub", "new-password"));
+
+        var savedWithStaleKey = await staleSessionService.AddSecretAsync(
+            "user-sub",
+            "database password",
+            "vault secret");
+
+        Assert.False(savedWithStaleKey);
+        Assert.False(staleSessionService.IsUnlocked);
+        Assert.Empty(await currentSessionService.GetSecretsAsync("user-sub"));
+    }
+
+    [Fact]
     public async Task ResetDeletesVaultProfileAndSavedSecrets()
     {
         var repository = new FakeSecretRepository();

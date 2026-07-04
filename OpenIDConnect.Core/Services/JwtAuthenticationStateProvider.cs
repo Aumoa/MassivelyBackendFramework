@@ -162,18 +162,13 @@ internal class JwtAuthenticationStateProvider(
             {
                 if (logger.IsEnabled(LogLevel.Information))
                 {
-                    logger.LogInformation("Failed to exchange authorization code for tokens. Status code: {StatusCode}", response.StatusCode);
-                    if (response.StatusCode == HttpStatusCode.BadRequest)
-                    {
-                        try
-                        {
-                            var s = await response.Content.ReadAsStringAsync(cancellationToken);
-                            logger.LogInformation("Token endpoint response: {Response}", s);
-                        }
-                        catch
-                        {
-                        }
-                    }
+                    var oauthError = response.StatusCode == HttpStatusCode.BadRequest
+                        ? await OAuthErrorResponse.TryReadErrorAsync(response, cancellationToken)
+                        : null;
+                    logger.LogInformation(
+                        "Failed to exchange authorization code for tokens. StatusCode={StatusCode}, OAuthError={OAuthError}.",
+                        response.StatusCode,
+                        oauthError ?? "unknown");
                 }
 
                 m_LastSuccessfullyCode = null;

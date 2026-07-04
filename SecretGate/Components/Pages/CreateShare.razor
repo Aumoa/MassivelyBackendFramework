@@ -24,7 +24,7 @@
     <form class="secret-form" @onsubmit="CreateShareAsync" @onsubmit:preventDefault="true">
         <label class="field">
             <span>@Strings.SHARE_SECRET_LABEL</span>
-            <textarea class="form-textarea" rows="6" @bind="shareSecret"></textarea>
+            <textarea class="form-textarea" rows="6" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" @bind="shareSecret"></textarea>
         </label>
         <label class="field field-compact">
             <span>@Strings.SHARE_EXPIRY_LABEL</span>
