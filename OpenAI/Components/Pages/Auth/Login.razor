@@ -22,8 +22,7 @@
 @code {
     private Task OnClickLoginAsync()
     {
-        var redirectUri = Nav.BaseUri + "auth/redirect";
-        Nav.NavigateTo(AuthState.GenerateLoginUri(redirectUri, "openid profile email groups"));
+        AuthState.NavigateToLogin(Nav, "auth/redirect", "openid profile email groups");
         return Task.CompletedTask;
     }
 }

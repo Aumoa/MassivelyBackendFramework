@@ -242,7 +242,20 @@ internal class JwtAuthenticationStateProvider(
 
     public void NavigateToLogin(NavigationManager navigation, string redirectRelativeUri, string scope)
     {
-        navigation.NavigateTo(CreateLoginUri(navigation.BaseUri + redirectRelativeUri, scope));
+        navigation.NavigateTo(CreateLocalLoginUri(navigation, redirectRelativeUri, scope), forceLoad: true);
+    }
+
+    private static string CreateLocalLoginUri(NavigationManager navigation, string redirectRelativeUri, string scope)
+    {
+        var baseUri = new Uri(navigation.BaseUri, UriKind.Absolute);
+        var redirectUri = new Uri(baseUri, redirectRelativeUri).ToString();
+        var localLoginUri = new Uri(baseUri, "_oidc/login").ToString();
+
+        return QueryHelpers.AddQueryString(localLoginUri, new Dictionary<string, string?>
+        {
+            ["redirect_uri"] = redirectUri,
+            ["scope"] = scope
+        });
     }
 
     private string CreateLoginUri(string redirectUri, string scope)
