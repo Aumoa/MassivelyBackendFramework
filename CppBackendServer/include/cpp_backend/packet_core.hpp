@@ -3,10 +3,12 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace cpp_backend {
@@ -213,6 +215,67 @@ struct gateway_direct_handshake_result {
     std::string gateway_node_id;
     std::string gateway_master_connection_id;
     packet_frame accepted_frame;
+};
+
+enum class gateway_session_event_kind {
+    ignored,
+    channel_open,
+    channel_data,
+    channel_close,
+};
+
+struct gateway_session_event {
+    gateway_session_event_kind kind = gateway_session_event_kind::ignored;
+    std::optional<gateway_backend_channel_open> open;
+    std::optional<gateway_backend_channel_data_envelope> data;
+    std::optional<gateway_backend_channel_close> close;
+};
+
+class gateway_frame_writer {
+public:
+    virtual ~gateway_frame_writer() = default;
+
+    virtual void write(packet_frame frame) = 0;
+};
+
+class trusted_gateway_session {
+public:
+    trusted_gateway_session(
+        std::string gateway_node_id,
+        std::string gateway_master_connection_id);
+
+    gateway_session_event handle_gateway_frame(const packet_frame& frame);
+
+    void write_channel_data(
+        gateway_frame_writer& writer,
+        std::uint32_t channel_id,
+        packet_kind routed_kind,
+        std::uint16_t routed_packet_id,
+        std::uint16_t routed_version,
+        std::optional<guid_bytes> exchange_id,
+        std::vector<std::uint8_t> routed_payload);
+
+    void write_channel_close(
+        gateway_frame_writer& writer,
+        std::uint32_t channel_id,
+        const std::string& reason);
+
+    void mark_disconnected();
+
+    bool has_channel(std::uint32_t channel_id) const;
+    std::size_t channel_count() const;
+
+    const std::string& gateway_node_id() const noexcept;
+    const std::string& gateway_master_connection_id() const noexcept;
+
+private:
+    void require_channel_open(std::uint32_t channel_id) const;
+
+    std::string m_gateway_node_id;
+    std::string m_gateway_master_connection_id;
+    mutable std::mutex m_sync;
+    std::mutex m_write_sync;
+    std::unordered_set<std::uint32_t> m_channels;
 };
 
 std::vector<std::uint8_t> encode_gateway_backend_channel_open(const gateway_backend_channel_open& value);

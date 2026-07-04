@@ -7,6 +7,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace cpp_backend;
@@ -173,6 +174,16 @@ public:
         gateway_node_id = requested_gateway_node_id;
         gateway_master_connection_id = requested_gateway_master_connection_id;
         return response;
+    }
+};
+
+class recording_frame_writer final : public gateway_frame_writer {
+public:
+    std::vector<packet_frame> frames;
+
+    void write(packet_frame frame) override
+    {
+        frames.push_back(std::move(frame));
     }
 };
 
@@ -417,6 +428,137 @@ void gateway_direct_handshake_rejects_non_gateway_hello()
     require(validator.call_count == 0, "Validator should not run for non-Gateway hello.");
 }
 
+void trusted_gateway_session_tracks_open_data_and_close()
+{
+    trusted_gateway_session session("gateway-a", "gateway-master-a");
+    auto open_frame = make_frame(
+        packet_kind::notify,
+        pid_gate_backend_channel_open,
+        gateway_backend_channel_version,
+        encode_gateway_backend_channel_open(gateway_backend_channel_open {
+            37,
+            std::string("player-1"),
+        }));
+
+    auto open_event = session.handle_gateway_frame(open_frame);
+    require(open_event.kind == gateway_session_event_kind::channel_open, "Open event kind mismatch.");
+    require(open_event.open.has_value(), "Open event missing payload.");
+    require(open_event.open->channel_id == 37, "Open event channel id mismatch.");
+    require(session.has_channel(37), "Session did not track opened channel.");
+
+    auto data_frame = make_frame(
+        packet_kind::request,
+        pid_gate_backend_channel_data,
+        gateway_backend_channel_version,
+        encode_gateway_backend_channel_data_envelope(gateway_backend_channel_data_envelope {
+            37,
+            packet_kind::request,
+            101,
+            1,
+            vector_guid(),
+            {0x01, 0x02},
+        }));
+    auto data_event = session.handle_gateway_frame(data_frame);
+    require(data_event.kind == gateway_session_event_kind::channel_data, "Data event kind mismatch.");
+    require(data_event.data.has_value(), "Data event missing payload.");
+    require(data_event.data->channel_id == 37, "Data event channel id mismatch.");
+    require(data_event.data->routed_payload == std::vector<std::uint8_t>({0x01, 0x02}), "Data payload mismatch.");
+
+    auto close_frame = make_frame(
+        packet_kind::notify,
+        pid_gate_backend_channel_close,
+        gateway_backend_channel_version,
+        encode_gateway_backend_channel_close(gateway_backend_channel_close {
+            37,
+            "client closed",
+        }));
+    auto close_event = session.handle_gateway_frame(close_frame);
+    require(close_event.kind == gateway_session_event_kind::channel_close, "Close event kind mismatch.");
+    require(close_event.close.has_value(), "Close event missing payload.");
+    require(!session.has_channel(37), "Session did not remove closed channel.");
+}
+
+void trusted_gateway_session_rejects_unknown_channel_data()
+{
+    trusted_gateway_session session("gateway-a", "gateway-master-a");
+    auto data_frame = make_frame(
+        packet_kind::notify,
+        pid_gate_backend_channel_data,
+        gateway_backend_channel_version,
+        encode_gateway_backend_channel_data_envelope(gateway_backend_channel_data_envelope {
+            37,
+            packet_kind::notify,
+            201,
+            1,
+            std::nullopt,
+            {0x01},
+        }));
+
+    require_packet_error(
+        [&session, &data_frame] {
+            (void)session.handle_gateway_frame(data_frame);
+        },
+        "Unknown channel data");
+}
+
+void trusted_gateway_session_writes_server_origin_frames()
+{
+    trusted_gateway_session session("gateway-a", "gateway-master-a");
+    auto open_frame = make_frame(
+        packet_kind::notify,
+        pid_gate_backend_channel_open,
+        gateway_backend_channel_version,
+        encode_gateway_backend_channel_open(gateway_backend_channel_open {
+            37,
+            std::nullopt,
+        }));
+    (void)session.handle_gateway_frame(open_frame);
+
+    recording_frame_writer writer;
+    session.write_channel_data(
+        writer,
+        37,
+        packet_kind::notify,
+        201,
+        1,
+        std::nullopt,
+        {0xaa, 0xbb});
+
+    require(writer.frames.size() == 1, "Expected one server-origin data frame.");
+    require(writer.frames[0].header.kind == packet_kind::notify, "Server-origin data frame kind mismatch.");
+    require(writer.frames[0].header.packet_id == pid_gate_backend_channel_data, "Server-origin data packet id mismatch.");
+    auto data = decode_gateway_backend_channel_data_envelope(writer.frames[0].payload);
+    require(data.channel_id == 37, "Server-origin data channel id mismatch.");
+    require(data.routed_payload == std::vector<std::uint8_t>({0xaa, 0xbb}), "Server-origin data payload mismatch.");
+
+    session.write_channel_close(writer, 37, "backend closed");
+    require(writer.frames.size() == 2, "Expected close frame.");
+    require(writer.frames[1].header.kind == packet_kind::notify, "Server-origin close frame kind mismatch.");
+    require(writer.frames[1].header.packet_id == pid_gate_backend_channel_close, "Server-origin close packet id mismatch.");
+    auto close = decode_gateway_backend_channel_close(writer.frames[1].payload);
+    require(close.channel_id == 37, "Server-origin close channel id mismatch.");
+    require(close.reason == "backend closed", "Server-origin close reason mismatch.");
+    require(!session.has_channel(37), "Server-origin close did not remove channel.");
+}
+
+void trusted_gateway_session_clears_channels_on_disconnect()
+{
+    trusted_gateway_session session("gateway-a", "gateway-master-a");
+    auto open_frame = make_frame(
+        packet_kind::notify,
+        pid_gate_backend_channel_open,
+        gateway_backend_channel_version,
+        encode_gateway_backend_channel_open(gateway_backend_channel_open {
+            37,
+            std::nullopt,
+        }));
+    (void)session.handle_gateway_frame(open_frame);
+    require(session.channel_count() == 1, "Expected one tracked channel.");
+
+    session.mark_disconnected();
+    require(session.channel_count() == 0, "Disconnect did not clear channels.");
+}
+
 } // namespace
 
 int main()
@@ -433,6 +575,10 @@ int main()
         gateway_direct_handshake_rejects_failed_validation();
         gateway_direct_handshake_rejects_unexpected_validation_identity();
         gateway_direct_handshake_rejects_non_gateway_hello();
+        trusted_gateway_session_tracks_open_data_and_close();
+        trusted_gateway_session_rejects_unknown_channel_data();
+        trusted_gateway_session_writes_server_origin_frames();
+        trusted_gateway_session_clears_channels_on_disconnect();
     } catch (const std::exception& exception) {
         std::cerr << exception.what() << '\n';
         return 1;

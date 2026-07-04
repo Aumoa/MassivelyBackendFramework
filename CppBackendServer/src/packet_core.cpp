@@ -1008,6 +1008,172 @@ gateway_direct_handshake_result complete_gateway_direct_handshake(
     };
 }
 
+trusted_gateway_session::trusted_gateway_session(
+    std::string gateway_node_id,
+    std::string gateway_master_connection_id)
+    : m_gateway_node_id(std::move(gateway_node_id)),
+      m_gateway_master_connection_id(std::move(gateway_master_connection_id))
+{
+    require_non_empty(m_gateway_node_id, "Gateway node id");
+    require_non_empty(m_gateway_master_connection_id, "Gateway Master connection id");
+}
+
+gateway_session_event trusted_gateway_session::handle_gateway_frame(const packet_frame& frame)
+{
+    if (frame.header.packet_id == pid_gate_backend_channel_open) {
+        if (frame.header.kind != packet_kind::notify ||
+            frame.header.version != gateway_backend_channel_version ||
+            frame.header.payload_length != frame.payload.size()) {
+            throw packet_error("Invalid Gateway Backend channel open frame.");
+        }
+
+        auto open = decode_gateway_backend_channel_open(frame.payload);
+        {
+            std::lock_guard lock(m_sync);
+            m_channels.insert(open.channel_id);
+        }
+
+        return gateway_session_event {
+            gateway_session_event_kind::channel_open,
+            open,
+            std::nullopt,
+            std::nullopt,
+        };
+    }
+
+    if (frame.header.packet_id == pid_gate_backend_channel_data) {
+        if (frame.header.version != gateway_backend_channel_version ||
+            frame.header.payload_length != frame.payload.size()) {
+            throw packet_error("Invalid Gateway Backend channel data frame.");
+        }
+
+        auto data = decode_gateway_backend_channel_data_envelope(frame.payload);
+        if (frame.header.kind != data.routed_kind) {
+            throw packet_error("Gateway Backend channel data frame kind does not match routed kind.");
+        }
+
+        require_channel_open(data.channel_id);
+        return gateway_session_event {
+            gateway_session_event_kind::channel_data,
+            std::nullopt,
+            std::move(data),
+            std::nullopt,
+        };
+    }
+
+    if (frame.header.packet_id == pid_gate_backend_channel_close) {
+        if (frame.header.kind != packet_kind::notify ||
+            frame.header.version != gateway_backend_channel_version ||
+            frame.header.payload_length != frame.payload.size()) {
+            throw packet_error("Invalid Gateway Backend channel close frame.");
+        }
+
+        auto close = decode_gateway_backend_channel_close(frame.payload);
+        {
+            std::lock_guard lock(m_sync);
+            m_channels.erase(close.channel_id);
+        }
+
+        return gateway_session_event {
+            gateway_session_event_kind::channel_close,
+            std::nullopt,
+            std::nullopt,
+            std::move(close),
+        };
+    }
+
+    return gateway_session_event {};
+}
+
+void trusted_gateway_session::write_channel_data(
+    gateway_frame_writer& writer,
+    std::uint32_t channel_id,
+    packet_kind routed_kind,
+    std::uint16_t routed_packet_id,
+    std::uint16_t routed_version,
+    std::optional<guid_bytes> exchange_id,
+    std::vector<std::uint8_t> routed_payload)
+{
+    require_channel_open(channel_id);
+    gateway_backend_channel_data_envelope envelope {
+        channel_id,
+        routed_kind,
+        routed_packet_id,
+        routed_version,
+        std::move(exchange_id),
+        std::move(routed_payload),
+    };
+
+    auto frame = make_frame(
+        routed_kind,
+        pid_gate_backend_channel_data,
+        gateway_backend_channel_version,
+        encode_gateway_backend_channel_data_envelope(envelope));
+    std::lock_guard lock(m_write_sync);
+    writer.write(std::move(frame));
+}
+
+void trusted_gateway_session::write_channel_close(
+    gateway_frame_writer& writer,
+    std::uint32_t channel_id,
+    const std::string& reason)
+{
+    require_channel_open(channel_id);
+    gateway_backend_channel_close close {
+        channel_id,
+        reason,
+    };
+
+    auto frame = make_frame(
+        packet_kind::notify,
+        pid_gate_backend_channel_close,
+        gateway_backend_channel_version,
+        encode_gateway_backend_channel_close(close));
+    {
+        std::lock_guard lock(m_write_sync);
+        writer.write(std::move(frame));
+    }
+
+    std::lock_guard lock(m_sync);
+    m_channels.erase(channel_id);
+}
+
+void trusted_gateway_session::mark_disconnected()
+{
+    std::lock_guard lock(m_sync);
+    m_channels.clear();
+}
+
+bool trusted_gateway_session::has_channel(std::uint32_t channel_id) const
+{
+    std::lock_guard lock(m_sync);
+    return m_channels.contains(channel_id);
+}
+
+std::size_t trusted_gateway_session::channel_count() const
+{
+    std::lock_guard lock(m_sync);
+    return m_channels.size();
+}
+
+const std::string& trusted_gateway_session::gateway_node_id() const noexcept
+{
+    return m_gateway_node_id;
+}
+
+const std::string& trusted_gateway_session::gateway_master_connection_id() const noexcept
+{
+    return m_gateway_master_connection_id;
+}
+
+void trusted_gateway_session::require_channel_open(std::uint32_t channel_id) const
+{
+    std::lock_guard lock(m_sync);
+    if (!m_channels.contains(channel_id)) {
+        throw packet_error("Gateway channel is not open.");
+    }
+}
+
 bool is_routed_packet_kind(packet_kind kind) noexcept
 {
     return kind == packet_kind::request ||
