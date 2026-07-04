@@ -32,15 +32,17 @@ Gateway and the C++ Backend/Dedicated server.
 
 ## Phase 1: Protocol Spec
 
-- [ ] Document the `PacketCore` frame format for non-.NET implementations.
-- [ ] Document integer endianness, string encoding, GUID encoding, packet kind values, and payload length limits.
-- [ ] Document Gateway-to-Backend direct connection handshake requirements.
-- [ ] Document Gateway Backend channel frames:
-  - [ ] channel open
-  - [ ] channel data
-  - [ ] channel close
-- [ ] Document request/response exchange id rules.
-- [ ] Document which protocol values are compatibility metadata, not authorization secrets.
+- [x] Document the `PacketCore` frame format for non-.NET implementations.
+- [x] Document integer endianness, string encoding, GUID encoding, packet kind values, and payload length limits.
+- [x] Document Gateway-to-Backend direct connection handshake requirements.
+- [x] Document Gateway Backend channel frames:
+  - [x] channel open
+  - [x] channel data
+  - [x] channel close
+- [x] Document request/response exchange id rules.
+- [x] Document which protocol values are compatibility metadata, not authorization secrets.
+
+Implemented protocol specification: see `BACKEND_CPP_PROTOCOL.md` for PacketCore frame layout, primitive encodings, Gateway-to-Backend direct handshake, Gateway Backend channel frames, sidecar local control packets, and full-frame wire test vectors.
 
 ## Phase 2: Sidecar Responsibilities
 
@@ -90,7 +92,7 @@ Implemented graceful shutdown coordination: C++ sends `SidecarShutdownStateUpdat
 - [ ] When adding a Backend framework feature in C#, either implement the C++ equivalent or document the compatibility boundary.
 - [ ] When adding a Backend framework feature in C++, either implement the C# equivalent or document the compatibility boundary.
 - [ ] Keep wire protocol changes backward-compatible during rolling deployments.
-- [ ] Add shared protocol/version documentation before changing Gateway, Master, or Backend channel contracts.
+- [x] Add shared protocol/version documentation before changing Gateway, Master, or Backend channel contracts.
 - [ ] Add cross-language test vectors for every shared wire codec.
 - [ ] Prefer schema or manifest sources that can generate both C# and C++ code when practical.
 - [ ] Avoid C#-only assumptions in Master/Gateway behavior that would block C++ Backend nodes.
@@ -110,7 +112,7 @@ Implemented manifest snapshot sharing: Master sends approved `BackendPacketManif
 
 ## Phase 7: Validation And Tests
 
-- [ ] Add C# and C++ wire codec compatibility test vectors.
+- [x] Add C# and C++ wire codec compatibility test vectors.
 - [x] Add integration tests for sidecar Master registration with a C++ endpoint advertisement.
 - [ ] Add integration tests for Gateway direct connection to a C++ Backend test server.
 - [ ] Add handshake rejection tests for invalid direct-connect codes.
