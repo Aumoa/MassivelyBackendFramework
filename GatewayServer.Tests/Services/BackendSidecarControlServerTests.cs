@@ -252,6 +252,47 @@ public sealed class BackendSidecarControlServerTests
     }
 
     [Fact]
+    public async Task ManifestDeclaration_AcknowledgesAndUpdatesStatus()
+    {
+        var port = GetFreeTcpPort();
+        var server = CreateServer(
+            port,
+            new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend));
+        await server.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+
+            var update = new SidecarManifestDeclarationUpdate(
+                Guid.NewGuid(),
+                "cpp-world:v2",
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+            await WriteManifestDeclarationUpdateAsync(stream, update);
+
+            var ack = await ReadManifestDeclarationAckAsync(stream);
+            Assert.True(ack.Success);
+            Assert.Equal(update.RequestId, ack.RequestId);
+
+            var status = server.GetStatusItems();
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Manifest id" &&
+                item.Value == "cpp-world:v2");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Manifest hash" &&
+                item.Value.Contains("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", StringComparison.Ordinal));
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task StartAsync_RejectsNonLoopbackEndpoint()
     {
         var server = new SidecarControlServer(
@@ -296,6 +337,19 @@ public sealed class BackendSidecarControlServerTests
             BackendSidecarControlProtocol.SchemaVersion,
             request,
             DirectConnectCodeValidationRequest.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+    }
+
+    private static async Task WriteManifestDeclarationUpdateAsync(
+        Stream stream,
+        SidecarManifestDeclarationUpdate update)
+    {
+        using var frame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.ManifestDeclarationUpdate,
+            BackendSidecarControlProtocol.SchemaVersion,
+            update,
+            SidecarManifestDeclarationUpdate.Codec);
         await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
     }
 
@@ -384,6 +438,18 @@ public sealed class BackendSidecarControlServerTests
             frame,
             BackendSidecarControlPacketIds.ShutdownStateAck);
         return PacketCodec.Decode(frame, SidecarShutdownStateAck.Codec);
+    }
+
+    private static async Task<SidecarManifestDeclarationAck> ReadManifestDeclarationAckAsync(Stream stream)
+    {
+        using var frame = await PacketFrameReader.ReadAsync(
+            stream,
+            BackendSidecarControlProtocol.LocalControlPolicy,
+            CancellationToken.None) ?? throw new EndOfStreamException("Sidecar manifest declaration ack was not written.");
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.ManifestDeclarationAck);
+        return PacketCodec.Decode(frame, SidecarManifestDeclarationAck.Codec);
     }
 
     private static int GetFreeTcpPort()

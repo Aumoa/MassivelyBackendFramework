@@ -6,6 +6,8 @@ public sealed record SidecarControlOptions
 
     public bool RequireEndpointReadyBeforeAdvertise { get; set; }
 
+    public bool RequireManifestBeforeAdvertise { get; set; }
+
     public string IPAddress { get; set; } = "127.0.0.1";
 
     public int Port { get; set; } = 11702;

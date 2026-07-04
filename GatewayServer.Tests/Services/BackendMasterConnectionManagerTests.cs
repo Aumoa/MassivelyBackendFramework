@@ -128,6 +128,70 @@ public sealed class BackendMasterConnectionManagerTests
         }
     }
 
+    [Fact]
+    public async Task MasterConnection_WhenManifestRequired_AdvertisesDeclaredManifest()
+    {
+        await using var master = new FakeMasterServer();
+        var sidecarPort = GetFreeTcpPort();
+        var sidecar = new SidecarControlServer(
+            Microsoft.Extensions.Options.Options.Create(new SidecarControlOptions
+            {
+                Enabled = true,
+                RequireManifestBeforeAdvertise = true,
+                IPAddress = "127.0.0.1",
+                Port = sidecarPort
+            }),
+            new AlwaysSuccessfulDirectConnectCodeValidator(),
+            new TestLogger<SidecarControlServer>());
+        await sidecar.StartAsync(CancellationToken.None);
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IBackendManifestIdentityProvider>(sidecar);
+        var manager = new MasterConnectionManager(
+            Microsoft.Extensions.Options.Options.Create(new MasterConnectionOptions
+            {
+                Enabled = true,
+                IPAddress = "127.0.0.1",
+                Port = master.Port,
+                NodeId = "cpp-sidecar",
+                DisplayName = "C++ Sidecar",
+                BackendKind = "cpp-world",
+                BackendPacketManifestId = "cpp-world:v1",
+                BackendPacketManifestHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                SharedSecret = "test-secret",
+                ReconnectDelayMilliseconds = 100,
+                HandshakeTimeoutMilliseconds = 5000
+            }),
+            Microsoft.Extensions.Options.Options.Create(new GatewayListenerOptions
+            {
+                Enabled = false,
+                IPAddress = "10.20.30.40",
+                Port = 21701,
+                UseTls = true
+            }),
+            services.BuildServiceProvider(),
+            new TestLogger<MasterConnectionManager>());
+        await manager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            await master.Hello.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await Assert.ThrowsAsync<TimeoutException>(async () =>
+                await master.Advertise.Task.WaitAsync(TimeSpan.FromMilliseconds(300)));
+
+            await SendManifestDeclarationAsync(sidecarPort);
+
+            var advertise = await master.Advertise.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("cpp-world:v2", advertise.ManifestId.Value);
+            Assert.Equal("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", advertise.ManifestHash.Value);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+            await sidecar.StopAsync(CancellationToken.None);
+        }
+    }
+
     private static async Task SendEndpointReadyAsync(int port)
     {
         using var client = new TcpClient();
@@ -155,6 +219,37 @@ public sealed class BackendMasterConnectionManagerTests
             ackFrame,
             BackendSidecarControlPacketIds.EndpointStateAck);
         var ack = PacketCodec.Decode(ackFrame, SidecarEndpointStateAck.Codec);
+        Assert.True(ack.Success);
+        Assert.Equal(update.RequestId, ack.RequestId);
+    }
+
+    private static async Task SendManifestDeclarationAsync(int port)
+    {
+        using var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, port);
+        await using var stream = client.GetStream();
+        var update = new SidecarManifestDeclarationUpdate(
+            Guid.NewGuid(),
+            "cpp-world:v2",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        using (var frame = PacketCodec.Encode(
+                   PacketKind.Control,
+                   BackendSidecarControlPacketIds.ManifestDeclarationUpdate,
+                   BackendSidecarControlProtocol.SchemaVersion,
+                   update,
+                   SidecarManifestDeclarationUpdate.Codec))
+        {
+            await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+        }
+
+        using var ackFrame = await PacketFrameReader.ReadAsync(
+            stream,
+            BackendSidecarControlProtocol.LocalControlPolicy,
+            CancellationToken.None) ?? throw new EndOfStreamException("Sidecar manifest declaration ack was not written.");
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            ackFrame,
+            BackendSidecarControlPacketIds.ManifestDeclarationAck);
+        var ack = PacketCodec.Decode(ackFrame, SidecarManifestDeclarationAck.Codec);
         Assert.True(ack.Success);
         Assert.Equal(update.RequestId, ack.RequestId);
     }

@@ -49,7 +49,7 @@ Gateway and the C++ Backend/Dedicated server.
 - [x] Advertise `BackendKind`, endpoint, and transport flags to Master on behalf of the C++ server.
 - [x] Keep Master control-plane reconnect, status, and shutdown behavior equivalent to the C# Backend path.
 - [x] Provide local direct-connect code validation for the C++ server.
-- [ ] Report C++ server health and Gateway session status through Master admin/status flows.
+- [x] Report C++ server health and Gateway session status through Master admin/status flows.
 - [ ] Share approved packet manifests or policy snapshots with the C++ server when needed.
 
 Implemented sidecar entry point: set `GatewayListener:Enabled` to `false`. The sidecar keeps using `MasterConnection` for the control plane and advertises the configured `GatewayListener` endpoint as the external C++ data-plane listener without binding that port itself.
@@ -98,11 +98,13 @@ Implemented graceful shutdown coordination: C++ sends `SidecarShutdownStateUpdat
 
 ## Phase 6: Packet Manifest Integration
 
-- [ ] Ensure the C++ server can declare the active packet manifest id/hash.
-- [ ] Have the sidecar advertise the C++ server's manifest id/hash to Master.
+- [x] Ensure the C++ server can declare the active packet manifest id/hash.
+- [x] Have the sidecar advertise the C++ server's manifest id/hash to Master.
 - [ ] Ensure Master approval and Gateway snapshot behavior works for C++ Backend nodes.
 - [ ] Provide C++ access to manifest metadata needed for fast parsers and debug validation.
 - [ ] Keep Gateway verifier policy compatible with both C# and C++ Backend runtimes.
+
+Implemented manifest declaration: set `SidecarControl:RequireManifestBeforeAdvertise` to `true`. C++ sends `SidecarManifestDeclarationUpdate` as control packet id `9`; the sidecar acknowledges with `SidecarManifestDeclarationAck` as control packet id `10` and advertises the declared manifest id/hash to Master.
 
 ## Phase 7: Validation And Tests
 

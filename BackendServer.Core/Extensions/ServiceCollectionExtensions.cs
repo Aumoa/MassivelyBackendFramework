@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<SidecarControlServer>();
         services.AddSingleton<ISidecarControlStatusProvider>(static provider => provider.GetRequiredService<SidecarControlServer>());
         services.AddSingleton<IBackendEndpointReadiness>(static provider => provider.GetRequiredService<SidecarControlServer>());
+        services.AddSingleton<IBackendManifestIdentityProvider>(static provider => provider.GetRequiredService<SidecarControlServer>());
         services.AddHostedService(static provider => provider.GetRequiredService<SidecarControlServer>());
 
         return services;

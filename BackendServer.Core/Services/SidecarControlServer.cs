@@ -22,6 +22,15 @@ internal interface IBackendEndpointReadiness
     Task WaitUntilReadyForAdvertisementAsync(CancellationToken cancellationToken);
 }
 
+internal sealed record BackendManifestIdentity(string ManifestId, string ManifestHash);
+
+internal interface IBackendManifestIdentityProvider
+{
+    bool RequiresManifestBeforeAdvertise { get; }
+
+    Task<BackendManifestIdentity?> GetManifestIdentityForAdvertisementAsync(CancellationToken cancellationToken);
+}
+
 internal static class BackendSidecarControlPacketIds
 {
     public const ushort DirectConnectCodeValidationRequest = 1;
@@ -32,6 +41,8 @@ internal static class BackendSidecarControlPacketIds
     public const ushort RuntimeStatusAck = 6;
     public const ushort ShutdownStateUpdate = 7;
     public const ushort ShutdownStateAck = 8;
+    public const ushort ManifestDeclarationUpdate = 9;
+    public const ushort ManifestDeclarationAck = 10;
 }
 
 internal static class BackendSidecarControlProtocol
@@ -61,13 +72,14 @@ internal static class BackendSidecarControlProtocol
 internal sealed class SidecarControlServer(
     IOptions<SidecarControlOptions> options,
     IDirectConnectCodeValidator directConnectCodeValidator,
-    ILogger<SidecarControlServer> logger) : IHostedService, ISidecarControlStatusProvider, IBackendEndpointReadiness
+    ILogger<SidecarControlServer> logger) : IHostedService, ISidecarControlStatusProvider, IBackendEndpointReadiness, IBackendManifestIdentityProvider
 {
     private readonly SidecarControlOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly object m_EndpointReadinessSync = new();
     private readonly object m_RuntimeStatusSync = new();
     private readonly object m_ShutdownStateSync = new();
+    private readonly object m_ManifestIdentitySync = new();
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
     private readonly ConcurrentDictionary<Guid, string> m_ConnectionStates = [];
     private TaskCompletionSource<bool> m_EndpointReadySignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -82,6 +94,9 @@ internal sealed class SidecarControlServer(
     private bool m_CppRuntimeShuttingDown;
     private string m_CppRuntimeShutdownReason = "Not requested";
     private DateTimeOffset? m_CppRuntimeShutdownChangedAt;
+    private TaskCompletionSource<bool> m_ManifestDeclaredSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private BackendManifestIdentity? m_ManifestIdentity;
+    private DateTimeOffset? m_ManifestDeclaredAt;
     private long m_ValidationRequestCount;
     private long m_ValidationSuccessCount;
     private long m_ValidationFailureCount;
@@ -89,6 +104,8 @@ internal sealed class SidecarControlServer(
     private Task? m_AcceptTask;
 
     public bool RequiresEndpointReadyBeforeAdvertise => m_Options.Enabled && m_Options.RequireEndpointReadyBeforeAdvertise;
+
+    public bool RequiresManifestBeforeAdvertise => m_Options.Enabled && m_Options.RequireManifestBeforeAdvertise;
 
     public Task WaitUntilReadyForAdvertisementAsync(CancellationToken cancellationToken)
     {
@@ -109,6 +126,26 @@ internal sealed class SidecarControlServer(
         }
 
         return readyTask.WaitAsync(cancellationToken);
+    }
+
+    public async Task<BackendManifestIdentity?> GetManifestIdentityForAdvertisementAsync(CancellationToken cancellationToken)
+    {
+        Task? declarationTask = null;
+        lock (m_ManifestIdentitySync)
+        {
+            if (!RequiresManifestBeforeAdvertise || m_ManifestIdentity != null)
+            {
+                return m_ManifestIdentity;
+            }
+
+            declarationTask = m_ManifestDeclaredSignal.Task;
+        }
+
+        await declarationTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+        lock (m_ManifestIdentitySync)
+        {
+            return m_ManifestIdentity;
+        }
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -181,6 +218,9 @@ internal sealed class SidecarControlServer(
             new("Sidecar Control", "Runtime detail", GetRuntimeStatusDetail()),
             new("Sidecar Control", "Shutdown state", GetShutdownStateStatus()),
             new("Sidecar Control", "Shutdown detail", GetShutdownDetail()),
+            new("Sidecar Control", "Manifest required", m_Options.RequireManifestBeforeAdvertise ? "Yes" : "No"),
+            new("Sidecar Control", "Manifest id", GetManifestIdStatus()),
+            new("Sidecar Control", "Manifest hash", GetManifestHashStatus()),
             new("Sidecar Control", "Active connections", m_ConnectionStates.Count.ToString()),
             new("Sidecar Control", "Validation requests", Interlocked.Read(ref m_ValidationRequestCount).ToString()),
             new("Sidecar Control", "Validation succeeded", Interlocked.Read(ref m_ValidationSuccessCount).ToString()),
@@ -302,6 +342,15 @@ internal sealed class SidecarControlServer(
                         continue;
                     }
 
+                    if (frame.Header.PacketId == BackendSidecarControlPacketIds.ManifestDeclarationUpdate)
+                    {
+                        await HandleManifestDeclarationUpdateAsync(
+                            stream,
+                            frame,
+                            cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+
                     logger.LogWarning(
                         "Backend sidecar control rejected unsupported packet. ConnectionId={ConnectionId}, PacketKind={PacketKind}, PacketId={PacketId}.",
                         connectionId,
@@ -353,6 +402,36 @@ internal sealed class SidecarControlServer(
             BackendSidecarControlProtocol.SchemaVersion,
             response,
             DirectConnectCodeValidationResponse.Codec);
+        await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask HandleManifestDeclarationUpdateAsync(
+        Stream stream,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.ManifestDeclarationUpdate);
+        var update = PacketCodec.Decode(frame, SidecarManifestDeclarationUpdate.Codec);
+
+        SidecarManifestDeclarationAck ack;
+        try
+        {
+            SetManifestIdentity(update.ManifestId, update.ManifestHash);
+            ack = SidecarManifestDeclarationAck.SuccessResult(update.RequestId);
+        }
+        catch (ArgumentException e)
+        {
+            ack = SidecarManifestDeclarationAck.Failure(update.RequestId, e.Message);
+        }
+
+        using var responseFrame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.ManifestDeclarationAck,
+            BackendSidecarControlProtocol.SchemaVersion,
+            ack,
+            SidecarManifestDeclarationAck.Codec);
         await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken).ConfigureAwait(false);
     }
 
@@ -442,6 +521,22 @@ internal sealed class SidecarControlServer(
         {
             return DirectConnectCodeValidationResponse.Failure(request.RequestId, e.Message);
         }
+    }
+
+    private void SetManifestIdentity(string manifestId, string manifestHash)
+    {
+        _ = new BackendPacketManifestId(manifestId);
+        _ = new BackendPacketManifestHash(manifestHash);
+
+        TaskCompletionSource<bool>? declaredSignal;
+        lock (m_ManifestIdentitySync)
+        {
+            m_ManifestIdentity = new BackendManifestIdentity(manifestId, manifestHash);
+            m_ManifestDeclaredAt = DateTimeOffset.UtcNow;
+            declaredSignal = m_ManifestDeclaredSignal;
+        }
+
+        declaredSignal.TrySetResult(true);
     }
 
     private static DirectConnectCodeValidationResponse CreateLocalResponse(
@@ -616,6 +711,29 @@ internal sealed class SidecarControlServer(
             return m_CppRuntimeShutdownChangedAt.HasValue
                 ? $"{m_CppRuntimeShutdownReason} ({m_CppRuntimeShutdownChangedAt.Value.LocalDateTime:O})"
                 : m_CppRuntimeShutdownReason;
+        }
+    }
+
+    private string GetManifestIdStatus()
+    {
+        lock (m_ManifestIdentitySync)
+        {
+            return m_ManifestIdentity?.ManifestId ?? "Not declared";
+        }
+    }
+
+    private string GetManifestHashStatus()
+    {
+        lock (m_ManifestIdentitySync)
+        {
+            if (m_ManifestIdentity == null)
+            {
+                return "Not declared";
+            }
+
+            return m_ManifestDeclaredAt.HasValue
+                ? $"{m_ManifestIdentity.ManifestHash} ({m_ManifestDeclaredAt.Value.LocalDateTime:O})"
+                : m_ManifestIdentity.ManifestHash;
         }
     }
 

@@ -264,6 +264,18 @@ internal sealed class MasterConnectionManager(
 
     private async Task AdvertiseBackendEndpointAsync(Stream stream, CancellationToken cancellationToken)
     {
+        var manifestId = m_Options.BackendPacketManifestId;
+        var manifestHash = m_Options.BackendPacketManifestHash;
+        var manifestIdentityProvider = serviceProvider.GetService<IBackendManifestIdentityProvider>();
+        var manifestIdentity = manifestIdentityProvider == null
+            ? null
+            : await manifestIdentityProvider.GetManifestIdentityForAdvertisementAsync(cancellationToken).ConfigureAwait(false);
+        if (manifestIdentity != null)
+        {
+            manifestId = manifestIdentity.ManifestId;
+            manifestHash = manifestIdentity.ManifestHash;
+        }
+
         var endpointReadiness = serviceProvider.GetService<IBackendEndpointReadiness>();
         if (endpointReadiness?.RequiresEndpointReadyBeforeAdvertise == true)
         {
@@ -279,8 +291,8 @@ internal sealed class MasterConnectionManager(
                 m_GatewayListenerOptions.IPAddress,
                 m_GatewayListenerOptions.Port,
                 m_GatewayListenerOptions.UseTls),
-            new BackendPacketManifestId(m_Options.BackendPacketManifestId),
-            new BackendPacketManifestHash(m_Options.BackendPacketManifestHash));
+            new BackendPacketManifestId(manifestId),
+            new BackendPacketManifestHash(manifestHash));
         using var frame = PacketCodec.Encode(
             PacketKind.Control,
             MasterControlPacketIds.BackendEndpointAdvertise,
