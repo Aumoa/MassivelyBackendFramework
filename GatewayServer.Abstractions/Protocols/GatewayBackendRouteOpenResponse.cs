@@ -5,6 +5,7 @@ namespace GatewayServer.Protocols;
 
 public sealed class GatewayBackendRouteOpenResponse
 {
+    public const ushort LegacyProtocolVersion = 1;
     public const ushort ProtocolVersion = 2;
 
     public GatewayBackendRouteOpenResponse(
@@ -111,7 +112,63 @@ public sealed class GatewayBackendRouteOpenResponse
         return new GatewayBackendRouteOpenResponse(null, backendKind, false, errorMessage);
     }
 
+    public static IPacketCodec<GatewayBackendRouteOpenResponse> LegacyCodec { get; } = new LegacyGatewayBackendRouteOpenResponseCodec();
+
     public static IPacketCodec<GatewayBackendRouteOpenResponse> Codec { get; } = new GatewayBackendRouteOpenResponseCodec();
+
+    private sealed class LegacyGatewayBackendRouteOpenResponseCodec : IPacketCodec<GatewayBackendRouteOpenResponse>
+    {
+        public int GetPayloadSize(GatewayBackendRouteOpenResponse value)
+        {
+            if (value == null)
+            {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            var routeTokenSize = value.RouteToken == null
+                ? 0
+                : PacketWriter.GetStringSize(value.RouteToken.Value);
+            return sizeof(byte) +
+                   PacketWriter.GetStringSize(value.BackendKind) +
+                   sizeof(byte) +
+                   routeTokenSize +
+                   PacketWriter.GetStringSize(value.ErrorMessage);
+        }
+
+        public void Encode(GatewayBackendRouteOpenResponse value, ref PacketWriter writer)
+        {
+            if (value == null)
+            {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            writer.WriteByte(value.Success ? (byte)1 : (byte)0);
+            writer.WriteString(value.BackendKind);
+            if (value.RouteToken == null)
+            {
+                writer.WriteByte(0);
+            }
+            else
+            {
+                writer.WriteByte(1);
+                writer.WriteString(value.RouteToken.Value);
+            }
+
+            writer.WriteString(value.ErrorMessage);
+        }
+
+        public GatewayBackendRouteOpenResponse Decode(ref PacketReader reader)
+        {
+            var success = reader.ReadByte() != 0;
+            var backendKind = reader.ReadString();
+            var hasRouteToken = reader.ReadByte() != 0;
+            GatewayBackendRouteToken? routeToken = hasRouteToken
+                ? new GatewayBackendRouteToken(reader.ReadString())
+                : null;
+            var errorMessage = reader.ReadString();
+            return new GatewayBackendRouteOpenResponse(routeToken, backendKind, success, errorMessage);
+        }
+    }
 
     private sealed class GatewayBackendRouteOpenResponseCodec : IPacketCodec<GatewayBackendRouteOpenResponse>
     {

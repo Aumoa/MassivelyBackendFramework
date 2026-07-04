@@ -503,12 +503,7 @@ internal class ConnectionManager(
                 throw new InvalidOperationException("Backend route open packets must be Request packets.");
             }
 
-            if (packet.Header.Version != GatewayBackendRouteOpenRequest.ProtocolVersion)
-            {
-                throw new InvalidOperationException($"Unsupported Backend route open protocol version {packet.Header.Version}.");
-            }
-
-            var request = PacketCodec.Decode(packet, GatewayBackendRouteOpenRequest.Codec);
+            var request = DecodeBackendRouteOpenRequest(packet);
             backendKind = request.BackendKind;
             var principalSubjectId = authenticationContext.Principal?.SubjectId;
             m_PersistentBackendRouteRegistry.RequireOpenAttemptAllowed(client, principalSubjectId);
@@ -1229,12 +1224,20 @@ internal class ConnectionManager(
         GatewayBackendRouteOpenResponse routeResponse,
         CancellationToken cancellationToken)
     {
+        if (!TryGetBackendRouteOpenResponseCodec(version, out var codec))
+        {
+            logger.LogWarning(
+                "Gateway skipped Backend route open response for unsupported protocol version {ProtocolVersion}.",
+                version);
+            return;
+        }
+
         using var response = PacketCodec.Encode(
             PacketKind.Response,
             Pid.GATE_BACKEND_ROUTE_OPEN,
             version,
             routeResponse,
-            GatewayBackendRouteOpenResponse.Codec);
+            codec);
         await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
@@ -1429,9 +1432,9 @@ internal class ConnectionManager(
     {
         try
         {
-            if (packet.Header.Version == GatewayBackendRouteOpenRequest.ProtocolVersion)
+            if (TryGetBackendRouteOpenRequestCodec(packet.Header.Version, out var codec))
             {
-                var request = PacketCodec.Decode(packet, GatewayBackendRouteOpenRequest.Codec);
+                var request = PacketCodec.Decode(packet, codec);
                 return GetResponseBackendKind(request.BackendKind);
             }
         }
@@ -1440,6 +1443,56 @@ internal class ConnectionManager(
         }
 
         return "unknown";
+    }
+
+    private static GatewayBackendRouteOpenRequest DecodeBackendRouteOpenRequest(PacketFrame packet)
+    {
+        if (!TryGetBackendRouteOpenRequestCodec(packet.Header.Version, out var codec))
+        {
+            throw new InvalidOperationException($"Unsupported Backend route open protocol version {packet.Header.Version}.");
+        }
+
+        return PacketCodec.Decode(packet, codec);
+    }
+
+    private static bool TryGetBackendRouteOpenRequestCodec(
+        ushort version,
+        out IPacketCodec<GatewayBackendRouteOpenRequest> codec)
+    {
+        if (version == GatewayBackendRouteOpenRequest.LegacyProtocolVersion)
+        {
+            codec = GatewayBackendRouteOpenRequest.LegacyCodec;
+            return true;
+        }
+
+        if (version == GatewayBackendRouteOpenRequest.ProtocolVersion)
+        {
+            codec = GatewayBackendRouteOpenRequest.Codec;
+            return true;
+        }
+
+        codec = GatewayBackendRouteOpenRequest.Codec;
+        return false;
+    }
+
+    private static bool TryGetBackendRouteOpenResponseCodec(
+        ushort version,
+        out IPacketCodec<GatewayBackendRouteOpenResponse> codec)
+    {
+        if (version == GatewayBackendRouteOpenResponse.LegacyProtocolVersion)
+        {
+            codec = GatewayBackendRouteOpenResponse.LegacyCodec;
+            return true;
+        }
+
+        if (version == GatewayBackendRouteOpenResponse.ProtocolVersion)
+        {
+            codec = GatewayBackendRouteOpenResponse.Codec;
+            return true;
+        }
+
+        codec = GatewayBackendRouteOpenResponse.Codec;
+        return false;
     }
 
     private static string GetBackendServerListResponseBackendKind(PacketFrame packet)

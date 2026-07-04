@@ -25,6 +25,24 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
     }
 
     [Fact]
+    public void OpenRequest_LegacyCodec_RoundTrips_BackendKind()
+    {
+        var request = new GatewayBackendRouteOpenRequest(" alpha ");
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Request,
+            Pid.GATE_BACKEND_ROUTE_OPEN,
+            GatewayBackendRouteOpenRequest.LegacyProtocolVersion,
+            request,
+            GatewayBackendRouteOpenRequest.LegacyCodec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendRouteOpenRequest.LegacyCodec);
+
+        Assert.Equal("alpha", decoded.BackendKind);
+        Assert.Null(decoded.ServerHandle);
+    }
+
+    [Fact]
     public void OpenRequest_Codec_RoundTrips_ServerHandle()
     {
         var serverHandle = new GatewayBackendServerHandle("server-alpha");
@@ -57,6 +75,35 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
             GatewayBackendRouteOpenResponse.Codec);
 
         var decoded = PacketCodec.Decode(frame, GatewayBackendRouteOpenResponse.Codec);
+
+        Assert.True(decoded.Success);
+        Assert.Equal("alpha", decoded.BackendKind);
+        Assert.Equal(routeToken, decoded.RouteToken);
+        Assert.Equal(string.Empty, decoded.ErrorMessage);
+        Assert.Null(decoded.ServerHandle);
+        Assert.Equal(string.Empty, decoded.DescriptorVersion);
+        Assert.Equal(string.Empty, decoded.DescriptorHash);
+    }
+
+    [Fact]
+    public void OpenResponse_LegacyCodec_RoundTrips_CommonFields()
+    {
+        var routeToken = new GatewayBackendRouteToken("route-token-alpha");
+        var response = GatewayBackendRouteOpenResponse.Accepted(
+            routeToken,
+            " alpha ",
+            new GatewayBackendServerHandle("server-alpha"),
+            "v1",
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+        using var frame = PacketCodec.Encode(
+            PacketKind.Response,
+            Pid.GATE_BACKEND_ROUTE_OPEN,
+            GatewayBackendRouteOpenResponse.LegacyProtocolVersion,
+            response,
+            GatewayBackendRouteOpenResponse.LegacyCodec);
+
+        var decoded = PacketCodec.Decode(frame, GatewayBackendRouteOpenResponse.LegacyCodec);
 
         Assert.True(decoded.Success);
         Assert.Equal("alpha", decoded.BackendKind);

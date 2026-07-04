@@ -1,3 +1,4 @@
+using System.Text;
 using MasterServer.ControlPlane;
 using PacketCore;
 using Xunit;
@@ -88,6 +89,30 @@ public sealed class BackendServerDescriptorProtocolTests
             BackendNodeState.Open,
             "v1",
             "{\"internalEndpoint\":\"10.0.0.12:19002\"}"));
+    }
+
+    [Fact]
+    public void Descriptor_RejectsJsonBeyondMaximumDepth()
+    {
+        var json = new StringBuilder();
+        json.Append("{\"layers\":");
+        for (var i = 0; i < BackendServerDescriptor.MaxDescriptorJsonDepth + 1; i++)
+        {
+            json.Append('[');
+        }
+
+        json.Append('0');
+        for (var i = 0; i < BackendServerDescriptor.MaxDescriptorJsonDepth + 1; i++)
+        {
+            json.Append(']');
+        }
+
+        json.Append('}');
+
+        Assert.Throws<ArgumentException>(() => BackendServerDescriptor.Create(
+            BackendNodeState.Open,
+            "v1",
+            json.ToString()));
     }
 
     [Fact]

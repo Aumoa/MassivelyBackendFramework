@@ -5,6 +5,7 @@ namespace GatewayServer.Protocols;
 
 public sealed class GatewayBackendRouteOpenRequest
 {
+    public const ushort LegacyProtocolVersion = 1;
     public const ushort ProtocolVersion = 2;
 
     public GatewayBackendRouteOpenRequest(string backendKind)
@@ -29,7 +30,47 @@ public sealed class GatewayBackendRouteOpenRequest
 
     public GatewayBackendServerHandle? ServerHandle { get; }
 
+    public static IPacketCodec<GatewayBackendRouteOpenRequest> LegacyCodec { get; } = new LegacyGatewayBackendRouteOpenRequestCodec();
+
     public static IPacketCodec<GatewayBackendRouteOpenRequest> Codec { get; } = new GatewayBackendRouteOpenRequestCodec();
+
+    private sealed class LegacyGatewayBackendRouteOpenRequestCodec : IPacketCodec<GatewayBackendRouteOpenRequest>
+    {
+        public int GetPayloadSize(GatewayBackendRouteOpenRequest value)
+        {
+            if (value == null)
+            {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            if (value.ServerHandle != null)
+            {
+                throw new ArgumentException("Legacy Backend route open requests cannot include a server handle.", nameof(value));
+            }
+
+            return PacketWriter.GetStringSize(value.BackendKind);
+        }
+
+        public void Encode(GatewayBackendRouteOpenRequest value, ref PacketWriter writer)
+        {
+            if (value == null)
+            {
+                throw new ArgumentNullException(nameof(value));
+            }
+
+            if (value.ServerHandle != null)
+            {
+                throw new ArgumentException("Legacy Backend route open requests cannot include a server handle.", nameof(value));
+            }
+
+            writer.WriteString(value.BackendKind);
+        }
+
+        public GatewayBackendRouteOpenRequest Decode(ref PacketReader reader)
+        {
+            return new GatewayBackendRouteOpenRequest(reader.ReadString());
+        }
+    }
 
     private sealed class GatewayBackendRouteOpenRequestCodec : IPacketCodec<GatewayBackendRouteOpenRequest>
     {

@@ -7,6 +7,7 @@ namespace MasterServer.ControlPlane;
 public sealed class BackendServerDescriptor
 {
     public const int MaxDescriptorJsonUtf8Bytes = 16 * 1024;
+    public const int MaxDescriptorJsonDepth = 64;
     public const int MaxDescriptorVersionLength = 128;
     public const int DescriptorHashHexLength = 64;
 
@@ -159,7 +160,7 @@ public sealed class BackendServerDescriptor
         public void ValidateRootObject()
         {
             SkipWhitespace();
-            ReadObject();
+            ReadObject(1);
             SkipWhitespace();
             if (m_Index != m_Text.Length)
             {
@@ -167,8 +168,9 @@ public sealed class BackendServerDescriptor
             }
         }
 
-        private void ReadValue()
+        private void ReadValue(int depth)
         {
+            RequireDepth(depth);
             SkipWhitespace();
             if (m_Index >= m_Text.Length)
             {
@@ -178,11 +180,11 @@ public sealed class BackendServerDescriptor
             var current = m_Text[m_Index];
             if (current == '{')
             {
-                ReadObject();
+                ReadObject(depth);
             }
             else if (current == '[')
             {
-                ReadArray();
+                ReadArray(depth);
             }
             else if (current == '"')
             {
@@ -206,8 +208,9 @@ public sealed class BackendServerDescriptor
             }
         }
 
-        private void ReadObject()
+        private void ReadObject(int depth)
         {
+            RequireDepth(depth);
             ReadRequired('{');
             SkipWhitespace();
             if (TryRead('}'))
@@ -228,7 +231,7 @@ public sealed class BackendServerDescriptor
 
                 SkipWhitespace();
                 ReadRequired(':');
-                ReadValue();
+                ReadValue(depth + 1);
                 SkipWhitespace();
 
                 if (TryRead('}'))
@@ -240,8 +243,9 @@ public sealed class BackendServerDescriptor
             }
         }
 
-        private void ReadArray()
+        private void ReadArray(int depth)
         {
+            RequireDepth(depth);
             ReadRequired('[');
             SkipWhitespace();
             if (TryRead(']'))
@@ -251,7 +255,7 @@ public sealed class BackendServerDescriptor
 
             while (true)
             {
-                ReadValue();
+                ReadValue(depth + 1);
                 SkipWhitespace();
                 if (TryRead(']'))
                 {
@@ -455,6 +459,16 @@ public sealed class BackendServerDescriptor
                 }
 
                 m_Index++;
+            }
+        }
+
+        private static void RequireDepth(int depth)
+        {
+            if (depth > MaxDescriptorJsonDepth)
+            {
+                throw new ArgumentException(
+                    $"Descriptor JSON can nest at most {MaxDescriptorJsonDepth} levels.",
+                    "descriptorJson");
             }
         }
 
