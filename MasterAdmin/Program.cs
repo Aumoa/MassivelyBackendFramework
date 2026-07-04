@@ -27,6 +27,7 @@ builder.Services.AddSingleton<IMasterOverviewProvider>(static provider => provid
 builder.Services.AddSingleton<IServiceConnectionCredentials>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 builder.Services.AddSingleton<IGatewayBackendRoutePolicy>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 builder.Services.AddSingleton<IGatewayClientSecretCredentials>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
+builder.Services.AddSingleton<IBackendPacketManifestStore>(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 builder.Services.AddHostedService(static provider => provider.GetRequiredService<MasterOverviewSocketClient>());
 
 var dataProtection = builder.Configuration.GetRequiredSection("DataProtection");

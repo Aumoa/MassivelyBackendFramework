@@ -18,7 +18,8 @@ public sealed class MasterOverviewSocketClient(
     IMasterOverviewProvider,
     IServiceConnectionCredentials,
     IGatewayBackendRoutePolicy,
-    IGatewayClientSecretCredentials
+    IGatewayClientSecretCredentials,
+    IBackendPacketManifestStore
 {
     private readonly MasterConnectionOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
@@ -28,6 +29,7 @@ public sealed class MasterOverviewSocketClient(
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<ServiceConnectionCredentialManagementResponse>> m_PendingCredentialRequests = [];
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<GatewayBackendRoutePolicyManagementResponse>> m_PendingBackendRoutePolicyRequests = [];
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<GatewayClientSecretCredentialManagementResponse>> m_PendingGatewayClientSecretRequests = [];
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<BackendPacketManifestManagementResponse>> m_PendingBackendPacketManifestRequests = [];
     private MasterOverviewState m_State = CreateInitialState(options.Value);
     private Task? m_RunTask;
     private Stream? m_ActiveStream;
@@ -229,6 +231,84 @@ public sealed class MasterOverviewSocketClient(
         EnsureGatewayClientSecretCredentialResponseSucceeded(response);
     }
 
+    async ValueTask<BackendPacketManifest[]> IBackendPacketManifestStore.GetGatewayManifestsAsync(CancellationToken cancellationToken)
+    {
+        var manifests = await ((IBackendPacketManifestStore)this)
+            .GetManifestInfosAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return [.. manifests.Select(static info => info.Manifest)];
+    }
+
+    async ValueTask<BackendPacketManifestInfo[]> IBackendPacketManifestStore.GetManifestInfosAsync(CancellationToken cancellationToken)
+    {
+        var response = await RequestBackendPacketManifestManagementAsync(
+            BackendPacketManifestManagementRequest.List(Guid.NewGuid()),
+            cancellationToken).ConfigureAwait(false);
+        EnsureBackendPacketManifestResponseSucceeded(response);
+        return response.Manifests;
+    }
+
+    async ValueTask<BackendPacketManifestInfo?> IBackendPacketManifestStore.FindApprovedManifestAsync(
+        string backendKind,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash hash,
+        CancellationToken cancellationToken)
+    {
+        var normalizedBackendKind = BackendPacketManifest.NormalizeBackendKind(backendKind);
+        var manifests = await ((IBackendPacketManifestStore)this)
+            .GetManifestInfosAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return manifests.FirstOrDefault(info =>
+            info.Lifecycle is BackendPacketManifestLifecycle.Approved or BackendPacketManifestLifecycle.Deprecated &&
+            info.Manifest.MatchesAdvertisement(normalizedBackendKind, manifestId, hash));
+    }
+
+    async ValueTask<BackendPacketManifestInfo> IBackendPacketManifestStore.CreateManifestAsync(
+        BackendPacketManifestInput input,
+        CancellationToken cancellationToken)
+    {
+        var response = await RequestBackendPacketManifestManagementAsync(
+            BackendPacketManifestManagementRequest.Create(Guid.NewGuid(), input.Manifest, input.AuditNote),
+            cancellationToken).ConfigureAwait(false);
+        EnsureBackendPacketManifestResponseSucceeded(response);
+        if (response.Manifests.Length != 1)
+        {
+            throw new InvalidOperationException("Master did not return the created Backend packet manifest.");
+        }
+
+        return response.Manifests[0];
+    }
+
+    async ValueTask IBackendPacketManifestStore.UpdateManifestAsync(
+        long id,
+        BackendPacketManifestInput input,
+        CancellationToken cancellationToken)
+    {
+        var response = await RequestBackendPacketManifestManagementAsync(
+            BackendPacketManifestManagementRequest.Update(Guid.NewGuid(), id, input.Manifest, input.AuditNote),
+            cancellationToken).ConfigureAwait(false);
+        EnsureBackendPacketManifestResponseSucceeded(response);
+    }
+
+    async ValueTask IBackendPacketManifestStore.DeprecateManifestAsync(
+        long id,
+        string auditNote,
+        CancellationToken cancellationToken)
+    {
+        var response = await RequestBackendPacketManifestManagementAsync(
+            BackendPacketManifestManagementRequest.Deprecate(Guid.NewGuid(), id, auditNote),
+            cancellationToken).ConfigureAwait(false);
+        EnsureBackendPacketManifestResponseSucceeded(response);
+    }
+
+    async ValueTask IBackendPacketManifestStore.RemoveManifestAsync(long id, CancellationToken cancellationToken)
+    {
+        var response = await RequestBackendPacketManifestManagementAsync(
+            BackendPacketManifestManagementRequest.Remove(Guid.NewGuid(), id),
+            cancellationToken).ConfigureAwait(false);
+        EnsureBackendPacketManifestResponseSucceeded(response);
+    }
+
     public async Task<ServiceAdminStatusResponse> RequestServiceAdminStatusAsync(
         string targetConnectionId,
         CancellationToken cancellationToken = default)
@@ -380,6 +460,43 @@ public sealed class MasterOverviewSocketClient(
         finally
         {
             m_PendingGatewayClientSecretRequests.TryRemove(request.RequestId, out _);
+        }
+    }
+
+    private async Task<BackendPacketManifestManagementResponse> RequestBackendPacketManifestManagementAsync(
+        BackendPacketManifestManagementRequest request,
+        CancellationToken cancellationToken)
+    {
+        var stream = m_ActiveStream ?? throw new InvalidOperationException("Master overview socket is not connected.");
+        var completion = new TaskCompletionSource<BackendPacketManifestManagementResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!m_PendingBackendPacketManifestRequests.TryAdd(request.RequestId, completion))
+        {
+            throw new InvalidOperationException("A duplicate Backend packet manifest management request id was generated.");
+        }
+
+        try
+        {
+            using var frame = PacketCodec.Encode(
+                PacketKind.Control,
+                MasterControlPacketIds.BackendPacketManifestManagementRequest,
+                MasterControlProtocol.SchemaVersion,
+                request,
+                BackendPacketManifestManagementRequest.Codec);
+            await m_WriteLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                m_WriteLock.Release();
+            }
+
+            return await completion.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            m_PendingBackendPacketManifestRequests.TryRemove(request.RequestId, out _);
         }
     }
 
@@ -675,6 +792,18 @@ public sealed class MasterOverviewSocketClient(
                     {
                         completion.TrySetResult(response);
                     }
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.BackendPacketManifestManagementResponse)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendPacketManifestManagementResponse);
+                    var response = PacketCodec.Decode(frame, BackendPacketManifestManagementResponse.Codec);
+                    if (m_PendingBackendPacketManifestRequests.TryRemove(response.RequestId, out var completion))
+                    {
+                        completion.TrySetResult(response);
+                    }
                 }
             }
         }
@@ -788,6 +917,14 @@ public sealed class MasterOverviewSocketClient(
                 completion.TrySetException(exception);
             }
         }
+
+        foreach (var request in m_PendingBackendPacketManifestRequests.ToArray())
+        {
+            if (m_PendingBackendPacketManifestRequests.TryRemove(request.Key, out var completion))
+            {
+                completion.TrySetException(exception);
+            }
+        }
     }
 
     private static void EnsureCredentialResponseSucceeded(ServiceConnectionCredentialManagementResponse response)
@@ -826,6 +963,19 @@ public sealed class MasterOverviewSocketClient(
         throw new InvalidOperationException(
             string.IsNullOrWhiteSpace(response.ErrorMessage)
                 ? "Master rejected the Gateway client secret credential management request."
+                : response.ErrorMessage);
+    }
+
+    private static void EnsureBackendPacketManifestResponseSucceeded(BackendPacketManifestManagementResponse response)
+    {
+        if (response.Success)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(response.ErrorMessage)
+                ? "Master rejected the Backend packet manifest management request."
                 : response.ErrorMessage);
     }
 
