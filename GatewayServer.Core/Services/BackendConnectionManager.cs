@@ -49,6 +49,10 @@ internal interface IBackendRouteSession
 
     string DirectConnectionId { get; }
 
+    BackendPacketManifestId ManifestId { get; }
+
+    BackendPacketManifestHash ManifestHash { get; }
+
     BackendRouteBinding Binding { get; }
 
     ValueTask WriteAsync(PacketFrame frame, CancellationToken cancellationToken);
@@ -305,6 +309,8 @@ internal sealed class BackendConnectionManager(
             items.Add(new ServiceAdminStatusItem(group, "Endpoint", $"{peer.Node.GatewayEndpoint.IPAddress}:{peer.Node.GatewayEndpoint.Port}"));
             items.Add(new ServiceAdminStatusItem(group, "TLS", peer.Node.GatewayEndpoint.UseTls ? "Enabled" : "Disabled"));
             items.Add(new ServiceAdminStatusItem(group, "Master connection", peer.Node.MasterConnectionId));
+            items.Add(new ServiceAdminStatusItem(group, "Manifest id", peer.Node.ManifestId.Value));
+            items.Add(new ServiceAdminStatusItem(group, "Manifest hash", peer.Node.ManifestHash.Value));
             if (m_PeerDirectConnectionIds.TryGetValue(peer.Node.MasterConnectionId, out var directConnectionId))
             {
                 items.Add(new ServiceAdminStatusItem(group, "Direct connection", directConnectionId));
@@ -355,7 +361,8 @@ internal sealed class BackendConnectionManager(
             {
                 if (!desired.TryGetValue(current.Node.MasterConnectionId, out var next) ||
                     !HasSameEndpoint(current.Node, next) ||
-                    !string.Equals(current.Node.BackendKind, next.BackendKind, StringComparison.Ordinal))
+                    !string.Equals(current.Node.BackendKind, next.BackendKind, StringComparison.Ordinal) ||
+                    !HasSameManifest(current.Node, next))
                 {
                     m_Peers.Remove(current.Node.MasterConnectionId);
                     m_PeerStates.TryRemove(current.Node.MasterConnectionId, out _);
@@ -555,6 +562,8 @@ internal sealed class BackendConnectionManager(
                 node.NodeId,
                 node.MasterConnectionId,
                 accepted.ConnectionId,
+                node.ManifestId,
+                node.ManifestHash,
                 activeStream,
                 socket);
         }
@@ -929,6 +938,12 @@ internal sealed class BackendConnectionManager(
                left.GatewayEndpoint.UseTls == right.GatewayEndpoint.UseTls;
     }
 
+    private static bool HasSameManifest(BackendNodeEndpoint left, BackendNodeEndpoint right)
+    {
+        return left.ManifestId == right.ManifestId &&
+               left.ManifestHash == right.ManifestHash;
+    }
+
     private static string NormalizeBackendKind(string backendKind)
     {
         if (string.IsNullOrWhiteSpace(backendKind))
@@ -994,6 +1009,8 @@ internal sealed class BackendConnectionManager(
         string nodeId,
         string masterConnectionId,
         string directConnectionId,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash manifestHash,
         Stream stream,
         Socket socket) : IBackendRouteSession, IAsyncDisposable
     {
@@ -1007,6 +1024,10 @@ internal sealed class BackendConnectionManager(
         public string MasterConnectionId { get; } = masterConnectionId;
 
         public string DirectConnectionId { get; } = directConnectionId;
+
+        public BackendPacketManifestId ManifestId { get; } = manifestId;
+
+        public BackendPacketManifestHash ManifestHash { get; } = manifestHash;
 
         public BackendRouteBinding Binding { get; } = new(
             backendKind,

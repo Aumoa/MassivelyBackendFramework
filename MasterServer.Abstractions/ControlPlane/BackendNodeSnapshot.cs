@@ -73,6 +73,8 @@ public sealed class BackendNodeSnapshot
                    PacketWriter.GetStringSize(value.DisplayName) +
                    PacketWriter.GetStringSize(value.MasterConnectionId) +
                    GetEndpointSize(value.GatewayEndpoint) +
+                   PacketWriter.GetStringSize(value.ManifestId.Value) +
+                   PacketWriter.GetStringSize(value.ManifestHash.Value) +
                    sizeof(long);
         }
 
@@ -83,6 +85,8 @@ public sealed class BackendNodeSnapshot
             writer.WriteString(value.DisplayName);
             writer.WriteString(value.MasterConnectionId);
             WriteEndpoint(value.GatewayEndpoint, ref writer);
+            writer.WriteString(value.ManifestId.Value);
+            writer.WriteString(value.ManifestHash.Value);
             writer.WriteInt64(value.AdvertisedAt.ToUnixTimeMilliseconds());
         }
 
@@ -93,8 +97,18 @@ public sealed class BackendNodeSnapshot
             string displayName = reader.ReadString();
             string masterConnectionId = reader.ReadString();
             var gatewayEndpoint = ReadEndpoint(ref reader);
+            var manifestId = new BackendPacketManifestId(reader.ReadString());
+            var manifestHash = new BackendPacketManifestHash(reader.ReadString());
             var advertisedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.ReadInt64());
-            return new BackendNodeEndpoint(backendKind, nodeId, displayName, masterConnectionId, gatewayEndpoint, advertisedAt);
+            return new BackendNodeEndpoint(
+                backendKind,
+                nodeId,
+                displayName,
+                masterConnectionId,
+                gatewayEndpoint,
+                manifestId,
+                manifestHash,
+                advertisedAt);
         }
 
         private static int GetEndpointSize(MasterSocketEndpoint value)

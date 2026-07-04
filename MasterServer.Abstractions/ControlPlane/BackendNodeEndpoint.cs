@@ -10,6 +10,8 @@ public sealed class BackendNodeEndpoint
         string displayName,
         string masterConnectionId,
         MasterSocketEndpoint gatewayEndpoint,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash manifestHash,
         DateTimeOffset advertisedAt)
     {
         if (string.IsNullOrWhiteSpace(backendKind))
@@ -37,6 +39,8 @@ public sealed class BackendNodeEndpoint
         DisplayName = displayName;
         MasterConnectionId = masterConnectionId;
         GatewayEndpoint = gatewayEndpoint ?? throw new ArgumentNullException(nameof(gatewayEndpoint));
+        ManifestId = manifestId;
+        ManifestHash = manifestHash;
         AdvertisedAt = advertisedAt;
     }
 
@@ -49,6 +53,10 @@ public sealed class BackendNodeEndpoint
     public string MasterConnectionId { get; }
 
     public MasterSocketEndpoint GatewayEndpoint { get; }
+
+    public BackendPacketManifestId ManifestId { get; }
+
+    public BackendPacketManifestHash ManifestHash { get; }
 
     public DateTimeOffset AdvertisedAt { get; }
 

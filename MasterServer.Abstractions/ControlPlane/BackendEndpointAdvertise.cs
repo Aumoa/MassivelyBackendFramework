@@ -5,7 +5,11 @@ namespace MasterServer.ControlPlane;
 
 public sealed class BackendEndpointAdvertise
 {
-    public BackendEndpointAdvertise(string backendKind, MasterSocketEndpoint gatewayEndpoint)
+    public BackendEndpointAdvertise(
+        string backendKind,
+        MasterSocketEndpoint gatewayEndpoint,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash manifestHash)
     {
         if (string.IsNullOrWhiteSpace(backendKind))
         {
@@ -14,11 +18,17 @@ public sealed class BackendEndpointAdvertise
 
         BackendKind = backendKind;
         GatewayEndpoint = gatewayEndpoint ?? throw new ArgumentNullException(nameof(gatewayEndpoint));
+        ManifestId = manifestId;
+        ManifestHash = manifestHash;
     }
 
     public string BackendKind { get; }
 
     public MasterSocketEndpoint GatewayEndpoint { get; }
+
+    public BackendPacketManifestId ManifestId { get; }
+
+    public BackendPacketManifestHash ManifestHash { get; }
 
     public static IPacketCodec<BackendEndpointAdvertise> Codec { get; } = new BackendEndpointAdvertiseCodec();
 
@@ -27,19 +37,28 @@ public sealed class BackendEndpointAdvertise
         public int GetPayloadSize(BackendEndpointAdvertise value)
         {
             return PacketWriter.GetStringSize(value.BackendKind) +
-                   GetEndpointSize(value.GatewayEndpoint);
+                   GetEndpointSize(value.GatewayEndpoint) +
+                   PacketWriter.GetStringSize(value.ManifestId.Value) +
+                   PacketWriter.GetStringSize(value.ManifestHash.Value);
         }
 
         public void Encode(BackendEndpointAdvertise value, ref PacketWriter writer)
         {
             writer.WriteString(value.BackendKind);
             WriteEndpoint(value.GatewayEndpoint, ref writer);
+            writer.WriteString(value.ManifestId.Value);
+            writer.WriteString(value.ManifestHash.Value);
         }
 
         public BackendEndpointAdvertise Decode(ref PacketReader reader)
         {
             string backendKind = reader.ReadString();
-            return new BackendEndpointAdvertise(backendKind, ReadEndpoint(ref reader));
+            var endpoint = ReadEndpoint(ref reader);
+            return new BackendEndpointAdvertise(
+                backendKind,
+                endpoint,
+                new BackendPacketManifestId(reader.ReadString()),
+                new BackendPacketManifestHash(reader.ReadString()));
         }
 
         private static int GetEndpointSize(MasterSocketEndpoint value)

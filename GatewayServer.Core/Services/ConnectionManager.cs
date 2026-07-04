@@ -24,6 +24,7 @@ internal class ConnectionManager(
     IOptions<BackendRouteOptions> backendRouteOptions,
     IBackendRouteManager backendRouteManager,
     IGatewayBackendRoutePolicyProvider gatewayBackendRoutePolicy,
+    IBackendPacketManifestProvider backendPacketManifests,
     IGatewayClientCertificateProvider certificateProvider,
     IGatewayClientStreamAuthenticator streamAuthenticator,
     IGatewayClientAuthenticationContextFactory authenticationContextFactory,
@@ -35,6 +36,7 @@ internal class ConnectionManager(
     private readonly BackendRouteOptions m_BackendRouteOptions = backendRouteOptions.Value;
     private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_ClientOriginPrincipalExchangeCounters = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_BackendOriginPrincipalExchangeCounters = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, long> m_PacketManifestRejectCounters = new(StringComparer.Ordinal);
     private readonly PersistentBackendRouteRegistry<Client> m_PersistentBackendRouteRegistry = new(
         backendRouteOptions.Value,
         gatewayBackendRoutePolicy,
@@ -511,10 +513,17 @@ internal class ConnectionManager(
                 throw new InvalidOperationException("Selected Backend session kind does not match the requested Backend kind.");
             }
 
+            backendPacketManifests.RequireManifest(
+                backendSession.BackendKind,
+                backendSession.ManifestId,
+                backendSession.ManifestHash);
+
             var route = m_PersistentBackendRouteRegistry.Open(
                 backendSession.Binding,
                 client,
                 principalSubjectId,
+                backendSession.ManifestId,
+                backendSession.ManifestHash,
                 m_GracefulCancellation.Token);
             openedRoute = route;
 
@@ -678,6 +687,14 @@ internal class ConnectionManager(
             }
 
             backendKind = route.BackendKind;
+            RequirePacketManifestMatch(
+                route,
+                BackendPacketManifestDirection.ClientToBackend,
+                envelope.RoutedKind,
+                envelope.RoutedPacketId,
+                envelope.RoutedVersion,
+                envelope.RoutedPayload.Length);
+
             if (envelope.RoutedKind == PacketKind.Request)
             {
                 registeredExchangeId = envelope.ExchangeId ?? throw new InvalidOperationException("Client Backend route requests require an exchange id.");
@@ -862,6 +879,14 @@ internal class ConnectionManager(
                 throw new InvalidOperationException("Persistent Backend route is not open.");
             }
 
+            RequirePacketManifestMatch(
+                route,
+                BackendPacketManifestDirection.BackendToClient,
+                envelope.RoutedKind,
+                envelope.RoutedPacketId,
+                envelope.RoutedVersion,
+                envelope.RoutedPayload.Length);
+
             if (envelope.RoutedKind == PacketKind.Request)
             {
                 registeredExchangeId = envelope.ExchangeId ?? throw new InvalidOperationException("Backend route requests require an exchange id.");
@@ -1040,6 +1065,37 @@ internal class ConnectionManager(
             $"Gateway persistent Backend route principal {directionName} exchange creation rate limit was exceeded.");
     }
 
+    private void RequirePacketManifestMatch(
+        PersistentBackendRoute<Client> route,
+        BackendPacketManifestDirection direction,
+        PacketKind packetKind,
+        ushort packetId,
+        ushort routedVersion,
+        int payloadLength)
+    {
+        var result = backendPacketManifests.ValidatePacket(
+            route.BackendKind,
+            route.ManifestId,
+            route.ManifestHash,
+            direction,
+            packetKind,
+            packetId,
+            routedVersion,
+            payloadLength);
+        if (result.Success)
+        {
+            return;
+        }
+
+        var counterKey = $"{direction}:{result.Failure}";
+        m_PacketManifestRejectCounters.AddOrUpdate(
+            counterKey,
+            static _ => 1,
+            static (_, current) => current + 1);
+        throw new InvalidOperationException(
+            $"Backend route packet failed manifest validation. Direction={direction}, Failure={result.Failure}, BackendKind={route.BackendKind}, ManifestId={route.ManifestId.Value}, PacketKind={packetKind}, PacketId={packetId}, Version={routedVersion}, PayloadLength={payloadLength}.");
+    }
+
     private async Task EchoPacketAsync(
         Client client,
         PacketFrame packet,
@@ -1140,7 +1196,22 @@ internal class ConnectionManager(
         return
         [
             .. certificateProvider.GetStatusItems(),
+            .. backendPacketManifests.GetStatusItems(),
+            .. GetPacketManifestRejectStatusItems(),
             .. m_PersistentBackendRouteRegistry.GetStatusItems()
+        ];
+    }
+
+    private ServiceAdminStatusItem[] GetPacketManifestRejectStatusItems()
+    {
+        return
+        [
+            .. m_PacketManifestRejectCounters
+                .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
+                .Select(static pair => new ServiceAdminStatusItem(
+                    "Backend packet manifest rejects",
+                    pair.Key,
+                    pair.Value.ToString()))
         ];
     }
 

@@ -62,6 +62,8 @@ A Backend server needs `MasterConnection` and `GatewayListener` configuration.
     "NodeId": "my-backend-local",
     "DisplayName": "My Backend",
     "BackendKind": "my-backend-kind",
+    "BackendPacketManifestId": "my-backend:v1",
+    "BackendPacketManifestHash": "<sha256-hex-from-approved-manifest>",
     "SharedSecret": "<issued-by-master-admin>",
     "ReconnectDelayMilliseconds": 5000,
     "HandshakeTimeoutMilliseconds": 5000
@@ -72,6 +74,8 @@ A Backend server needs `MasterConnection` and `GatewayListener` configuration.
 `MasterConnection:NodeId` is the node identifier registered with Master.
 
 `MasterConnection:BackendKind` is the Backend kind used by Gateway route policy and client route-open requests. Adding a new kind should not require rebuilding Gateway or Master; credentials and route policy are managed through MasterAdmin.
+
+`MasterConnection:BackendPacketManifestId` and `MasterConnection:BackendPacketManifestHash` identify the active packet manifest that this Backend binary or configuration expects. Master accepts the Backend advertisement only when that id/hash is approved for the authorized `BackendKind`, then publishes the approved manifest snapshot to Gateways.
 
 `MasterConnection:SharedSecret` must use the Backend service connection credential issued by MasterAdmin. Do not commit this value to the repository.
 
@@ -214,7 +218,11 @@ Master issues and validates direct-connect codes between Gateway and Backend. Ba
 
 Gateway is the client-facing trust boundary. Gateway performs client authentication, route token validation, route ownership checks, exchange matching, and Backend binding validation.
 
-Backend can trust packets that arrive from an authenticated Gateway connection, but it should still keep cheap protocol sanity checks such as packet kind, packet id, version, and payload shape. Gameplay rules and authoritative state validation remain Backend runtime responsibilities.
+Gateway also validates routed packets against the approved Backend packet manifest selected by the trusted Backend session. The manifest is keyed by `BackendKind`, manifest id, and manifest hash, with entries for direction, packet kind, packet id, routed version, payload length constraints, and optional schema metadata.
+
+Gateway rejects client-to-Backend and Backend-to-client routed packets when the manifest does not contain the packet contract or when the payload length is outside the approved range. Deprecated packet versions remain accepted while they are still present in an approved or deprecated manifest, which supports rolling deployments. Removing a manifest from Master storage revokes it for new Backend advertisements and future Gateway snapshots.
+
+Backend can trust packets that arrive from an authenticated Gateway connection to have passed route ownership, exchange matching, and manifest compatibility checks, but it should still keep cheap protocol sanity checks such as packet kind, packet id, version, and payload length. Gameplay rules and authoritative state validation remain Backend runtime responsibilities, and manifest validation never replaces state-based authorization or game-rule decisions.
 
 ## Adding A New Backend
 
@@ -225,9 +233,10 @@ Backend can trust packets that arrive from an authenticated Gateway connection, 
 5. Call `services.AddBackendServer(configuration)`.
 6. Issue a Backend service credential in MasterAdmin and configure it as `MasterConnection:SharedSecret`.
 7. Set `MasterConnection:BackendKind` to the desired Backend kind.
-8. Allow that Backend kind in Gateway route policy through MasterAdmin.
-9. Configure private network reachability, ports, and TLS between Gateway and Backend.
-10. Clients use the same Backend kind when they request route open through Gateway.
+8. Approve a Backend packet manifest in MasterAdmin, then configure `MasterConnection:BackendPacketManifestId` and `MasterConnection:BackendPacketManifestHash` to match that approved manifest.
+9. Allow that Backend kind in Gateway route policy through MasterAdmin.
+10. Configure private network reachability, ports, and TLS between Gateway and Backend.
+11. Clients use the same Backend kind when they request route open through Gateway.
 
 ## Current Boundaries
 
@@ -235,4 +244,4 @@ The Backend API provides Gateway direct connection handling and route channel li
 
 The sender serializes writes to each active Gateway connection. If channel-level gameplay ordering or mailbox dispatch is needed, the runtime should build that execution model around `BackendGatewayChannel`.
 
-Gateway remains the final authority for route token ownership, Backend binding, and exchange id matching. Runtime code should still clear closed channel state to avoid unnecessary push attempts.
+Gateway remains the final authority for route token ownership, Backend binding, exchange id matching, and manifest compatibility. Runtime code should still clear closed channel state to avoid unnecessary push attempts.

@@ -269,7 +269,9 @@ internal sealed class MasterConnectionManager(
             new MasterSocketEndpoint(
                 m_GatewayListenerOptions.IPAddress,
                 m_GatewayListenerOptions.Port,
-                m_GatewayListenerOptions.UseTls));
+                m_GatewayListenerOptions.UseTls),
+            new BackendPacketManifestId(m_Options.BackendPacketManifestId),
+            new BackendPacketManifestHash(m_Options.BackendPacketManifestHash));
         using var frame = PacketCodec.Encode(
             PacketKind.Control,
             MasterControlPacketIds.BackendEndpointAdvertise,
@@ -278,11 +280,13 @@ internal sealed class MasterConnectionManager(
             BackendEndpointAdvertise.Codec);
         await WriteFrameAsync(stream, frame, cancellationToken).ConfigureAwait(false);
         logger.LogInformation(
-            "Backend advertised Gateway endpoint to Master. BackendKind={BackendKind}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
+            "Backend advertised Gateway endpoint to Master. BackendKind={BackendKind}, Endpoint={Address}:{Port}, UseTls={UseTls}, ManifestId={ManifestId}, ManifestHash={ManifestHash}.",
             advertise.BackendKind,
             advertise.GatewayEndpoint.IPAddress,
             advertise.GatewayEndpoint.Port,
-            advertise.GatewayEndpoint.UseTls);
+            advertise.GatewayEndpoint.UseTls,
+            advertise.ManifestId.Value,
+            advertise.ManifestHash.Value);
     }
 
     private static async Task<PacketFrame> ReadRequiredHandshakeFrameAsync(
@@ -475,6 +479,9 @@ internal sealed class MasterConnectionManager(
         {
             throw new InvalidOperationException("MasterConnection:BackendKind must be configured.");
         }
+
+        _ = new BackendPacketManifestId(m_Options.BackendPacketManifestId);
+        _ = new BackendPacketManifestHash(m_Options.BackendPacketManifestHash);
     }
 
     private void SetStatus(
