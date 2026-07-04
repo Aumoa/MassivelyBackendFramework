@@ -19,6 +19,8 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
     private readonly ConcurrentDictionary<string, PersistentBackendRoute<TOwner>> m_Routes = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<uint, PersistentBackendRoute<TOwner>> m_ChannelRoutes = new();
     private int m_NextChannelId;
+    private static readonly BackendPacketManifestId s_DefaultManifestId = new("default");
+    private static readonly BackendPacketManifestHash s_DefaultManifestHash = new("0000000000000000000000000000000000000000000000000000000000000000");
 
     public string RequireAllowedBackendKind(string backendKind)
     {
@@ -90,6 +92,8 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
             backendBinding,
             owner,
             principalSubjectId: null,
+            s_DefaultManifestId,
+            s_DefaultManifestHash,
             cancellationToken);
     }
 
@@ -97,6 +101,23 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
         BackendRouteBinding backendBinding,
         TOwner owner,
         string? principalSubjectId,
+        CancellationToken cancellationToken)
+    {
+        return Open(
+            backendBinding,
+            owner,
+            principalSubjectId,
+            s_DefaultManifestId,
+            s_DefaultManifestHash,
+            cancellationToken);
+    }
+
+    public PersistentBackendRoute<TOwner> Open(
+        BackendRouteBinding backendBinding,
+        TOwner owner,
+        string? principalSubjectId,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash manifestHash,
         CancellationToken cancellationToken)
     {
         if (backendBinding == null)
@@ -134,6 +155,8 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
                     tokenGenerator.Generate(),
                     AllocateChannelId(),
                     normalizedBackendBinding,
+                    manifestId,
+                    manifestHash,
                     owner,
                     normalizedPrincipalSubjectId,
                     now,
@@ -508,6 +531,8 @@ internal sealed class PersistentBackendRoute<TOwner>(
     GatewayBackendRouteToken routeToken,
     uint channelId,
     BackendRouteBinding backendBinding,
+    BackendPacketManifestId manifestId,
+    BackendPacketManifestHash manifestHash,
     TOwner owner,
     string? principalSubjectId,
     DateTimeOffset createdAt,
@@ -534,6 +559,10 @@ internal sealed class PersistentBackendRoute<TOwner>(
     public BackendRouteBinding BackendBinding { get; } = backendBinding;
 
     public string BackendKind => BackendBinding.BackendKind;
+
+    public BackendPacketManifestId ManifestId { get; } = manifestId;
+
+    public BackendPacketManifestHash ManifestHash { get; } = manifestHash;
 
     public TOwner Owner { get; } = owner;
 

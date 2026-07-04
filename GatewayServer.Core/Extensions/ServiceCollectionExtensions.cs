@@ -22,6 +22,9 @@ public static class ServiceCollectionExtensions
         s.AddSingleton<GatewayBackendRoutePolicyCatalog>();
         s.AddSingleton<IGatewayBackendRoutePolicyProvider>(p => p.GetRequiredService<GatewayBackendRoutePolicyCatalog>());
         s.AddSingleton<IGatewayBackendRoutePolicyWriter>(p => p.GetRequiredService<GatewayBackendRoutePolicyCatalog>());
+        s.AddSingleton<BackendPacketManifestCatalog>();
+        s.AddSingleton<IBackendPacketManifestProvider>(p => p.GetRequiredService<BackendPacketManifestCatalog>());
+        s.AddSingleton<IBackendPacketManifestWriter>(p => p.GetRequiredService<BackendPacketManifestCatalog>());
         s.AddSingleton<IGatewayClientCertificateLoader, GatewayClientCertificateLoader>();
         s.AddSingleton<GatewayClientCertificateProvider>();
         s.AddSingleton<IGatewayClientCertificateProvider>(p => p.GetRequiredService<GatewayClientCertificateProvider>());

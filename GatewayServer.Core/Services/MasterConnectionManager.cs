@@ -18,6 +18,7 @@ internal sealed class MasterConnectionManager(
     IOptions<MasterConnectionOptions> options,
     IDedicatedNodeCatalogWriter dedicatedNodeCatalog,
     IBackendNodeCatalogWriter backendNodeCatalog,
+    IBackendPacketManifestWriter backendPacketManifestCatalog,
     IGatewayBackendRoutePolicyWriter backendRoutePolicy,
     IGatewayClientSecretCredentialWriter gatewayClientSecretCredentials,
     IServiceProvider serviceProvider,
@@ -386,6 +387,18 @@ internal sealed class MasterConnectionManager(
                         string.Join(", ", snapshot.AllowedBackendKinds
                             .Distinct(StringComparer.Ordinal)
                             .OrderBy(static backendKind => backendKind, StringComparer.Ordinal)));
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.BackendPacketManifestSnapshot)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendPacketManifestSnapshot);
+                    var snapshot = PacketCodec.Decode(frame, BackendPacketManifestSnapshot.Codec);
+                    backendPacketManifestCatalog.Publish(snapshot);
+                    logger.LogInformation(
+                        "Gateway received Backend packet manifest snapshot. ManifestCount={Count}.",
+                        snapshot.Manifests.Length);
                     continue;
                 }
 
