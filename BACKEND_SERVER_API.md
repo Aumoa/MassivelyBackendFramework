@@ -46,12 +46,22 @@ A Backend server needs `MasterConnection` and `GatewayListener` configuration.
 ```json
 {
   "GatewayListener": {
+    "Enabled": true,
     "IPAddress": "::1",
     "Port": 11701,
     "UseTls": false,
     "CertificateSubjectName": "localhost",
     "Backlog": 512,
     "HandshakeTimeoutMilliseconds": 5000
+  },
+  "SidecarControl": {
+    "Enabled": false,
+    "RequireEndpointReadyBeforeAdvertise": false,
+    "RequireManifestBeforeAdvertise": false,
+    "IPAddress": "127.0.0.1",
+    "Port": 11702,
+    "Backlog": 64,
+    "RequestTimeoutMilliseconds": 5000
   },
   "MasterConnection": {
     "Enabled": true,
@@ -82,6 +92,18 @@ A Backend server needs `MasterConnection` and `GatewayListener` configuration.
 `MasterConnection:SharedSecret` must use the Backend service connection credential issued by MasterAdmin. Do not commit this value to the repository.
 
 `GatewayListener` is the Backend-side listener that Gateway connects to after receiving a direct-connect code. In production, configure this together with private networking and TLS.
+
+Set `GatewayListener:Enabled` to `false` for C++ Backend sidecar mode. In that mode the C# sidecar does not open the Gateway listener or load a local TLS certificate. The configured `GatewayListener` address, port, and TLS flag are still advertised to Master as the external data-plane endpoint owned by the C++ Backend/Dedicated process.
+
+Set `SidecarControl:Enabled` to `true` when a C++ Backend/Dedicated process needs the sidecar to validate Gateway direct-connect codes. The sidecar opens a loopback-only PacketCore control listener and accepts `DirectConnectCodeValidationRequest` frames on packet id `1`, then returns `DirectConnectCodeValidationResponse` frames on packet id `2`. This local protocol is for handshake/control work only; gameplay channel packets must stay on the direct Gateway-to-C++ data-plane socket.
+
+Set `SidecarControl:RequireEndpointReadyBeforeAdvertise` to `true` when the C++ process should explicitly signal that its Gateway-facing listener is reachable before the sidecar advertises the endpoint to Master. The C++ process sends `SidecarEndpointStateUpdate` as control packet id `3`, and the sidecar returns `SidecarEndpointStateAck` as control packet id `4`.
+
+The C++ process can report runtime health through `SidecarRuntimeStatusUpdate` as control packet id `5`. The sidecar acknowledges with `SidecarRuntimeStatusAck` as packet id `6` and includes the latest health, active Gateway session count, active channel count, and detail text in Master admin/status responses.
+
+Before graceful shutdown or draining, the C++ process can send `SidecarShutdownStateUpdate` as control packet id `7`. The sidecar acknowledges with `SidecarShutdownStateAck` as packet id `8`, marks the C++ endpoint not ready, and exposes the shutdown reason through Master admin/status responses.
+
+When the C++ process owns manifest selection, set `SidecarControl:RequireManifestBeforeAdvertise` to `true` and send `SidecarManifestDeclarationUpdate` as control packet id `9` before endpoint advertisement. The sidecar acknowledges with `SidecarManifestDeclarationAck` as packet id `10` and advertises the declared manifest id/hash to Master.
 
 ## Runtime Lifecycle
 
@@ -247,6 +269,18 @@ The Backend API provides Gateway direct connection handling and route channel li
 The sender serializes writes to each active Gateway connection. If channel-level gameplay ordering or mailbox dispatch is needed, the runtime should build that execution model around `BackendGatewayChannel`.
 
 Gateway remains the final authority for route token ownership, Backend binding, exchange id matching, and manifest compatibility. Runtime code should still clear closed channel state to avoid unnecessary push attempts.
+
+C++ sidecar mode currently covers Master control-plane registration and endpoint advertisement only. The C++ data-plane process must own the Gateway-facing listener and implement the Gateway handshake, direct-connect code validation callout, channel envelopes, and packet writes.
+
+The sidecar now provides a local direct-connect validation callout, but it still does not relay Gateway channel traffic. The C++ data-plane process remains responsible for accepting Gateway sessions only after a successful local validation response.
+
+When endpoint readiness is required, Master advertisement is delayed until the sidecar receives a ready endpoint state update from the C++ data-plane process.
+
+The sidecar status surface includes the latest C++ runtime health and Gateway session counters reported over the local control listener.
+
+Shutdown state updates are control-plane coordination only. Existing Gateway data-plane sessions are still owned by the C++ process, which must close or drain them according to its own gameplay rules.
+
+If no manifest declaration is required or received, the sidecar keeps using `MasterConnection:BackendPacketManifestId` and `MasterConnection:BackendPacketManifestHash`.
 
 ## Server Directory Flow
 

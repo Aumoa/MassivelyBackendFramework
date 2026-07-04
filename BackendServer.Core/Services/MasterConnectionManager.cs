@@ -180,8 +180,31 @@ internal sealed class MasterConnectionManager(
                 accepted.ConnectionId);
 
             m_ActiveStream = activeStream;
-            await AdvertiseBackendEndpointAsync(activeStream, cancellationToken).ConfigureAwait(false);
-            await DrainTrustedFramesAsync(activeStream, cancellationToken).ConfigureAwait(false);
+            using var sessionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var drainTask = DrainTrustedFramesAsync(activeStream, sessionCancellation.Token);
+            try
+            {
+                var advertiseTask = AdvertiseBackendEndpointAsync(activeStream, sessionCancellation.Token);
+                var completedTask = await Task.WhenAny(advertiseTask, drainTask).ConfigureAwait(false);
+                if (completedTask == drainTask)
+                {
+                    await sessionCancellation.CancelAsync().ConfigureAwait(false);
+                    await WaitForShutdownAsync(advertiseTask, CancellationToken.None).ConfigureAwait(false);
+                    await drainTask.ConfigureAwait(false);
+                    return;
+                }
+
+                await advertiseTask.ConfigureAwait(false);
+                await drainTask.ConfigureAwait(false);
+            }
+            finally
+            {
+                await sessionCancellation.CancelAsync().ConfigureAwait(false);
+                if (!drainTask.IsCompleted)
+                {
+                    await WaitForShutdownAsync(drainTask, CancellationToken.None).ConfigureAwait(false);
+                }
+            }
         }
         finally
         {
@@ -264,14 +287,35 @@ internal sealed class MasterConnectionManager(
 
     private async Task AdvertiseBackendEndpointAsync(Stream stream, CancellationToken cancellationToken)
     {
+        var manifestId = m_Options.BackendPacketManifestId;
+        var manifestHash = m_Options.BackendPacketManifestHash;
+        var manifestIdentityProvider = serviceProvider.GetService<IBackendManifestIdentityProvider>();
+        var manifestIdentity = manifestIdentityProvider == null
+            ? null
+            : await manifestIdentityProvider.GetManifestIdentityForAdvertisementAsync(cancellationToken).ConfigureAwait(false);
+        if (manifestIdentity != null)
+        {
+            manifestId = manifestIdentity.ManifestId;
+            manifestHash = manifestIdentity.ManifestHash;
+        }
+
+        var endpointReadiness = serviceProvider.GetService<IBackendEndpointReadiness>();
+        if (endpointReadiness?.RequiresEndpointReadyBeforeAdvertise == true)
+        {
+            SetStatus("WaitingForEndpointReady");
+            logger.LogInformation("Backend endpoint advertisement is waiting for sidecar endpoint readiness.");
+            await endpointReadiness.WaitUntilReadyForAdvertisementAsync(cancellationToken).ConfigureAwait(false);
+            SetStatus("Trusted");
+        }
+
         var advertise = new BackendEndpointAdvertise(
             m_Options.BackendKind,
             new MasterSocketEndpoint(
                 m_GatewayListenerOptions.IPAddress,
-            m_GatewayListenerOptions.Port,
-            m_GatewayListenerOptions.UseTls),
-            new BackendPacketManifestId(m_Options.BackendPacketManifestId),
-            new BackendPacketManifestHash(m_Options.BackendPacketManifestHash),
+                m_GatewayListenerOptions.Port,
+                m_GatewayListenerOptions.UseTls),
+            new BackendPacketManifestId(manifestId),
+            new BackendPacketManifestHash(manifestHash),
             m_Options.ServerState,
             m_Options.ServerDescriptorVersion,
             m_Options.ServerDescriptorJson);
@@ -356,6 +400,17 @@ internal sealed class MasterConnectionManager(
                     {
                         completion.TrySetResult(response);
                     }
+
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.BackendPacketManifestSnapshot)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendPacketManifestSnapshot);
+                    var snapshot = PacketCodec.Decode(frame, BackendPacketManifestSnapshot.Codec);
+                    serviceProvider.GetService<IBackendPacketManifestSnapshotSink>()
+                        ?.PublishBackendPacketManifestSnapshot(snapshot);
                 }
             }
         }
@@ -406,6 +461,7 @@ internal sealed class MasterConnectionManager(
         }
 
         items.AddRange(serviceProvider.GetRequiredService<IGatewayConnectionStatusProvider>().GetStatusItems());
+        items.AddRange(serviceProvider.GetRequiredService<ISidecarControlStatusProvider>().GetStatusItems());
 
         var response = new ServiceAdminStatusResponse(
             request.RequestId,

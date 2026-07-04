@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<MasterConnectionOptions>(config.GetSection("MasterConnection"));
         services.Configure<GatewayListenerOptions>(config.GetSection("GatewayListener"));
+        services.Configure<SidecarControlOptions>(config.GetSection("SidecarControl"));
 
         services.TryAddSingleton<IBackendRuntime, NoOpBackendRuntime>();
         services.AddSingleton<GatewayChannelSender>();
@@ -24,6 +25,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<MasterConnectionManager>();
         services.AddSingleton<IDirectConnectCodeValidator>(static provider => provider.GetRequiredService<MasterConnectionManager>());
         services.AddHostedService(static provider => provider.GetRequiredService<MasterConnectionManager>());
+        services.AddSingleton<SidecarControlServer>();
+        services.AddSingleton<ISidecarControlStatusProvider>(static provider => provider.GetRequiredService<SidecarControlServer>());
+        services.AddSingleton<IBackendEndpointReadiness>(static provider => provider.GetRequiredService<SidecarControlServer>());
+        services.AddSingleton<IBackendManifestIdentityProvider>(static provider => provider.GetRequiredService<SidecarControlServer>());
+        services.AddSingleton<IBackendPacketManifestSnapshotSink>(static provider => provider.GetRequiredService<SidecarControlServer>());
+        services.AddHostedService(static provider => provider.GetRequiredService<SidecarControlServer>());
 
         return services;
     }
