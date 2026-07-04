@@ -125,6 +125,107 @@ public sealed class BackendPacketManifestTests
         Assert.Equal(BackendPacketManifestValidationFailure.PayloadLengthMismatch, result.Failure);
     }
 
+    [Fact]
+    public void ValidatePacket_AcceptsPayloadThatMatchesVerifierProgram()
+    {
+        var manifest = CreateVerifiedManifest();
+
+        var result = manifest.ValidatePacket(
+            BackendPacketManifestDirection.ClientToBackend,
+            PacketKind.Request,
+            401,
+            1,
+            new byte[] { 3, 1, 2, 3 });
+
+        Assert.True(result.Success);
+    }
+
+    [Fact]
+    public void ValidatePacket_RejectsVerifierTrailingBytes()
+    {
+        var manifest = CreateVerifiedManifest();
+
+        var result = manifest.ValidatePacket(
+            BackendPacketManifestDirection.ClientToBackend,
+            PacketKind.Request,
+            401,
+            1,
+            new byte[] { 1, 7, 9 });
+
+        Assert.False(result.Success);
+        Assert.Equal(BackendPacketManifestValidationFailure.VerifierTrailingBytes, result.Failure);
+    }
+
+    [Fact]
+    public void VerifierProgram_RejectsOutOfRangeRepeatCount()
+    {
+        var program = new BackendPacketVerifierProgram(
+            [
+                BackendPacketVerifierInstruction.ReadUInt8(targetSlot: 0),
+                BackendPacketVerifierInstruction.Repeat(
+                    countSlot: 0,
+                    minimumCount: 0,
+                    maximumCount: 3,
+                    [
+                        BackendPacketVerifierInstruction.ReadUInt16()
+                    ])
+            ]);
+
+        var result = program.Verify(new byte[] { 4 });
+
+        Assert.False(result.Success);
+        Assert.Equal(BackendPacketManifestValidationFailure.VerifierRepeatCountOutOfRange, result.Failure);
+    }
+
+    [Fact]
+    public void VerifierProgram_EnforcesInstructionBudget()
+    {
+        var program = new BackendPacketVerifierProgram(
+            [
+                BackendPacketVerifierInstruction.ReadUInt8(targetSlot: 0),
+                BackendPacketVerifierInstruction.Repeat(
+                    countSlot: 0,
+                    minimumCount: 0,
+                    maximumCount: 10,
+                    [
+                        BackendPacketVerifierInstruction.ReadUInt8()
+                    ])
+            ],
+            instructionBudget: 3);
+
+        var result = program.Verify(new byte[] { 3, 1, 2, 3 });
+
+        Assert.False(result.Success);
+        Assert.Equal(BackendPacketManifestValidationFailure.VerifierInstructionBudgetExceeded, result.Failure);
+    }
+
+    [Fact]
+    public void VerifierProgram_RejectsInvalidUtf8()
+    {
+        var program = new BackendPacketVerifierProgram(
+            [
+                BackendPacketVerifierInstruction.ReadUtf8String(BackendPacketVerifierLengthConstraint.Fixed(1))
+            ]);
+
+        var result = program.Verify(new byte[] { 0xff });
+
+        Assert.False(result.Success);
+        Assert.Equal(BackendPacketManifestValidationFailure.VerifierInvalidUtf8, result.Failure);
+    }
+
+    [Fact]
+    public void VerifierProgram_RejectsProgramsThatUseDynamicSlotBeforeRead()
+    {
+        Assert.Throws<ArgumentException>(() => new BackendPacketVerifierProgram(
+            [
+                BackendPacketVerifierInstruction.ReadBytes(
+                    BackendPacketVerifierLengthConstraint.Dynamic(
+                        sourceSlot: 0,
+                        minimumLength: 0,
+                        maximumLength: 8))
+            ]));
+    }
+
     [Theory]
     [InlineData(PacketKind.Response, 101, 2, BackendPacketManifestValidationFailure.PacketKindMismatch)]
     [InlineData(PacketKind.Request, 101, 9, BackendPacketManifestValidationFailure.UnknownVersion)]
@@ -155,6 +256,38 @@ public sealed class BackendPacketManifestTests
             new BackendPacketManifestId("v1"),
             [
                 CreateEntry(BackendPacketManifestDirection.ClientToBackend, PacketKind.Request, 101, 2, 4, 16)
+            ]);
+    }
+
+    private static BackendPacketManifest CreateVerifiedManifest()
+    {
+        var verifierProgram = new BackendPacketVerifierProgram(
+            [
+                BackendPacketVerifierInstruction.ReadUInt8(
+                    targetSlot: 0,
+                    valueConstraint: new BackendPacketVerifierValueConstraint(
+                        minimumValue: 0,
+                        maximumValue: 4)),
+                BackendPacketVerifierInstruction.ReadBytes(
+                    BackendPacketVerifierLengthConstraint.Dynamic(
+                        sourceSlot: 0,
+                        minimumLength: 0,
+                        maximumLength: 4))
+            ]);
+
+        return new BackendPacketManifest(
+            "inventory",
+            new BackendPacketManifestId("verified-v1"),
+            [
+                new BackendPacketManifestEntry(
+                    BackendPacketManifestDirection.ClientToBackend,
+                    PacketKind.Request,
+                    401,
+                    1,
+                    new BackendPacketPayloadConstraint(
+                        1,
+                        5,
+                        verifierProgram: verifierProgram))
             ]);
     }
 

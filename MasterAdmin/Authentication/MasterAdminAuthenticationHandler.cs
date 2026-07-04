@@ -17,7 +17,7 @@ internal sealed class MasterAdminAuthenticationHandler(
 {
     public const string SchemeName = "MasterAdminOidc";
     private const string LoginRedirectPath = "/auth/redirect";
-    private const string LoginScope = "openid profile email groups";
+    private const string LoginScope = "openid profile email groups offline_access";
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {

@@ -585,6 +585,77 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
+    public async Task RouteDataNotify_RejectsVerifierFailureFromClientManifest()
+    {
+        var verifierProgram = new BackendPacketVerifierProgram(
+            [
+                BackendPacketVerifierInstruction.ReadUInt8(
+                    targetSlot: 0,
+                    valueConstraint: new BackendPacketVerifierValueConstraint(
+                        minimumValue: 0,
+                        maximumValue: 2)),
+                BackendPacketVerifierInstruction.ReadBytes(
+                    BackendPacketVerifierLengthConstraint.Dynamic(
+                        sourceSlot: 0,
+                        minimumLength: 0,
+                        maximumLength: 2))
+            ]);
+        var manifest = CreatePacketManifest(
+            CreateManifestEntry(
+                BackendPacketManifestDirection.ClientToBackend,
+                PacketKind.Notify,
+                101,
+                1,
+                1,
+                3,
+                verifierProgram));
+        var routeManager = new RecordingBackendRouteManager(manifest);
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port,
+            backendPacketManifestProvider: new StaticBackendPacketManifestProvider(manifest));
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            var routeToken = await OpenPersistentBackendRouteAsync(stream);
+            var dataEnvelope = new GatewayBackendRouteDataEnvelope(
+                routeToken,
+                GatewayBackendRouteDirection.ClientToBackend,
+                PacketKind.Notify,
+                routedPacketId: 101,
+                routedVersion: 1,
+                exchangeId: null,
+                [1, 7, 9]);
+            await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Notify, dataEnvelope);
+
+            await AssertNoDataRelayAsync(routeManager);
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Backend packet manifest rejects" &&
+                item.Name == "ClientToBackend:VerifierTrailingBytes" &&
+                item.Value == "1");
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task BackendRouteDataNotify_RejectsOversizedBackendPayloadFromManifest()
     {
         var manifest = CreatePacketManifest(
@@ -2650,7 +2721,7 @@ public sealed class ConnectionManagerBackendRouteTests
             PacketKind packetKind,
             ushort packetId,
             ushort routedVersion,
-            int payloadLength)
+            ReadOnlySpan<byte> payload)
         {
             return BackendPacketManifestValidationResult.Accepted(new BackendPacketManifestEntry(
                 direction,
@@ -2690,10 +2761,10 @@ public sealed class ConnectionManagerBackendRouteTests
             PacketKind packetKind,
             ushort packetId,
             ushort routedVersion,
-            int payloadLength)
+            ReadOnlySpan<byte> payload)
         {
             return RequireManifest(backendKind, manifestId, manifestHash)
-                .ValidatePacket(direction, packetKind, packetId, routedVersion, payloadLength);
+                .ValidatePacket(direction, packetKind, packetId, routedVersion, payload);
         }
 
         public ServiceAdminStatusItem[] GetStatusItems()
@@ -2720,7 +2791,7 @@ public sealed class ConnectionManagerBackendRouteTests
             PacketKind packetKind,
             ushort packetId,
             ushort routedVersion,
-            int payloadLength)
+            ReadOnlySpan<byte> payload)
         {
             throw new InvalidOperationException("Backend packet manifest is not loaded.");
         }
@@ -2871,14 +2942,18 @@ public sealed class ConnectionManagerBackendRouteTests
         ushort packetId,
         ushort routedVersion,
         int minimumLength,
-        int maximumLength)
+        int maximumLength,
+        BackendPacketVerifierProgram? verifierProgram = null)
     {
         return new BackendPacketManifestEntry(
             direction,
             packetKind,
             packetId,
             routedVersion,
-            new BackendPacketPayloadConstraint(minimumLength, maximumLength));
+            new BackendPacketPayloadConstraint(
+                minimumLength,
+                maximumLength,
+                verifierProgram: verifierProgram));
     }
 
     private static async Task WriteBackendRouteCloseRequestAsync(

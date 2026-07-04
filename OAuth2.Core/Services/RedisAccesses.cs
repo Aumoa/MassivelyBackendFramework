@@ -1,15 +1,20 @@
 ﻿using System.Security.Cryptography;
 using System.Globalization;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OAuth2.DTO;
 using OAuth2.Misc;
+using OAuth2.Options;
 using StackExchange.Redis;
 
 namespace OAuth2.Services;
 
-internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses> logger) : IAccesses
+internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses> logger, IOptions<JwtOptions> jwtOptions) : IAccesses
 {
     private static readonly TimeSpan RefreshReplayWindow = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MinimumInvalidationRetention = TimeSpan.FromDays(90);
+    private static readonly TimeSpan InvalidationRetentionPadding = TimeSpan.FromDays(1);
+    private readonly TimeSpan m_TokenInvalidationRetention = GetTokenInvalidationRetention(jwtOptions.Value.RefreshTokenExpiresIn);
 
     private const string RotateRefreshTokenScript = """
         local accessToken = redis.call('HGET', KEYS[1], 'access_token')
@@ -525,7 +530,7 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         await db.StringIncrementAsync(userGenKey).WaitAsync(cancellationToken);
 
         // Keep the key alive long enough to outlast any existing long-lived refresh tokens.
-        await db.KeyExpireAsync(userGenKey, TimeSpan.FromDays(90)).WaitAsync(cancellationToken);
+        await db.KeyExpireAsync(userGenKey, m_TokenInvalidationRetention).WaitAsync(cancellationToken);
     }
 
     public async ValueTask InvalidateClientTokensAsync(string sub, string clientId, CancellationToken cancellationToken = default)
@@ -537,12 +542,25 @@ internal class RedisAccesses(RedisConnection multiplexer, ILogger<RedisAccesses>
         var clientUserGenKey = KeyNames.ClientUserGen(sub, clientId);
 
         await db.StringIncrementAsync(clientUserGenKey).WaitAsync(cancellationToken);
-        await db.KeyExpireAsync(clientUserGenKey, TimeSpan.FromDays(90)).WaitAsync(cancellationToken);
+        await db.KeyExpireAsync(clientUserGenKey, m_TokenInvalidationRetention).WaitAsync(cancellationToken);
     }
 
     private static long ToPositiveMilliseconds(TimeSpan value)
     {
         return Math.Max(1, (long)Math.Ceiling(value.TotalMilliseconds));
+    }
+
+    private static TimeSpan GetTokenInvalidationRetention(TimeSpan refreshTokenExpire)
+    {
+        if (refreshTokenExpire <= TimeSpan.Zero)
+        {
+            return MinimumInvalidationRetention;
+        }
+
+        var retention = refreshTokenExpire + InvalidationRetentionPadding;
+        return retention > MinimumInvalidationRetention
+            ? retention
+            : MinimumInvalidationRetention;
     }
 
     private static long? ParseAuthTime(RedisValue value)

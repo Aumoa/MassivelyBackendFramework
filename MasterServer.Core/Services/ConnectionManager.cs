@@ -1103,7 +1103,6 @@ internal sealed class ConnectionManager(
         CancellationToken cancellationToken)
     {
         MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendPacketManifestManagementRequest);
-        var request = PacketCodec.Decode(frame, BackendPacketManifestManagementRequest.Codec);
 
         if (source.NodeKind != MasterNodeKind.MasterAdmin)
         {
@@ -1114,6 +1113,8 @@ internal sealed class ConnectionManager(
                 source.NodeId);
             return;
         }
+
+        var request = PacketCodec.Decode(frame, BackendPacketManifestManagementRequest.Codec);
 
         BackendPacketManifestManagementResponse response;
         try
