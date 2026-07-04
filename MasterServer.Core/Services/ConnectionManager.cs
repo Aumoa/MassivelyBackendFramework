@@ -383,9 +383,10 @@ internal sealed class ConnectionManager(
                 connection.AuthorizedBackendKind!,
                 advertised.GatewayEndpoint,
                 advertised.ManifestId,
-                advertised.ManifestHash);
+                advertised.ManifestHash,
+                advertised.Descriptor);
             logger.LogInformation(
-                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, BackendKind={BackendKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}, ManifestId={ManifestId}, ManifestHash={ManifestHash}.",
+                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, BackendKind={BackendKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}, ManifestId={ManifestId}, ManifestHash={ManifestHash}, State={State}, DescriptorVersion={DescriptorVersion}, DescriptorHash={DescriptorHash}.",
                 connection.ConnectionId,
                 connection.NodeKind,
                 connection.AuthorizedBackendKind,
@@ -394,7 +395,10 @@ internal sealed class ConnectionManager(
                 advertised.GatewayEndpoint.Port,
                 advertised.GatewayEndpoint.UseTls,
                 advertised.ManifestId.Value,
-                advertised.ManifestHash.Value);
+                advertised.ManifestHash.Value,
+                advertised.Descriptor.State,
+                advertised.Descriptor.DescriptorVersion,
+                advertised.Descriptor.DescriptorHash);
             return;
         }
 
@@ -1720,6 +1724,8 @@ internal sealed class ConnectionManager(
 
         public BackendPacketManifestHash? BackendManifestHash { get; private set; }
 
+        public BackendServerDescriptor? BackendDescriptor { get; private set; }
+
         public DateTimeOffset? BackendGatewayEndpointAdvertisedAt { get; private set; }
 
         public void AttachStream(Stream stream)
@@ -1754,12 +1760,14 @@ internal sealed class ConnectionManager(
             string backendKind,
             MasterSocketEndpoint endpoint,
             BackendPacketManifestId manifestId,
-            BackendPacketManifestHash manifestHash)
+            BackendPacketManifestHash manifestHash,
+            BackendServerDescriptor descriptor)
         {
             BackendKind = backendKind;
             BackendGatewayEndpoint = endpoint;
             BackendManifestId = manifestId;
             BackendManifestHash = manifestHash;
+            BackendDescriptor = descriptor;
             BackendGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
             MarkSeen();
         }
@@ -1825,6 +1833,7 @@ internal sealed class ConnectionManager(
                 endpoint == null ||
                 !BackendManifestId.HasValue ||
                 !BackendManifestHash.HasValue ||
+                BackendDescriptor == null ||
                 !advertisedAt.HasValue)
             {
                 return null;
@@ -1838,6 +1847,7 @@ internal sealed class ConnectionManager(
                 endpoint,
                 BackendManifestId.Value,
                 BackendManifestHash.Value,
+                BackendDescriptor,
                 advertisedAt.Value);
         }
 

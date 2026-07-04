@@ -5,9 +5,16 @@ namespace GatewayServer.Protocols;
 
 public sealed class GatewayBackendRouteOpenRequest
 {
-    public const ushort ProtocolVersion = 1;
+    public const ushort ProtocolVersion = 2;
 
     public GatewayBackendRouteOpenRequest(string backendKind)
+        : this(backendKind, serverHandle: null)
+    {
+    }
+
+    public GatewayBackendRouteOpenRequest(
+        string backendKind,
+        GatewayBackendServerHandle? serverHandle)
     {
         if (string.IsNullOrWhiteSpace(backendKind))
         {
@@ -15,9 +22,12 @@ public sealed class GatewayBackendRouteOpenRequest
         }
 
         BackendKind = backendKind.Trim();
+        ServerHandle = serverHandle;
     }
 
     public string BackendKind { get; }
+
+    public GatewayBackendServerHandle? ServerHandle { get; }
 
     public static IPacketCodec<GatewayBackendRouteOpenRequest> Codec { get; } = new GatewayBackendRouteOpenRequestCodec();
 
@@ -30,7 +40,11 @@ public sealed class GatewayBackendRouteOpenRequest
                 throw new ArgumentNullException(nameof(value));
             }
 
-            return PacketWriter.GetStringSize(value.BackendKind);
+            return PacketWriter.GetStringSize(value.BackendKind) +
+                   sizeof(byte) +
+                   (value.ServerHandle == null
+                       ? 0
+                       : PacketWriter.GetStringSize(value.ServerHandle.Value));
         }
 
         public void Encode(GatewayBackendRouteOpenRequest value, ref PacketWriter writer)
@@ -41,11 +55,26 @@ public sealed class GatewayBackendRouteOpenRequest
             }
 
             writer.WriteString(value.BackendKind);
+            if (value.ServerHandle == null)
+            {
+                writer.WriteByte(0);
+            }
+            else
+            {
+                writer.WriteByte(1);
+                writer.WriteString(value.ServerHandle.Value);
+            }
         }
 
         public GatewayBackendRouteOpenRequest Decode(ref PacketReader reader)
         {
-            return new GatewayBackendRouteOpenRequest(reader.ReadString());
+            var backendKind = reader.ReadString();
+            var hasServerHandle = reader.ReadByte() != 0;
+            return new GatewayBackendRouteOpenRequest(
+                backendKind,
+                hasServerHandle
+                    ? new GatewayBackendServerHandle(reader.ReadString())
+                    : null);
         }
     }
 }
