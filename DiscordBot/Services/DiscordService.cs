@@ -15,8 +15,6 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
     public record Configuration
     {
         public required string Token { get; set; }
-
-        public string? AdminBaseUrl { get; set; }
     }
 
     private readonly DiscordSocketClient m_Socket = new(new DiscordSocketConfig
@@ -73,30 +71,6 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         var channelId = message.Channel.Id.ToString();
 
         using var scope = scopeFactory.CreateScope();
-        var channelAccess = scope.ServiceProvider.GetRequiredService<IAllowedChannelService>();
-        if (!await channelAccess.IsAllowedAsync(channelId))
-        {
-            if (shouldRespond)
-            {
-                var requestService = scope.ServiceProvider.GetRequiredService<IAllowedChannelRequestService>();
-                var guildChannel = message.Channel as SocketGuildChannel;
-                var request = await requestService.GetOrCreateAsync(
-                    channelId,
-                    guildId,
-                    guildChannel?.Name,
-                    guildChannel?.Guild.Name,
-                    message.Author.Id.ToString(),
-                    message.Author.Username,
-                    message.Id.ToString());
-                var approvalUrl = BuildAdminUrl($"/channel-requests/{request.Token}");
-                await message.Channel.SendMessageAsync(
-                    "허용되지 않은 채널입니다. 관리자에게 아래 승인 링크를 전달해 주세요.\n" +
-                    approvalUrl);
-            }
-
-            return;
-        }
-
         var processedImages = await ProcessImageAttachmentsAsync(message, scope.ServiceProvider);
         var processedAttachments = await ProcessDocumentAttachmentsAsync(message, scope.ServiceProvider);
         var referencedMessageId = GetReferencedMessageId(message);
@@ -804,18 +778,6 @@ MessageId: {referencedChatLog.MessageId ?? "(unknown)"}
                 exception,
                 "Failed to process attachment document: {url}",
                 attachment.Url));
-    }
-
-    private string BuildAdminUrl(string path)
-    {
-        var normalizedPath = path.StartsWith('/') ? path : "/" + path;
-        var baseUrl = options.Value.AdminBaseUrl?.Trim().TrimEnd('/');
-        if (Uri.TryCreate(baseUrl, UriKind.Absolute, out _))
-        {
-            return baseUrl + normalizedPath;
-        }
-
-        return normalizedPath;
     }
 
     private static async ValueTask<ChatLogData?> GetReferencedChatLogAsync(

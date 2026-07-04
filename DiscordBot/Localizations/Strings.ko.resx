@@ -76,9 +76,6 @@
   <data name="NAVMENU_LABEL_HOME" xml:space="preserve">
     <value>홈</value>
   </data>
-  <data name="NAVMENU_LABEL_CHANNELS" xml:space="preserve">
-    <value>채널</value>
-  </data>
   <data name="NAVMENU_LABEL_TOOLS" xml:space="preserve">
     <value>도구</value>
   </data>
@@ -120,98 +117,6 @@
   </data>
   <data name="ACCESS_DENIED_BUTTON_LOGOUT" xml:space="preserve">
     <value>로그아웃</value>
-  </data>
-
-  <!-- Channels -->
-  <data name="ALLOWED_CHANNELS_TITLE" xml:space="preserve">
-    <value>채널</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_SUBTITLE" xml:space="preserve">
-    <value>Discord 채널 설정</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_DETAIL_TITLE" xml:space="preserve">
-    <value>채널 상세</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_DETAIL_SUBTITLE" xml:space="preserve">
-    <value>채널 설정</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_CHANNEL_ID" xml:space="preserve">
-    <value>채널 ID</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_GUILD_ID" xml:space="preserve">
-    <value>서버 ID</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_CHANNEL_NAME" xml:space="preserve">
-    <value>채널 이름</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_GUILD_NAME" xml:space="preserve">
-    <value>서버 이름</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_MEMO" xml:space="preserve">
-    <value>메모</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_ENABLED" xml:space="preserve">
-    <value>활성</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_DISABLED" xml:space="preserve">
-    <value>비활성</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_CREATED_BY" xml:space="preserve">
-    <value>생성자</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_CREATED_AT" xml:space="preserve">
-    <value>생성일</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_UPDATED_AT" xml:space="preserve">
-    <value>수정일</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_BUTTON_ADD" xml:space="preserve">
-    <value>추가</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_BUTTON_BACK" xml:space="preserve">
-    <value>뒤로</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_BUTTON_SAVE" xml:space="preserve">
-    <value>저장</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_BUTTON_DELETE" xml:space="preserve">
-    <value>삭제</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_LOADING" xml:space="preserve">
-    <value>불러오는 중...</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_EMPTY" xml:space="preserve">
-    <value>설정된 채널이 없습니다.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_NOT_FOUND" xml:space="preserve">
-    <value>채널을 찾을 수 없습니다.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_ADDED" xml:space="preserve">
-    <value>채널을 추가했습니다.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_SAVED" xml:space="preserve">
-    <value>채널을 저장했습니다.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_ENABLED" xml:space="preserve">
-    <value>채널을 활성화했습니다.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_DISABLED" xml:space="preserve">
-    <value>채널을 비활성화했습니다.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_DELETED" xml:space="preserve">
-    <value>채널을 삭제했습니다.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_ERROR_LOAD_FAILED" xml:space="preserve">
-    <value>채널 목록을 불러오지 못했습니다.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_ERROR_SAVE_FAILED" xml:space="preserve">
-    <value>채널을 저장하지 못했습니다.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_ERROR_ACTION_FAILED" xml:space="preserve">
-    <value>채널을 업데이트하지 못했습니다.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_ERROR_CHANNEL_ID_REQUIRED" xml:space="preserve">
-    <value>채널 ID를 입력하세요.</value>
   </data>
 
   <!-- ClaudeSettings -->

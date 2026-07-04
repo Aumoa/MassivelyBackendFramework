@@ -76,9 +76,6 @@
   <data name="NAVMENU_LABEL_HOME" xml:space="preserve">
     <value>Home</value>
   </data>
-  <data name="NAVMENU_LABEL_CHANNELS" xml:space="preserve">
-    <value>Channels</value>
-  </data>
   <data name="NAVMENU_LABEL_TOOLS" xml:space="preserve">
     <value>Tools</value>
   </data>
@@ -120,98 +117,6 @@
   </data>
   <data name="ACCESS_DENIED_BUTTON_LOGOUT" xml:space="preserve">
     <value>Sign out</value>
-  </data>
-
-  <!-- Channels -->
-  <data name="ALLOWED_CHANNELS_TITLE" xml:space="preserve">
-    <value>Channels</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_SUBTITLE" xml:space="preserve">
-    <value>Discord channel settings</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_DETAIL_TITLE" xml:space="preserve">
-    <value>Channel Details</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_DETAIL_SUBTITLE" xml:space="preserve">
-    <value>Channel settings</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_CHANNEL_ID" xml:space="preserve">
-    <value>Channel ID</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_GUILD_ID" xml:space="preserve">
-    <value>Guild ID</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_CHANNEL_NAME" xml:space="preserve">
-    <value>Channel Name</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_GUILD_NAME" xml:space="preserve">
-    <value>Guild Name</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_MEMO" xml:space="preserve">
-    <value>Memo</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_ENABLED" xml:space="preserve">
-    <value>Enabled</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_DISABLED" xml:space="preserve">
-    <value>Disabled</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_CREATED_BY" xml:space="preserve">
-    <value>Created By</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_CREATED_AT" xml:space="preserve">
-    <value>Created At</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_LABEL_UPDATED_AT" xml:space="preserve">
-    <value>Updated At</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_BUTTON_ADD" xml:space="preserve">
-    <value>Add</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_BUTTON_BACK" xml:space="preserve">
-    <value>Back</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_BUTTON_SAVE" xml:space="preserve">
-    <value>Save</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_BUTTON_DELETE" xml:space="preserve">
-    <value>Delete</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_LOADING" xml:space="preserve">
-    <value>Loading...</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_EMPTY" xml:space="preserve">
-    <value>No channels configured.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_NOT_FOUND" xml:space="preserve">
-    <value>Channel not found.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_ADDED" xml:space="preserve">
-    <value>Channel added.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_SAVED" xml:space="preserve">
-    <value>Channel saved.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_ENABLED" xml:space="preserve">
-    <value>Channel enabled.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_DISABLED" xml:space="preserve">
-    <value>Channel disabled.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_STATUS_DELETED" xml:space="preserve">
-    <value>Channel deleted.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_ERROR_LOAD_FAILED" xml:space="preserve">
-    <value>Failed to load channels.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_ERROR_SAVE_FAILED" xml:space="preserve">
-    <value>Failed to save channel.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_ERROR_ACTION_FAILED" xml:space="preserve">
-    <value>Failed to update channel.</value>
-  </data>
-  <data name="ALLOWED_CHANNELS_ERROR_CHANNEL_ID_REQUIRED" xml:space="preserve">
-    <value>Channel ID is required.</value>
   </data>
 
   <!-- ClaudeSettings -->
