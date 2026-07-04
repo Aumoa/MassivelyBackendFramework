@@ -134,9 +134,11 @@ Implemented Gateway verifier compatibility coverage: `ConnectionManagerBackendRo
 - [x] Add handshake rejection tests for invalid direct-connect codes.
 - [x] Add channel open/data/close tests against the C++ data-plane implementation.
 - [x] Add shutdown and reconnect tests for sidecar and C++ server coordination.
-- [ ] Add performance tests that confirm sidecar IPC is not on the gameplay packet hot path.
+- [x] Add performance tests that confirm sidecar IPC is not on the gameplay packet hot path.
 
 Implemented shutdown/reconnect coverage: C# sidecar tests verify shutdown can be cleared and a reconnected endpoint can become ready again; C++ sidecar client tests verify endpoint readiness and shutdown state updates reconnect over loopback control connections.
+
+Implemented hot-path performance guard: `trusted_gateway_session_data_path_stays_off_sidecar_hot_path` runs repeated Gateway channel data handling and Backend-origin writes entirely through the trusted Gateway session, with a bounded in-process timing check that would catch accidental sidecar/control IPC on the gameplay data path.
 
 ## Decisions
 

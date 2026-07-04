@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <exception>
 #include <functional>
 #include <iostream>
@@ -931,6 +932,60 @@ void trusted_gateway_session_clears_channels_on_disconnect()
     require(session.channel_count() == 0, "Disconnect did not clear channels.");
 }
 
+void trusted_gateway_session_data_path_stays_off_sidecar_hot_path()
+{
+    trusted_gateway_session session("gateway-a", "gateway-master-a");
+    auto open_frame = make_frame(
+        packet_kind::notify,
+        pid_gate_backend_channel_open,
+        gateway_backend_channel_version,
+        encode_gateway_backend_channel_open(gateway_backend_channel_open {
+            37,
+            std::nullopt,
+        }));
+    (void)session.handle_gateway_frame(open_frame);
+
+    auto data_frame = make_frame(
+        packet_kind::notify,
+        pid_gate_backend_channel_data,
+        gateway_backend_channel_version,
+        encode_gateway_backend_channel_data_envelope(gateway_backend_channel_data_envelope {
+            37,
+            packet_kind::notify,
+            201,
+            1,
+            std::nullopt,
+            {0x01, 0x02, 0x03, 0x04},
+        }));
+
+    recording_frame_writer writer;
+    constexpr int iterations = 4096;
+    auto started_at = std::chrono::steady_clock::now();
+    for (int index = 0; index < iterations; ++index) {
+        auto event = session.handle_gateway_frame(data_frame);
+        require(event.kind == gateway_session_event_kind::channel_data, "Hot path data event kind mismatch.");
+        session.write_channel_data(
+            writer,
+            37,
+            packet_kind::notify,
+            201,
+            1,
+            std::nullopt,
+            {0xaa, 0xbb, 0xcc, 0xdd});
+    }
+
+    auto elapsed = std::chrono::steady_clock::now() - started_at;
+    if (elapsed > std::chrono::seconds(5)) {
+        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+        std::ostringstream message;
+        message << "Gateway data hot path took too long: " << elapsed_ms << " ms.";
+        throw std::runtime_error(message.str());
+    }
+
+    require(writer.frames.size() == static_cast<std::size_t>(iterations), "Hot path writer frame count mismatch.");
+    require(session.channel_count() == 1, "Hot path should keep the Gateway channel open.");
+}
+
 } // namespace
 
 int main()
@@ -963,6 +1018,7 @@ int main()
         trusted_gateway_session_rejects_unknown_channel_data();
         trusted_gateway_session_writes_server_origin_frames();
         trusted_gateway_session_clears_channels_on_disconnect();
+        trusted_gateway_session_data_path_stays_off_sidecar_hot_path();
     } catch (const std::exception& exception) {
         std::cerr << exception.what() << '\n';
         return 1;
