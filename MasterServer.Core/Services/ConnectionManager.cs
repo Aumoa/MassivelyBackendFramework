@@ -22,6 +22,7 @@ internal sealed class ConnectionManager(
     IServiceConnectionCredentials serviceConnectionCredentials,
     IGatewayBackendRoutePolicy gatewayBackendRoutePolicy,
     IGatewayClientSecretCredentials gatewayClientSecretCredentials,
+    IBackendPacketManifestStore backendPacketManifestStore,
     ILogger<ConnectionManager> logger) : IHostedService, IConnectionManager
 {
     private readonly MasterSocketOptions m_Options = options.Value;
@@ -29,6 +30,7 @@ internal sealed class ConnectionManager(
     private readonly IServiceConnectionCredentials m_ServiceConnectionCredentials = serviceConnectionCredentials;
     private readonly IGatewayBackendRoutePolicy m_GatewayBackendRoutePolicy = gatewayBackendRoutePolicy;
     private readonly IGatewayClientSecretCredentials m_GatewayClientSecretCredentials = gatewayClientSecretCredentials;
+    private readonly IBackendPacketManifestStore m_BackendPacketManifestStore = backendPacketManifestStore;
     private readonly CancellationTokenSource m_Shutdown = new();
     private readonly ConcurrentDictionary<Guid, MasterConnection> m_Connections = [];
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
@@ -364,16 +366,39 @@ internal sealed class ConnectionManager(
                     $"Backend node '{connection.NodeId}' advertised unauthorized backend kind '{advertised.BackendKind}'.");
             }
 
-            connection.UpdateBackendGatewayEndpoint(connection.AuthorizedBackendKind!, advertised.GatewayEndpoint);
+            var approvedManifest = await m_BackendPacketManifestStore
+                .FindApprovedManifestAsync(
+                    advertised.BackendKind,
+                    advertised.ManifestId,
+                    advertised.ManifestHash,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (approvedManifest == null)
+            {
+                throw new UnauthorizedAccessException(
+                    $"Backend node '{connection.NodeId}' advertised an unapproved packet manifest '{advertised.ManifestId.Value}' ({advertised.ManifestHash.Value}).");
+            }
+
+            connection.UpdateBackendGatewayEndpoint(
+                connection.AuthorizedBackendKind!,
+                advertised.GatewayEndpoint,
+                advertised.ManifestId,
+                advertised.ManifestHash,
+                advertised.Descriptor);
             logger.LogInformation(
-                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, BackendKind={BackendKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}.",
+                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, BackendKind={BackendKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}, ManifestId={ManifestId}, ManifestHash={ManifestHash}, State={State}, DescriptorVersion={DescriptorVersion}, DescriptorHash={DescriptorHash}.",
                 connection.ConnectionId,
                 connection.NodeKind,
                 connection.AuthorizedBackendKind,
                 connection.NodeId,
                 advertised.GatewayEndpoint.IPAddress,
                 advertised.GatewayEndpoint.Port,
-                advertised.GatewayEndpoint.UseTls);
+                advertised.GatewayEndpoint.UseTls,
+                advertised.ManifestId.Value,
+                advertised.ManifestHash.Value,
+                advertised.Descriptor.State,
+                advertised.Descriptor.DescriptorVersion,
+                advertised.Descriptor.DescriptorHash);
             return;
         }
 
@@ -421,6 +446,12 @@ internal sealed class ConnectionManager(
         if (frame.Header.PacketId == MasterControlPacketIds.GatewayClientSecretCredentialManagementRequest)
         {
             await HandleGatewayClientSecretCredentialManagementRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (frame.Header.PacketId == MasterControlPacketIds.BackendPacketManifestManagementRequest)
+        {
+            await HandleBackendPacketManifestManagementRequestAsync(connection, frame, cancellationToken).ConfigureAwait(false);
             return;
         }
     }
@@ -536,6 +567,7 @@ internal sealed class ConnectionManager(
     {
         await WriteDedicatedNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
         await WriteBackendNodeSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+        await WriteBackendPacketManifestSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
         await WriteGatewayBackendRoutePolicySnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
         await WriteGatewayClientSecretCredentialSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
     }
@@ -564,6 +596,15 @@ internal sealed class ConnectionManager(
             MasterControlPacketIds.GatewayBackendRoutePolicySnapshot,
             await CreateGatewayBackendRoutePolicySnapshotAsync(cancellationToken).ConfigureAwait(false),
             GatewayBackendRoutePolicySnapshot.Codec,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteBackendPacketManifestSnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
+    {
+        await connection.WriteControlAsync(
+            MasterControlPacketIds.BackendPacketManifestSnapshot,
+            await CreateBackendPacketManifestSnapshotAsync(cancellationToken).ConfigureAwait(false),
+            BackendPacketManifestSnapshot.Codec,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -642,6 +683,42 @@ internal sealed class ConnectionManager(
                 logger.LogWarning(
                     e,
                     "Failed to push Gateway client secret credential snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    gateway.ConnectionId,
+                    gateway.NodeId);
+            }
+        }
+    }
+
+    private async Task BroadcastBackendPacketManifestSnapshotAsync(CancellationToken cancellationToken)
+    {
+        var gateways = m_Connections.Values
+            .Where(static connection => connection.IsTrusted && connection.NodeKind == MasterNodeKind.Gateway)
+            .ToArray();
+
+        foreach (var gateway in gateways)
+        {
+            try
+            {
+                await WriteBackendPacketManifestSnapshotAsync(gateway, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception e) when (IsRemoteDisconnect(e))
+            {
+                logger.LogDebug(
+                    e,
+                    "Backend packet manifest snapshot write failed because the remote connection closed. ConnectionId={ConnectionId}, NodeId={NodeId}.",
+                    gateway.ConnectionId,
+                    gateway.NodeId);
+                gateway.Dispose();
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(
+                    e,
+                    "Failed to push Backend packet manifest snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
                     gateway.ConnectionId,
                     gateway.NodeId);
             }
@@ -1020,6 +1097,56 @@ internal sealed class ConnectionManager(
         }
     }
 
+    private async Task HandleBackendPacketManifestManagementRequestAsync(
+        MasterConnection source,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendPacketManifestManagementRequest);
+
+        if (source.NodeKind != MasterNodeKind.MasterAdmin)
+        {
+            logger.LogWarning(
+                "Rejected Backend packet manifest management request from non-admin node. SourceConnectionId={ConnectionId}, NodeKind={NodeKind}, NodeId={NodeId}.",
+                source.ConnectionId,
+                source.NodeKind,
+                source.NodeId);
+            return;
+        }
+
+        var request = PacketCodec.Decode(frame, BackendPacketManifestManagementRequest.Codec);
+
+        BackendPacketManifestManagementResponse response;
+        try
+        {
+            response = await ExecuteBackendPacketManifestRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Failed to process Backend packet manifest management request. RequestId={RequestId}, Operation={Operation}.",
+                request.RequestId,
+                request.Operation);
+            response = BackendPacketManifestManagementResponse.Failure(request.RequestId, e.Message);
+        }
+
+        await source.WriteControlAsync(
+            MasterControlPacketIds.BackendPacketManifestManagementResponse,
+            response,
+            BackendPacketManifestManagementResponse.Codec,
+            cancellationToken).ConfigureAwait(false);
+
+        if (response.Success && IsBackendPacketManifestMutation(request.Operation))
+        {
+            await BroadcastBackendPacketManifestSnapshotAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private async ValueTask<ServiceConnectionCredentialManagementResponse> ExecuteServiceConnectionCredentialRequestAsync(
         ServiceConnectionCredentialManagementRequest request,
         CancellationToken cancellationToken)
@@ -1164,6 +1291,55 @@ internal sealed class ConnectionManager(
         }
     }
 
+    private async ValueTask<BackendPacketManifestManagementResponse> ExecuteBackendPacketManifestRequestAsync(
+        BackendPacketManifestManagementRequest request,
+        CancellationToken cancellationToken)
+    {
+        switch (request.Operation)
+        {
+            case BackendPacketManifestOperation.List:
+            {
+                var manifests = await m_BackendPacketManifestStore.GetManifestInfosAsync(cancellationToken).ConfigureAwait(false);
+                return BackendPacketManifestManagementResponse.SuccessResult(request.RequestId, manifests);
+            }
+
+            case BackendPacketManifestOperation.Create:
+            {
+                var created = await m_BackendPacketManifestStore.CreateManifestAsync(request.ToInput(), cancellationToken).ConfigureAwait(false);
+                return BackendPacketManifestManagementResponse.SuccessResult(
+                    request.RequestId,
+                    [created]);
+            }
+
+            case BackendPacketManifestOperation.Update:
+                await m_BackendPacketManifestStore.UpdateManifestAsync(
+                    request.ManifestRecordId,
+                    request.ToInput(),
+                    cancellationToken).ConfigureAwait(false);
+                return BackendPacketManifestManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<BackendPacketManifestInfo>());
+
+            case BackendPacketManifestOperation.Deprecate:
+                await m_BackendPacketManifestStore.DeprecateManifestAsync(
+                    request.ManifestRecordId,
+                    request.AuditNote,
+                    cancellationToken).ConfigureAwait(false);
+                return BackendPacketManifestManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<BackendPacketManifestInfo>());
+
+            case BackendPacketManifestOperation.Remove:
+                await m_BackendPacketManifestStore.RemoveManifestAsync(request.ManifestRecordId, cancellationToken).ConfigureAwait(false);
+                return BackendPacketManifestManagementResponse.SuccessResult(
+                    request.RequestId,
+                    Array.Empty<BackendPacketManifestInfo>());
+
+            default:
+                throw new InvalidOperationException($"Unsupported Backend packet manifest management operation '{request.Operation}'.");
+        }
+    }
+
     private async Task WriteDirectConnectCodeFailureAsync(
         MasterConnection connection,
         Guid requestId,
@@ -1230,6 +1406,15 @@ internal sealed class ConnectionManager(
             GatewayClientSecretCredentialOperation.Remove;
     }
 
+    private static bool IsBackendPacketManifestMutation(BackendPacketManifestOperation operation)
+    {
+        return operation is
+            BackendPacketManifestOperation.Create or
+            BackendPacketManifestOperation.Update or
+            BackendPacketManifestOperation.Deprecate or
+            BackendPacketManifestOperation.Remove;
+    }
+
     private MasterOverviewSnapshot CreateOverviewSnapshot()
     {
         return new MasterOverviewSnapshot(
@@ -1278,6 +1463,16 @@ internal sealed class ConnectionManager(
             .ConfigureAwait(false);
         return new GatewayClientSecretCredentialSnapshot(
             secrets,
+            DateTimeOffset.UtcNow);
+    }
+
+    private async Task<BackendPacketManifestSnapshot> CreateBackendPacketManifestSnapshotAsync(CancellationToken cancellationToken)
+    {
+        var manifests = await m_BackendPacketManifestStore
+            .GetGatewayManifestsAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return new BackendPacketManifestSnapshot(
+            manifests,
             DateTimeOffset.UtcNow);
     }
 
@@ -1526,6 +1721,12 @@ internal sealed class ConnectionManager(
 
         public string BackendKind { get; private set; } = string.Empty;
 
+        public BackendPacketManifestId? BackendManifestId { get; private set; }
+
+        public BackendPacketManifestHash? BackendManifestHash { get; private set; }
+
+        public BackendServerDescriptor? BackendDescriptor { get; private set; }
+
         public DateTimeOffset? BackendGatewayEndpointAdvertisedAt { get; private set; }
 
         public void AttachStream(Stream stream)
@@ -1556,10 +1757,18 @@ internal sealed class ConnectionManager(
             MarkSeen();
         }
 
-        public void UpdateBackendGatewayEndpoint(string backendKind, MasterSocketEndpoint endpoint)
+        public void UpdateBackendGatewayEndpoint(
+            string backendKind,
+            MasterSocketEndpoint endpoint,
+            BackendPacketManifestId manifestId,
+            BackendPacketManifestHash manifestHash,
+            BackendServerDescriptor descriptor)
         {
             BackendKind = backendKind;
             BackendGatewayEndpoint = endpoint;
+            BackendManifestId = manifestId;
+            BackendManifestHash = manifestHash;
+            BackendDescriptor = descriptor;
             BackendGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
             MarkSeen();
         }
@@ -1623,6 +1832,9 @@ internal sealed class ConnectionManager(
                 !BackendNodeEndpoint.IsBackendNodeKind(NodeKind) ||
                 string.IsNullOrWhiteSpace(BackendKind) ||
                 endpoint == null ||
+                !BackendManifestId.HasValue ||
+                !BackendManifestHash.HasValue ||
+                BackendDescriptor == null ||
                 !advertisedAt.HasValue)
             {
                 return null;
@@ -1634,6 +1846,9 @@ internal sealed class ConnectionManager(
                 DisplayName,
                 ConnectionId.ToString("N"),
                 endpoint,
+                BackendManifestId.Value,
+                BackendManifestHash.Value,
+                BackendDescriptor,
                 advertisedAt.Value);
         }
 

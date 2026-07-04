@@ -162,6 +162,200 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
+    public async Task RouteOpenRequest_RejectsLegacyBeforeAuthenticationWithLegacyResponse()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000
+            },
+            out var port,
+            authenticateClients: false);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteBackendRouteOpenRequestAsync(
+                stream,
+                new GatewayBackendRouteOpenRequest("alpha"),
+                GatewayBackendRouteOpenRequest.LegacyProtocolVersion,
+                GatewayBackendRouteOpenRequest.LegacyCodec);
+
+            using var rejectedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, rejectedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_ROUTE_OPEN, rejectedFrame.Header.PacketId);
+            Assert.Equal(GatewayBackendRouteOpenResponse.LegacyProtocolVersion, rejectedFrame.Header.Version);
+
+            var rejected = PacketCodec.Decode(rejectedFrame, GatewayBackendRouteOpenResponse.LegacyCodec);
+            Assert.False(rejected.Success);
+            Assert.Equal("alpha", rejected.BackendKind);
+            Assert.Null(rejected.RouteToken);
+            Assert.Equal("Client is not authenticated.", rejected.ErrorMessage);
+            Assert.Null(rejected.ServerHandle);
+            Assert.Equal(string.Empty, rejected.DescriptorVersion);
+            Assert.Equal(string.Empty, rejected.DescriptorHash);
+            Assert.Equal(0, routeManager.RelayCount);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task ServerListRequest_RejectsBeforeAuthentication()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000
+            },
+            out var port,
+            authenticateClients: false);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteBackendServerListRequestAsync(stream, new GatewayBackendServerListRequest("alpha"));
+
+            using var rejectedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, rejectedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_SERVER_LIST, rejectedFrame.Header.PacketId);
+
+            var rejected = PacketCodec.Decode(rejectedFrame, GatewayBackendServerListResponse.Codec);
+            Assert.False(rejected.Success);
+            Assert.Equal("alpha", rejected.BackendKind);
+            Assert.Empty(rejected.Entries);
+            Assert.Equal("Client is not authenticated.", rejected.ErrorMessage);
+            Assert.Equal(0, routeManager.ConnectCount);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task ServerListRequest_ReturnsClientSafeDirectoryForAuthenticatedClient()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteBackendServerListRequestAsync(stream, new GatewayBackendServerListRequest(" alpha "));
+
+            using var responseFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, responseFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_SERVER_LIST, responseFrame.Header.PacketId);
+
+            var response = PacketCodec.Decode(responseFrame, GatewayBackendServerListResponse.Codec);
+            Assert.True(response.Success);
+            Assert.Equal("alpha", response.BackendKind);
+            var entry = Assert.Single(response.Entries);
+            Assert.Equal(new GatewayBackendServerHandle("server-alpha"), entry.ServerHandle);
+            Assert.Equal(GatewayBackendServerState.Open, entry.State);
+            Assert.Equal("test-v1", entry.DescriptorVersion);
+            Assert.Equal("{\"name\":\"Alpha\"}", entry.DescriptorJson);
+            Assert.DoesNotContain("127.0.0.1", entry.DescriptorJson, StringComparison.Ordinal);
+            Assert.Equal(0, routeManager.ConnectCount);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RouteOpenRequest_UsesServerHandleFromServerList()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                MaxOpenRoutesPerClient = 2,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteBackendServerListRequestAsync(stream, new GatewayBackendServerListRequest("alpha"));
+            using var listFrame = await ReadRequiredFrameAsync(stream);
+            var list = PacketCodec.Decode(listFrame, GatewayBackendServerListResponse.Codec);
+            var handle = Assert.Single(list.Entries).ServerHandle;
+
+            await WriteBackendRouteOpenRequestAsync(
+                stream,
+                new GatewayBackendRouteOpenRequest("alpha", handle));
+
+            using var acceptedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, acceptedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_ROUTE_OPEN, acceptedFrame.Header.PacketId);
+
+            var accepted = PacketCodec.Decode(acceptedFrame, GatewayBackendRouteOpenResponse.Codec);
+            Assert.True(accepted.Success);
+            Assert.Equal(handle, accepted.ServerHandle);
+            Assert.Equal("test-v1", accepted.DescriptorVersion);
+            Assert.Equal(1, routeManager.ConnectCount);
+
+            var opened = await routeManager.RelayedOpenFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(routeManager.DefaultBinding, opened.Binding);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task ClientAuthenticateRequest_RejectsWhenTokenValidatorIsNotConfigured()
     {
         var routeManager = new RecordingBackendRouteManager();
@@ -331,6 +525,286 @@ public sealed class ConnectionManagerBackendRouteTests
             Assert.Contains(connectionManager.GetStatusItems(), item =>
                 item.Group == "Persistent Backend route alpha" &&
                 item.Name == "Open routes" &&
+                item.Value == "1");
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RouteOpenRequest_AcceptsLegacyBackendKindOnlyRequest()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                MaxOpenRoutesPerClient = 2,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteBackendRouteOpenRequestAsync(
+                stream,
+                new GatewayBackendRouteOpenRequest(" alpha "),
+                GatewayBackendRouteOpenRequest.LegacyProtocolVersion,
+                GatewayBackendRouteOpenRequest.LegacyCodec);
+
+            using var acceptedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, acceptedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_ROUTE_OPEN, acceptedFrame.Header.PacketId);
+            Assert.Equal(GatewayBackendRouteOpenResponse.LegacyProtocolVersion, acceptedFrame.Header.Version);
+
+            var accepted = PacketCodec.Decode(acceptedFrame, GatewayBackendRouteOpenResponse.LegacyCodec);
+            Assert.True(accepted.Success);
+            Assert.Equal("alpha", accepted.BackendKind);
+            Assert.NotNull(accepted.RouteToken);
+            Assert.Null(accepted.ServerHandle);
+            Assert.Equal(string.Empty, accepted.DescriptorVersion);
+            Assert.Equal(string.Empty, accepted.DescriptorHash);
+            Assert.Equal(1, routeManager.ConnectCount);
+
+            var opened = await routeManager.RelayedOpenFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("alpha", opened.BackendKind);
+            Assert.Equal(routeManager.DefaultBinding, opened.Binding);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RouteOpenRequest_RejectsWhenBackendManifestIsMissing()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port,
+            backendPacketManifestProvider: new MissingBackendPacketManifestProvider());
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteBackendRouteOpenRequestAsync(stream, new GatewayBackendRouteOpenRequest("alpha"));
+
+            using var rejectedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, rejectedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_ROUTE_OPEN, rejectedFrame.Header.PacketId);
+
+            var rejected = PacketCodec.Decode(rejectedFrame, GatewayBackendRouteOpenResponse.Codec);
+            Assert.False(rejected.Success);
+            Assert.Equal("alpha", rejected.BackendKind);
+            Assert.Null(rejected.RouteToken);
+            Assert.Equal("Backend route open was rejected.", rejected.ErrorMessage);
+            Assert.Equal(1, routeManager.ConnectCount);
+            Assert.Equal(0, routeManager.RelayCount);
+
+            var completed = await Task.WhenAny(
+                routeManager.RelayedOpenFrame.Task,
+                Task.Delay(TimeSpan.FromMilliseconds(250)));
+            Assert.NotSame(routeManager.RelayedOpenFrame.Task, completed);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RouteDataNotify_RejectsUnknownPacketIdFromClientManifest()
+    {
+        var manifest = CreatePacketManifest(
+            CreateManifestEntry(BackendPacketManifestDirection.ClientToBackend, PacketKind.Notify, 101, 1, 0, 8));
+        var routeManager = new RecordingBackendRouteManager(manifest);
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port,
+            backendPacketManifestProvider: new StaticBackendPacketManifestProvider(manifest));
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            var routeToken = await OpenPersistentBackendRouteAsync(stream);
+            var dataEnvelope = new GatewayBackendRouteDataEnvelope(
+                routeToken,
+                GatewayBackendRouteDirection.ClientToBackend,
+                PacketKind.Notify,
+                routedPacketId: 999,
+                routedVersion: 1,
+                exchangeId: null,
+                [1, 2, 3]);
+            await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Notify, dataEnvelope);
+
+            await AssertNoDataRelayAsync(routeManager);
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Backend packet manifest rejects" &&
+                item.Name == "ClientToBackend:UnknownPacketId" &&
+                item.Value == "1");
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RouteDataNotify_RejectsVerifierFailureFromClientManifest()
+    {
+        var verifierProgram = new BackendPacketVerifierProgram(
+            [
+                BackendPacketVerifierInstruction.ReadUInt8(
+                    targetSlot: 0,
+                    valueConstraint: new BackendPacketVerifierValueConstraint(
+                        minimumValue: 0,
+                        maximumValue: 2)),
+                BackendPacketVerifierInstruction.ReadBytes(
+                    BackendPacketVerifierLengthConstraint.Dynamic(
+                        sourceSlot: 0,
+                        minimumLength: 0,
+                        maximumLength: 2))
+            ]);
+        var manifest = CreatePacketManifest(
+            CreateManifestEntry(
+                BackendPacketManifestDirection.ClientToBackend,
+                PacketKind.Notify,
+                101,
+                1,
+                1,
+                3,
+                verifierProgram));
+        var routeManager = new RecordingBackendRouteManager(manifest);
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port,
+            backendPacketManifestProvider: new StaticBackendPacketManifestProvider(manifest));
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            var routeToken = await OpenPersistentBackendRouteAsync(stream);
+            var dataEnvelope = new GatewayBackendRouteDataEnvelope(
+                routeToken,
+                GatewayBackendRouteDirection.ClientToBackend,
+                PacketKind.Notify,
+                routedPacketId: 101,
+                routedVersion: 1,
+                exchangeId: null,
+                [1, 7, 9]);
+            await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Notify, dataEnvelope);
+
+            await AssertNoDataRelayAsync(routeManager);
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Backend packet manifest rejects" &&
+                item.Name == "ClientToBackend:VerifierTrailingBytes" &&
+                item.Value == "1");
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task BackendRouteDataNotify_RejectsOversizedBackendPayloadFromManifest()
+    {
+        var manifest = CreatePacketManifest(
+            CreateManifestEntry(BackendPacketManifestDirection.BackendToClient, PacketKind.Notify, 201, 1, 0, 2));
+        var routeManager = new RecordingBackendRouteManager(manifest);
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port,
+            backendPacketManifestProvider: new StaticBackendPacketManifestProvider(manifest));
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            var routeToken = await OpenPersistentBackendRouteAsync(stream);
+            var envelope = new GatewayBackendRouteDataEnvelope(
+                routeToken,
+                GatewayBackendRouteDirection.BackendToClient,
+                PacketKind.Notify,
+                routedPacketId: 201,
+                routedVersion: 1,
+                exchangeId: null,
+                [1, 2, 3]);
+            await routeManager.PublishBackendRouteDataFrameAsync("alpha", envelope);
+
+            await AssertNoClientFrameAsync(stream);
+            Assert.Contains(connectionManager.GetStatusItems(), item =>
+                item.Group == "Backend packet manifest rejects" &&
+                item.Name == "BackendToClient:PayloadTooLarge" &&
                 item.Value == "1");
         }
         finally
@@ -2278,7 +2752,8 @@ public sealed class ConnectionManagerBackendRouteTests
         IGatewayClientStreamAuthenticator? streamAuthenticator = null,
         bool authenticateClients = true,
         IGatewayClientTokenValidator? clientTokenValidator = null,
-        string[]? allowedBackendKinds = null)
+        string[]? allowedBackendKinds = null,
+        IBackendPacketManifestProvider? backendPacketManifestProvider = null)
     {
         port = GetAvailableTcpPort();
         connectionOptions ??= new ConnectionManagerOptions
@@ -2291,6 +2766,7 @@ public sealed class ConnectionManagerBackendRouteTests
             Microsoft.Extensions.Options.Options.Create(backendRouteOptions),
             routeManager,
             new StaticGatewayBackendRoutePolicyProvider(allowedBackendKinds ?? ["alpha"]),
+            backendPacketManifestProvider ?? new PermissiveBackendPacketManifestProvider(),
             certificateProvider ?? new StaticCertificateProvider(CreateServerCertificate()),
             streamAuthenticator ?? new PassThroughStreamAuthenticator(),
             new StaticGatewayClientAuthenticationContextFactory(authenticateClients),
@@ -2326,6 +2802,110 @@ public sealed class ConnectionManagerBackendRouteTests
                 candidate,
                 normalized,
                 StringComparison.Ordinal));
+        }
+    }
+
+    private sealed class PermissiveBackendPacketManifestProvider : IBackendPacketManifestProvider
+    {
+        private static readonly BackendPacketManifest s_Manifest = new(
+            "alpha",
+            RecordingBackendRouteManager.TestManifestId,
+            []);
+
+        public BackendPacketManifest RequireManifest(
+            string backendKind,
+            BackendPacketManifestId manifestId,
+            BackendPacketManifestHash manifestHash)
+        {
+            return s_Manifest;
+        }
+
+        public BackendPacketManifestValidationResult ValidatePacket(
+            string backendKind,
+            BackendPacketManifestId manifestId,
+            BackendPacketManifestHash manifestHash,
+            BackendPacketManifestDirection direction,
+            PacketKind packetKind,
+            ushort packetId,
+            ushort routedVersion,
+            ReadOnlySpan<byte> payload)
+        {
+            return BackendPacketManifestValidationResult.Accepted(new BackendPacketManifestEntry(
+                direction,
+                packetKind,
+                packetId,
+                routedVersion,
+                BackendPacketPayloadConstraint.Any));
+        }
+
+        public ServiceAdminStatusItem[] GetStatusItems()
+        {
+            return [];
+        }
+    }
+
+    private sealed class StaticBackendPacketManifestProvider(BackendPacketManifest manifest)
+        : IBackendPacketManifestProvider
+    {
+        public BackendPacketManifest RequireManifest(
+            string backendKind,
+            BackendPacketManifestId manifestId,
+            BackendPacketManifestHash manifestHash)
+        {
+            if (manifest.MatchesAdvertisement(backendKind, manifestId, manifestHash))
+            {
+                return manifest;
+            }
+
+            throw new InvalidOperationException("Backend packet manifest is not loaded.");
+        }
+
+        public BackendPacketManifestValidationResult ValidatePacket(
+            string backendKind,
+            BackendPacketManifestId manifestId,
+            BackendPacketManifestHash manifestHash,
+            BackendPacketManifestDirection direction,
+            PacketKind packetKind,
+            ushort packetId,
+            ushort routedVersion,
+            ReadOnlySpan<byte> payload)
+        {
+            return RequireManifest(backendKind, manifestId, manifestHash)
+                .ValidatePacket(direction, packetKind, packetId, routedVersion, payload);
+        }
+
+        public ServiceAdminStatusItem[] GetStatusItems()
+        {
+            return [];
+        }
+    }
+
+    private sealed class MissingBackendPacketManifestProvider : IBackendPacketManifestProvider
+    {
+        public BackendPacketManifest RequireManifest(
+            string backendKind,
+            BackendPacketManifestId manifestId,
+            BackendPacketManifestHash manifestHash)
+        {
+            throw new InvalidOperationException("Backend packet manifest is not loaded.");
+        }
+
+        public BackendPacketManifestValidationResult ValidatePacket(
+            string backendKind,
+            BackendPacketManifestId manifestId,
+            BackendPacketManifestHash manifestHash,
+            BackendPacketManifestDirection direction,
+            PacketKind packetKind,
+            ushort packetId,
+            ushort routedVersion,
+            ReadOnlySpan<byte> payload)
+        {
+            throw new InvalidOperationException("Backend packet manifest is not loaded.");
+        }
+
+        public ServiceAdminStatusItem[] GetStatusItems()
+        {
+            return [];
         }
     }
 
@@ -2402,13 +2982,40 @@ public sealed class ConnectionManagerBackendRouteTests
         Stream stream,
         GatewayBackendRouteOpenRequest request)
     {
+        await WriteBackendRouteOpenRequestAsync(
+            stream,
+            request,
+            GatewayBackendRouteOpenRequest.ProtocolVersion,
+            GatewayBackendRouteOpenRequest.Codec);
+    }
+
+    private static async Task WriteBackendRouteOpenRequestAsync(
+        Stream stream,
+        GatewayBackendRouteOpenRequest request,
+        ushort protocolVersion,
+        IPacketCodec<GatewayBackendRouteOpenRequest> codec)
+    {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         using var frame = PacketCodec.Encode(
             PacketKind.Request,
             Pid.GATE_BACKEND_ROUTE_OPEN,
-            GatewayBackendRouteOpenRequest.ProtocolVersion,
+            protocolVersion,
             request,
-            GatewayBackendRouteOpenRequest.Codec);
+            codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, timeout.Token);
+    }
+
+    private static async Task WriteBackendServerListRequestAsync(
+        Stream stream,
+        GatewayBackendServerListRequest request)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var frame = PacketCodec.Encode(
+            PacketKind.Request,
+            Pid.GATE_BACKEND_SERVER_LIST,
+            GatewayBackendServerListRequest.ProtocolVersion,
+            request,
+            GatewayBackendServerListRequest.Codec);
         await PacketFrameWriter.WriteAsync(stream, frame, timeout.Token);
     }
 
@@ -2439,6 +3046,34 @@ public sealed class ConnectionManagerBackendRouteTests
         Assert.True(accepted.Success);
         Assert.NotNull(accepted.RouteToken);
         return accepted.RouteToken!;
+    }
+
+    private static BackendPacketManifest CreatePacketManifest(params BackendPacketManifestEntry[] entries)
+    {
+        return new BackendPacketManifest(
+            "alpha",
+            RecordingBackendRouteManager.TestManifestId,
+            entries);
+    }
+
+    private static BackendPacketManifestEntry CreateManifestEntry(
+        BackendPacketManifestDirection direction,
+        PacketKind packetKind,
+        ushort packetId,
+        ushort routedVersion,
+        int minimumLength,
+        int maximumLength,
+        BackendPacketVerifierProgram? verifierProgram = null)
+    {
+        return new BackendPacketManifestEntry(
+            direction,
+            packetKind,
+            packetId,
+            routedVersion,
+            new BackendPacketPayloadConstraint(
+                minimumLength,
+                maximumLength,
+                verifierProgram: verifierProgram));
     }
 
     private static async Task WriteBackendRouteCloseRequestAsync(
@@ -2558,11 +3193,16 @@ public sealed class ConnectionManagerBackendRouteTests
 
     private sealed class RecordingBackendRouteManager : IBackendRouteManager
     {
+        public static readonly BackendPacketManifestId TestManifestId = new("test");
+        public static readonly BackendPacketManifestHash TestManifestHash = new("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         private readonly BackendRouteBinding m_DefaultBinding = new(
             "alpha",
             "backend-a",
             "master-a",
             "backend-direct-a");
+        private readonly GatewayBackendServerHandle m_DefaultServerHandle = new("server-alpha");
+        private readonly BackendPacketManifestId m_ManifestId;
+        private readonly BackendPacketManifestHash m_ManifestHash;
         private readonly object m_TestChannelSync = new();
         private readonly Dictionary<string, uint> m_TestChannelIdsByRouteToken = new(StringComparer.Ordinal);
         private int m_ConnectCount;
@@ -2576,6 +3216,17 @@ public sealed class ConnectionManagerBackendRouteTests
         public event BackendRouteCloseFrameReceivedHandler? RouteCloseFrameReceived;
 
         public event BackendRouteSessionClosedHandler? RouteSessionClosed;
+
+        public RecordingBackendRouteManager()
+            : this(null)
+        {
+        }
+
+        public RecordingBackendRouteManager(BackendPacketManifest? manifest)
+        {
+            m_ManifestId = manifest?.ManifestId ?? TestManifestId;
+            m_ManifestHash = manifest?.Hash ?? TestManifestHash;
+        }
 
         public TaskCompletionSource<ObservedBackendRouteFrame> RelayedFrame { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -2591,6 +3242,10 @@ public sealed class ConnectionManagerBackendRouteTests
 
         public BackendRouteBinding DefaultBinding => m_DefaultBinding;
 
+        public BackendPacketManifestId ManifestId => m_ManifestId;
+
+        public BackendPacketManifestHash ManifestHash => m_ManifestHash;
+
         public int ConnectCount => Volatile.Read(ref m_ConnectCount);
 
         public int RelayCount => Volatile.Read(ref m_RelayCount);
@@ -2598,6 +3253,32 @@ public sealed class ConnectionManagerBackendRouteTests
         public string[] GetDiscoveredBackendKinds()
         {
             return ["alpha"];
+        }
+
+        public BackendServerDirectorySnapshot ListServers(
+            string backendKind,
+            int maximumEntries)
+        {
+            if (!string.Equals(backendKind, m_DefaultBinding.BackendKind, StringComparison.Ordinal))
+            {
+                return new BackendServerDirectorySnapshot([], DateTimeOffset.UtcNow);
+            }
+
+            var descriptor = BackendServerDescriptor.Create(
+                BackendNodeState.Open,
+                "test-v1",
+                "{\"name\":\"Alpha\"}");
+            return new BackendServerDirectorySnapshot(
+                [
+                    new GatewayBackendServerListEntry(
+                        m_DefaultServerHandle,
+                        m_DefaultBinding.BackendKind,
+                        GatewayBackendServerState.Open,
+                        descriptor.DescriptorVersion,
+                        descriptor.DescriptorHash,
+                        descriptor.DescriptorJson)
+                ],
+                DateTimeOffset.UtcNow);
         }
 
         public ValueTask<IBackendRouteSession> ConnectAsync(
@@ -2611,6 +3292,19 @@ public sealed class ConnectionManagerBackendRouteTests
             }
 
             return ValueTask.FromResult<IBackendRouteSession>(new RecordingBackendRouteSession(this, m_DefaultBinding));
+        }
+
+        public ValueTask<IBackendRouteSession> ConnectAsync(
+            string backendKind,
+            GatewayBackendServerHandle serverHandle,
+            CancellationToken cancellationToken)
+        {
+            if (!m_DefaultServerHandle.Equals(serverHandle))
+            {
+                throw new InvalidOperationException("No recording Backend route session is available for the requested server handle.");
+            }
+
+            return ConnectAsync(backendKind, cancellationToken);
         }
 
         public ValueTask RelayFrameAsync(
@@ -2874,6 +3568,16 @@ public sealed class ConnectionManagerBackendRouteTests
         public string DirectConnectionId => binding.DirectConnectionId;
 
         public BackendRouteBinding Binding => binding;
+
+        public BackendPacketManifestId ManifestId => owner.ManifestId;
+
+        public BackendPacketManifestHash ManifestHash => owner.ManifestHash;
+
+        public GatewayBackendServerHandle? ServerHandle { get; } = new("server-alpha");
+
+        public string DescriptorVersion { get; } = "test-v1";
+
+        public string DescriptorHash { get; } = BackendServerDescriptor.ComputeDescriptorHash("{\"name\":\"Alpha\"}");
 
         public ValueTask WriteAsync(PacketFrame frame, CancellationToken cancellationToken)
         {

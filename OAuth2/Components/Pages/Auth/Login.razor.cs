@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using Microsoft.JSInterop;
 using OAuth2.DTO;
 using OAuth2.Localizations;
@@ -24,8 +23,8 @@ public partial class Login(
     NavigationManager nav,
     IHttpContextAccessor accessor,
     ILogger<Login> logger,
-    IJwt jwt,
     ILoginAttemptLimiter loginAttemptLimiter,
+    CachedAuthorizationSessionService cachedSessions,
     IJSRuntime js)
 {
     private static readonly TimeSpan kFailedLoginDelay = TimeSpan.FromMilliseconds(500);
@@ -232,33 +231,17 @@ public partial class Login(
             var httpContext = accessor.HttpContext;
             if (httpContext != null)
             {
-                const string CachedJwtPrefix = "cached_jwt_";
                 foreach (var cookie in httpContext.Request.Cookies)
                 {
-                    if (!cookie.Key.StartsWith(CachedJwtPrefix, StringComparison.Ordinal))
+                    if (!cachedSessions.TryGetAccountId(cookie.Key, out _))
                     {
                         continue;
                     }
 
-                    var accountId = cookie.Key[CachedJwtPrefix.Length..];
-                    try
+                    var session = await cachedSessions.TryGetSessionAsync(httpContext, cookie.Key, cookie.Value);
+                    if (session != null && IsAuthenticationFresh(session.AuthTime))
                     {
-                        var handler = new JwtSecurityTokenHandler();
-                        var validationParams = jwt.GetValidationParameters();
-                        var principal = handler.ValidateToken(cookie.Value, validationParams, out var validatedToken);
-                        var cachedJwt = (JwtSecurityToken)validatedToken;
-                        if (IsAuthenticationFresh(GetCachedAuthTime(cachedJwt)))
-                        {
-                            m_CachedJwts.Add(cachedJwt);
-                        }
-                    }
-                    catch (SecurityTokenException e)
-                    {
-                        logger.LogWarning("{Key} token validation failed: {Message}", cookie.Key, e.Message);
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogWarning("Failed to export cached jwt token. {Message}", e.Message);
+                        m_CachedJwts.Add(session.Token);
                     }
                 }
             }

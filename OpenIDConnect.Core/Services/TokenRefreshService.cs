@@ -25,6 +25,12 @@ internal class TokenRefreshService(
             return null;
         }
 
+        if (httpContext.Response.HasStarted)
+        {
+            logger.LogDebug("Response headers were already sent; token refresh was skipped to avoid losing rotated refresh-token cookies.");
+            return null;
+        }
+
         var refreshToken = cookieManager.ReadRefreshToken(httpContext);
         if (string.IsNullOrEmpty(refreshToken))
         {

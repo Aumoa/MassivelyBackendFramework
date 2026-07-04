@@ -37,8 +37,12 @@ public class OllamaChatHistory(
 - 약속, 일정, 기한처럼 날짜/시간 해석이 필요한 요청에서 '내일', '다음 주', '13일' 같은 상대적이거나 부분적인 날짜는 기본적으로 KST(Asia/Seoul) 기준 현재 날짜를 확인해 해석하세요.
 - '이번 주 일요일', '다음 주 금요일'처럼 요일이 포함된 약속 날짜는 최종 날짜의 실제 요일과 일치하는지 확인하세요.
 - 월/연도, 오전/오후, 시간대, 과거/미래 여부가 애매해 잘못 저장하거나 안내할 수 있으면 추측으로 확정하지 말고 사용자에게 확인 질문을 하세요.
+- 사용자가 '아까', '전에', '위에서', '채널에서', '누가 말한 것', '그때 결론'처럼 현재 Discord 채널의 과거 채팅을 자연스럽게 가리키면, 기억이나 추측으로 답하지 말고 먼저 현재 채널의 채팅 조회 도구를 사용하세요.
+- 사용자가 AI와 나눈 직전 대화 자체를 명확히 묻는 경우에만 기억된 대화로 답할 수 있습니다. 다른 사용자의 발화, 채널에 올라온 메시지, 과거 논의, 결정, 약속, 첨부 파일을 묻는 것 같으면 get_chat_history, search_chat_history, summarize_recent_discussion, get_chat_context, get_reply_thread_context, get_chat_by_message_id 같은 현재 채널 조회 도구 결과를 우선하세요.
 - 사용자 요청은 가능한 범위에서 반영하되, 사실성, 안전성, 도구 결과, 시스템 지침, 대화 품질을 우선하세요.
 """;
+
+    internal static string GetDefaultBehaviorInstruction() => DefaultBehaviorInstruction;
 
     private readonly List<ChatMessage> m_Messages = [];
     private readonly SemaphoreSlim m_Semaphore = new(1);
@@ -73,7 +77,7 @@ public class OllamaChatHistory(
             recentHistory.Add(new ChatMessage
             {
                 Role = ChatRole.System,
-                Content = DefaultBehaviorInstruction
+                Content = GetDefaultBehaviorInstruction()
             });
 
             var skillSelection = await aiSkillProvider.SelectSkillsAsync(prompt, cancellationToken);

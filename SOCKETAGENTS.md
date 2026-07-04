@@ -38,6 +38,15 @@
 - Small and frequent packets, such as movement packets, may be grouped under a shared protocol header when queued together.
 - Do not casually batch packets that require immediate handling or strict correctness, such as authentication, authorization, payment, session control, or important combat input.
 
+## Gateway Relay Performance
+
+- Gateway is the only client-facing path to internal Backend and Dedicated services, so Gateway relay design must treat throughput, latency, jitter, allocation rate, and backpressure as first-order concerns.
+- Gateway is horizontally scalable, but scale-out does not remove per-packet latency from the relay path. Avoid unnecessary payload copies, allocations, locks, scheduler hops, and packet re-encoding work even when more Gateway instances can be added.
+- Prefer parsing Gateway envelopes and routed payload boundaries with `Span<T>`, `ReadOnlySpan<T>`, `Memory<T>`, `ReadOnlyMemory<T>`, pooled buffers, or pipeline-style readers/writers when those APIs can reduce allocations or copies.
+- Keep routed payloads as slices or borrowed memory through the Gateway hot path where practical. Do not decode game payload semantics in Gateway unless a Gateway-owned compatibility or verifier policy requires it.
+- If safe managed APIs cannot reasonably meet Gateway hot-path goals, narrowly scoped `unsafe` code may be used when the expected performance benefit is substantial and the buffer lifetime, bounds, pinning, alignment, and concurrency assumptions are explicit.
+- Do not add `unsafe` code or ref-heavy complexity for minor, speculative, or cold-path wins. Prefer measured evidence or clear hot-path reasoning before accepting the maintenance and memory-safety cost.
+
 ## Dedicated Execution Model
 
 - Treat each game channel as a single logical execution flow owned by a channel owner lane.
@@ -49,7 +58,7 @@
 
 ## .NET Performance Policy
 
-- Use .NET for productivity, but apply .NET performance optimization aggressively in Dedicated hot paths.
+- Use .NET for productivity, but apply .NET performance optimization aggressively in Gateway relay paths and Dedicated hot paths.
 - Use Dependency Injection for server composition, service wiring, and lifetime management.
 - Do not use Dependency Injection as part of real-time packet processing or game-logic hot paths.
 - In hot paths, minimize allocation, locks, blocking calls, scheduler overhead, reflection, and unnecessary async state machine creation.

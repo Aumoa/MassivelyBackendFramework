@@ -240,13 +240,11 @@ internal class Jwt : IJwt
 
     public string Issue(string audience, params Claim[] claims)
     {
-        var expireAt = DateTime.UtcNow.Add(m_ExpiresIn);
-
         var token = new JwtSecurityToken(
             issuer: m_Issuer,
             audience: audience,
             claims: [.. claims],
-            expires: expireAt,
+            expires: DateTime.UtcNow.Add(m_ExpiresIn),
             signingCredentials: m_Credentials
             );
 

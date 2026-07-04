@@ -32,6 +32,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IServiceConnectionCredentials, MySqlServiceConnectionCredentials>();
         services.AddSingleton<IGatewayBackendRoutePolicy, MySqlGatewayBackendRoutePolicy>();
         services.AddSingleton<IGatewayClientSecretCredentials, MySqlGatewayClientSecretCredentials>();
+        services.AddSingleton<IBackendPacketManifestStore, MySqlBackendPacketManifestStore>();
         services.AddSingleton<INodeAuthSecretProvider, MySqlNodeAuthSecretProvider>();
         services.AddSingleton<IDirectConnectCodeStore, RedisDirectConnectCodeStore>();
 

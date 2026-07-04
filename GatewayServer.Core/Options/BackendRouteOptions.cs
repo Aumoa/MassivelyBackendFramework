@@ -22,6 +22,14 @@ public sealed record BackendRouteOptions
 
     public int MaxRouteOpenAttemptsPerPrincipalPerWindow { get; set; } = 64;
 
+    public int ServerListRateLimitWindowMilliseconds { get; set; } = 1000;
+
+    public int MaxServerListRequestsPerClientPerWindow { get; set; } = 16;
+
+    public int MaxServerListRequestsPerPrincipalPerWindow { get; set; } = 32;
+
+    public int MaxServerListEntries { get; set; } = 256;
+
     public int ExchangeTimeoutMilliseconds { get; set; } = 30000;
 
     public int MaxPendingExchangesPerRoute { get; set; } = 1024;

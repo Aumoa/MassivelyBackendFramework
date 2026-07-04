@@ -10,6 +10,31 @@ public sealed class BackendNodeEndpoint
         string displayName,
         string masterConnectionId,
         MasterSocketEndpoint gatewayEndpoint,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash manifestHash,
+        DateTimeOffset advertisedAt)
+        : this(
+            backendKind,
+            nodeId,
+            displayName,
+            masterConnectionId,
+            gatewayEndpoint,
+            manifestId,
+            manifestHash,
+            BackendServerDescriptor.DefaultOpen,
+            advertisedAt)
+    {
+    }
+
+    public BackendNodeEndpoint(
+        string backendKind,
+        string nodeId,
+        string displayName,
+        string masterConnectionId,
+        MasterSocketEndpoint gatewayEndpoint,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash manifestHash,
+        BackendServerDescriptor descriptor,
         DateTimeOffset advertisedAt)
     {
         if (string.IsNullOrWhiteSpace(backendKind))
@@ -37,6 +62,9 @@ public sealed class BackendNodeEndpoint
         DisplayName = displayName;
         MasterConnectionId = masterConnectionId;
         GatewayEndpoint = gatewayEndpoint ?? throw new ArgumentNullException(nameof(gatewayEndpoint));
+        ManifestId = manifestId;
+        ManifestHash = manifestHash;
+        Descriptor = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
         AdvertisedAt = advertisedAt;
     }
 
@@ -49,6 +77,20 @@ public sealed class BackendNodeEndpoint
     public string MasterConnectionId { get; }
 
     public MasterSocketEndpoint GatewayEndpoint { get; }
+
+    public BackendPacketManifestId ManifestId { get; }
+
+    public BackendPacketManifestHash ManifestHash { get; }
+
+    public BackendServerDescriptor Descriptor { get; }
+
+    public BackendNodeState State => Descriptor.State;
+
+    public string DescriptorVersion => Descriptor.DescriptorVersion;
+
+    public string DescriptorHash => Descriptor.DescriptorHash;
+
+    public string DescriptorJson => Descriptor.DescriptorJson;
 
     public DateTimeOffset AdvertisedAt { get; }
 

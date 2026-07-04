@@ -15,7 +15,7 @@ using HostOptions = OAuth2.Options.HostOptions;
 namespace OAuth2.Controllers;
 
 [ApiController]
-public class AuthController(IOptions<HostOptions> options, ILogger<AuthController> logger) : ControllerBase
+public class AuthController(IOptions<HostOptions> options, ILogger<AuthController> logger, CachedAuthorizationSessionService cachedSessions) : ControllerBase
 {
     private const string OpSessionCookieName = "op_session";
     private const string PkceVerifierCookieName = "oauth2_pkce_verifier";
@@ -128,23 +128,25 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 authorizationCode.Value.AuthTime);
             var tokenResponse = issueResult.Response;
 
+            if (string.IsNullOrWhiteSpace(tokenResponse.RefreshToken) || !tokenResponse.RefreshExpiresIn.HasValue)
+            {
+                return BadRequest("Refresh token is required for the internal OAuth2 client.");
+            }
+
             HttpContext.Response.Cookies.Append("access_token", tokenResponse.AccessToken, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn)
             });
-
-            if (string.IsNullOrWhiteSpace(tokenResponse.RefreshToken))
-            {
-                return BadRequest("Refresh token is required for the internal OAuth2 client.");
-            }
 
             HttpContext.Response.Cookies.Append("refresh_token", tokenResponse.RefreshToken, new CookieOptions
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.Strict
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn.Value)
             });
 
             HttpContext.Response.Cookies.Delete("id", new CookieOptions
@@ -160,7 +162,8 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 {
                     HttpOnly = true,
                     Secure = true,
-                    SameSite = SameSiteMode.Strict
+                    SameSite = SameSiteMode.Strict,
+                    Expires = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn)
                 });
             }
 
@@ -331,96 +334,14 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             return await HandlePromptNoneAsync();
         }
 
-        const string CachedJwtPrefix = "cached_jwt_";
         foreach (var cookie in HttpContext.Request.Cookies)
         {
-            if (!cookie.Key.StartsWith(CachedJwtPrefix, StringComparison.Ordinal))
+            if (!cachedSessions.TryGetAccountId(cookie.Key, out _))
             {
                 continue;
             }
 
-            var accountId = cookie.Key[CachedJwtPrefix.Length..];
-            try
-            {
-                var handler = new JwtSecurityTokenHandler();
-                var validationParams = jwt.GetValidationParameters();
-                var principal = handler.ValidateToken(cookie.Value, validationParams, out var validatedToken);
-                var cachedJwt = (JwtSecurityToken)validatedToken;
-                var cachedAccountId = cachedJwt.Claims.FirstOrDefault(p => p.Type == "id")?.Value;
-                if (string.IsNullOrWhiteSpace(cachedAccountId) || cachedAccountId != accountId)
-                {
-                    DeleteCachedAccount(accountId);
-                    continue;
-                }
-
-                var access_token = cachedJwt.Claims.FirstOrDefault(p => p.Type == "access_token")?.Value;
-                if (access_token == null)
-                {
-                    DeleteCachedAccount(accountId);
-                    continue;
-                }
-
-                var verified = await accesses.VerifyAsync(access_token);
-                if (verified == null)
-                {
-                    var refresh_token = cachedJwt.Claims.FirstOrDefault(p => p.Type == "refresh_token")?.Value;
-                    if (refresh_token == null)
-                    {
-                        DeleteCachedAccount(accountId);
-                        continue;
-                    }
-
-                    var newAccess = await accesses.RefreshAccessAsync(refresh_token, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn);
-                    if (newAccess.HasValue == false)
-                    {
-                        DeleteCachedAccount(accountId);
-                        continue;
-                    }
-
-                    var except = cachedJwt.Claims.Where(p => p.Type is not ("access_token" or "refresh_token"));
-                    var newCachedJwt = jwt.Issue(options.Value.ClientId, [.. except, new Claim("access_token", newAccess.Value.AccessToken), new Claim("refresh_token", newAccess.Value.RefreshToken)]);
-
-                    HttpContext.Response.Cookies.Append($"cached_jwt_{accountId}", newCachedJwt, new CookieOptions
-                    {
-                        HttpOnly = true,
-                        Secure = true,
-                        SameSite = SameSiteMode.Lax,
-                        Path = "/",
-                        Expires = DateTimeOffset.UtcNow.AddYears(10)
-                    });
-
-                    cachedJwt = handler.ReadJwtToken(newCachedJwt);
-                }
-
-            }
-            catch (SecurityTokenException e)
-            {
-                logger.LogWarning("{Key} token validation failed: {Message}", cookie.Key, e.Message);
-                DeleteCachedAccount(accountId);
-            }
-            catch (Exception e)
-            {
-                logger.LogWarning("Failed to process cached jwt token. {Message}", e.Message);
-                DeleteCachedAccount(accountId);
-            }
-
-            void DeleteCachedAccount(string id)
-            {
-                HttpContext.Response.Cookies.Delete($"cached_jwt_{id}", new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.Lax,
-                    Path = "/"
-                });
-                HttpContext.Response.Cookies.Delete($"cached_jwt_{id}", new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.Lax,
-                    Path = "/authorize"
-                });
-            }
+            _ = await cachedSessions.TryGetSessionAsync(HttpContext, cookie.Key, cookie.Value, cancellationToken);
         }
 
         return Login();
@@ -487,6 +408,31 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                     HttpContext.Response.Cookies.Delete(OpSessionCookieName, CreateOpSessionCookieOptions());
                     return null;
                 }
+            }
+
+            CachedAuthorizationSession? cachedAuthorizationSession = null;
+            foreach (var cookie in HttpContext.Request.Cookies)
+            {
+                if (!cachedSessions.TryGetAccountId(cookie.Key, out _))
+                {
+                    continue;
+                }
+
+                var cachedSession = await cachedSessions.TryGetSessionAsync(HttpContext, cookie.Key, cookie.Value, cancellationToken);
+                if (cachedSession != null)
+                {
+                    if (cachedAuthorizationSession != null)
+                    {
+                        return null;
+                    }
+
+                    cachedAuthorizationSession = cachedSession;
+                }
+            }
+
+            if (cachedAuthorizationSession != null)
+            {
+                return new AuthorizationSession(cachedAuthorizationSession.AccountId, cachedAuthorizationSession.AuthTime);
             }
 
             var accessToken = HttpContext.Request.Cookies["access_token"];
@@ -610,14 +556,7 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 .. jwt.ConfigureClaims(rawAccount.Value, normalizedScope, claims, null, true, authorizationCode.Value.AuthTime)
             ]);
 
-            HttpContext.Response.Cookies.Append($"cached_jwt_{authorizationCode.Value.AccountId}", jwtToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Lax,
-                Path = "/",
-                Expires = DateTimeOffset.UtcNow.AddYears(10)
-            });
+            cachedSessions.AppendSession(HttpContext, authorizationCode.Value.AccountId, jwtToken);
 
             HttpContext.Response.Cookies.Append(OpSessionCookieName, jwt.Issue(options.Value.ClientId, [
                 new("id", authorizationCode.Value.AccountId),

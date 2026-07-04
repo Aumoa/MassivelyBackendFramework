@@ -22,7 +22,7 @@
 @code {
     private Task OnClickLoginAsync()
     {
-        AuthState.NavigateToLogin(Nav, "auth/redirect", "openid profile email groups");
+        AuthState.NavigateToLogin(Nav, "auth/redirect", "openid profile email groups offline_access");
         return Task.CompletedTask;
     }
 }

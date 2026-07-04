@@ -673,7 +673,7 @@
 
     private void StartLogin()
     {
-        OidcAuth.NavigateToLogin(Nav, "auth/redirect", "openid");
+        OidcAuth.NavigateToLogin(Nav, "auth/redirect", "openid offline_access");
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)

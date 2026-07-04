@@ -73,6 +73,9 @@ public sealed class BackendNodeSnapshot
                    PacketWriter.GetStringSize(value.DisplayName) +
                    PacketWriter.GetStringSize(value.MasterConnectionId) +
                    GetEndpointSize(value.GatewayEndpoint) +
+                   PacketWriter.GetStringSize(value.ManifestId.Value) +
+                   PacketWriter.GetStringSize(value.ManifestHash.Value) +
+                   GetDescriptorSize(value.Descriptor) +
                    sizeof(long);
         }
 
@@ -83,6 +86,9 @@ public sealed class BackendNodeSnapshot
             writer.WriteString(value.DisplayName);
             writer.WriteString(value.MasterConnectionId);
             WriteEndpoint(value.GatewayEndpoint, ref writer);
+            writer.WriteString(value.ManifestId.Value);
+            writer.WriteString(value.ManifestHash.Value);
+            WriteDescriptor(value.Descriptor, ref writer);
             writer.WriteInt64(value.AdvertisedAt.ToUnixTimeMilliseconds());
         }
 
@@ -93,8 +99,45 @@ public sealed class BackendNodeSnapshot
             string displayName = reader.ReadString();
             string masterConnectionId = reader.ReadString();
             var gatewayEndpoint = ReadEndpoint(ref reader);
+            var manifestId = new BackendPacketManifestId(reader.ReadString());
+            var manifestHash = new BackendPacketManifestHash(reader.ReadString());
+            var descriptor = ReadDescriptor(ref reader);
             var advertisedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.ReadInt64());
-            return new BackendNodeEndpoint(backendKind, nodeId, displayName, masterConnectionId, gatewayEndpoint, advertisedAt);
+            return new BackendNodeEndpoint(
+                backendKind,
+                nodeId,
+                displayName,
+                masterConnectionId,
+                gatewayEndpoint,
+                manifestId,
+                manifestHash,
+                descriptor,
+                advertisedAt);
+        }
+
+        private static int GetDescriptorSize(BackendServerDescriptor value)
+        {
+            return sizeof(byte) +
+                   PacketWriter.GetStringSize(value.DescriptorVersion) +
+                   PacketWriter.GetStringSize(value.DescriptorHash) +
+                   PacketWriter.GetStringSize(value.DescriptorJson);
+        }
+
+        private static void WriteDescriptor(BackendServerDescriptor value, ref PacketWriter writer)
+        {
+            writer.WriteByte((byte)value.State);
+            writer.WriteString(value.DescriptorVersion);
+            writer.WriteString(value.DescriptorHash);
+            writer.WriteString(value.DescriptorJson);
+        }
+
+        private static BackendServerDescriptor ReadDescriptor(ref PacketReader reader)
+        {
+            return new BackendServerDescriptor(
+                (BackendNodeState)reader.ReadByte(),
+                reader.ReadString(),
+                reader.ReadString(),
+                reader.ReadString());
         }
 
         private static int GetEndpointSize(MasterSocketEndpoint value)
