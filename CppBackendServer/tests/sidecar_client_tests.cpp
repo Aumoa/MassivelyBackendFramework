@@ -556,11 +556,37 @@ namespace
         require(accepted.node_id == "gateway-a", "Accepted node id mismatch.");
         require(accepted.connection_id == "backend-connection-a", "Accepted connection id mismatch.");
 
-        auto result = server.get();
-        require(result.gateway_node_id == "gateway-a", "Server result gateway node mismatch.");
-        require(result.gateway_master_connection_id == "gateway-master-a", "Server result Gateway Master id mismatch.");
+        auto connection = server.get();
+        require(connection.gateway_node_id() == "gateway-a", "Server connection gateway node mismatch.");
+        require(connection.gateway_master_connection_id() == "gateway-master-a",
+                "Server connection Gateway Master id mismatch.");
+        require(connection.accepted_frame().header.packet_id == master_pid_node_accepted,
+                "Server accepted frame packet id mismatch.");
         require(validator.call_count == 1, "Validator call count mismatch.");
         require(validator.code == "code-1", "Validator code mismatch.");
+
+        auto channel_open_frame =
+            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_version,
+                       encode_gateway_backend_channel_open(gateway_backend_channel_open{
+                           37,
+                           std::string("player-1"),
+                       }));
+        write_frame(client.get(), channel_open_frame);
+
+        auto open_event = connection.read_next_frame();
+        require(open_event.kind == gateway_session_event_kind::channel_open, "Open event kind mismatch.");
+        require(open_event.open.has_value(), "Open event missing payload.");
+        require(open_event.open->channel_id == 37, "Open event channel id mismatch.");
+        require(connection.has_channel(37), "Connection did not keep the post-handshake channel open.");
+
+        connection.write_channel_data(37, packet_kind::notify, 201, 1, std::nullopt, {0xaa, 0xbb});
+        auto server_data_frame = read_frame(client.get());
+        require(server_data_frame.header.kind == packet_kind::notify, "Server data frame kind mismatch.");
+        require(server_data_frame.header.packet_id == pid_gate_backend_channel_data,
+                "Server data frame packet id mismatch.");
+        auto server_data = decode_gateway_backend_channel_data_envelope(server_data_frame.payload);
+        require(server_data.channel_id == 37, "Server data channel id mismatch.");
+        require(server_data.routed_payload == std::vector<std::uint8_t>({0xaa, 0xbb}), "Server data payload mismatch.");
     }
 
 } // namespace

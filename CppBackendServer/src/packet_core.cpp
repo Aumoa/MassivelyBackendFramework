@@ -648,6 +648,134 @@ namespace cpp_backend
                                         encode_sidecar_shutdown_state_update(update), request_id);
     }
 
+    class gateway_direct_connection::impl
+    {
+    public:
+        impl(socket_owner socket, gateway_direct_handshake_result handshake)
+            : m_socket(std::move(socket)),
+              m_session(std::move(handshake.gateway_node_id), std::move(handshake.gateway_master_connection_id)),
+              m_accepted_frame(std::move(handshake.accepted_frame))
+        {
+        }
+
+        const std::string& gateway_node_id() const noexcept
+        {
+            return m_session.gateway_node_id();
+        }
+
+        const std::string& gateway_master_connection_id() const noexcept
+        {
+            return m_session.gateway_master_connection_id();
+        }
+
+        const packet_frame& accepted_frame() const noexcept
+        {
+            return m_accepted_frame;
+        }
+
+        gateway_session_event read_next_frame()
+        {
+            auto frame = read_socket_frame(m_socket.get(), packet_header::max_payload_length);
+            return m_session.handle_gateway_frame(frame);
+        }
+
+        void write_channel_data(std::uint32_t channel_id, packet_kind routed_kind, std::uint16_t routed_packet_id,
+                                std::uint16_t routed_version, std::optional<guid_bytes> exchange_id,
+                                std::vector<std::uint8_t> routed_payload)
+        {
+            socket_gateway_frame_writer writer(m_socket.get());
+            m_session.write_channel_data(writer, channel_id, routed_kind, routed_packet_id, routed_version,
+                                         std::move(exchange_id), std::move(routed_payload));
+        }
+
+        void write_channel_close(std::uint32_t channel_id, const std::string& reason)
+        {
+            socket_gateway_frame_writer writer(m_socket.get());
+            m_session.write_channel_close(writer, channel_id, reason);
+        }
+
+        bool has_channel(std::uint32_t channel_id) const
+        {
+            return m_session.has_channel(channel_id);
+        }
+
+        std::size_t channel_count() const
+        {
+            return m_session.channel_count();
+        }
+
+    private:
+        class socket_gateway_frame_writer final : public gateway_frame_writer
+        {
+        public:
+            explicit socket_gateway_frame_writer(socket_handle socket) : m_socket(socket) {}
+
+            void write(packet_frame frame) override
+            {
+                write_socket_frame(m_socket, frame);
+            }
+
+        private:
+            socket_handle m_socket;
+        };
+
+        socket_owner m_socket;
+        trusted_gateway_session m_session;
+        packet_frame m_accepted_frame;
+    };
+
+    gateway_direct_connection::gateway_direct_connection(std::unique_ptr<impl> impl) : m_impl(std::move(impl)) {}
+
+    gateway_direct_connection::~gateway_direct_connection() = default;
+
+    gateway_direct_connection::gateway_direct_connection(gateway_direct_connection&&) noexcept = default;
+
+    gateway_direct_connection& gateway_direct_connection::operator=(gateway_direct_connection&&) noexcept = default;
+
+    const std::string& gateway_direct_connection::gateway_node_id() const noexcept
+    {
+        return m_impl->gateway_node_id();
+    }
+
+    const std::string& gateway_direct_connection::gateway_master_connection_id() const noexcept
+    {
+        return m_impl->gateway_master_connection_id();
+    }
+
+    const packet_frame& gateway_direct_connection::accepted_frame() const noexcept
+    {
+        return m_impl->accepted_frame();
+    }
+
+    gateway_session_event gateway_direct_connection::read_next_frame()
+    {
+        return m_impl->read_next_frame();
+    }
+
+    void gateway_direct_connection::write_channel_data(std::uint32_t channel_id, packet_kind routed_kind,
+                                                       std::uint16_t routed_packet_id, std::uint16_t routed_version,
+                                                       std::optional<guid_bytes> exchange_id,
+                                                       std::vector<std::uint8_t> routed_payload)
+    {
+        m_impl->write_channel_data(channel_id, routed_kind, routed_packet_id, routed_version, std::move(exchange_id),
+                                   std::move(routed_payload));
+    }
+
+    void gateway_direct_connection::write_channel_close(std::uint32_t channel_id, const std::string& reason)
+    {
+        m_impl->write_channel_close(channel_id, reason);
+    }
+
+    bool gateway_direct_connection::has_channel(std::uint32_t channel_id) const
+    {
+        return m_impl->has_channel(channel_id);
+    }
+
+    std::size_t gateway_direct_connection::channel_count() const
+    {
+        return m_impl->channel_count();
+    }
+
     class gateway_direct_listener::impl
     {
     public:
@@ -662,7 +790,7 @@ namespace cpp_backend
             return m_port;
         }
 
-        gateway_direct_handshake_result accept_one(const std::string& backend_connection_id)
+        gateway_direct_connection accept_one(const std::string& backend_connection_id)
         {
             socket_owner client(::accept(m_listener.get(), nullptr, nullptr));
             if (!client)
@@ -676,7 +804,8 @@ namespace cpp_backend
             auto result = complete_gateway_direct_handshake(hello_frame, direct_connect_code_frame, *m_validator,
                                                             backend_connection_id);
             write_socket_frame(client.get(), result.accepted_frame);
-            return result;
+            return gateway_direct_connection(
+                std::make_unique<gateway_direct_connection::impl>(std::move(client), std::move(result)));
         }
 
     private:
@@ -703,7 +832,7 @@ namespace cpp_backend
         return m_impl->port();
     }
 
-    gateway_direct_handshake_result gateway_direct_listener::accept_one(const std::string& backend_connection_id)
+    gateway_direct_connection gateway_direct_listener::accept_one(const std::string& backend_connection_id)
     {
         return m_impl->accept_one(backend_connection_id);
     }

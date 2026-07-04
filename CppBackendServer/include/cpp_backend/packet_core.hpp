@@ -222,6 +222,22 @@ namespace cpp_backend
         std::string error_message;
     };
 
+    enum class gateway_session_event_kind
+    {
+        ignored,
+        channel_open,
+        channel_data,
+        channel_close,
+    };
+
+    struct gateway_session_event
+    {
+        gateway_session_event_kind kind = gateway_session_event_kind::ignored;
+        std::optional<gateway_backend_channel_open> open;
+        std::optional<gateway_backend_channel_data_envelope> data;
+        std::optional<gateway_backend_channel_close> close;
+    };
+
     struct backend_packet_payload_constraint
     {
         std::int32_t minimum_length = 0;
@@ -356,6 +372,38 @@ namespace cpp_backend
         int backlog = 16;
     };
 
+    class gateway_direct_connection
+    {
+    public:
+        class impl;
+
+        explicit gateway_direct_connection(std::unique_ptr<impl> impl);
+        ~gateway_direct_connection();
+
+        gateway_direct_connection(const gateway_direct_connection&) = delete;
+        gateway_direct_connection& operator=(const gateway_direct_connection&) = delete;
+        gateway_direct_connection(gateway_direct_connection&&) noexcept;
+        gateway_direct_connection& operator=(gateway_direct_connection&&) noexcept;
+
+        const std::string& gateway_node_id() const noexcept;
+        const std::string& gateway_master_connection_id() const noexcept;
+        const packet_frame& accepted_frame() const noexcept;
+
+        gateway_session_event read_next_frame();
+
+        void write_channel_data(std::uint32_t channel_id, packet_kind routed_kind, std::uint16_t routed_packet_id,
+                                std::uint16_t routed_version, std::optional<guid_bytes> exchange_id,
+                                std::vector<std::uint8_t> routed_payload);
+
+        void write_channel_close(std::uint32_t channel_id, const std::string& reason);
+
+        bool has_channel(std::uint32_t channel_id) const;
+        std::size_t channel_count() const;
+
+    private:
+        std::unique_ptr<impl> m_impl;
+    };
+
     class gateway_direct_listener
     {
     public:
@@ -370,27 +418,11 @@ namespace cpp_backend
 
         std::uint16_t port() const noexcept;
 
-        gateway_direct_handshake_result accept_one(const std::string& backend_connection_id);
+        gateway_direct_connection accept_one(const std::string& backend_connection_id);
 
     private:
         class impl;
         std::unique_ptr<impl> m_impl;
-    };
-
-    enum class gateway_session_event_kind
-    {
-        ignored,
-        channel_open,
-        channel_data,
-        channel_close,
-    };
-
-    struct gateway_session_event
-    {
-        gateway_session_event_kind kind = gateway_session_event_kind::ignored;
-        std::optional<gateway_backend_channel_open> open;
-        std::optional<gateway_backend_channel_data_envelope> data;
-        std::optional<gateway_backend_channel_close> close;
     };
 
     class gateway_frame_writer
