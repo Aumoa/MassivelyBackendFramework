@@ -586,6 +586,13 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
             return Error(Strings.ERRORS_INVALID_REDIRECT_URI);
         }
 
+        if (authorizationCode.Value.ClientId != options.Value.ClientId ||
+            authorizationCode.Value.RedirectUri != redirect_uri ||
+            !ScopePolicy.TryNormalize(authorizationCode.Value.Scope, true, out var normalizedScope, out _))
+        {
+            return Error(Strings.ERRORS_INVALID_ACCESS);
+        }
+
         try
         {
             var rawAccount = await accounts.GetRawAccountAsync(authorizationCode.Value.AccountId, cancellationToken);
@@ -594,13 +601,13 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 return Error(Strings.ERRORS_INVALID_ACCESS);
             }
 
-            var access = await accesses.WriteAccessAsync(authorizationCode.Value.AccountId, rawAccount.Value.Sub, authorizationCode.Value.Scope, authorizationCode.Value.ClientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken, authorizationCode.Value.AuthTime);
+            var access = await accesses.WriteAccessAsync(authorizationCode.Value.AccountId, rawAccount.Value.Sub, normalizedScope, authorizationCode.Value.ClientId, jwt.ExpiresIn, jwt.RefreshTokenExpiresIn, cancellationToken, authorizationCode.Value.AuthTime);
             var claims = await accountClaims.GetClaimsAsync(authorizationCode.Value.AccountId, cancellationToken);
             var jwtToken = jwt.Issue(options.Value.ClientId, [
                 new("access_token", access.AccessToken),
                 new("refresh_token", access.RefreshToken),
                 new("id", authorizationCode.Value.AccountId),
-                .. jwt.ConfigureClaims(rawAccount.Value, authorizationCode.Value.Scope, claims, null, true, authorizationCode.Value.AuthTime)
+                .. jwt.ConfigureClaims(rawAccount.Value, normalizedScope, claims, null, true, authorizationCode.Value.AuthTime)
             ]);
 
             HttpContext.Response.Cookies.Append($"cached_jwt_{authorizationCode.Value.AccountId}", jwtToken, new CookieOptions

@@ -422,7 +422,7 @@ public partial class Login(
         var redirect_uri = QueryHelpers.AddQueryString(RedirectUri, query);
         if (refreshCache)
         {
-            var cacheCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", "/authorize/int", null, AuthTime: authTime));
+            var cacheCode = await authorizationCodes.PushAsync(new AuthorizationCodeBody(id, hostOptions.Value.ClientId, "all", redirect_uri, null, AuthTime: authTime));
 
             nav.NavigateTo($"/authorize/int?redirect_uri={Uri.EscapeDataString(redirect_uri)}&code={Uri.EscapeDataString(cacheCode)}", forceLoad: true);
         }
