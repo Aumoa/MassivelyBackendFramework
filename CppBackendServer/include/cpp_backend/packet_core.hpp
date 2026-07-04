@@ -303,6 +303,22 @@ private:
     sidecar_control_endpoint m_endpoint;
 };
 
+class sidecar_control_client final {
+public:
+    explicit sidecar_control_client(sidecar_control_endpoint endpoint);
+
+    sidecar_control_ack update_endpoint_state(
+        bool ready,
+        std::string detail);
+
+    sidecar_control_ack update_shutdown_state(
+        bool shutting_down,
+        std::string reason);
+
+private:
+    sidecar_control_endpoint m_endpoint;
+};
+
 struct gateway_direct_handshake_result {
     std::string gateway_node_id;
     std::string gateway_master_connection_id;

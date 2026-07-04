@@ -252,6 +252,80 @@ public sealed class BackendSidecarControlServerTests
     }
 
     [Fact]
+    public async Task ShutdownStateUpdate_CanClearAndAcceptReconnectedEndpoint()
+    {
+        var port = GetFreeTcpPort();
+        var server = CreateServer(
+            port,
+            new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend),
+            requireEndpointReadyBeforeAdvertise: true);
+        await server.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+
+            await WriteEndpointStateUpdateAsync(
+                stream,
+                new SidecarEndpointStateUpdate(
+                    Guid.NewGuid(),
+                    ready: true,
+                    "cpp listener ready"));
+            _ = await ReadEndpointStateAckAsync(stream);
+
+            await WriteShutdownStateUpdateAsync(
+                stream,
+                new SidecarShutdownStateUpdate(
+                    Guid.NewGuid(),
+                    shuttingDown: true,
+                    "rolling restart"));
+            _ = await ReadShutdownStateAckAsync(stream);
+
+            await WriteShutdownStateUpdateAsync(
+                stream,
+                new SidecarShutdownStateUpdate(
+                    Guid.NewGuid(),
+                    shuttingDown: false,
+                    "restart complete"));
+            _ = await ReadShutdownStateAckAsync(stream);
+
+            var reconnected = new SidecarEndpointStateUpdate(
+                Guid.NewGuid(),
+                ready: true,
+                "cpp listener reconnected");
+            await WriteEndpointStateUpdateAsync(stream, reconnected);
+
+            var ack = await ReadEndpointStateAckAsync(stream);
+            Assert.True(ack.Success);
+            Assert.Equal(reconnected.RequestId, ack.RequestId);
+
+            var status = server.GetStatusItems();
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Shutdown state" &&
+                item.Value == "Not requested");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Shutdown detail" &&
+                item.Value.Contains("restart complete", StringComparison.Ordinal));
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Endpoint state" &&
+                item.Value == "Ready");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Endpoint detail" &&
+                item.Value.Contains("cpp listener reconnected", StringComparison.Ordinal));
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task ManifestDeclaration_AcknowledgesAndUpdatesStatus()
     {
         var port = GetFreeTcpPort();

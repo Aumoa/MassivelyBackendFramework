@@ -588,6 +588,78 @@ direct_connect_code_validation_response sidecar_direct_connect_code_validator::v
     return response;
 }
 
+sidecar_control_ack send_sidecar_ack_request(
+    const sidecar_control_endpoint& endpoint,
+    std::uint16_t request_packet_id,
+    std::uint16_t ack_packet_id,
+    std::vector<std::uint8_t> payload,
+    const guid_bytes& request_id)
+{
+    auto socket = connect_tcp(endpoint);
+    auto request_frame = make_frame(
+        packet_kind::control,
+        request_packet_id,
+        sidecar_control_schema_version,
+        std::move(payload));
+    write_socket_frame(socket.get(), request_frame);
+
+    auto ack_frame = read_socket_frame(socket.get(), sidecar_control_max_payload_length);
+    require_control_frame(
+        ack_frame,
+        ack_packet_id,
+        sidecar_control_schema_version);
+
+    auto ack = decode_sidecar_control_ack(ack_frame.payload);
+    if (ack.request_id != request_id) {
+        throw packet_error("Sidecar ack used a different request id.");
+    }
+
+    return ack;
+}
+
+sidecar_control_client::sidecar_control_client(sidecar_control_endpoint endpoint)
+    : m_endpoint(std::move(endpoint))
+{
+}
+
+sidecar_control_ack sidecar_control_client::update_endpoint_state(
+    bool ready,
+    std::string detail)
+{
+    sidecar_endpoint_state_update update {
+        create_request_id(),
+        ready,
+        std::move(detail),
+    };
+
+    auto request_id = update.request_id;
+    return send_sidecar_ack_request(
+        m_endpoint,
+        sidecar_pid_endpoint_state_update,
+        sidecar_pid_endpoint_state_ack,
+        encode_sidecar_endpoint_state_update(update),
+        request_id);
+}
+
+sidecar_control_ack sidecar_control_client::update_shutdown_state(
+    bool shutting_down,
+    std::string reason)
+{
+    sidecar_shutdown_state_update update {
+        create_request_id(),
+        shutting_down,
+        std::move(reason),
+    };
+
+    auto request_id = update.request_id;
+    return send_sidecar_ack_request(
+        m_endpoint,
+        sidecar_pid_shutdown_state_update,
+        sidecar_pid_shutdown_state_ack,
+        encode_sidecar_shutdown_state_update(update),
+        request_id);
+}
+
 class gateway_direct_listener::impl {
 public:
     impl(

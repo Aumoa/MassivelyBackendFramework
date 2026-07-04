@@ -281,6 +281,12 @@ struct observed_validation_request {
     std::string gateway_master_connection_id;
 };
 
+struct observed_control_update {
+    std::uint16_t packet_id = 0;
+    bool flag = false;
+    std::string detail;
+};
+
 std::future<observed_validation_request> accept_one_validation_request(
     socket_handle listener,
     bool wrong_request_id)
@@ -332,6 +338,66 @@ std::future<observed_validation_request> accept_one_validation_request(
                 request.gateway_node_id,
                 request.gateway_master_connection_id,
             };
+        });
+}
+
+std::future<std::vector<observed_control_update>> accept_control_updates(
+    socket_handle listener,
+    int count)
+{
+    return std::async(
+        std::launch::async,
+        [listener, count] {
+            std::vector<observed_control_update> updates;
+            updates.reserve(static_cast<std::size_t>(count));
+
+            for (int index = 0; index < count; ++index) {
+                socket_owner client(::accept(listener, nullptr, nullptr));
+                if (!client) {
+                    throw std::runtime_error("Fake sidecar control accept failed.");
+                }
+
+                auto request_frame = read_frame(client.get());
+                require(request_frame.header.kind == packet_kind::control, "Control request frame kind mismatch.");
+                require(
+                    request_frame.header.version == sidecar_control_schema_version,
+                    "Control request frame version mismatch.");
+
+                sidecar_control_ack ack;
+                std::uint16_t ack_packet_id = 0;
+                if (request_frame.header.packet_id == sidecar_pid_endpoint_state_update) {
+                    auto update = decode_sidecar_endpoint_state_update(request_frame.payload);
+                    updates.push_back(observed_control_update {
+                        request_frame.header.packet_id,
+                        update.ready,
+                        update.detail,
+                    });
+                    ack.request_id = update.request_id;
+                    ack.success = true;
+                    ack_packet_id = sidecar_pid_endpoint_state_ack;
+                } else if (request_frame.header.packet_id == sidecar_pid_shutdown_state_update) {
+                    auto update = decode_sidecar_shutdown_state_update(request_frame.payload);
+                    updates.push_back(observed_control_update {
+                        request_frame.header.packet_id,
+                        update.shutting_down,
+                        update.reason,
+                    });
+                    ack.request_id = update.request_id;
+                    ack.success = true;
+                    ack_packet_id = sidecar_pid_shutdown_state_ack;
+                } else {
+                    throw std::runtime_error("Unexpected sidecar control packet id.");
+                }
+
+                auto ack_frame = make_frame(
+                    packet_kind::control,
+                    ack_packet_id,
+                    sidecar_control_schema_version,
+                    encode_sidecar_control_ack(ack));
+                write_frame(client.get(), ack_frame);
+            }
+
+            return updates;
         });
 }
 
@@ -402,6 +468,39 @@ void sidecar_validator_rejects_mismatched_response_id()
     }
 
     throw std::runtime_error("Mismatched sidecar response id did not throw.");
+}
+
+void sidecar_control_client_reports_shutdown_and_reconnects_endpoint_state()
+{
+    socket_runtime runtime;
+    std::uint16_t port = 0;
+    auto listener = create_listener(port);
+    auto server = accept_control_updates(listener.get(), 4);
+
+    sidecar_control_client client({ "127.0.0.1", port });
+    auto ready_ack = client.update_endpoint_state(true, "listener ready");
+    require(ready_ack.success, "Expected endpoint ready ack success.");
+    auto shutdown_ack = client.update_shutdown_state(true, "rolling restart");
+    require(shutdown_ack.success, "Expected shutdown ack success.");
+    auto clear_ack = client.update_shutdown_state(false, "restart complete");
+    require(clear_ack.success, "Expected shutdown clear ack success.");
+    auto reconnected_ack = client.update_endpoint_state(true, "listener reconnected");
+    require(reconnected_ack.success, "Expected reconnected endpoint ack success.");
+
+    auto updates = server.get();
+    require(updates.size() == 4, "Expected four sidecar control updates.");
+    require(updates[0].packet_id == sidecar_pid_endpoint_state_update, "First update packet mismatch.");
+    require(updates[0].flag, "First endpoint update should be ready.");
+    require(updates[0].detail == "listener ready", "First endpoint detail mismatch.");
+    require(updates[1].packet_id == sidecar_pid_shutdown_state_update, "Second update packet mismatch.");
+    require(updates[1].flag, "Shutdown update should request shutdown.");
+    require(updates[1].detail == "rolling restart", "Shutdown reason mismatch.");
+    require(updates[2].packet_id == sidecar_pid_shutdown_state_update, "Third update packet mismatch.");
+    require(!updates[2].flag, "Shutdown clear update should clear shutdown.");
+    require(updates[2].detail == "restart complete", "Shutdown clear reason mismatch.");
+    require(updates[3].packet_id == sidecar_pid_endpoint_state_update, "Fourth update packet mismatch.");
+    require(updates[3].flag, "Reconnected endpoint update should be ready.");
+    require(updates[3].detail == "listener reconnected", "Reconnected endpoint detail mismatch.");
 }
 
 void gateway_direct_listener_accepts_gateway_handshake()
@@ -480,6 +579,7 @@ int main()
     try {
         sidecar_validator_sends_validation_request();
         sidecar_validator_rejects_mismatched_response_id();
+        sidecar_control_client_reports_shutdown_and_reconnects_endpoint_state();
         gateway_direct_listener_accepts_gateway_handshake();
     } catch (const std::exception& exception) {
         std::cerr << exception.what() << '\n';

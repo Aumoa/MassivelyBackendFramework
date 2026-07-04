@@ -133,8 +133,10 @@ Implemented Gateway verifier compatibility coverage: `ConnectionManagerBackendRo
 - [x] Add integration tests for Gateway direct connection to a C++ Backend test server.
 - [x] Add handshake rejection tests for invalid direct-connect codes.
 - [x] Add channel open/data/close tests against the C++ data-plane implementation.
-- [ ] Add shutdown and reconnect tests for sidecar and C++ server coordination.
+- [x] Add shutdown and reconnect tests for sidecar and C++ server coordination.
 - [ ] Add performance tests that confirm sidecar IPC is not on the gameplay packet hot path.
+
+Implemented shutdown/reconnect coverage: C# sidecar tests verify shutdown can be cleared and a reconnected endpoint can become ready again; C++ sidecar client tests verify endpoint readiness and shutdown state updates reconnect over loopback control connections.
 
 ## Decisions
 
