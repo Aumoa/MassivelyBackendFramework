@@ -18,6 +18,10 @@ public sealed record MasterConnectionOptions
 
     public string BackendKind { get; set; } = "backend";
 
+    public string BackendPacketManifestId { get; set; } = string.Empty;
+
+    public string BackendPacketManifestHash { get; set; } = string.Empty;
+
     public string SharedSecret { get; set; } = string.Empty;
 
     public int ReconnectDelayMilliseconds { get; set; } = 5000;

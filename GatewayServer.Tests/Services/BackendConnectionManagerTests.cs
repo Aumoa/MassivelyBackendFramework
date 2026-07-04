@@ -460,6 +460,8 @@ public sealed class BackendConnectionManagerTests
             displayName: nodeId,
             masterConnectionId,
             new MasterSocketEndpoint("127.0.0.1", port, useTls: false),
+            new BackendPacketManifestId("test"),
+            new BackendPacketManifestHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
             DateTimeOffset.UtcNow);
     }
 

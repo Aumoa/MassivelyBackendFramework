@@ -26,4 +26,7 @@ public static class MasterControlPacketIds
     public const ushort GatewayClientSecretCredentialSnapshot = 121;
     public const ushort GatewayClientSecretCredentialManagementRequest = 122;
     public const ushort GatewayClientSecretCredentialManagementResponse = 123;
+    public const ushort BackendPacketManifestSnapshot = 124;
+    public const ushort BackendPacketManifestManagementRequest = 125;
+    public const ushort BackendPacketManifestManagementResponse = 126;
 }

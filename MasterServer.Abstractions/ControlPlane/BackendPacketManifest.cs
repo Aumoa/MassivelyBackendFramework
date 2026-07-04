@@ -175,7 +175,7 @@ public sealed class BackendPacketManifest
         return result;
     }
 
-    internal static string NormalizeBackendKind(string backendKind)
+    public static string NormalizeBackendKind(string backendKind)
     {
         if (string.IsNullOrWhiteSpace(backendKind))
         {
