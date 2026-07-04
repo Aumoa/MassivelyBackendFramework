@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 using MySql.Data.MySqlClient;
@@ -8,6 +9,8 @@ namespace SecretGate.Services;
 
 public sealed class MySqlSecretRepository(IOptions<MySqlOptions> options) : ISecretRepository
 {
+    internal const int MaxShareAccessFailures = 8;
+
     public async Task<VaultProfileRecord?> GetVaultProfileAsync(
         string ownerSubject,
         CancellationToken cancellationToken = default)
@@ -328,27 +331,45 @@ VALUES
         {
             command.Transaction = transaction;
             command.CommandText = @"
-SELECT `id`, `salt`, `nonce`, `cipher_text`, `tag`, `expires_at`, `created_at`
+SELECT `id`, `access_key_hash`, `failed_access_attempts`, `salt`, `nonce`, `cipher_text`, `tag`, `expires_at`, `created_at`
 FROM `secretgate_share_secret`
 WHERE `url_token_hash` = @urlTokenHash
-  AND `access_key_hash` = @accessKeyHash
   AND `expires_at` > @nowUtc
 FOR UPDATE;";
             AddBinary(command, "@urlTokenHash", urlTokenHash);
-            AddBinary(command, "@accessKeyHash", accessKeyHash);
             command.Parameters.Add("@nowUtc", MySqlDbType.DateTime).Value = nowUtc;
 
             using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
-                record = new SharedSecretRecord(
-                    ReadGuid(reader.GetValue(0)),
-                    (byte[])reader["salt"],
-                    (byte[])reader["nonce"],
-                    (byte[])reader["cipher_text"],
-                    (byte[])reader["tag"],
-                    DateTime.SpecifyKind(reader.GetDateTime(5), DateTimeKind.Utc),
-                    DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc));
+                var storedAccessKeyHash = (byte[])reader["access_key_hash"];
+                if (CryptographicOperations.FixedTimeEquals(storedAccessKeyHash, accessKeyHash))
+                {
+                    record = new SharedSecretRecord(
+                        ReadGuid(reader.GetValue(0)),
+                        (byte[])reader["salt"],
+                        (byte[])reader["nonce"],
+                        (byte[])reader["cipher_text"],
+                        (byte[])reader["tag"],
+                        DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc),
+                        DateTime.SpecifyKind(reader.GetDateTime(8), DateTimeKind.Utc));
+                }
+                else
+                {
+                    var id = ReadGuid(reader.GetValue(0));
+                    var nextFailedAttempts = reader.GetInt32(2) + 1;
+                    await reader.DisposeAsync();
+                    await RecordShareAccessFailureAsync(
+                        connection,
+                        transaction,
+                        id,
+                        nextFailedAttempts,
+                        nowUtc,
+                        cancellationToken);
+
+                    await transaction.CommitAsync(cancellationToken);
+                    return null;
+                }
             }
         }
 
@@ -368,6 +389,35 @@ FOR UPDATE;";
 
         await transaction.CommitAsync(cancellationToken);
         return record;
+    }
+
+    private static async Task RecordShareAccessFailureAsync(
+        MySqlConnection connection,
+        MySqlTransaction transaction,
+        Guid id,
+        int failedAttempts,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.Parameters.Add("@id", MySqlDbType.VarChar).Value = id.ToString("D");
+        if (failedAttempts >= MaxShareAccessFailures)
+        {
+            command.CommandText = "DELETE FROM `secretgate_share_secret` WHERE `id` = @id;";
+        }
+        else
+        {
+            command.CommandText = @"
+UPDATE `secretgate_share_secret`
+SET `failed_access_attempts` = @failedAttempts,
+    `last_failed_at` = @nowUtc
+WHERE `id` = @id;";
+            command.Parameters.Add("@failedAttempts", MySqlDbType.Int32).Value = failedAttempts;
+            command.Parameters.Add("@nowUtc", MySqlDbType.DateTime).Value = nowUtc;
+        }
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private MySqlConnection GetConnection()

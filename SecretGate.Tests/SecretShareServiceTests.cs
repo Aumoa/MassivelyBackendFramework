@@ -27,9 +27,30 @@ public sealed class SecretShareServiceTests
         Assert.Equal(ConsumeShareStatus.NotFoundOrExpired, secondRead.Status);
     }
 
+    [Fact]
+    public async Task SharedSecretIsBurnedAfterTooManyAccessKeyFailures()
+    {
+        var repository = new FakeSecretRepository();
+        var service = new SecretShareService(repository, new SecretGateTokenGenerator());
+
+        var receipt = await service.CreateShareAsync("single view secret", DateTime.UtcNow.AddMinutes(5));
+
+        for (var i = 0; i < MySqlSecretRepository.MaxShareAccessFailures; i++)
+        {
+            var failed = await service.ConsumeShareAsync(receipt.UrlToken, "AAAA-AAAA");
+
+            Assert.Equal(ConsumeShareStatus.NotFoundOrExpired, failed.Status);
+        }
+
+        var correctKeyAfterFailures = await service.ConsumeShareAsync(receipt.UrlToken, receipt.AccessKey);
+
+        Assert.Equal(ConsumeShareStatus.NotFoundOrExpired, correctKeyAfterFailures.Status);
+    }
+
     private sealed class FakeSecretRepository : ISecretRepository
     {
         private StoredShare? m_Share;
+        private int m_FailedAccessAttempts;
 
         public SecretEncryptionEnvelope? LastShareEnvelope { get; private set; }
 
@@ -102,6 +123,7 @@ public sealed class SecretShareServiceTests
             CancellationToken cancellationToken = default)
         {
             LastShareEnvelope = envelope;
+            m_FailedAccessAttempts = 0;
             m_Share = new StoredShare(
                 urlTokenHash,
                 accessKeyHash,
@@ -125,9 +147,19 @@ public sealed class SecretShareServiceTests
         {
             if (m_Share == null ||
                 m_Share.Record.ExpiresAtUtc <= nowUtc ||
-                !m_Share.UrlTokenHash.SequenceEqual(urlTokenHash) ||
-                !m_Share.AccessKeyHash.SequenceEqual(accessKeyHash))
+                !m_Share.UrlTokenHash.SequenceEqual(urlTokenHash))
             {
+                return Task.FromResult<SharedSecretRecord?>(null);
+            }
+
+            if (!m_Share.AccessKeyHash.SequenceEqual(accessKeyHash))
+            {
+                m_FailedAccessAttempts++;
+                if (m_FailedAccessAttempts >= MySqlSecretRepository.MaxShareAccessFailures)
+                {
+                    m_Share = null;
+                }
+
                 return Task.FromResult<SharedSecretRecord?>(null);
             }
 
