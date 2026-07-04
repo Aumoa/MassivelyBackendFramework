@@ -69,7 +69,14 @@
             return;
         }
 
-        var result = await ShareService.ConsumeShareAsync(Token, accessKey);
+        var normalizedAccessKey = SecretGateTokenGenerator.NormalizeAccessKey(accessKey);
+        if (!SecretGateTokenGenerator.IsAccessKeyFormat(normalizedAccessKey))
+        {
+            SetMessage(Strings.MESSAGE_ACCESS_KEY_FORMAT, true);
+            return;
+        }
+
+        var result = await ShareService.ConsumeShareAsync(Token, normalizedAccessKey);
         if (result.Status != ConsumeShareStatus.Consumed || result.Secret == null)
         {
             SetMessage(Strings.SHARE_EXPIRED_OR_INVALID, true);

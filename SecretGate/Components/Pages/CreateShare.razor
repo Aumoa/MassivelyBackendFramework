@@ -1,0 +1,146 @@
+@page "/share"
+@rendermode InteractiveServer
+@using System.Globalization
+@inject SecretShareService ShareService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<PageTitle>@Strings.SHARE_CREATE_TITLE - @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1>@Strings.SHARE_CREATE_TITLE</h1>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="message @(statusIsError ? "message-error" : "message-success")">@statusMessage</div>
+}
+
+<section class="tool-panel">
+    <div class="panel-header">
+        <h2>@Strings.SHARE_TITLE</h2>
+    </div>
+
+    <form class="secret-form" @onsubmit="CreateShareAsync" @onsubmit:preventDefault="true">
+        <label class="field">
+            <span>@Strings.SHARE_SECRET_LABEL</span>
+            <textarea class="form-textarea" rows="6" @bind="shareSecret"></textarea>
+        </label>
+        <label class="field field-compact">
+            <span>@Strings.SHARE_EXPIRY_LABEL</span>
+            <input class="form-input" type="number" min="1" max="10080" @bind="shareExpiryMinutes" />
+        </label>
+        <div class="form-actions">
+            <button class="btn-primary" type="submit">
+                <span class="material-symbols-outlined" aria-hidden="true">link</span>
+                @Strings.CREATE_SHARE_BUTTON
+            </button>
+            <button class="btn-secondary" type="button" @onclick="ClearShareForm">
+                <span class="material-symbols-outlined" aria-hidden="true">backspace</span>
+                @Strings.RESET_SHARE_BUTTON
+            </button>
+        </div>
+    </form>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(shareUrl) && !string.IsNullOrWhiteSpace(shareAccessKey))
+{
+    <section class="tool-panel">
+        <div class="panel-header">
+            <h2>@Strings.SHARE_RESULT_TITLE</h2>
+            <span class="status-pill status-unlocked">
+                <span class="material-symbols-outlined" aria-hidden="true">timer</span>
+                @Strings.EXPIRES_AT @FormatLocal(shareExpiresAtUtc)
+            </span>
+        </div>
+
+        <div class="share-result">
+            <label class="field">
+                <span>@Strings.SHARE_LINK_LABEL</span>
+                <div class="copy-field">
+                    <input class="form-input" readonly value="@shareUrl" />
+                    <button class="icon-button" type="button" title="@Strings.COPY_BUTTON" @onclick="() => CopyAsync(shareUrl)">
+                        <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                    </button>
+                </div>
+            </label>
+            <label class="field">
+                <span>@Strings.SHARE_ACCESS_KEY_LABEL</span>
+                <div class="copy-field">
+                    <input class="form-input code-input" readonly value="@shareAccessKey" />
+                    <button class="icon-button" type="button" title="@Strings.COPY_BUTTON" @onclick="() => CopyAsync(shareAccessKey)">
+                        <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                    </button>
+                </div>
+            </label>
+            <button class="btn-secondary share-bundle-button" type="button" @onclick="CopyShareBundleAsync">
+                <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                @Strings.COPY_SHARE_BUNDLE_BUTTON
+            </button>
+        </div>
+    </section>
+}
+
+@code {
+    private string shareSecret = string.Empty;
+    private int shareExpiryMinutes = 60;
+    private string? shareUrl;
+    private string? shareAccessKey;
+    private DateTime shareExpiresAtUtc;
+    private string? statusMessage;
+    private bool statusIsError;
+
+    private async Task CreateShareAsync()
+    {
+        if (string.IsNullOrWhiteSpace(shareSecret))
+        {
+            SetStatus(Strings.MESSAGE_SHARE_SECRET_REQUIRED, true);
+            return;
+        }
+
+        shareExpiryMinutes = Math.Clamp(shareExpiryMinutes, 1, 10_080);
+        var receipt = await ShareService.CreateShareAsync(
+            shareSecret,
+            DateTime.UtcNow.AddMinutes(shareExpiryMinutes));
+
+        shareUrl = new Uri(new Uri(Nav.BaseUri), $"share/{receipt.UrlToken}").ToString();
+        shareAccessKey = receipt.AccessKey;
+        shareExpiresAtUtc = receipt.ExpiresAtUtc;
+        shareSecret = string.Empty;
+        SetStatus(Strings.MESSAGE_SHARE_CREATED, false);
+    }
+
+    private void ClearShareForm()
+    {
+        shareSecret = string.Empty;
+        shareUrl = null;
+        shareAccessKey = null;
+        shareExpiresAtUtc = default;
+        statusMessage = null;
+    }
+
+    private Task CopyShareBundleAsync()
+    {
+        var bundle = $"{Strings.SHARE_LINK_LABEL}: {shareUrl}{Environment.NewLine}{Strings.SHARE_ACCESS_KEY_LABEL}: {shareAccessKey}";
+        return CopyAsync(bundle);
+    }
+
+    private async Task CopyAsync(string? value)
+    {
+        if (!string.IsNullOrEmpty(value))
+        {
+            await JS.InvokeVoidAsync("secretGate.copyText", value);
+        }
+    }
+
+    private void SetStatus(string message, bool isError)
+    {
+        statusMessage = message;
+        statusIsError = isError;
+    }
+
+    private static string FormatLocal(DateTime utc)
+    {
+        return utc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+    }
+}

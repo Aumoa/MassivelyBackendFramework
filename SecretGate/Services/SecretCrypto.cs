@@ -61,6 +61,33 @@ public static class SecretCrypto
         }
     }
 
+    public static bool CanDecrypt(
+        SecretEncryptionEnvelope envelope,
+        string passphrase,
+        string purpose)
+    {
+        ArgumentNullException.ThrowIfNull(envelope);
+        ArgumentException.ThrowIfNullOrWhiteSpace(passphrase);
+        ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
+
+        var plainText = new byte[envelope.CipherText.Length];
+        try
+        {
+            using var key = DeriveKey(passphrase, purpose, envelope.Salt);
+            using var aes = new AesGcm(key.KeyBytes, TagLength);
+            aes.Decrypt(envelope.Nonce, envelope.CipherText, envelope.Tag, plainText);
+            return true;
+        }
+        catch (CryptographicException)
+        {
+            return false;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(plainText);
+        }
+    }
+
     public static byte[] Sha256(string value)
     {
         ArgumentNullException.ThrowIfNull(value);

@@ -13,6 +13,29 @@ public sealed class SecretVaultService(
         session.Unlock(vaultKey);
     }
 
+    public async Task<bool> TryUnlockAsync(
+        string ownerSubject,
+        string vaultKey,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerSubject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(vaultKey);
+
+        var records = await repository.GetVaultSecretsAsync(ownerSubject, cancellationToken);
+        foreach (var record in records)
+        {
+            var envelope = new SecretEncryptionEnvelope(record.Salt, record.Nonce, record.CipherText, record.Tag);
+            if (!SecretCrypto.CanDecrypt(envelope, vaultKey, GetVaultPurpose(ownerSubject, record.Id)))
+            {
+                session.Lock();
+                return false;
+            }
+        }
+
+        session.Unlock(vaultKey);
+        return true;
+    }
+
     public void Lock()
     {
         session.Lock();

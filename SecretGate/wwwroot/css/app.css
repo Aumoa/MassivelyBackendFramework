@@ -438,6 +438,10 @@ button:disabled {
     gap: var(--space-4);
 }
 
+.share-bundle-button {
+    justify-self: start;
+}
+
 .copy-field {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;

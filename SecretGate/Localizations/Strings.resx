@@ -21,6 +21,9 @@
   <data name="COPY_BUTTON" xml:space="preserve">
     <value>Copy</value>
   </data>
+  <data name="COPY_SHARE_BUNDLE_BUTTON" xml:space="preserve">
+    <value>Copy URL and key</value>
+  </data>
   <data name="CREATE_SHARE_BUTTON" xml:space="preserve">
     <value>Create share</value>
   </data>
@@ -42,6 +45,9 @@
   <data name="ERROR_UNHANDLED" xml:space="preserve">
     <value>An unhandled error occurred.</value>
   </data>
+  <data name="EXPIRES_AT" xml:space="preserve">
+    <value>Expires</value>
+  </data>
   <data name="HOME_TITLE" xml:space="preserve">
     <value>Vault</value>
   </data>
@@ -56,6 +62,9 @@
   </data>
   <data name="MESSAGE_ACCESS_KEY_REQUIRED" xml:space="preserve">
     <value>Enter the access key.</value>
+  </data>
+  <data name="MESSAGE_ACCESS_KEY_FORMAT" xml:space="preserve">
+    <value>Use the XXXX-XXXX access key format.</value>
   </data>
   <data name="MESSAGE_INVALID_SUBJECT" xml:space="preserve">
     <value>OIDC subject is unavailable.</value>
@@ -81,6 +90,9 @@
   <data name="MESSAGE_VAULT_KEY_REQUIRED" xml:space="preserve">
     <value>Enter the vault key.</value>
   </data>
+  <data name="MESSAGE_VAULT_KEY_INVALID" xml:space="preserve">
+    <value>The vault key did not decrypt the saved secrets.</value>
+  </data>
   <data name="MESSAGE_VAULT_LOCKED" xml:space="preserve">
     <value>Vault locked.</value>
   </data>
@@ -93,11 +105,17 @@
   <data name="NAV_LOGOUT" xml:space="preserve">
     <value>Logout</value>
   </data>
+  <data name="NAV_SHARE" xml:space="preserve">
+    <value>Share</value>
+  </data>
   <data name="NOT_FOUND_TITLE" xml:space="preserve">
     <value>Not found</value>
   </data>
   <data name="OPEN_SHARE_BUTTON" xml:space="preserve">
     <value>Open</value>
+  </data>
+  <data name="RESET_SHARE_BUTTON" xml:space="preserve">
+    <value>Clear</value>
   </data>
   <data name="SECRET_NAME_LABEL" xml:space="preserve">
     <value>Name</value>
@@ -114,6 +132,9 @@
   <data name="SHARE_CONSUMED" xml:space="preserve">
     <value>Secret opened.</value>
   </data>
+  <data name="SHARE_CREATE_TITLE" xml:space="preserve">
+    <value>Create one-time share</value>
+  </data>
   <data name="SHARE_EXPIRED_OR_INVALID" xml:space="preserve">
     <value>Share expired or key is invalid.</value>
   </data>
@@ -125,6 +146,9 @@
   </data>
   <data name="SHARE_PAGE_TITLE" xml:space="preserve">
     <value>Open shared secret</value>
+  </data>
+  <data name="SHARE_RESULT_TITLE" xml:space="preserve">
+    <value>Share details</value>
   </data>
   <data name="SHARE_SECRET_LABEL" xml:space="preserve">
     <value>Secret</value>

@@ -36,4 +36,13 @@ public sealed class SecretCryptoTests
 
         Assert.False(decrypted);
     }
+
+    [Fact]
+    public void CanDecryptValidatesWithoutReturningPlainText()
+    {
+        var envelope = SecretCrypto.Encrypt("alpha secret", "vault-key", "test-purpose");
+
+        Assert.True(SecretCrypto.CanDecrypt(envelope, "vault-key", "test-purpose"));
+        Assert.False(SecretCrypto.CanDecrypt(envelope, "wrong-key", "test-purpose"));
+    }
 }
