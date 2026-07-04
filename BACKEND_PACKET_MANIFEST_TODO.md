@@ -21,6 +21,8 @@ making Gateway own game-specific business rules.
 - Prefer explicit wire schemas over native C++ struct memory layouts.
 - Allow Gateways to cache manifest snapshots and continue operating for a bounded time during Master outages.
 - Keep validation cost predictable enough for Gateway scale-out workloads.
+- Move structural validation toward Gateway when it can save Dedicated CPU for authoritative game logic.
+- Treat Dedicated Backend CPU as harder to scale than Gateway CPU for channel/world-owned workloads.
 
 ## Phase 1: Contract Model
 
@@ -71,7 +73,24 @@ making Gateway own game-specific business rules.
 - [ ] Add counters for rejected packets by reason without logging every malformed packet.
 - [ ] Apply rate limiting or route closure policy for repeated structural violations.
 
-## Phase 6: Optional Structural Schema Verification
+## Phase 6: Gateway Verifier Pattern Language
+
+- [ ] Define a bounded verifier pattern format for packet payloads.
+- [ ] Ensure verifier patterns are data, not executable code.
+- [ ] Support cursor-based `read(N)` operations over the routed payload.
+- [ ] Support primitive reads such as `u8`, `u16`, `u32`, `i32`, `i64`, `guid`, bytes, and UTF-8 strings.
+- [ ] Support value constraints such as min/max range, enum set, flags mask, exact length, and max length.
+- [ ] Support dynamic reads where a previously read value determines a later length, after that value passes an approved bound.
+- [ ] Support bounded loops where packet data can choose the repeat count only within manifest-defined limits.
+- [ ] Support early loop termination only through explicit verifier instructions with deterministic behavior.
+- [ ] Require every verifier program to end with `require_eof` or an equivalent trailing-byte policy.
+- [ ] Reject verifier patterns that can perform unbounded reads, unbounded loops, recursion, arbitrary jumps, I/O, allocations, or external calls.
+- [ ] Add an instruction budget per packet validation to keep Gateway denial-of-service risk bounded.
+- [ ] Validate verifier patterns at Master/Admin approval time before distributing them to Gateways.
+- [ ] Validate verifier patterns again when Gateway loads a manifest snapshot.
+- [ ] Represent verifier failures as compact reject reasons suitable for metrics and rate limiting.
+
+## Phase 7: Optional Structural Schema Verification
 
 - [ ] Choose a schema representation for structural wire validation.
 - [ ] Prefer a compact schema format that can be interpreted without allocations on hot paths.
@@ -80,19 +99,24 @@ making Gateway own game-specific business rules.
 - [ ] Benchmark schema validation cost against Backend-side decoding cost.
 - [ ] Enable structural verification per packet entry instead of globally for every routed packet.
 
-## Phase 7: Backend Runtime Contract
+## Phase 8: Backend Runtime Contract
 
 - [ ] Document which Gateway checks Backend can rely on for trusted Gateway sessions.
 - [ ] Keep cheap Backend sanity checks for packet kind, id, version, and payload length.
+- [ ] Allow Backend fast parsers to assume Gateway-verified wire boundaries on trusted Gateway sessions.
 - [ ] Keep all gameplay and authorization decisions in Backend/Dedicated.
+- [ ] Document that Gateway verifier success never replaces state-based gameplay validation.
 - [ ] Add compatibility guidance for C++ Backend wire schemas.
 - [ ] Provide a generated or shared manifest source so Backend code and Master/Admin policy cannot drift silently.
 
-## Phase 8: Tests And Validation
+## Phase 9: Tests And Validation
 
 - [ ] Add unit tests for manifest hash calculation and approval rules.
 - [ ] Add unit tests for Gateway packet policy matching.
+- [ ] Add unit tests for verifier pattern validation and instruction budget handling.
+- [ ] Add unit tests for bounded dynamic lengths and bounded repeat counts.
 - [ ] Add malformed packet tests for unknown packet id, wrong version, wrong kind, oversized payload, and undersized payload.
+- [ ] Add malformed packet tests for out-of-range fields, invalid counts, truncated variable-length data, and trailing bytes.
 - [ ] Add rolling deployment tests with multiple approved manifests for one `BackendKind`.
 - [ ] Add integration tests for Backend advertise -> Master approval -> Gateway snapshot -> route data validation.
 - [ ] Add performance tests for hot-path validation with representative packet rates.
@@ -102,6 +126,8 @@ making Gateway own game-specific business rules.
 - Should Gateway enforce Backend-to-client packet manifests, or only verify client-to-Backend traffic?
 - Should manifest policy live entirely in Master storage, or be generated from checked-in schema files?
 - How much structural validation is worth doing before the cost approaches full decode?
+- Which packet classes should use full verifier patterns first, instead of simple length/id validation?
+- Should verifier patterns be authored directly, generated from schemas, or both?
 - What is the rollback behavior when a Backend node advertises a manifest that was approved and then revoked?
 - Should route-open responses include the manifest id/hash selected for the route?
 - Should clients know manifest ids, or should that remain an internal Gateway/Backend detail?
