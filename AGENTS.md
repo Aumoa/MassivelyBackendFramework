@@ -38,6 +38,7 @@
 ## Coding Style Policy
 
 - Follow Microsoft's standard C# coding conventions by default.
+- For C++ Backend source, formatting, CMake, and IDE support work, follow `.codex/skills/cpp-backend-style/SKILL.md`; it is the more specific source for C++ naming and formatting decisions.
 - Keep repository-specific deviations from the standard documented only under `Coding Style Exceptions`.
 
 ## Coding Style Exceptions

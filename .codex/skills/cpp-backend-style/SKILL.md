@@ -1,13 +1,13 @@
 ---
 name: cpp-backend-style
-description: Repository-local C++ Backend formatting, naming, CMake, CMake Presets, and IDE support rules. Use when editing C++ source/header files, CMakeLists.txt, CMakePresets.json, C++ tests, or Visual Studio/VS Code project support for the CppBackendServer area.
+description: Repository-local C++ Backend formatting, established naming, CMake, CMake Presets, and IDE support rules. Use when editing C++ source/header files, CMakeLists.txt, CMakePresets.json, C++ tests, or Visual Studio/VS Code project support for the CppBackendServer area.
 ---
 
 # C++ Backend Style
 
 ## Core Sources
 
-Use these rules for C++ Backend work in this repository. They capture the reusable formatting and IDE-generation practices adopted from the reference C++ project, without depending on that project's paths or tools.
+Use these rules for C++ Backend work in this repository. They capture the reusable formatting and IDE-generation practices adopted from the reference C++ project, while preserving the naming and API shape already established in `CppBackendServer`.
 
 ## Formatting
 
@@ -23,23 +23,21 @@ Use these rules for C++ Backend work in this repository. They capture the reusab
 
 ## Naming
 
-Adapt Microsoft's recommended C# naming style to C++ code:
+Follow the existing C++ Backend naming style rather than mechanically translating C# naming rules into C++:
 
-- Use PascalCase for types, concepts that model types, public methods, and non-local constants that behave like named API concepts.
-- Use camelCase for local variables and parameters.
-- Prefix private C++ member fields with `m_`; prefer `m_PascalCase` for new fields.
+- Use lower_snake_case for new C++ namespaces, types, functions, enum values, variables, parameters, and constants when working in the current `CppBackendServer` style.
+- Prefix private C++ member fields with `m_`; keep the spelling after `m_` consistent with the surrounding C++ code, such as `m_impl`, `m_sync`, or `m_gateway_node_id`.
 - Use descriptive names instead of abbreviations. Avoid Hungarian notation and type-encoding prefixes.
-- Name boolean values with affirmative predicates such as `isReady`, `hasSnapshot`, or `shouldReconnect`.
+- Name boolean values so their meaning is affirmative and readable, but preserve concise protocol field names such as `ready`, `success`, `healthy`, and `shutting_down` when they match the wire model.
 - Keep namespaces short and stable. Existing namespaces, wire names, protocol ids, serialized field names, and compatibility constants may keep their established spelling when renaming would break protocol documentation, tests, or external callers.
 - Do not mechanically rename stable public or wire-facing identifiers solely for style. Rename them only as part of an intentional compatibility-aware change.
+- Use PascalCase only when integrating with an external API, generated artifact, or cross-language boundary that already requires that spelling.
 
-## C# Style Rules To Mirror
+## C# Style Relationship
 
-When translating C# style expectations into C++ decisions, mirror these major rules:
+The repository-level C# style policy still applies to C# code. For C++ Backend code, mirror only the broad readability goals from the C# policy:
 
-- PascalCase for types and public members.
-- camelCase for parameters and locals.
-- Interface-like abstractions should be clearly named by role; use an `I` prefix only when the local C++ design deliberately mirrors a C# interface boundary.
+- Keep names consistent within their local language and module conventions.
 - Prefer explicit types when they improve readability; use `auto` only when the type is obvious from the right-hand side or when it avoids noisy iterator/template spellings.
 - Prefer object initializers or aggregate initialization when it keeps construction clear.
 - Prefer expression simplicity over clever compression; split complex conditions into named local variables.
