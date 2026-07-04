@@ -6,6 +6,7 @@
 @layout AuthorizedLayout
 @inject JwtAuthenticationStateProvider Auth
 @inject IApiKeys ApiKeys
+@inject IApiKeyCreationService ApiKeyCreation
 @inject IOAuthGrants OAuthGrants
 @inject IAccesses Accesses
 @inject IJSRuntime JS
@@ -349,22 +350,17 @@
         var apiKeyName = m_NewApiKeyName!.Trim();
         var allowedClientId = m_NewApiKeyAllowedClientId!.Trim();
         var allowedScope = m_NewApiKeyAllowedScope!.Trim();
-        if (!string.IsNullOrWhiteSpace(allowedScope))
+        var result = await ApiKeyCreation.CreateApiKeyAsync(accountId, apiKeyName, allowedClientId, allowedScope);
+        if (!result.IsSuccess || result.ApiKey == null)
         {
-            if (!ScopePolicy.TryNormalize(allowedScope, false, out var normalizedScope, out _))
-            {
-                return;
-            }
-
-            allowedScope = normalizedScope;
+            return;
         }
 
-        var apiKey = await ApiKeys.CreateApiKeyAsync(accountId, allowedClientId, allowedScope, apiKeyName);
         m_NewApiKeyName = null;
         m_NewApiKeyAllowedClientId = null;
         m_NewApiKeyAllowedScope = null;
         await RefreshApiKeysAsync();
-        await m_DlgNewApiKey.ShowAsync(apiKey);
+        await m_DlgNewApiKey.ShowAsync(result.ApiKey);
     }
 
     private async Task OnNewApiKeyDialogClosedAsync()

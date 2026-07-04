@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         s.AddTransient<IClientUserGroups, MySqlClientUserGroups>();
         s.AddTransient<IOAuthGrants, MySqlOAuthGrants>();
         s.AddTransient<IApiKeys, MySqlApiKeys>();
+        s.AddTransient<IApiKeyCreationService, ApiKeyCreationService>();
         s.AddSingleton(TimeProvider.System);
         s.AddSingleton<ILoginAttemptLimiter, LoginAttemptLimiter>();
 
