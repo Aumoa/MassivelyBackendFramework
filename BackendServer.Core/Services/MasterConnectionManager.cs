@@ -400,6 +400,7 @@ internal sealed class MasterConnectionManager(
         }
 
         items.AddRange(serviceProvider.GetRequiredService<IGatewayConnectionStatusProvider>().GetStatusItems());
+        items.AddRange(serviceProvider.GetRequiredService<ISidecarControlStatusProvider>().GetStatusItems());
 
         var response = new ServiceAdminStatusResponse(
             request.RequestId,

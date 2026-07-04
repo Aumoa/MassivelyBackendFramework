@@ -48,11 +48,13 @@ Gateway and the C++ Backend/Dedicated server.
 - [x] Configure the sidecar with the C++ server's Gateway-facing endpoint.
 - [x] Advertise `BackendKind`, endpoint, and transport flags to Master on behalf of the C++ server.
 - [x] Keep Master control-plane reconnect, status, and shutdown behavior equivalent to the C# Backend path.
-- [ ] Provide local direct-connect code validation for the C++ server.
+- [x] Provide local direct-connect code validation for the C++ server.
 - [ ] Report C++ server health and Gateway session status through Master admin/status flows.
 - [ ] Share approved packet manifests or policy snapshots with the C++ server when needed.
 
 Implemented sidecar entry point: set `GatewayListener:Enabled` to `false`. The sidecar keeps using `MasterConnection` for the control plane and advertises the configured `GatewayListener` endpoint as the external C++ data-plane listener without binding that port itself.
+
+Implemented local validation callout: set `SidecarControl:Enabled` to `true`. The sidecar opens a loopback-only PacketCore control listener. C++ sends `DirectConnectCodeValidationRequest` as control packet id `1` and receives `DirectConnectCodeValidationResponse` as control packet id `2`.
 
 ## Phase 3: C++ Data Plane
 
@@ -68,13 +70,13 @@ Implemented sidecar entry point: set `GatewayListener:Enabled` to `false`. The s
 
 ## Phase 4: Sidecar And C++ Local Contract
 
-- [ ] Define the local IPC/shared-state protocol between sidecar and C++ server.
-- [ ] Keep local IPC off the per-packet gameplay data path.
-- [ ] Support direct-connect code validation requests and responses.
+- [x] Define the local IPC/shared-state protocol between sidecar and C++ server.
+- [x] Keep local IPC off the per-packet gameplay data path.
+- [x] Support direct-connect code validation requests and responses.
 - [ ] Support health/status updates from C++ server to sidecar.
 - [ ] Support endpoint readiness signaling so sidecar does not advertise an unreachable C++ listener.
 - [ ] Support graceful shutdown coordination.
-- [ ] Decide whether local communication uses named pipes, Unix domain sockets, TCP loopback, shared memory, or platform-specific primitives.
+- [x] Decide whether local communication uses named pipes, Unix domain sockets, TCP loopback, shared memory, or platform-specific primitives.
 
 ## Phase 5: C# And C++ Backend Framework Compatibility
 

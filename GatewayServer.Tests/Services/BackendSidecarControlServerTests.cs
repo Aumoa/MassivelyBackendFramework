@@ -1,0 +1,229 @@
+using System.Net;
+using System.Net.Sockets;
+using BackendServer.Options;
+using BackendServer.Services;
+using MasterServer.ControlPlane;
+using Microsoft.Extensions.Logging;
+using PacketCore;
+using Xunit;
+
+namespace GatewayServer.Tests.Services;
+
+public sealed class BackendSidecarControlServerTests
+{
+    [Fact]
+    public async Task DirectConnectValidation_ReturnsSuccessfulBackendValidation()
+    {
+        var port = GetFreeTcpPort();
+        var validator = new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend);
+        var server = CreateServer(port, validator);
+        await server.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+
+            var request = new DirectConnectCodeValidationRequest(
+                Guid.NewGuid(),
+                "direct-code",
+                "gateway-a",
+                "gateway-master-a");
+            await WriteValidationRequestAsync(stream, request);
+
+            var response = await ReadValidationResponseAsync(stream);
+            Assert.True(response.Success);
+            Assert.Equal(request.RequestId, response.RequestId);
+            Assert.Equal("gateway-a", response.GatewayNodeId);
+            Assert.Equal("gateway-master-a", response.GatewayMasterConnectionId);
+            Assert.Equal(MasterNodeKind.Backend, response.TargetNodeKind);
+            Assert.Equal("backend-local", response.TargetNodeId);
+            Assert.Equal("backend-master-a", response.TargetMasterConnectionId);
+
+            var recorded = await validator.Validation.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("direct-code", recorded.Code);
+            Assert.Equal("gateway-a", recorded.GatewayNodeId);
+            Assert.Equal("gateway-master-a", recorded.GatewayMasterConnectionId);
+
+            var status = server.GetStatusItems();
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Validation requests" &&
+                item.Value == "1");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Validation succeeded" &&
+                item.Value == "1");
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task DirectConnectValidation_RejectsUnexpectedTargetKind()
+    {
+        var port = GetFreeTcpPort();
+        var server = CreateServer(
+            port,
+            new RecordingDirectConnectCodeValidator(MasterNodeKind.Dedicated));
+        await server.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+
+            var request = new DirectConnectCodeValidationRequest(
+                Guid.NewGuid(),
+                "direct-code",
+                "gateway-a",
+                "gateway-master-a");
+            await WriteValidationRequestAsync(stream, request);
+
+            var response = await ReadValidationResponseAsync(stream);
+            Assert.False(response.Success);
+            Assert.Equal(request.RequestId, response.RequestId);
+            Assert.Contains("unexpected connection identity", response.ErrorMessage);
+
+            Assert.Contains(server.GetStatusItems(), item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Validation failed" &&
+                item.Value == "1");
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task StartAsync_RejectsNonLoopbackEndpoint()
+    {
+        var server = new SidecarControlServer(
+            Microsoft.Extensions.Options.Options.Create(new SidecarControlOptions
+            {
+                Enabled = true,
+                IPAddress = "0.0.0.0",
+                Port = GetFreeTcpPort()
+            }),
+            new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend),
+            new TestLogger<SidecarControlServer>());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await server.StartAsync(CancellationToken.None));
+    }
+
+    private static SidecarControlServer CreateServer(
+        int port,
+        IDirectConnectCodeValidator validator)
+    {
+        return new SidecarControlServer(
+            Microsoft.Extensions.Options.Options.Create(new SidecarControlOptions
+            {
+                Enabled = true,
+                IPAddress = "127.0.0.1",
+                Port = port,
+                RequestTimeoutMilliseconds = 5000
+            }),
+            validator,
+            new TestLogger<SidecarControlServer>());
+    }
+
+    private static async Task WriteValidationRequestAsync(
+        Stream stream,
+        DirectConnectCodeValidationRequest request)
+    {
+        using var frame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.DirectConnectCodeValidationRequest,
+            BackendSidecarControlProtocol.SchemaVersion,
+            request,
+            DirectConnectCodeValidationRequest.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+    }
+
+    private static async Task<DirectConnectCodeValidationResponse> ReadValidationResponseAsync(Stream stream)
+    {
+        using var frame = await PacketFrameReader.ReadAsync(
+            stream,
+            BackendSidecarControlProtocol.LocalControlPolicy,
+            CancellationToken.None) ?? throw new EndOfStreamException("Sidecar validation response was not written.");
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.DirectConnectCodeValidationResponse);
+        return PacketCodec.Decode(frame, DirectConnectCodeValidationResponse.Codec);
+    }
+
+    private static int GetFreeTcpPort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            return ((IPEndPoint)listener.LocalEndpoint).Port;
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    private sealed class RecordingDirectConnectCodeValidator(MasterNodeKind targetNodeKind) : IDirectConnectCodeValidator
+    {
+        public TaskCompletionSource<ValidationRequest> Validation { get; } = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<DirectConnectCodeValidationResponse> ValidateDirectConnectCodeAsync(
+            string code,
+            string gatewayNodeId,
+            string gatewayMasterConnectionId,
+            CancellationToken cancellationToken)
+        {
+            Validation.TrySetResult(new ValidationRequest(
+                code,
+                gatewayNodeId,
+                gatewayMasterConnectionId));
+            return Task.FromResult(new DirectConnectCodeValidationResponse(
+                Guid.NewGuid(),
+                success: true,
+                gatewayNodeId,
+                gatewayMasterConnectionId,
+                targetNodeKind,
+                targetNodeKind == MasterNodeKind.Backend ? "backend-local" : "dedicated-local",
+                "backend-master-a",
+                string.Empty));
+        }
+    }
+
+    private sealed record ValidationRequest(
+        string Code,
+        string GatewayNodeId,
+        string GatewayMasterConnectionId);
+
+    private sealed class TestLogger<T> : ILogger<T>
+    {
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return null;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return false;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+        }
+    }
+}

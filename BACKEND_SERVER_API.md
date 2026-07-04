@@ -54,6 +54,13 @@ A Backend server needs `MasterConnection` and `GatewayListener` configuration.
     "Backlog": 512,
     "HandshakeTimeoutMilliseconds": 5000
   },
+  "SidecarControl": {
+    "Enabled": false,
+    "IPAddress": "127.0.0.1",
+    "Port": 11702,
+    "Backlog": 64,
+    "RequestTimeoutMilliseconds": 5000
+  },
   "MasterConnection": {
     "Enabled": true,
     "IPAddress": "::1",
@@ -83,6 +90,8 @@ A Backend server needs `MasterConnection` and `GatewayListener` configuration.
 `GatewayListener` is the Backend-side listener that Gateway connects to after receiving a direct-connect code. In production, configure this together with private networking and TLS.
 
 Set `GatewayListener:Enabled` to `false` for C++ Backend sidecar mode. In that mode the C# sidecar does not open the Gateway listener or load a local TLS certificate. The configured `GatewayListener` address, port, and TLS flag are still advertised to Master as the external data-plane endpoint owned by the C++ Backend/Dedicated process.
+
+Set `SidecarControl:Enabled` to `true` when a C++ Backend/Dedicated process needs the sidecar to validate Gateway direct-connect codes. The sidecar opens a loopback-only PacketCore control listener and accepts `DirectConnectCodeValidationRequest` frames on packet id `1`, then returns `DirectConnectCodeValidationResponse` frames on packet id `2`. This local protocol is for handshake/control work only; gameplay channel packets must stay on the direct Gateway-to-C++ data-plane socket.
 
 ## Runtime Lifecycle
 
@@ -250,3 +259,5 @@ The sender serializes writes to each active Gateway connection. If channel-level
 Gateway remains the final authority for route token ownership, Backend binding, exchange id matching, and manifest compatibility. Runtime code should still clear closed channel state to avoid unnecessary push attempts.
 
 C++ sidecar mode currently covers Master control-plane registration and endpoint advertisement only. The C++ data-plane process must own the Gateway-facing listener and implement the Gateway handshake, direct-connect code validation callout, channel envelopes, and packet writes.
+
+The sidecar now provides a local direct-connect validation callout, but it still does not relay Gateway channel traffic. The C++ data-plane process remains responsible for accepting Gateway sessions only after a successful local validation response.
