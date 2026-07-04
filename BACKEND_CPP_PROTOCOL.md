@@ -152,8 +152,9 @@ manifest verification.
 ## Wire Test Vectors
 
 The C# tests in `GatewayServer.Tests/Protocols/BackendCppWireVectorTests.cs`
-assert these full-frame hex vectors. A C++ implementation should produce and
-consume the same bytes.
+and the C++ tests in `CppBackendServer/tests/packet_core_tests.cpp` assert these
+full-frame hex vectors. A C++ implementation should produce and consume the same
+bytes.
 
 | Name | Hex |
 | --- | --- |

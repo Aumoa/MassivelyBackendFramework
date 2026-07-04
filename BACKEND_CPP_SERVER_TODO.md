@@ -60,15 +60,17 @@ Implemented local validation callout: set `SidecarControl:Enabled` to `true`. Th
 
 ## Phase 3: C++ Data Plane
 
-- [ ] Implement a C++ `PacketCore` reader/writer compatible with the C# implementation.
+- [x] Implement a C++ `PacketCore` reader/writer compatible with the C# implementation.
 - [ ] Implement Gateway direct connection accept/listen logic in C++.
 - [ ] Implement Gateway handshake handling in C++.
 - [ ] Call the sidecar for direct-connect code validation during handshake.
 - [ ] Accept trusted Gateway sessions only after validation succeeds.
-- [ ] Implement channel open/data/close envelope parsing.
+- [x] Implement channel open/data/close envelope parsing.
 - [ ] Implement server-origin notify/request/response writes directly to Gateway.
 - [ ] Serialize writes per trusted Gateway connection.
 - [ ] Track channel-local state and remove it on channel close or Gateway disconnect.
+
+Implemented C++ codec foundation: `CppBackendServer` provides a CMake-built C++20 PacketCore reader/writer plus Gateway Backend channel open/data/close and sidecar request codecs. `cpp_backend_packet_core_tests` verifies the same full-frame wire vectors as the C# tests.
 
 ## Phase 4: Sidecar And C++ Local Contract
 
