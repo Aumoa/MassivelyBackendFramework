@@ -31,6 +31,10 @@
 
 - When working on DiscordBot chat persistence, chat history lookup, search, context loading, message inspection, or chat-related attachment/image retrieval, read and follow `.codex/skills/discordbot-channel-chat-scope/SKILL.md`.
 
+## C++ Backend Style Skill
+
+- When working on C++ Backend source files, C++ formatting, CMake files, CMake presets, or IDE project support, read and follow `.codex/skills/cpp-backend-style/SKILL.md`.
+
 ## Coding Style Policy
 
 - Follow Microsoft's standard C# coding conventions by default.

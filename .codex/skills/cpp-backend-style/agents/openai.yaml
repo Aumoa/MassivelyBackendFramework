@@ -1,0 +1,4 @@
+interface:
+  display_name: "C++ Backend Style"
+  short_description: "Use C++ Backend formatting, naming, and CMake IDE rules."
+  default_prompt: "Apply the repository C++ Backend style, formatting, and CMake IDE support rules."
