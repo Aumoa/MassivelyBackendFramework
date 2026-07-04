@@ -118,11 +118,13 @@ Implemented compatibility policy: see `BACKEND_CPP_COMPATIBILITY.md` for cross-l
 - [x] Have the sidecar advertise the C++ server's manifest id/hash to Master.
 - [x] Ensure Master approval and Gateway snapshot behavior works for C++ Backend nodes.
 - [x] Provide C++ access to manifest metadata needed for fast parsers and debug validation.
-- [ ] Keep Gateway verifier policy compatible with both C# and C++ Backend runtimes.
+- [x] Keep Gateway verifier policy compatible with both C# and C++ Backend runtimes.
 
 Implemented manifest declaration: set `SidecarControl:RequireManifestBeforeAdvertise` to `true`. C++ sends `SidecarManifestDeclarationUpdate` as control packet id `9`; the sidecar acknowledges with `SidecarManifestDeclarationAck` as control packet id `10` and advertises the declared manifest id/hash to Master.
 
 Implemented manifest snapshot sharing: Master sends approved `BackendPacketManifestSnapshot` updates to Backend sidecars as well as Gateways. C++ sends `SidecarManifestSnapshotRequest` as control packet id `11`; the sidecar responds with `SidecarManifestSnapshotResponse` as control packet id `12`, carrying the latest approved manifest snapshot using the shared Master control-plane manifest codec.
+
+Implemented Gateway verifier compatibility coverage: `ConnectionManagerBackendRouteTests.RouteDataNotify_AllowsCppBackendKindWithManifestPolicy` verifies that a `cpp-world` Backend kind is routed and packet-verified through the same manifest policy path as C# Backend nodes.
 
 ## Phase 7: Validation And Tests
 
