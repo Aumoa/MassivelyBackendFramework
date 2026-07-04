@@ -135,6 +135,11 @@ public class AuthController(IOptions<HostOptions> options, ILogger<AuthControlle
                 SameSite = SameSiteMode.Strict
             });
 
+            if (string.IsNullOrWhiteSpace(tokenResponse.RefreshToken))
+            {
+                return BadRequest("Refresh token is required for the internal OAuth2 client.");
+            }
+
             HttpContext.Response.Cookies.Append("refresh_token", tokenResponse.RefreshToken, new CookieOptions
             {
                 HttpOnly = true,

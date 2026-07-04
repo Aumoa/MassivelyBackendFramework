@@ -77,14 +77,48 @@ public sealed class TokenControllerApiKeyTests
         Assert.Equal("profile email", tokenIssuer.Scope);
     }
 
+    [Theory]
+    [InlineData("profile", false)]
+    [InlineData("profile offline_access", true)]
+    public async Task PostAsync_ReturnsRefreshTokenOnlyForOfflineAccess(string scope, bool expectRefreshToken)
+    {
+        var refreshedAccess = new Access
+        {
+            Id = "account",
+            Sub = "sub",
+            AccessToken = "new-access",
+            RefreshToken = "new-refresh",
+            Scope = scope,
+            ClientId = "client"
+        };
+        var controller = CreateController(
+            new ApiKeysStub(null),
+            clientClaims: new ClientClaimsStub("profile", "offline_access"),
+            accesses: new AccessesStub(refreshedAccess));
+
+        var result = await controller.PostAsync(new TokenRequest
+        {
+            GrantType = "refresh_token",
+            RefreshToken = "refresh",
+            ClientId = "client",
+            ClientSecret = "secret"
+        }, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = Assert.IsType<TokenResponse>(ok.Value);
+        Assert.Equal(expectRefreshToken ? "new-refresh" : null, response.RefreshToken);
+        Assert.Equal(expectRefreshToken ? 3600 : null, response.RefreshExpiresIn);
+    }
+
     private static TokenController CreateController(
         ApiKeysStub apiKeys,
         ClientClaimsStub? clientClaims = null,
-        TokenIssuerStub? tokenIssuer = null)
+        TokenIssuerStub? tokenIssuer = null,
+        AccessesStub? accesses = null)
     {
         var controller = new TokenController(
             new AuthorizationCodesStub(),
-            new AccessesStub(),
+            accesses ?? new AccessesStub(),
             new JwtStub(),
             new AccountsStub(),
             new AccountClaimsStub(),
@@ -205,6 +239,7 @@ public sealed class TokenControllerApiKeyTests
         {
             var claims = allowedScopes
                 .Select((scope, index) => new ClientClaim(index + 1, "scope", scope))
+                .Append(new ClientClaim(1000, "secret", PasswordHasher.Hash("secret")))
                 .ToArray();
             return ValueTask.FromResult(claims);
         }
@@ -341,7 +376,7 @@ public sealed class TokenControllerApiKeyTests
         }
     }
 
-    private sealed class AccessesStub : IAccesses
+    private sealed class AccessesStub(Access? refreshedAccess = null) : IAccesses
     {
         public ValueTask<Access> WriteAccessAsync(string id, string sub, string scope, string clientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default, long? authTime = null, string? userInfoClaims = null)
         {
@@ -365,7 +400,7 @@ public sealed class TokenControllerApiKeyTests
 
         public ValueTask<Access?> RefreshAccessAsync(string refreshToken, string clientId, TimeSpan expire, TimeSpan refreshTokenExpire, CancellationToken cancellationToken = default)
         {
-            throw new NotSupportedException();
+            return ValueTask.FromResult<Access?>(refreshedAccess);
         }
 
         public ValueTask RevokeAsync(string accessToken, CancellationToken cancellationToken = default)

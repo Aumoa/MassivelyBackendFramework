@@ -17,10 +17,12 @@ public record TokenResponse
     public required string Scope { get; set; }
 
     [JsonPropertyName("refresh_token")]
-    public required string RefreshToken { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RefreshToken { get; set; }
 
     [JsonPropertyName("refresh_expires_in")]
-    public required int RefreshExpiresIn { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? RefreshExpiresIn { get; set; }
 
     [JsonPropertyName("id_token")]
     public required string? IdToken { get; set; }

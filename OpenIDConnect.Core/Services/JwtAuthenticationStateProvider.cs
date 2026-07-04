@@ -201,12 +201,12 @@ internal class JwtAuthenticationStateProvider(
                     DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn));
             }
 
-            if (tokenResponse.RefreshToken != null)
+            if (tokenResponse.RefreshToken != null && tokenResponse.RefreshExpiresIn.HasValue)
             {
                 cookieManager.AppendRefreshToken(
                     httpContext,
                     tokenResponse.RefreshToken,
-                    DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn));
+                    DateTimeOffset.UtcNow.AddSeconds(tokenResponse.RefreshExpiresIn.Value));
             }
 
             m_LastSuccessfullyCode = code;

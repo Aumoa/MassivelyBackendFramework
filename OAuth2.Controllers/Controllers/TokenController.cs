@@ -340,14 +340,17 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
             idToken = jwt.Issue(newAccess.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, newAccess.Value.Scope, [.. claims, .. groupsClaim], null, true, newAccess.Value.AuthTime));
         }
 
+        var canReturnRefreshToken = newAccess.Value.ClientId == hostOptions.Value.ClientId ||
+                                    ScopePolicy.HasOfflineAccess(newAccess.Value.Scope);
+
         var response = new TokenResponse
         {
             AccessToken = newAccess.Value.AccessToken,
             TokenType = "Bearer",
             ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
             Scope = newAccess.Value.Scope,
-            RefreshToken = newAccess.Value.RefreshToken,
-            RefreshExpiresIn = (int)jwt.RefreshTokenExpiresIn.TotalSeconds,
+            RefreshToken = canReturnRefreshToken ? newAccess.Value.RefreshToken : null,
+            RefreshExpiresIn = canReturnRefreshToken ? (int)jwt.RefreshTokenExpiresIn.TotalSeconds : null,
             IdToken = idToken
         };
 
