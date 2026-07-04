@@ -31,6 +31,11 @@ internal interface IBackendManifestIdentityProvider
     Task<BackendManifestIdentity?> GetManifestIdentityForAdvertisementAsync(CancellationToken cancellationToken);
 }
 
+internal interface IBackendPacketManifestSnapshotSink
+{
+    void PublishBackendPacketManifestSnapshot(BackendPacketManifestSnapshot snapshot);
+}
+
 internal static class BackendSidecarControlPacketIds
 {
     public const ushort DirectConnectCodeValidationRequest = 1;
@@ -43,12 +48,14 @@ internal static class BackendSidecarControlPacketIds
     public const ushort ShutdownStateAck = 8;
     public const ushort ManifestDeclarationUpdate = 9;
     public const ushort ManifestDeclarationAck = 10;
+    public const ushort ManifestSnapshotRequest = 11;
+    public const ushort ManifestSnapshotResponse = 12;
 }
 
 internal static class BackendSidecarControlProtocol
 {
     public const ushort SchemaVersion = 1;
-    public const int MaxPayloadLength = 16 * 1024;
+    public const int MaxPayloadLength = PacketReadPolicy.DefaultUntrustedMaxPayloadLength;
 
     public static readonly PacketReadPolicy LocalControlPolicy = new(
         PacketKindMask.Control,
@@ -72,7 +79,7 @@ internal static class BackendSidecarControlProtocol
 internal sealed class SidecarControlServer(
     IOptions<SidecarControlOptions> options,
     IDirectConnectCodeValidator directConnectCodeValidator,
-    ILogger<SidecarControlServer> logger) : IHostedService, ISidecarControlStatusProvider, IBackendEndpointReadiness, IBackendManifestIdentityProvider
+    ILogger<SidecarControlServer> logger) : IHostedService, ISidecarControlStatusProvider, IBackendEndpointReadiness, IBackendManifestIdentityProvider, IBackendPacketManifestSnapshotSink
 {
     private readonly SidecarControlOptions m_Options = options.Value;
     private readonly CancellationTokenSource m_Shutdown = new();
@@ -80,6 +87,7 @@ internal sealed class SidecarControlServer(
     private readonly object m_RuntimeStatusSync = new();
     private readonly object m_ShutdownStateSync = new();
     private readonly object m_ManifestIdentitySync = new();
+    private readonly object m_ManifestSnapshotSync = new();
     private readonly ConcurrentDictionary<Guid, Task> m_ConnectionTasks = [];
     private readonly ConcurrentDictionary<Guid, string> m_ConnectionStates = [];
     private TaskCompletionSource<bool> m_EndpointReadySignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -97,6 +105,8 @@ internal sealed class SidecarControlServer(
     private TaskCompletionSource<bool> m_ManifestDeclaredSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private BackendManifestIdentity? m_ManifestIdentity;
     private DateTimeOffset? m_ManifestDeclaredAt;
+    private BackendPacketManifestSnapshot? m_ManifestSnapshot;
+    private DateTimeOffset? m_ManifestSnapshotReceivedAt;
     private long m_ValidationRequestCount;
     private long m_ValidationSuccessCount;
     private long m_ValidationFailureCount;
@@ -145,6 +155,20 @@ internal sealed class SidecarControlServer(
         lock (m_ManifestIdentitySync)
         {
             return m_ManifestIdentity;
+        }
+    }
+
+    public void PublishBackendPacketManifestSnapshot(BackendPacketManifestSnapshot snapshot)
+    {
+        if (snapshot == null)
+        {
+            throw new ArgumentNullException(nameof(snapshot));
+        }
+
+        lock (m_ManifestSnapshotSync)
+        {
+            m_ManifestSnapshot = snapshot;
+            m_ManifestSnapshotReceivedAt = DateTimeOffset.UtcNow;
         }
     }
 
@@ -221,6 +245,8 @@ internal sealed class SidecarControlServer(
             new("Sidecar Control", "Manifest required", m_Options.RequireManifestBeforeAdvertise ? "Yes" : "No"),
             new("Sidecar Control", "Manifest id", GetManifestIdStatus()),
             new("Sidecar Control", "Manifest hash", GetManifestHashStatus()),
+            new("Sidecar Control", "Manifest snapshot", GetManifestSnapshotStatus()),
+            new("Sidecar Control", "Manifest snapshot observed", GetManifestSnapshotObservedStatus()),
             new("Sidecar Control", "Active connections", m_ConnectionStates.Count.ToString()),
             new("Sidecar Control", "Validation requests", Interlocked.Read(ref m_ValidationRequestCount).ToString()),
             new("Sidecar Control", "Validation succeeded", Interlocked.Read(ref m_ValidationSuccessCount).ToString()),
@@ -351,6 +377,15 @@ internal sealed class SidecarControlServer(
                         continue;
                     }
 
+                    if (frame.Header.PacketId == BackendSidecarControlPacketIds.ManifestSnapshotRequest)
+                    {
+                        await HandleManifestSnapshotRequestAsync(
+                            stream,
+                            frame,
+                            cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+
                     logger.LogWarning(
                         "Backend sidecar control rejected unsupported packet. ConnectionId={ConnectionId}, PacketKind={PacketKind}, PacketId={PacketId}.",
                         connectionId,
@@ -432,6 +467,29 @@ internal sealed class SidecarControlServer(
             BackendSidecarControlProtocol.SchemaVersion,
             ack,
             SidecarManifestDeclarationAck.Codec);
+        await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async ValueTask HandleManifestSnapshotRequestAsync(
+        Stream stream,
+        PacketFrame frame,
+        CancellationToken cancellationToken)
+    {
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.ManifestSnapshotRequest);
+        var request = PacketCodec.Decode(frame, SidecarManifestSnapshotRequest.Codec);
+
+        var snapshot = GetBackendPacketManifestSnapshot();
+        var response = snapshot == null
+            ? SidecarManifestSnapshotResponse.Failure(request.RequestId, "Backend packet manifest snapshot is not loaded.")
+            : SidecarManifestSnapshotResponse.SuccessResult(request.RequestId, snapshot);
+        using var responseFrame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.ManifestSnapshotResponse,
+            BackendSidecarControlProtocol.SchemaVersion,
+            response,
+            SidecarManifestSnapshotResponse.Codec);
         await PacketFrameWriter.WriteAsync(stream, responseFrame, cancellationToken).ConfigureAwait(false);
     }
 
@@ -537,6 +595,14 @@ internal sealed class SidecarControlServer(
         }
 
         declaredSignal.TrySetResult(true);
+    }
+
+    private BackendPacketManifestSnapshot? GetBackendPacketManifestSnapshot()
+    {
+        lock (m_ManifestSnapshotSync)
+        {
+            return m_ManifestSnapshot;
+        }
     }
 
     private static DirectConnectCodeValidationResponse CreateLocalResponse(
@@ -734,6 +800,32 @@ internal sealed class SidecarControlServer(
             return m_ManifestDeclaredAt.HasValue
                 ? $"{m_ManifestIdentity.ManifestHash} ({m_ManifestDeclaredAt.Value.LocalDateTime:O})"
                 : m_ManifestIdentity.ManifestHash;
+        }
+    }
+
+    private string GetManifestSnapshotStatus()
+    {
+        lock (m_ManifestSnapshotSync)
+        {
+            return m_ManifestSnapshot == null
+                ? "Not loaded"
+                : $"{m_ManifestSnapshot.Manifests.Length} manifests";
+        }
+    }
+
+    private string GetManifestSnapshotObservedStatus()
+    {
+        lock (m_ManifestSnapshotSync)
+        {
+            if (m_ManifestSnapshot == null)
+            {
+                return "Never";
+            }
+
+            var receivedAt = m_ManifestSnapshotReceivedAt.HasValue
+                ? m_ManifestSnapshotReceivedAt.Value.LocalDateTime.ToString("O")
+                : "unknown receive time";
+            return $"{m_ManifestSnapshot.ObservedAt.LocalDateTime:O} (received {receivedAt})";
         }
     }
 

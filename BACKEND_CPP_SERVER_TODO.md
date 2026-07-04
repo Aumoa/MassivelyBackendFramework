@@ -50,7 +50,7 @@ Gateway and the C++ Backend/Dedicated server.
 - [x] Keep Master control-plane reconnect, status, and shutdown behavior equivalent to the C# Backend path.
 - [x] Provide local direct-connect code validation for the C++ server.
 - [x] Report C++ server health and Gateway session status through Master admin/status flows.
-- [ ] Share approved packet manifests or policy snapshots with the C++ server when needed.
+- [x] Share approved packet manifests or policy snapshots with the C++ server when needed.
 
 Implemented sidecar entry point: set `GatewayListener:Enabled` to `false`. The sidecar keeps using `MasterConnection` for the control plane and advertises the configured `GatewayListener` endpoint as the external C++ data-plane listener without binding that port itself.
 
@@ -100,16 +100,18 @@ Implemented graceful shutdown coordination: C++ sends `SidecarShutdownStateUpdat
 
 - [x] Ensure the C++ server can declare the active packet manifest id/hash.
 - [x] Have the sidecar advertise the C++ server's manifest id/hash to Master.
-- [ ] Ensure Master approval and Gateway snapshot behavior works for C++ Backend nodes.
-- [ ] Provide C++ access to manifest metadata needed for fast parsers and debug validation.
+- [x] Ensure Master approval and Gateway snapshot behavior works for C++ Backend nodes.
+- [x] Provide C++ access to manifest metadata needed for fast parsers and debug validation.
 - [ ] Keep Gateway verifier policy compatible with both C# and C++ Backend runtimes.
 
 Implemented manifest declaration: set `SidecarControl:RequireManifestBeforeAdvertise` to `true`. C++ sends `SidecarManifestDeclarationUpdate` as control packet id `9`; the sidecar acknowledges with `SidecarManifestDeclarationAck` as control packet id `10` and advertises the declared manifest id/hash to Master.
 
+Implemented manifest snapshot sharing: Master sends approved `BackendPacketManifestSnapshot` updates to Backend sidecars as well as Gateways. C++ sends `SidecarManifestSnapshotRequest` as control packet id `11`; the sidecar responds with `SidecarManifestSnapshotResponse` as control packet id `12`, carrying the latest approved manifest snapshot using the shared Master control-plane manifest codec.
+
 ## Phase 7: Validation And Tests
 
 - [ ] Add C# and C++ wire codec compatibility test vectors.
-- [ ] Add integration tests for sidecar Master registration with a C++ endpoint advertisement.
+- [x] Add integration tests for sidecar Master registration with a C++ endpoint advertisement.
 - [ ] Add integration tests for Gateway direct connection to a C++ Backend test server.
 - [ ] Add handshake rejection tests for invalid direct-connect codes.
 - [ ] Add channel open/data/close tests against the C++ data-plane implementation.

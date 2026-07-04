@@ -276,6 +276,10 @@ internal sealed class ConnectionManager(
             {
                 await PushGatewayDiscoveryUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
             }
+            else if (BackendNodeEndpoint.IsBackendNodeKind(connection.NodeKind))
+            {
+                await PushBackendControlSnapshotsUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
+            }
             else
             {
                 await DrainUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
@@ -568,6 +572,15 @@ internal sealed class ConnectionManager(
         await WriteGatewayClientSecretCredentialSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task PushBackendControlSnapshotsUntilClosedAsync(
+        MasterConnection connection,
+        Stream stream,
+        CancellationToken cancellationToken)
+    {
+        await WriteBackendPacketManifestSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+        await DrainUntilClosedAsync(connection, stream, cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task WriteDedicatedNodeSnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
     {
         await connection.WriteControlAsync(
@@ -687,15 +700,18 @@ internal sealed class ConnectionManager(
 
     private async Task BroadcastBackendPacketManifestSnapshotAsync(CancellationToken cancellationToken)
     {
-        var gateways = m_Connections.Values
-            .Where(static connection => connection.IsTrusted && connection.NodeKind == MasterNodeKind.Gateway)
+        var recipients = m_Connections.Values
+            .Where(static connection =>
+                connection.IsTrusted &&
+                (connection.NodeKind == MasterNodeKind.Gateway ||
+                 BackendNodeEndpoint.IsBackendNodeKind(connection.NodeKind)))
             .ToArray();
 
-        foreach (var gateway in gateways)
+        foreach (var recipient in recipients)
         {
             try
             {
-                await WriteBackendPacketManifestSnapshotAsync(gateway, cancellationToken).ConfigureAwait(false);
+                await WriteBackendPacketManifestSnapshotAsync(recipient, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -706,17 +722,17 @@ internal sealed class ConnectionManager(
                 logger.LogDebug(
                     e,
                     "Backend packet manifest snapshot write failed because the remote connection closed. ConnectionId={ConnectionId}, NodeId={NodeId}.",
-                    gateway.ConnectionId,
-                    gateway.NodeId);
-                gateway.Dispose();
+                    recipient.ConnectionId,
+                    recipient.NodeId);
+                recipient.Dispose();
             }
             catch (Exception e)
             {
                 logger.LogWarning(
                     e,
                     "Failed to push Backend packet manifest snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
-                    gateway.ConnectionId,
-                    gateway.NodeId);
+                    recipient.ConnectionId,
+                    recipient.NodeId);
             }
         }
     }

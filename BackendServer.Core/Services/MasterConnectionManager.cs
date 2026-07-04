@@ -180,8 +180,31 @@ internal sealed class MasterConnectionManager(
                 accepted.ConnectionId);
 
             m_ActiveStream = activeStream;
-            await AdvertiseBackendEndpointAsync(activeStream, cancellationToken).ConfigureAwait(false);
-            await DrainTrustedFramesAsync(activeStream, cancellationToken).ConfigureAwait(false);
+            using var sessionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var drainTask = DrainTrustedFramesAsync(activeStream, sessionCancellation.Token);
+            try
+            {
+                var advertiseTask = AdvertiseBackendEndpointAsync(activeStream, sessionCancellation.Token);
+                var completedTask = await Task.WhenAny(advertiseTask, drainTask).ConfigureAwait(false);
+                if (completedTask == drainTask)
+                {
+                    await sessionCancellation.CancelAsync().ConfigureAwait(false);
+                    await WaitForShutdownAsync(advertiseTask, CancellationToken.None).ConfigureAwait(false);
+                    await drainTask.ConfigureAwait(false);
+                    return;
+                }
+
+                await advertiseTask.ConfigureAwait(false);
+                await drainTask.ConfigureAwait(false);
+            }
+            finally
+            {
+                await sessionCancellation.CancelAsync().ConfigureAwait(false);
+                if (!drainTask.IsCompleted)
+                {
+                    await WaitForShutdownAsync(drainTask, CancellationToken.None).ConfigureAwait(false);
+                }
+            }
         }
         finally
         {
@@ -371,6 +394,17 @@ internal sealed class MasterConnectionManager(
                     {
                         completion.TrySetResult(response);
                     }
+
+                    continue;
+                }
+
+                if (frame.Header.Kind == PacketKind.Control &&
+                    frame.Header.PacketId == MasterControlPacketIds.BackendPacketManifestSnapshot)
+                {
+                    MasterControlProtocol.ValidateControlFrame(frame, MasterControlPacketIds.BackendPacketManifestSnapshot);
+                    var snapshot = PacketCodec.Decode(frame, BackendPacketManifestSnapshot.Codec);
+                    serviceProvider.GetService<IBackendPacketManifestSnapshotSink>()
+                        ?.PublishBackendPacketManifestSnapshot(snapshot);
                 }
             }
         }

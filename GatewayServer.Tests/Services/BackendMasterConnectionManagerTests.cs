@@ -192,6 +192,89 @@ public sealed class BackendMasterConnectionManagerTests
         }
     }
 
+    [Fact]
+    public async Task MasterConnection_PublishesManifestSnapshotToSidecar()
+    {
+        var snapshot = CreateManifestSnapshot();
+        await using var master = new FakeMasterServer
+        {
+            InitialManifestSnapshot = snapshot
+        };
+        var sidecarPort = GetFreeTcpPort();
+        var sidecar = new SidecarControlServer(
+            Microsoft.Extensions.Options.Options.Create(new SidecarControlOptions
+            {
+                Enabled = true,
+                IPAddress = "127.0.0.1",
+                Port = sidecarPort
+            }),
+            new AlwaysSuccessfulDirectConnectCodeValidator(),
+            new TestLogger<SidecarControlServer>());
+        await sidecar.StartAsync(CancellationToken.None);
+
+        var services = new ServiceCollection();
+        services.AddSingleton<IBackendPacketManifestSnapshotSink>(sidecar);
+        var manager = new MasterConnectionManager(
+            Microsoft.Extensions.Options.Options.Create(new MasterConnectionOptions
+            {
+                Enabled = true,
+                IPAddress = "127.0.0.1",
+                Port = master.Port,
+                NodeId = "cpp-sidecar",
+                DisplayName = "C++ Sidecar",
+                BackendKind = "cpp-world",
+                BackendPacketManifestId = "cpp-world:v2",
+                BackendPacketManifestHash = snapshot.Manifests[0].Hash.Value,
+                SharedSecret = "test-secret",
+                ReconnectDelayMilliseconds = 100,
+                HandshakeTimeoutMilliseconds = 5000
+            }),
+            Microsoft.Extensions.Options.Options.Create(new GatewayListenerOptions
+            {
+                Enabled = false,
+                IPAddress = "10.20.30.40",
+                Port = 21701,
+                UseTls = true
+            }),
+            services.BuildServiceProvider(),
+            new TestLogger<MasterConnectionManager>());
+        await manager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            _ = await master.Advertise.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await WaitForManifestSnapshotAsync(sidecar);
+
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, sidecarPort);
+            await using var stream = client.GetStream();
+
+            var request = new SidecarManifestSnapshotRequest(Guid.NewGuid());
+            using (var frame = PacketCodec.Encode(
+                       PacketKind.Control,
+                       BackendSidecarControlPacketIds.ManifestSnapshotRequest,
+                       BackendSidecarControlProtocol.SchemaVersion,
+                       request,
+                       SidecarManifestSnapshotRequest.Codec))
+            {
+                await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+            }
+
+            var response = await ReadManifestSnapshotResponseAsync(stream);
+            Assert.True(response.Success);
+            Assert.Equal(request.RequestId, response.RequestId);
+            Assert.NotNull(response.Snapshot);
+            var manifest = Assert.Single(response.Snapshot!.Manifests);
+            Assert.Equal("cpp-world", manifest.BackendKind);
+            Assert.Equal("cpp-world:v2", manifest.ManifestId.Value);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+            await sidecar.StopAsync(CancellationToken.None);
+        }
+    }
+
     private static async Task SendEndpointReadyAsync(int port)
     {
         using var client = new TcpClient();
@@ -254,6 +337,55 @@ public sealed class BackendMasterConnectionManagerTests
         Assert.Equal(update.RequestId, ack.RequestId);
     }
 
+    private static async Task<SidecarManifestSnapshotResponse> ReadManifestSnapshotResponseAsync(Stream stream)
+    {
+        using var frame = await PacketFrameReader.ReadAsync(
+            stream,
+            BackendSidecarControlProtocol.LocalControlPolicy,
+            CancellationToken.None) ?? throw new EndOfStreamException("Sidecar manifest snapshot response was not written.");
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.ManifestSnapshotResponse);
+        return PacketCodec.Decode(frame, SidecarManifestSnapshotResponse.Codec);
+    }
+
+    private static async Task WaitForManifestSnapshotAsync(SidecarControlServer sidecar)
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            if (sidecar.GetStatusItems().Any(static item =>
+                    item.Group == "Sidecar Control" &&
+                    item.Name == "Manifest snapshot" &&
+                    item.Value == "1 manifests"))
+            {
+                return;
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new TimeoutException("Timed out waiting for sidecar manifest snapshot.");
+    }
+
+    private static BackendPacketManifestSnapshot CreateManifestSnapshot()
+    {
+        return new BackendPacketManifestSnapshot(
+            [
+                new BackendPacketManifest(
+                    "cpp-world",
+                    new BackendPacketManifestId("cpp-world:v2"),
+                    [
+                        new BackendPacketManifestEntry(
+                            BackendPacketManifestDirection.ClientToBackend,
+                            PacketKind.Request,
+                            101,
+                            1,
+                            new BackendPacketPayloadConstraint(4, 64))
+                    ])
+            ],
+            DateTimeOffset.FromUnixTimeMilliseconds(1_783_000_000_000));
+    }
+
     private static int GetFreeTcpPort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -289,6 +421,8 @@ public sealed class BackendMasterConnectionManagerTests
 
         public TaskCompletionSource<BackendEndpointAdvertise> Advertise { get; } = new(
             TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public BackendPacketManifestSnapshot? InitialManifestSnapshot { get; init; }
 
         public async ValueTask DisposeAsync()
         {
@@ -347,6 +481,16 @@ public sealed class BackendMasterConnectionManagerTests
                     new NodeAccepted(hello.NodeId, "master-connection-a"),
                     NodeAccepted.Codec,
                     cancellationToken).ConfigureAwait(false);
+
+                if (InitialManifestSnapshot != null)
+                {
+                    await WriteControlFrameAsync(
+                        stream,
+                        MasterControlPacketIds.BackendPacketManifestSnapshot,
+                        InitialManifestSnapshot,
+                        BackendPacketManifestSnapshot.Codec,
+                        cancellationToken).ConfigureAwait(false);
+                }
 
                 var advertise = await ReadControlFrameAsync(
                     stream,

@@ -293,6 +293,51 @@ public sealed class BackendSidecarControlServerTests
     }
 
     [Fact]
+    public async Task ManifestSnapshotRequest_ReturnsPublishedSnapshot()
+    {
+        var port = GetFreeTcpPort();
+        var server = CreateServer(
+            port,
+            new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend));
+        var snapshot = CreateManifestSnapshot();
+        server.PublishBackendPacketManifestSnapshot(snapshot);
+        await server.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+
+            var request = new SidecarManifestSnapshotRequest(Guid.NewGuid());
+            await WriteManifestSnapshotRequestAsync(stream, request);
+
+            var response = await ReadManifestSnapshotResponseAsync(stream);
+            Assert.True(response.Success);
+            Assert.Equal(request.RequestId, response.RequestId);
+            Assert.NotNull(response.Snapshot);
+            Assert.Equal(snapshot.ObservedAt, response.Snapshot!.ObservedAt);
+            var manifest = Assert.Single(response.Snapshot.Manifests);
+            Assert.Equal("cpp-world", manifest.BackendKind);
+            Assert.Equal("cpp-world:v2", manifest.ManifestId.Value);
+
+            var status = server.GetStatusItems();
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Manifest snapshot" &&
+                item.Value == "1 manifests");
+            Assert.Contains(status, item =>
+                item.Group == "Sidecar Control" &&
+                item.Name == "Manifest snapshot observed" &&
+                item.Value.Contains(snapshot.ObservedAt.LocalDateTime.ToString("O"), StringComparison.Ordinal));
+        }
+        finally
+        {
+            await server.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task StartAsync_RejectsNonLoopbackEndpoint()
     {
         var server = new SidecarControlServer(
@@ -337,6 +382,19 @@ public sealed class BackendSidecarControlServerTests
             BackendSidecarControlProtocol.SchemaVersion,
             request,
             DirectConnectCodeValidationRequest.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
+    }
+
+    private static async Task WriteManifestSnapshotRequestAsync(
+        Stream stream,
+        SidecarManifestSnapshotRequest request)
+    {
+        using var frame = PacketCodec.Encode(
+            PacketKind.Control,
+            BackendSidecarControlPacketIds.ManifestSnapshotRequest,
+            BackendSidecarControlProtocol.SchemaVersion,
+            request,
+            SidecarManifestSnapshotRequest.Codec);
         await PacketFrameWriter.WriteAsync(stream, frame, CancellationToken.None);
     }
 
@@ -450,6 +508,37 @@ public sealed class BackendSidecarControlServerTests
             frame,
             BackendSidecarControlPacketIds.ManifestDeclarationAck);
         return PacketCodec.Decode(frame, SidecarManifestDeclarationAck.Codec);
+    }
+
+    private static async Task<SidecarManifestSnapshotResponse> ReadManifestSnapshotResponseAsync(Stream stream)
+    {
+        using var frame = await PacketFrameReader.ReadAsync(
+            stream,
+            BackendSidecarControlProtocol.LocalControlPolicy,
+            CancellationToken.None) ?? throw new EndOfStreamException("Sidecar manifest snapshot response was not written.");
+        BackendSidecarControlProtocol.ValidateControlFrame(
+            frame,
+            BackendSidecarControlPacketIds.ManifestSnapshotResponse);
+        return PacketCodec.Decode(frame, SidecarManifestSnapshotResponse.Codec);
+    }
+
+    private static BackendPacketManifestSnapshot CreateManifestSnapshot()
+    {
+        return new BackendPacketManifestSnapshot(
+            [
+                new BackendPacketManifest(
+                    "cpp-world",
+                    new BackendPacketManifestId("cpp-world:v2"),
+                    [
+                        new BackendPacketManifestEntry(
+                            BackendPacketManifestDirection.ClientToBackend,
+                            PacketKind.Request,
+                            101,
+                            1,
+                            new BackendPacketPayloadConstraint(4, 64))
+                    ])
+            ],
+            DateTimeOffset.FromUnixTimeMilliseconds(1_783_000_000_000));
     }
 
     private static int GetFreeTcpPort()
