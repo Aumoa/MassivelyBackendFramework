@@ -276,7 +276,7 @@
                     <FloatingInput @bind-Value="m_NewApiKeyAllowedClientId" Type="text" Placeholder="@Strings.MANAGEACCOUNTS_APIKEYS_CLIENT_PLACEHOLDER" />
                     <FloatingInput @bind-Value="m_NewApiKeyAllowedScope" Type="text" Placeholder="@Strings.MANAGEACCOUNTS_APIKEYS_SCOPE_PLACEHOLDER" />
                 </div>
-                <button @onclick="OnAddApiKeyAsync" type="button" class="apikey-add-btn">
+                <button @onclick="OnAddApiKeyAsync" type="button" class="apikey-add-btn" disabled="@(!CanAddApiKey)">
                     <span class="material-symbols-outlined">add</span>
                     @Strings.MANAGE_APPLICATION_APIKEYS_NEW_BUTTON
                 </button>
@@ -304,6 +304,11 @@
     private string? m_NewApiKeyAllowedClientId;
     private string? m_NewApiKeyAllowedScope;
 
+    private bool CanAddApiKey =>
+        !string.IsNullOrWhiteSpace(m_NewApiKeyName) &&
+        !string.IsNullOrWhiteSpace(m_NewApiKeyAllowedClientId) &&
+        !string.IsNullOrWhiteSpace(m_NewApiKeyAllowedScope);
+
     protected override async Task OnInitializedAsync()
     {
         await RefreshApiKeysAsync();
@@ -330,7 +335,7 @@
 
     private async Task OnAddApiKeyAsync()
     {
-        if (string.IsNullOrWhiteSpace(m_NewApiKeyName))
+        if (!CanAddApiKey)
         {
             return;
         }
@@ -341,11 +346,12 @@
             return;
         }
 
-        var allowedClientId = string.IsNullOrWhiteSpace(m_NewApiKeyAllowedClientId) ? null : m_NewApiKeyAllowedClientId.Trim();
-        var allowedScope = string.IsNullOrWhiteSpace(m_NewApiKeyAllowedScope) ? null : m_NewApiKeyAllowedScope.Trim();
-        if (allowedScope != null)
+        var apiKeyName = m_NewApiKeyName!.Trim();
+        var allowedClientId = m_NewApiKeyAllowedClientId!.Trim();
+        var allowedScope = m_NewApiKeyAllowedScope!.Trim();
+        if (!string.IsNullOrWhiteSpace(allowedScope))
         {
-            if (!ScopePolicy.TryNormalize(allowedScope, true, out var normalizedScope, out _))
+            if (!ScopePolicy.TryNormalize(allowedScope, false, out var normalizedScope, out _))
             {
                 return;
             }
@@ -353,7 +359,7 @@
             allowedScope = normalizedScope;
         }
 
-        var apiKey = await ApiKeys.CreateApiKeyAsync(accountId, allowedClientId, allowedScope, m_NewApiKeyName.Trim());
+        var apiKey = await ApiKeys.CreateApiKeyAsync(accountId, allowedClientId, allowedScope, apiKeyName);
         m_NewApiKeyName = null;
         m_NewApiKeyAllowedClientId = null;
         m_NewApiKeyAllowedScope = null;
