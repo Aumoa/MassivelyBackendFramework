@@ -3,7 +3,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using AI;
 using DiscordBot.Options;
-using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
@@ -35,7 +34,7 @@ internal interface IDiscordAutoResponseEvaluator
 internal sealed partial class DiscordAutoResponseEvaluator(
     IChatClient chatClient,
     IClaudeSettingsService claudeSettings,
-    IOptions<AutoResponseOptions> options,
+    IAutoResponseSettingsService autoResponseSettings,
     ILogger<DiscordAutoResponseEvaluator> logger) : IDiscordAutoResponseEvaluator
 {
     private const int DefaultMaxBufferedMessages = 20;
@@ -70,7 +69,7 @@ internal sealed partial class DiscordAutoResponseEvaluator(
         IReadOnlyList<DiscordAutoResponseMessage> messages,
         CancellationToken cancellationToken = default)
     {
-        var currentOptions = options.Value;
+        var currentOptions = (await autoResponseSettings.GetAsync(cancellationToken)).ToOptions();
         if (!currentOptions.Enabled || messages.Count == 0)
         {
             return Decline("disabled_or_empty");

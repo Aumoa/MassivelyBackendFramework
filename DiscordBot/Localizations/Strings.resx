@@ -82,6 +82,9 @@
   <data name="NAVMENU_LABEL_AI_SKILLS" xml:space="preserve">
     <value>AI Skills</value>
   </data>
+  <data name="NAVMENU_LABEL_AUTO_RESPONSE" xml:space="preserve">
+    <value>Auto Response</value>
+  </data>
   <data name="NAVMENU_LABEL_SERVER_LOGS" xml:space="preserve">
     <value>Logs</value>
   </data>
@@ -447,6 +450,83 @@
   </data>
   <data name="TOOLS_TOOL_CALCULATE_PARAM_EXPRESSION" xml:space="preserve">
     <value>The math expression to evaluate.</value>
+  </data>
+
+  <!-- AutoResponse -->
+  <data name="AUTO_RESPONSE_TITLE" xml:space="preserve">
+    <value>Auto Response</value>
+  </data>
+  <data name="AUTO_RESPONSE_SUBTITLE" xml:space="preserve">
+    <value>Runtime trigger settings and recent automatic response decisions</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_ENABLED" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_INTERVAL_SECONDS" xml:space="preserve">
+    <value>Interval Seconds</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_COOLDOWN_SECONDS" xml:space="preserve">
+    <value>Cooldown Seconds</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_MAX_BUFFERED_MESSAGES" xml:space="preserve">
+    <value>Max Buffered Messages</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_CLASSIFIER_MAX_TOKENS" xml:space="preserve">
+    <value>Classifier Max Tokens</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_CLASSIFIER_MODEL" xml:space="preserve">
+    <value>Classifier Model</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_BOT_ALIASES" xml:space="preserve">
+    <value>Bot Name Aliases</value>
+  </data>
+  <data name="AUTO_RESPONSE_BUTTON_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="AUTO_RESPONSE_BUTTON_REFRESH" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="AUTO_RESPONSE_STATUS_LOADING" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="AUTO_RESPONSE_STATUS_SAVED" xml:space="preserve">
+    <value>Auto response settings saved.</value>
+  </data>
+  <data name="AUTO_RESPONSE_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>Failed to load auto response settings.</value>
+  </data>
+  <data name="AUTO_RESPONSE_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>Failed to save auto response settings.</value>
+  </data>
+  <data name="AUTO_RESPONSE_ERROR_EVENTS_LOAD_FAILED" xml:space="preserve">
+    <value>Failed to load auto response events.</value>
+  </data>
+  <data name="AUTO_RESPONSE_ERROR_NUMBER_RANGE" xml:space="preserve">
+    <value>Numeric settings must be greater than 0.</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENTS_TITLE" xml:space="preserve">
+    <value>Recent Decisions</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENTS_EMPTY" xml:space="preserve">
+    <value>No auto response decisions recorded.</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_TIME" xml:space="preserve">
+    <value>Time</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_DECISION" xml:space="preserve">
+    <value>Decision</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_CHANNEL" xml:space="preserve">
+    <value>Channel</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_MESSAGES" xml:space="preserve">
+    <value>Messages</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_REASON" xml:space="preserve">
+    <value>Reason</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_FOCUS" xml:space="preserve">
+    <value>Focus</value>
   </data>
 
   <!-- ServerLogs -->

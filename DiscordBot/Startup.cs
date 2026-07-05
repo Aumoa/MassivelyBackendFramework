@@ -92,6 +92,7 @@ if (app.Environment.IsDevelopment())
 }
 
 await InitializeClaudeSettingsAsync(app.Lifetime.ApplicationStopping);
+await InitializeAutoResponseSettingsAsync(app.Lifetime.ApplicationStopping);
 await InitializeAiSkillsAsync(app.Lifetime.ApplicationStopping);
 
 app.Run();
@@ -105,6 +106,7 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
 
     sc.Configure<DiscordService.Configuration>(conf.GetRequiredSection("Discord"));
     sc.Configure<AutoResponseOptions>(conf.GetSection("AutoResponse"));
+    sc.AddSingleton<IAutoResponseSettingsService, AutoResponseSettingsService>();
     sc.AddSingleton<IDiscordAutoResponseEvaluator, DiscordAutoResponseEvaluator>();
     sc.AddSingleton<IDiscordAutoResponseCoordinator, DiscordAutoResponseCoordinator>();
     sc.AddHostedService<DiscordService>();
@@ -165,6 +167,11 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddScoped<IToolSettingsService, ToolSettingsService>();
     sc.AddSingleton<IClaudeSettingsRepository, MySqlClaudeSettingsRepository>();
     sc.AddSingleton<IClaudeSettingsService, ClaudeSettingsService>();
+    sc.AddSingleton<MySqlAutoResponseSettingsRepository>();
+    sc.AddSingleton<IAutoResponseSettingsRepository>(
+        sp => sp.GetRequiredService<MySqlAutoResponseSettingsRepository>());
+    sc.AddSingleton<IAutoResponseEventRepository>(
+        sp => sp.GetRequiredService<MySqlAutoResponseSettingsRepository>());
     sc.AddSingleton<IAiSkillRepository, MySqlAiSkillRepository>();
 }
 
@@ -181,6 +188,13 @@ async ValueTask InitializeClaudeSettingsAsync(CancellationToken cancellationToke
 {
     using var scope = app.Services.CreateScope();
     var settings = scope.ServiceProvider.GetRequiredService<IClaudeSettingsService>();
+    await settings.GetAsync(cancellationToken);
+}
+
+async ValueTask InitializeAutoResponseSettingsAsync(CancellationToken cancellationToken)
+{
+    using var scope = app.Services.CreateScope();
+    var settings = scope.ServiceProvider.GetRequiredService<IAutoResponseSettingsService>();
     await settings.GetAsync(cancellationToken);
 }
 

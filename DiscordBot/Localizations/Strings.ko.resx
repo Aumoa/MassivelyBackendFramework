@@ -82,6 +82,9 @@
   <data name="NAVMENU_LABEL_AI_SKILLS" xml:space="preserve">
     <value>AI Skill</value>
   </data>
+  <data name="NAVMENU_LABEL_AUTO_RESPONSE" xml:space="preserve">
+    <value>자동 응답</value>
+  </data>
   <data name="NAVMENU_LABEL_SERVER_LOGS" xml:space="preserve">
     <value>로그</value>
   </data>
@@ -447,6 +450,83 @@
   </data>
   <data name="TOOLS_TOOL_CALCULATE_PARAM_EXPRESSION" xml:space="preserve">
     <value>계산할 수식입니다.</value>
+  </data>
+
+  <!-- AutoResponse -->
+  <data name="AUTO_RESPONSE_TITLE" xml:space="preserve">
+    <value>자동 응답</value>
+  </data>
+  <data name="AUTO_RESPONSE_SUBTITLE" xml:space="preserve">
+    <value>런타임 트리거 설정과 최근 자동 응답 판단 기록</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_ENABLED" xml:space="preserve">
+    <value>사용</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_INTERVAL_SECONDS" xml:space="preserve">
+    <value>판단 주기 초</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_COOLDOWN_SECONDS" xml:space="preserve">
+    <value>쿨다운 초</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_MAX_BUFFERED_MESSAGES" xml:space="preserve">
+    <value>최대 버퍼 메시지 수</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_CLASSIFIER_MAX_TOKENS" xml:space="preserve">
+    <value>분류 최대 토큰</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_CLASSIFIER_MODEL" xml:space="preserve">
+    <value>분류 모델</value>
+  </data>
+  <data name="AUTO_RESPONSE_LABEL_BOT_ALIASES" xml:space="preserve">
+    <value>봇 이름 별칭</value>
+  </data>
+  <data name="AUTO_RESPONSE_BUTTON_SAVE" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="AUTO_RESPONSE_BUTTON_REFRESH" xml:space="preserve">
+    <value>새로고침</value>
+  </data>
+  <data name="AUTO_RESPONSE_STATUS_LOADING" xml:space="preserve">
+    <value>불러오는 중...</value>
+  </data>
+  <data name="AUTO_RESPONSE_STATUS_SAVED" xml:space="preserve">
+    <value>자동 응답 설정을 저장했습니다.</value>
+  </data>
+  <data name="AUTO_RESPONSE_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>자동 응답 설정을 불러오지 못했습니다.</value>
+  </data>
+  <data name="AUTO_RESPONSE_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>자동 응답 설정을 저장하지 못했습니다.</value>
+  </data>
+  <data name="AUTO_RESPONSE_ERROR_EVENTS_LOAD_FAILED" xml:space="preserve">
+    <value>자동 응답 기록을 불러오지 못했습니다.</value>
+  </data>
+  <data name="AUTO_RESPONSE_ERROR_NUMBER_RANGE" xml:space="preserve">
+    <value>숫자 설정은 0보다 커야 합니다.</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENTS_TITLE" xml:space="preserve">
+    <value>최근 판단 기록</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENTS_EMPTY" xml:space="preserve">
+    <value>기록된 자동 응답 판단이 없습니다.</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_TIME" xml:space="preserve">
+    <value>시간</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_DECISION" xml:space="preserve">
+    <value>판정</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_CHANNEL" xml:space="preserve">
+    <value>채널</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_MESSAGES" xml:space="preserve">
+    <value>메시지</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_REASON" xml:space="preserve">
+    <value>이유</value>
+  </data>
+  <data name="AUTO_RESPONSE_EVENT_LABEL_FOCUS" xml:space="preserve">
+    <value>초점</value>
   </data>
 
   <!-- ServerLogs -->

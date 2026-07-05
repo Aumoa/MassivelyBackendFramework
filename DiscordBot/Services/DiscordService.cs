@@ -400,7 +400,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             ReferencesBotMessage: referencesBotMessage,
             HasAttachments: message.Attachments.Count > 0 || message.Embeds.Count > 0);
 
-        autoResponse.Observe(
+        await autoResponse.ObserveAsync(
             autoResponseMessage,
             async (request, cancellationToken) => await GenerateResponseAsync(
                 message,

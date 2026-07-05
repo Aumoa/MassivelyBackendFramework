@@ -1,5 +1,4 @@
 using DiscordBot.Options;
-using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
@@ -9,7 +8,7 @@ internal sealed record DiscordAutoResponseRequest(
 
 internal interface IDiscordAutoResponseCoordinator
 {
-    void Observe(
+    ValueTask ObserveAsync(
         DiscordAutoResponseMessage message,
         Func<DiscordAutoResponseRequest, CancellationToken, Task> respondAsync);
 
@@ -18,7 +17,7 @@ internal interface IDiscordAutoResponseCoordinator
 
 internal sealed class DiscordAutoResponseCoordinator(
     IDiscordAutoResponseEvaluator evaluator,
-    IOptions<AutoResponseOptions> options,
+    IAutoResponseSettingsService autoResponseSettings,
     ILogger<DiscordAutoResponseCoordinator> logger) : IDiscordAutoResponseCoordinator, IDisposable
 {
     private const int DefaultIntervalSeconds = 45;
@@ -32,11 +31,11 @@ internal sealed class DiscordAutoResponseCoordinator(
     private readonly Dictionary<string, ChannelState> m_Channels = [];
     private bool m_Disposed;
 
-    public void Observe(
+    public async ValueTask ObserveAsync(
         DiscordAutoResponseMessage message,
         Func<DiscordAutoResponseRequest, CancellationToken, Task> respondAsync)
     {
-        var currentOptions = options.Value;
+        var currentOptions = (await autoResponseSettings.GetAsync()).ToOptions();
         if (!currentOptions.Enabled || m_Disposed)
         {
             return;
@@ -142,23 +141,51 @@ internal sealed class DiscordAutoResponseCoordinator(
         CancellationTokenSource delayCts)
     {
         var cancellationToken = delayCts.Token;
+        IReadOnlyList<DiscordAutoResponseMessage> batch = [];
         try
         {
+            var currentOptions = (await autoResponseSettings.GetAsync(cancellationToken)).ToOptions();
+            if (!currentOptions.Enabled)
+            {
+                ClearPendingDelay(channelId, evaluationVersion);
+                return;
+            }
+
             var delay = TimeSpan.FromSeconds(NormalizeRange(
-                options.Value.IntervalSeconds,
+                currentOptions.IntervalSeconds,
                 DefaultIntervalSeconds,
                 MaxIntervalSeconds));
             await Task.Delay(delay, cancellationToken);
 
-            var batch = TakeBatch(channelId, evaluationVersion, out var respondAsync);
+            currentOptions = (await autoResponseSettings.GetAsync(cancellationToken)).ToOptions();
+            if (!currentOptions.Enabled)
+            {
+                batch = TakeBatch(channelId, evaluationVersion, out _);
+                await RecordEventAsync(
+                    batch,
+                    "disabled",
+                    "auto_response_disabled",
+                    string.Empty,
+                    cancellationToken);
+                ClearActiveEvaluation(channelId, evaluationVersion);
+                return;
+            }
+
+            batch = TakeBatch(channelId, evaluationVersion, out var respondAsync);
             if (batch.Count == 0 || respondAsync == null)
             {
                 return;
             }
 
-            if (IsCoolingDown(channelId))
+            if (IsCoolingDown(channelId, currentOptions))
             {
-                logger.LogDebug("Skipping auto response for channel {ChannelId}: cooldown is active.", channelId);
+                logger.LogInformation("Skipping auto response for channel {ChannelId}: cooldown is active.", channelId);
+                await RecordEventAsync(
+                    batch,
+                    "cooldown",
+                    "cooldown_active",
+                    string.Empty,
+                    cancellationToken);
                 ClearActiveEvaluation(channelId, evaluationVersion);
                 return;
             }
@@ -166,23 +193,45 @@ internal sealed class DiscordAutoResponseCoordinator(
             var decision = await evaluator.EvaluateAsync(batch, cancellationToken);
             if (!decision.ShouldRespond)
             {
-                logger.LogDebug(
+                logger.LogInformation(
                     "Auto response declined for channel {ChannelId}: {Reason}",
                     channelId,
                     decision.Reason);
+                await RecordEventAsync(
+                    batch,
+                    "declined",
+                    decision.Reason,
+                    decision.Focus,
+                    cancellationToken);
                 ClearActiveEvaluation(channelId, evaluationVersion);
                 return;
             }
 
             if (!IsCurrentEvaluation(channelId, evaluationVersion))
             {
-                logger.LogDebug(
+                logger.LogInformation(
                     "Skipping stale auto response for channel {ChannelId}: conversation changed during evaluation.",
                     channelId);
+                await RecordEventAsync(
+                    batch,
+                    "stale",
+                    "conversation_changed_during_evaluation",
+                    decision.Focus,
+                    cancellationToken);
                 return;
             }
 
             MarkResponded(channelId, evaluationVersion);
+            logger.LogInformation(
+                "Auto response accepted for channel {ChannelId}: {Reason}",
+                channelId,
+                decision.Reason);
+            await RecordEventAsync(
+                batch,
+                "accepted",
+                decision.Reason,
+                decision.Focus,
+                cancellationToken);
             await respondAsync(new DiscordAutoResponseRequest(batch, decision), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -191,11 +240,34 @@ internal sealed class DiscordAutoResponseCoordinator(
         catch (Exception e)
         {
             logger.LogError(e, "Failed to evaluate Discord auto response for channel {ChannelId}.", channelId);
+            await RecordEventAsync(
+                batch,
+                "error",
+                e.GetType().Name,
+                string.Empty,
+                CancellationToken.None);
             ClearActiveEvaluation(channelId, evaluationVersion);
         }
         finally
         {
             delayCts.Dispose();
+        }
+    }
+
+    private void ClearPendingDelay(string channelId, int evaluationVersion)
+    {
+        lock (m_Lock)
+        {
+            if (!m_Channels.TryGetValue(channelId, out var state)
+                || state.EvaluationVersion != evaluationVersion)
+            {
+                return;
+            }
+
+            state.DelayCts = null;
+            state.Messages.Clear();
+            state.RespondAsync = null;
+            state.IsEvaluating = false;
         }
     }
 
@@ -250,7 +322,7 @@ internal sealed class DiscordAutoResponseCoordinator(
         }
     }
 
-    private bool IsCoolingDown(string channelId)
+    private bool IsCoolingDown(string channelId, AutoResponseOptions options)
     {
         lock (m_Lock)
         {
@@ -261,10 +333,40 @@ internal sealed class DiscordAutoResponseCoordinator(
             }
 
             var cooldown = TimeSpan.FromSeconds(NormalizeRange(
-                options.Value.CooldownSeconds,
+                options.CooldownSeconds,
                 DefaultCooldownSeconds,
                 MaxCooldownSeconds));
             return DateTimeOffset.UtcNow - state.LastResponseAt.Value < cooldown;
+        }
+    }
+
+    private async ValueTask RecordEventAsync(
+        IReadOnlyList<DiscordAutoResponseMessage> batch,
+        string decision,
+        string reason,
+        string focus,
+        CancellationToken cancellationToken)
+    {
+        if (batch.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await autoResponseSettings.RecordEventAsync(
+                batch,
+                decision,
+                reason,
+                focus,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Failed to record Discord auto response event.");
         }
     }
 

@@ -1,0 +1,267 @@
+@page "/auto-response"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IAutoResponseSettingsService AutoResponseSettingsService
+
+<PageTitle>@T("AUTO_RESPONSE_TITLE") - @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">@T("AUTO_RESPONSE_TITLE")</h1>
+    <p class="page-subtitle">@T("AUTO_RESPONSE_SUBTITLE")</p>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@if (isLoading)
+{
+    <p class="empty-state">@T("AUTO_RESPONSE_STATUS_LOADING")</p>
+}
+else
+{
+    <form class="auto-response-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <label class="enabled-field">
+            <input type="checkbox" @bind="enabled" disabled="@isBusy" />
+            <span>@T("AUTO_RESPONSE_LABEL_ENABLED")</span>
+        </label>
+        <label>
+            <span>@T("AUTO_RESPONSE_LABEL_INTERVAL_SECONDS")</span>
+            <input type="number" min="1" max="600" @bind="intervalSeconds" disabled="@isBusy" required />
+        </label>
+        <label>
+            <span>@T("AUTO_RESPONSE_LABEL_COOLDOWN_SECONDS")</span>
+            <input type="number" min="1" max="3600" @bind="cooldownSeconds" disabled="@isBusy" required />
+        </label>
+        <label>
+            <span>@T("AUTO_RESPONSE_LABEL_MAX_BUFFERED_MESSAGES")</span>
+            <input type="number" min="1" max="50" @bind="maxBufferedMessages" disabled="@isBusy" required />
+        </label>
+        <label>
+            <span>@T("AUTO_RESPONSE_LABEL_CLASSIFIER_MAX_TOKENS")</span>
+            <input type="number" min="1" max="512" @bind="classifierMaxTokens" disabled="@isBusy" required />
+        </label>
+        <label>
+            <span>@T("AUTO_RESPONSE_LABEL_CLASSIFIER_MODEL")</span>
+            <input @bind="classifierModel" disabled="@isBusy" maxlength="128" />
+        </label>
+        <label class="form-full">
+            <span>@T("AUTO_RESPONSE_LABEL_BOT_ALIASES")</span>
+            <textarea @bind="botNameAliasesText" disabled="@isBusy" rows="4" maxlength="1024"></textarea>
+        </label>
+        <div class="form-actions">
+            <button class="btn-primary" type="submit" disabled="@isBusy">
+                <span class="material-symbols-outlined">save</span>
+                @T("AUTO_RESPONSE_BUTTON_SAVE")
+            </button>
+            <button class="btn-ghost" type="button" @onclick="LoadAsync" disabled="@isBusy">
+                <span class="material-symbols-outlined">refresh</span>
+                @T("AUTO_RESPONSE_BUTTON_REFRESH")
+            </button>
+        </div>
+    </form>
+
+    <section class="auto-response-events">
+        <div class="section-heading">
+            <h2>@T("AUTO_RESPONSE_EVENTS_TITLE")</h2>
+            <button class="btn-ghost" type="button" @onclick="LoadEventsAsync" disabled="@isBusy">
+                <span class="material-symbols-outlined">refresh</span>
+                @T("AUTO_RESPONSE_BUTTON_REFRESH")
+            </button>
+        </div>
+
+        @if (events.Count == 0)
+        {
+            <p class="empty-state">@T("AUTO_RESPONSE_EVENTS_EMPTY")</p>
+        }
+        else
+        {
+            <div class="event-table-wrap">
+                <table class="event-table">
+                    <thead>
+                        <tr>
+                            <th>@T("AUTO_RESPONSE_EVENT_LABEL_TIME")</th>
+                            <th>@T("AUTO_RESPONSE_EVENT_LABEL_DECISION")</th>
+                            <th>@T("AUTO_RESPONSE_EVENT_LABEL_CHANNEL")</th>
+                            <th>@T("AUTO_RESPONSE_EVENT_LABEL_MESSAGES")</th>
+                            <th>@T("AUTO_RESPONSE_EVENT_LABEL_REASON")</th>
+                            <th>@T("AUTO_RESPONSE_EVENT_LABEL_FOCUS")</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in events)
+                        {
+                            <tr @key="entry.Id">
+                                <td>@FormatTimestamp(entry.CreatedAt)</td>
+                                <td>
+                                    <span class="decision-badge @GetDecisionClass(entry.Decision)">@FormatDecision(entry.Decision)</span>
+                                </td>
+                                <td class="mono">@entry.ChannelId</td>
+                                <td class="mono">@FormatMessageIds(entry)</td>
+                                <td>@entry.Reason</td>
+                                <td>@entry.Focus</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlyList<AutoResponseEventView> events = [];
+    private bool enabled;
+    private int intervalSeconds;
+    private int cooldownSeconds;
+    private int maxBufferedMessages;
+    private int classifierMaxTokens;
+    private string? classifierModel;
+    private string botNameAliasesText = string.Empty;
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var settings = await AutoResponseSettingsService.GetAsync();
+            enabled = settings.Enabled;
+            intervalSeconds = settings.IntervalSeconds;
+            cooldownSeconds = settings.CooldownSeconds;
+            maxBufferedMessages = settings.MaxBufferedMessages;
+            classifierMaxTokens = settings.ClassifierMaxTokens;
+            classifierModel = settings.ClassifierModel ?? string.Empty;
+            botNameAliasesText = string.Join(Environment.NewLine, settings.BotNameAliases);
+            await LoadEventsAsync();
+        }
+        catch
+        {
+            SetStatus("error", T("AUTO_RESPONSE_ERROR_LOAD_FAILED"));
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadEventsAsync()
+    {
+        try
+        {
+            events = await AutoResponseSettingsService.GetRecentEventsAsync(100);
+        }
+        catch
+        {
+            SetStatus("error", T("AUTO_RESPONSE_ERROR_EVENTS_LOAD_FAILED"));
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        if (intervalSeconds <= 0
+            || cooldownSeconds <= 0
+            || maxBufferedMessages <= 0
+            || classifierMaxTokens <= 0)
+        {
+            SetStatus("error", T("AUTO_RESPONSE_ERROR_NUMBER_RANGE"));
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await AutoResponseSettingsService.SaveAsync(new AutoResponseSettingsSaveRequest(
+                enabled,
+                intervalSeconds,
+                cooldownSeconds,
+                maxBufferedMessages,
+                classifierMaxTokens,
+                classifierModel,
+                ParseAliases(botNameAliasesText)));
+            SetStatus("success", T("AUTO_RESPONSE_STATUS_SAVED"));
+        }
+        catch
+        {
+            SetStatus("error", T("AUTO_RESPONSE_ERROR_SAVE_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+
+    private static IReadOnlyList<string> ParseAliases(string text)
+    {
+        return text
+            .Split(['\r', '\n', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(alias => !string.IsNullOrWhiteSpace(alias))
+            .ToArray();
+    }
+
+    private static string FormatTimestamp(DateTime timestamp)
+    {
+        return timestamp.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture);
+    }
+
+    private static string FormatMessageIds(AutoResponseEventView entry)
+    {
+        if (entry.MessageIds.Count == 0)
+        {
+            return entry.TriggerMessageId ?? string.Empty;
+        }
+
+        var visibleIds = entry.MessageIds.Take(3).ToArray();
+        var suffix = entry.MessageIds.Count > visibleIds.Length
+            ? $" +{entry.MessageIds.Count - visibleIds.Length}"
+            : string.Empty;
+        return string.Join(", ", visibleIds) + suffix;
+    }
+
+    private static string FormatDecision(string decision)
+    {
+        return string.IsNullOrWhiteSpace(decision)
+            ? "unknown"
+            : decision;
+    }
+
+    private static string GetDecisionClass(string decision)
+    {
+        return decision switch
+        {
+            "accepted" => "accepted",
+            "declined" => "declined",
+            "cooldown" or "disabled" or "stale" => "skipped",
+            "error" => "error",
+            _ => "unknown"
+        };
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+}
