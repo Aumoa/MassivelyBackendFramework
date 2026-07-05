@@ -49,7 +49,12 @@ Discord 메시지 URL은 이 도구가 아니라 채팅 조회 도구를 사용�
             MinCharacters,
             NormalizeRange(currentOptions.MaxCharacters, 50_000, MinCharacters, HardMaxCharacters));
         var maxRedirects = NormalizeRange(currentOptions.MaxRedirects, 5, 0, 10);
+        var timeout = TimeSpan.FromSeconds(NormalizeRange(currentOptions.TimeoutSeconds, 15, 1, 120));
         var httpClient = httpClientFactory.CreateClient(WebPageReadOptions.HttpClientName);
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(timeout);
+        var operationToken = timeoutCts.Token;
 
         try
         {
@@ -58,7 +63,7 @@ Discord 메시지 URL은 이 도구가 아니라 채팅 조회 도구를 사용�
                 var validationError = await WebPageAddressSafety.GetPublicUriValidationErrorAsync(
                     uri,
                     addressResolver,
-                    cancellationToken);
+                    operationToken);
                 if (!string.IsNullOrWhiteSpace(validationError))
                 {
                     return $"정적 웹페이지 텍스트를 읽지 못했습니다. 공개 HTTP/HTTPS 웹페이지만 지원합니다: {validationError}";
@@ -70,7 +75,7 @@ Discord 메시지 URL은 이 도구가 아니라 채팅 조회 도구를 사용�
                 using var response = await httpClient.SendAsync(
                     request,
                     HttpCompletionOption.ResponseHeadersRead,
-                    cancellationToken);
+                    operationToken);
 
                 if (IsRedirect(response.StatusCode))
                 {
@@ -100,7 +105,7 @@ Discord 메시지 URL은 이 도구가 아니라 채팅 조회 도구를 사용�
                     return $"정적 웹페이지 텍스트를 읽지 못했습니다. 텍스트/HTML 콘텐츠로 보이지 않습니다: {mediaType ?? "(unknown)"}";
                 }
 
-                var (bytes, readError) = await ReadContentBytesAsync(response.Content, maxBytes, cancellationToken);
+                var (bytes, readError) = await ReadContentBytesAsync(response.Content, maxBytes, operationToken);
                 if (!string.IsNullOrWhiteSpace(readError) || bytes == null)
                 {
                     return readError ?? "정적 웹페이지 본문을 읽지 못했습니다.";
@@ -137,7 +142,7 @@ Characters: {readableText.Length}{(truncated ? $" (truncated to {maxCharacters})
 """;
             }
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
             return "정적 웹페이지 텍스트 요청 시간이 초과되었습니다.";
         }

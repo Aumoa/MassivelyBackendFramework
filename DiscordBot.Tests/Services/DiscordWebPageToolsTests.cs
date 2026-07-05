@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -55,6 +56,21 @@ public sealed class DiscordWebPageToolsTests
         Assert.Empty(factory.Requests);
     }
 
+    [Theory]
+    [InlineData("https://localhost/admin")]
+    [InlineData("https://service.localhost/admin")]
+    [InlineData("https://intranet/admin")]
+    public async Task ReadStaticWebPageAsync_RejectsLocalhostAndSingleLabelHostsBeforeHttpRequest(string url)
+    {
+        var factory = new StubHttpClientFactory();
+        var tool = CreateTool(factory);
+
+        var result = await tool.ReadStaticWebPageAsync(url);
+
+        Assert.Contains("정적 웹페이지 텍스트를 읽지 못했습니다", result);
+        Assert.Empty(factory.Requests);
+    }
+
     [Fact]
     public async Task ReadStaticWebPageAsync_RejectsRedirectToPrivateAddress()
     {
@@ -66,6 +82,22 @@ public sealed class DiscordWebPageToolsTests
         var result = await tool.ReadStaticWebPageAsync("https://example.com/start");
 
         Assert.Contains("127.0.0.1", result);
+        Assert.Single(factory.Requests);
+    }
+
+    [Fact]
+    public async Task ReadStaticWebPageAsync_RevalidatesRedirectHostDnsBeforeSecondRequest()
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.Found);
+        response.Headers.Location = new Uri("https://private.example/admin");
+        var factory = new StubHttpClientFactory(response);
+        var resolver = new StubWebPageAddressResolver();
+        resolver.Set("private.example", IPAddress.Parse("192.168.1.10"));
+        var tool = CreateTool(factory, resolver);
+
+        var result = await tool.ReadStaticWebPageAsync("https://example.com/start");
+
+        Assert.Contains("192.168.1.10", result);
         Assert.Single(factory.Requests);
     }
 
@@ -100,6 +132,74 @@ public sealed class DiscordWebPageToolsTests
 
         Assert.Contains("truncated to 1000", result);
         Assert.Contains("...(truncated)", result);
+    }
+
+    [Fact]
+    public async Task ReadStaticWebPageAsync_TimesOutSlowResponseBody()
+    {
+        var factory = new StubHttpClientFactory(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StreamContent(new BlockingReadStream())
+            {
+                Headers =
+                {
+                    ContentType = new MediaTypeHeaderValue("text/plain")
+                }
+            }
+        });
+        var tool = CreateTool(factory, options: new WebPageReadOptions { TimeoutSeconds = 1 });
+        var stopwatch = Stopwatch.StartNew();
+
+        var result = await tool.ReadStaticWebPageAsync("https://example.com/slow");
+
+        Assert.Contains("요청 시간이 초과", result);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(5));
+    }
+
+    [Theory]
+    [InlineData("0.0.0.1")]
+    [InlineData("10.0.0.1")]
+    [InlineData("100.64.0.1")]
+    [InlineData("127.0.0.1")]
+    [InlineData("169.254.1.1")]
+    [InlineData("172.16.0.1")]
+    [InlineData("192.168.1.1")]
+    [InlineData("192.0.0.1")]
+    [InlineData("192.0.2.1")]
+    [InlineData("198.51.100.1")]
+    [InlineData("203.0.113.1")]
+    [InlineData("224.0.0.1")]
+    [InlineData("::")]
+    [InlineData("::1")]
+    [InlineData("fe80::1")]
+    [InlineData("fc00::1")]
+    [InlineData("2001:db8::1")]
+    [InlineData("ff02::1")]
+    public void IsPublicAddress_RejectsRepresentativeBlockedRanges(string address)
+    {
+        Assert.False(WebPageAddressSafety.IsPublicAddress(IPAddress.Parse(address)));
+    }
+
+    [Theory]
+    [InlineData("93.184.216.34")]
+    [InlineData("2606:4700:4700::1111")]
+    public void IsPublicAddress_AllowsRepresentativePublicAddresses(string address)
+    {
+        Assert.True(WebPageAddressSafety.IsPublicAddress(IPAddress.Parse(address)));
+    }
+
+    [Fact]
+    public async Task ConnectToPublicAddressAsync_RejectsPrivateResolvedAddressBeforeSocketConnect()
+    {
+        var resolver = new StubWebPageAddressResolver();
+        resolver.Set("private.example", IPAddress.Parse("10.0.0.7"));
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(
+            async () => await WebPageAddressSafety.ConnectToPublicAddressAsync(
+                new DnsEndPoint("private.example", 443),
+                resolver));
+
+        Assert.Contains("non-public IP", exception.Message);
     }
 
     private static DiscordWebPageTools CreateTool(
@@ -167,6 +267,64 @@ public sealed class DiscordWebPageToolsTests
                     Content = new StringContent(string.Empty, Encoding.UTF8, "text/plain")
                 }
                 : responses.Dequeue());
+        }
+    }
+
+    private sealed class BlockingReadStream : Stream
+    {
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override async ValueTask<int> ReadAsync(
+            Memory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
+        }
+
+        public override Task<int> ReadAsync(
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken)
+        {
+            return ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
         }
     }
 }
