@@ -10,7 +10,7 @@ namespace DiscordBot.Tests.Services;
 public sealed class DiscordWebPageToolsTests
 {
     [Fact]
-    public async Task ReadWebPageAsync_UsesNamedClientAndReturnsReadableHtml()
+    public async Task ReadStaticWebPageAsync_UsesNamedClientAndReturnsReadableHtmlWithLimitNotice()
     {
         var factory = new StubHttpClientFactory(new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -26,9 +26,12 @@ public sealed class DiscordWebPageToolsTests
         });
         var tool = CreateTool(factory);
 
-        var result = await tool.ReadWebPageAsync("https://example.com/page");
+        var result = await tool.ReadStaticWebPageAsync("https://example.com/page");
 
         Assert.Equal(WebPageReadOptions.HttpClientName, factory.RequestedName);
+        Assert.Contains("정적 웹페이지 텍스트 읽기 결과", result);
+        Assert.Contains("Fetch-Mode: static HTTP GET; JavaScript was not executed.", result);
+        Assert.Contains("가져온 정적 텍스트 기준", result);
         Assert.Contains("Source: https://example.com/page", result);
         Assert.Contains("Example Title", result);
         Assert.Contains("Hello & welcome", result);
@@ -38,35 +41,36 @@ public sealed class DiscordWebPageToolsTests
     }
 
     [Fact]
-    public async Task ReadWebPageAsync_RejectsPrivateResolvedAddressBeforeHttpRequest()
+    public async Task ReadStaticWebPageAsync_RejectsPrivateResolvedAddressBeforeHttpRequest()
     {
         var factory = new StubHttpClientFactory();
         var resolver = new StubWebPageAddressResolver();
         resolver.Set("example.com", IPAddress.Parse("10.0.0.5"));
         var tool = CreateTool(factory, resolver);
 
-        var result = await tool.ReadWebPageAsync("https://example.com/private");
+        var result = await tool.ReadStaticWebPageAsync("https://example.com/private");
 
+        Assert.Contains("정적 웹페이지 텍스트를 읽지 못했습니다", result);
         Assert.Contains("공개 주소가 아닌 IP", result);
         Assert.Empty(factory.Requests);
     }
 
     [Fact]
-    public async Task ReadWebPageAsync_RejectsRedirectToPrivateAddress()
+    public async Task ReadStaticWebPageAsync_RejectsRedirectToPrivateAddress()
     {
         var response = new HttpResponseMessage(HttpStatusCode.Found);
         response.Headers.Location = new Uri("http://127.0.0.1/admin");
         var factory = new StubHttpClientFactory(response);
         var tool = CreateTool(factory);
 
-        var result = await tool.ReadWebPageAsync("https://example.com/start");
+        var result = await tool.ReadStaticWebPageAsync("https://example.com/start");
 
         Assert.Contains("127.0.0.1", result);
         Assert.Single(factory.Requests);
     }
 
     [Fact]
-    public async Task ReadWebPageAsync_RejectsNonTextContentType()
+    public async Task ReadStaticWebPageAsync_RejectsNonTextContentType()
     {
         var content = new ByteArrayContent([1, 2, 3]);
         content.Headers.ContentType = new MediaTypeHeaderValue("image/png");
@@ -76,14 +80,14 @@ public sealed class DiscordWebPageToolsTests
         });
         var tool = CreateTool(factory);
 
-        var result = await tool.ReadWebPageAsync("https://example.com/image.png");
+        var result = await tool.ReadStaticWebPageAsync("https://example.com/image.png");
 
-        Assert.Contains("텍스트 웹페이지로 보이지 않는 콘텐츠 유형", result);
+        Assert.Contains("텍스트/HTML 콘텐츠로 보이지 않습니다", result);
         Assert.Contains("image/png", result);
     }
 
     [Fact]
-    public async Task ReadWebPageAsync_TruncatesToRequestedCharacterLimit()
+    public async Task ReadStaticWebPageAsync_TruncatesToRequestedCharacterLimit()
     {
         var text = new string('a', 1500);
         var factory = new StubHttpClientFactory(new HttpResponseMessage(HttpStatusCode.OK)
@@ -92,7 +96,7 @@ public sealed class DiscordWebPageToolsTests
         });
         var tool = CreateTool(factory);
 
-        var result = await tool.ReadWebPageAsync("https://example.com/long", max_characters: 1000);
+        var result = await tool.ReadStaticWebPageAsync("https://example.com/long", max_characters: 1000);
 
         Assert.Contains("truncated to 1000", result);
         Assert.Contains("...(truncated)", result);

@@ -21,13 +21,15 @@ internal sealed partial class DiscordWebPageTools(
     private const int MinCharacters = 1_000;
 
     [ToolFunction(
-        Name = "read_web_page",
-        Description = @"공개 HTTP/HTTPS 웹페이지의 텍스트 내용을 읽습니다.
+        Name = "read_static_web_page",
+        Description = @"공개 HTTP/HTTPS 웹페이지의 정적 텍스트를 제한적으로 읽습니다.
 
-사용자가 뉴스, 문서, 블로그, 공지, 일반 웹페이지 URL을 주며 내용을 확인/요약/분석해 달라고 할 때 사용하세요.
+이 도구는 브라우저가 아니라 HTTP GET으로 서버가 처음 반환한 HTML/텍스트에서 내용을 추출합니다. JavaScript 실행, 로그인, 쿠키, 버튼 클릭, 스크롤, 동영상/이미지 분석은 지원하지 않습니다.
+사용자가 뉴스, 문서, 블로그, 공지, 일반 웹페이지 URL을 주며 내용을 확인/요약/분석해 달라고 할 때만 사용하세요.
 Discord 메시지 URL은 이 도구가 아니라 채팅 조회 도구를 사용하세요.
-동영상, 이미지, 파일 다운로드, 로그인/권한이 필요한 페이지, localhost/사설망/내부망 주소에는 사용하지 마세요.")]
-    public async Task<string> ReadWebPageAsync(
+최종 답변에서는 반드시 '가져온 정적 텍스트 기준'이라고 밝혀 사용자가 브라우저 렌더링 전체를 확인한 것으로 오해하지 않게 하세요.
+동적 렌더링 페이지처럼 내용이 부족하면 읽을 수 없다고 말하고, 본문을 붙여 달라고 안내하세요.")]
+    public async Task<string> ReadStaticWebPageAsync(
         [ToolParameterInfo(Description = "읽을 공개 HTTP/HTTPS 웹페이지 URL입니다.")]
         string url,
         [ToolParameterInfo(Description = "응답에 포함할 추출 텍스트 최대 글자 수입니다. 기본 12000, 최대 60000입니다.")]
@@ -59,7 +61,7 @@ Discord 메시지 URL은 이 도구가 아니라 채팅 조회 도구를 사용�
                     cancellationToken);
                 if (!string.IsNullOrWhiteSpace(validationError))
                 {
-                    return $"공개 HTTP/HTTPS 웹페이지만 읽을 수 있습니다: {validationError}";
+                    return $"정적 웹페이지 텍스트를 읽지 못했습니다. 공개 HTTP/HTTPS 웹페이지만 지원합니다: {validationError}";
                 }
 
                 using var request = new HttpRequestMessage(HttpMethod.Get, uri);
@@ -74,7 +76,7 @@ Discord 메시지 URL은 이 도구가 아니라 채팅 조회 도구를 사용�
                 {
                     if (redirectCount >= maxRedirects)
                     {
-                        return $"웹페이지 리다이렉트가 {maxRedirects}회를 초과해 중단했습니다.";
+                        return $"정적 웹페이지 텍스트를 읽지 못했습니다. 리다이렉트가 {maxRedirects}회를 초과했습니다.";
                     }
 
                     if (!TryCreateRedirectUri(uri, response.Headers.Location, out var redirectUri, out var redirectError))
@@ -88,39 +90,48 @@ Discord 메시지 URL은 이 도구가 아니라 채팅 조회 도구를 사용�
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    return $"웹페이지를 가져오지 못했습니다. HTTP {(int)response.StatusCode} {response.ReasonPhrase}";
+                    return $"정적 웹페이지 텍스트를 읽지 못했습니다. HTTP {(int)response.StatusCode} {response.ReasonPhrase}";
                 }
 
                 var contentType = response.Content.Headers.ContentType;
                 var mediaType = contentType?.MediaType;
                 if (!IsSupportedMediaType(mediaType))
                 {
-                    return $"텍스트 웹페이지로 보이지 않는 콘텐츠 유형입니다: {mediaType ?? "(unknown)"}";
+                    return $"정적 웹페이지 텍스트를 읽지 못했습니다. 텍스트/HTML 콘텐츠로 보이지 않습니다: {mediaType ?? "(unknown)"}";
                 }
 
                 var (bytes, readError) = await ReadContentBytesAsync(response.Content, maxBytes, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(readError) || bytes == null)
                 {
-                    return readError ?? "웹페이지 본문을 읽지 못했습니다.";
+                    return readError ?? "정적 웹페이지 본문을 읽지 못했습니다.";
                 }
 
                 var decoded = DecodeContent(bytes, contentType);
                 var readableText = ExtractReadableText(decoded, mediaType);
                 if (string.IsNullOrWhiteSpace(readableText))
                 {
-                    return "웹페이지에서 읽을 수 있는 텍스트를 추출하지 못했습니다.";
+                    return "정적 웹페이지 텍스트를 읽지 못했습니다. 서버가 처음 반환한 HTML/텍스트에서 읽을 만한 본문을 추출하지 못했습니다. JavaScript 렌더링, 로그인, 이미지/동영상 중심 페이지일 수 있으니 필요한 본문을 직접 붙여 주세요.";
                 }
 
                 var truncatedText = Truncate(readableText, maxCharacters, out var truncated);
+                var contentWarning = BuildContentWarning(decoded, readableText, mediaType);
                 logger.LogInformation(
-                    "Read web page {Url}: {CharacterCount} characters extracted.",
+                    "Read static web page {Url}: {CharacterCount} characters extracted.",
                     uri,
                     readableText.Length);
 
                 return $"""
+정적 웹페이지 텍스트 읽기 결과
 Source: {uri}
+Fetch-Mode: static HTTP GET; JavaScript was not executed.
 Content-Type: {mediaType ?? "(unknown)"}
 Characters: {readableText.Length}{(truncated ? $" (truncated to {maxCharacters})" : string.Empty)}
+{contentWarning}
+
+응답 규칙:
+- 이 결과는 브라우저 렌더링 전체가 아니라 서버가 처음 반환한 HTML/텍스트에서 추출한 내용입니다.
+- 최종 답변에 "가져온 정적 텍스트 기준"이라고 밝혀 주세요.
+- 내용이 비어 있거나 질문에 필요한 본문이 부족하면 웹페이지를 실제로 확인했다고 단정하지 말고, JavaScript 렌더링/권한/비텍스트 콘텐츠 때문에 읽지 못했을 수 있다고 안내하세요.
 
 {truncatedText}
 """;
@@ -128,12 +139,12 @@ Characters: {readableText.Length}{(truncated ? $" (truncated to {maxCharacters})
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return "웹페이지 요청 시간이 초과되었습니다.";
+            return "정적 웹페이지 텍스트 요청 시간이 초과되었습니다.";
         }
         catch (HttpRequestException e)
         {
-            logger.LogWarning(e, "Failed to read web page {Url}.", uri);
-            return $"웹페이지를 가져오지 못했습니다: {e.Message}";
+            logger.LogWarning(e, "Failed to read static web page {Url}.", uri);
+            return $"정적 웹페이지 텍스트를 읽지 못했습니다: {e.Message}";
         }
     }
 
@@ -145,7 +156,7 @@ Characters: {readableText.Length}{(truncated ? $" (truncated to {maxCharacters})
         uri = null!;
         if (string.IsNullOrWhiteSpace(url))
         {
-            error = "읽을 웹페이지 URL이 필요합니다.";
+            error = "읽을 정적 웹페이지 URL이 필요합니다.";
             return false;
         }
 
@@ -169,13 +180,13 @@ Characters: {readableText.Length}{(truncated ? $" (truncated to {maxCharacters})
         redirectUri = null!;
         if (location == null)
         {
-            error = "웹페이지가 Location 헤더 없이 리다이렉트를 반환했습니다.";
+            error = "정적 웹페이지 요청 중 Location 헤더 없는 리다이렉트가 반환되었습니다.";
             return false;
         }
 
         if (!Uri.TryCreate(currentUri, location, out var parsed))
         {
-            error = "웹페이지 리다이렉트 URL을 해석하지 못했습니다.";
+            error = "정적 웹페이지 리다이렉트 URL을 해석하지 못했습니다.";
             return false;
         }
 
@@ -216,7 +227,7 @@ Characters: {readableText.Length}{(truncated ? $" (truncated to {maxCharacters})
         var contentLength = content.Headers.ContentLength;
         if (contentLength.HasValue && contentLength.Value > maxBytes)
         {
-            return (null, $"웹페이지 본문이 {contentLength.Value} bytes로 제한({maxBytes} bytes)을 초과합니다.");
+            return (null, $"정적 웹페이지 본문이 {contentLength.Value} bytes로 제한({maxBytes} bytes)을 초과합니다.");
         }
 
         await using var input = await content.ReadAsStreamAsync(cancellationToken);
@@ -231,7 +242,7 @@ Characters: {readableText.Length}{(truncated ? $" (truncated to {maxCharacters})
                 totalBytes += bytesRead;
                 if (totalBytes > maxBytes)
                 {
-                    return (null, $"웹페이지 다운로드가 제한({maxBytes} bytes)을 초과했습니다.");
+                    return (null, $"정적 웹페이지 다운로드가 제한({maxBytes} bytes)을 초과했습니다.");
                 }
 
                 output.Write(buffer, 0, bytesRead);
@@ -309,6 +320,23 @@ Characters: {readableText.Length}{(truncated ? $" (truncated to {maxCharacters})
 
         truncated = true;
         return value[..maxCharacters].TrimEnd() + "\n\n...(truncated)";
+    }
+
+    private static string BuildContentWarning(string decodedContent, string readableText, string? mediaType)
+    {
+        var normalizedMediaType = mediaType?.Trim().ToLowerInvariant();
+        if (normalizedMediaType != null && !normalizedMediaType.Contains("html", StringComparison.Ordinal))
+        {
+            return "Content-Warning: none";
+        }
+
+        if (readableText.Length < 500
+            && decodedContent.Contains("<script", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Content-Warning: extracted text is short and the page includes scripts; the main content may require JavaScript rendering.";
+        }
+
+        return "Content-Warning: static HTML text only; client-rendered content may be missing.";
     }
 
     private static int NormalizeRange(int value, int fallback, int min, int max)
