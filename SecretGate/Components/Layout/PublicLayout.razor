@@ -1,0 +1,14 @@
+@inherits LayoutComponentBase
+
+<div class="public-shell">
+    <header class="public-topbar">
+        <a class="brand" href="/">@Strings.APP_TITLE</a>
+    </header>
+    @Body
+</div>
+
+<div id="blazor-error-ui">
+    @Strings.ERROR_UNHANDLED
+    <a href="" class="reload">@Strings.ERROR_RELOAD</a>
+    <span class="dismiss">x</span>
+</div>

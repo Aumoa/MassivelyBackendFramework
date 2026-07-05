@@ -1,0 +1,14 @@
+@inject NavigationManager Nav
+@inject OpenIDConnect.IAuthenticationStateProvider Auth
+
+@code {
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Auth.NavigateToLogin(Nav, "auth/redirect", "openid profile email offline_access");
+        }
+
+        return Task.CompletedTask;
+    }
+}
