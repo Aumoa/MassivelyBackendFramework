@@ -142,6 +142,12 @@ public sealed class DiscordUserPermissionServiceTests
         Assert.Contains("Trusted Discord user authorization result", text);
         Assert.Contains("PrimaryRole: app_owner", text);
         Assert.Contains("AuthoritySources: discord_application", text);
+        Assert.DoesNotContain("OwnerUserId:", text);
+        Assert.DoesNotContain("OwnerUsername:", text);
+        Assert.DoesNotContain("TeamId:", text);
+        Assert.DoesNotContain("TeamName:", text);
+        Assert.DoesNotContain("TeamOwnerUserId:", text);
+        Assert.DoesNotContain("TeamOwnerUsername:", text);
     }
 
     private static DiscordUserPermissionData CreateData(
