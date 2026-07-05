@@ -358,6 +358,7 @@ File: note.txt
 
         Assert.NotNull(toolsProvider.FindFunction("allowed_tool"));
         Assert.NotNull(toolsProvider.FindFunction("get_chat_history"));
+        Assert.NotNull(toolsProvider.FindFunction("get_current_discord_user_authorization"));
         Assert.NotNull(toolsProvider.FindFunction("calculate"));
         Assert.Null(toolsProvider.FindFunction("removed_tool"));
     }
@@ -462,6 +463,12 @@ File: note.txt
         private string GetChatHistory()
         {
             return "history";
+        }
+
+        [ToolFunction(Name = "get_current_discord_user_authorization")]
+        private string GetCurrentDiscordUserAuthorization()
+        {
+            return "authorization";
         }
 
         [ToolFunction(Name = "calculate")]

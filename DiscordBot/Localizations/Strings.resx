@@ -82,6 +82,9 @@
   <data name="NAVMENU_LABEL_TOOLS" xml:space="preserve">
     <value>Tools</value>
   </data>
+  <data name="NAVMENU_LABEL_USERS" xml:space="preserve">
+    <value>Users</value>
+  </data>
   <data name="NAVMENU_LABEL_AI_SKILLS" xml:space="preserve">
     <value>AI Skills</value>
   </data>
@@ -362,6 +365,95 @@
     <value>Failed to update AI Skill.</value>
   </data>
 
+  <!-- UserPermissions -->
+  <data name="USER_PERMISSIONS_TITLE" xml:space="preserve">
+    <value>Users</value>
+  </data>
+  <data name="USER_PERMISSIONS_SUBTITLE" xml:space="preserve">
+    <value>Discord user permission registry</value>
+  </data>
+  <data name="USER_PERMISSIONS_DETAIL_TITLE" xml:space="preserve">
+    <value>User Permission Details</value>
+  </data>
+  <data name="USER_PERMISSIONS_DETAIL_SUBTITLE" xml:space="preserve">
+    <value>Registered permission settings</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_USER_ID" xml:space="preserve">
+    <value>User ID</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_DISPLAY_NAME" xml:space="preserve">
+    <value>Display Name</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_PERMISSION" xml:space="preserve">
+    <value>Permission</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_STATUS" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_ENABLED" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_DISABLED" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_MEMO" xml:space="preserve">
+    <value>Memo</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_CREATED_BY" xml:space="preserve">
+    <value>Created By</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_CREATED_AT" xml:space="preserve">
+    <value>Created At</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_UPDATED_AT" xml:space="preserve">
+    <value>Updated At</value>
+  </data>
+  <data name="USER_PERMISSIONS_PERMISSION_USER" xml:space="preserve">
+    <value>General User</value>
+  </data>
+  <data name="USER_PERMISSIONS_PERMISSION_ADMINISTRATOR" xml:space="preserve">
+    <value>Administrator</value>
+  </data>
+  <data name="USER_PERMISSIONS_BUTTON_ADD" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="USER_PERMISSIONS_BUTTON_BACK" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="USER_PERMISSIONS_BUTTON_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="USER_PERMISSIONS_BUTTON_DELETE" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="USER_PERMISSIONS_STATUS_LOADING" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="USER_PERMISSIONS_EMPTY" xml:space="preserve">
+    <value>No users configured.</value>
+  </data>
+  <data name="USER_PERMISSIONS_STATUS_NOT_FOUND" xml:space="preserve">
+    <value>User permission entry not found.</value>
+  </data>
+  <data name="USER_PERMISSIONS_STATUS_ADDED" xml:space="preserve">
+    <value>User permission added.</value>
+  </data>
+  <data name="USER_PERMISSIONS_STATUS_SAVED" xml:space="preserve">
+    <value>User permission saved.</value>
+  </data>
+  <data name="USER_PERMISSIONS_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>Failed to load user permissions.</value>
+  </data>
+  <data name="USER_PERMISSIONS_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>Failed to save user permission.</value>
+  </data>
+  <data name="USER_PERMISSIONS_ERROR_ACTION_FAILED" xml:space="preserve">
+    <value>Failed to update user permission.</value>
+  </data>
+  <data name="USER_PERMISSIONS_ERROR_USER_ID_REQUIRED" xml:space="preserve">
+    <value>Discord user ID is required.</value>
+  </data>
+
   <!-- Tools -->
   <data name="TOOLS_TITLE" xml:space="preserve">
     <value>Tools</value>
@@ -536,6 +628,9 @@
   </data>
   <data name="TOOLS_TOOL_GET_CURRENT_DATE_PARAM_TIMEZONE" xml:space="preserve">
     <value>IANA timezone ID.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CURRENT_DISCORD_USER_AUTHORIZATION_DESCRIPTION" xml:space="preserve">
+    <value>Checks the current Discord message author's trusted server-side permission.</value>
   </data>
   <data name="TOOLS_TOOL_CALCULATE_DESCRIPTION" xml:space="preserve">
     <value>Evaluates arithmetic and common math expressions accurately.</value>

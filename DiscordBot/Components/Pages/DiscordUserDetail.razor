@@ -1,0 +1,238 @@
+@page "/users/{Id:long}"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DiscordBot.Repositories
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IDiscordUserPermissionService UserPermissions
+@inject NavigationManager Navigation
+
+<PageTitle>@T("USER_PERMISSIONS_DETAIL_TITLE") - @Strings.APP_TITLE</PageTitle>
+
+<div class="detail-toolbar">
+    <a class="btn-ghost back-link" href="/users" title="@T("USER_PERMISSIONS_BUTTON_BACK")">
+        <span class="material-symbols-outlined">arrow_back</span>
+        <span>@T("USER_PERMISSIONS_BUTTON_BACK")</span>
+    </a>
+</div>
+
+<div class="page-header">
+    <h1 class="page-title">@T("USER_PERMISSIONS_DETAIL_TITLE")</h1>
+    <p class="page-subtitle">@T("USER_PERMISSIONS_DETAIL_SUBTITLE")</p>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@if (isLoading)
+{
+    <p class="empty-state">@T("USER_PERMISSIONS_STATUS_LOADING")</p>
+}
+else if (form is null && !loadFailed)
+{
+    <p class="empty-state">@T("USER_PERMISSIONS_STATUS_NOT_FOUND")</p>
+}
+else if (form is not null)
+{
+    <form class="user-permission-detail-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <label>
+            <span>@T("USER_PERMISSIONS_LABEL_USER_ID")</span>
+            <input class="mono" @bind="form.UserId" disabled="@isBusy" required maxlength="64" />
+        </label>
+        <label>
+            <span>@T("USER_PERMISSIONS_LABEL_DISPLAY_NAME")</span>
+            <input @bind="form.DisplayName" disabled="@isBusy" maxlength="128" />
+        </label>
+        <label>
+            <span>@T("USER_PERMISSIONS_LABEL_PERMISSION")</span>
+            <select @bind="form.Permission" disabled="@isBusy">
+                @foreach (var permission in DiscordUserPermissionLevels.All)
+                {
+                    <option value="@permission">@FormatPermission(permission)</option>
+                }
+            </select>
+        </label>
+        <label class="enabled-field">
+            <input type="checkbox" @bind="form.Enabled" disabled="@isBusy" />
+            <span>@T("USER_PERMISSIONS_LABEL_ENABLED")</span>
+        </label>
+        <label class="memo-field">
+            <span>@T("USER_PERMISSIONS_LABEL_MEMO")</span>
+            <textarea @bind="form.Memo" disabled="@isBusy" maxlength="512"></textarea>
+        </label>
+
+        <dl class="metadata-list">
+            <div>
+                <dt>@T("USER_PERMISSIONS_LABEL_CREATED_BY")</dt>
+                <dd>@user?.CreatedBy</dd>
+            </div>
+            <div>
+                <dt>@T("USER_PERMISSIONS_LABEL_CREATED_AT")</dt>
+                <dd>@DisplayDate(user?.CreatedAt)</dd>
+            </div>
+            <div>
+                <dt>@T("USER_PERMISSIONS_LABEL_UPDATED_AT")</dt>
+                <dd>@DisplayDate(user?.UpdatedAt)</dd>
+            </div>
+        </dl>
+
+        <div class="form-actions">
+            <button class="btn-primary" type="submit" disabled="@isBusy">
+                <span class="material-symbols-outlined">save</span>
+                @T("USER_PERMISSIONS_BUTTON_SAVE")
+            </button>
+            <button class="btn-danger" type="button" disabled="@isBusy" @onclick="DeleteAsync">
+                <span class="material-symbols-outlined">delete</span>
+                @T("USER_PERMISSIONS_BUTTON_DELETE")
+            </button>
+        </div>
+    </form>
+}
+
+@code {
+    [Parameter]
+    public long Id { get; set; }
+
+    private DiscordUserPermissionData? user;
+    private UserPermissionForm? form;
+    private bool isLoading = true;
+    private bool isBusy;
+    private bool loadFailed;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        loadFailed = false;
+        try
+        {
+            user = await UserPermissions.GetAsync(Id);
+            form = user is null ? null : UserPermissionForm.From(user);
+        }
+        catch
+        {
+            loadFailed = true;
+            form = null;
+            SetStatus("error", T("USER_PERMISSIONS_ERROR_LOAD_FAILED"));
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (isBusy || form is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(form.UserId))
+        {
+            SetStatus("error", T("USER_PERMISSIONS_ERROR_USER_ID_REQUIRED"));
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await UserPermissions.UpdateAsync(
+                Id,
+                form.UserId,
+                form.DisplayName,
+                form.Permission,
+                form.Enabled,
+                form.Memo);
+            await LoadAsync();
+            SetStatus("success", T("USER_PERMISSIONS_STATUS_SAVED"));
+        }
+        catch
+        {
+            SetStatus("error", T("USER_PERMISSIONS_ERROR_SAVE_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await UserPermissions.DeleteAsync(Id);
+            Navigation.NavigateTo("/users");
+        }
+        catch
+        {
+            SetStatus("error", T("USER_PERMISSIONS_ERROR_ACTION_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private static string FormatPermission(string permission)
+    {
+        return T($"USER_PERMISSIONS_PERMISSION_{ToResourceKey(permission)}");
+    }
+
+    private static string ToResourceKey(string value)
+    {
+        return value.Replace('-', '_').ToUpperInvariant();
+    }
+
+    private static string DisplayDate(DateTime? value)
+    {
+        return value?.ToLocalTime().ToString("G", CultureInfo.CurrentCulture) ?? string.Empty;
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+
+    private sealed class UserPermissionForm
+    {
+        public string UserId { get; set; } = string.Empty;
+        public string? DisplayName { get; set; }
+        public string Permission { get; set; } = DiscordUserPermissionLevels.User;
+        public string? Memo { get; set; }
+        public bool Enabled { get; set; }
+
+        public static UserPermissionForm From(DiscordUserPermissionData data)
+        {
+            return new UserPermissionForm
+            {
+                UserId = data.UserId,
+                DisplayName = data.DisplayName,
+                Permission = data.Permission,
+                Memo = data.Memo,
+                Enabled = data.Enabled
+            };
+        }
+    }
+}

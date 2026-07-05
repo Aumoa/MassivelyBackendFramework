@@ -164,6 +164,8 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddScoped<IAllowedChannelRequestService, AllowedChannelRequestService>();
     sc.AddTransient<IToolSettingsRepository, MySqlToolSettingsRepository>();
     sc.AddScoped<IToolSettingsService, ToolSettingsService>();
+    sc.AddTransient<IDiscordUserPermissionRepository, MySqlDiscordUserPermissionRepository>();
+    sc.AddScoped<IDiscordUserPermissionService, DiscordUserPermissionService>();
     sc.AddSingleton<IClaudeSettingsRepository, MySqlClaudeSettingsRepository>();
     sc.AddSingleton<IClaudeSettingsService, ClaudeSettingsService>();
     sc.AddSingleton<IAiSkillRepository, MySqlAiSkillRepository>();
