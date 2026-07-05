@@ -540,6 +540,15 @@
   <data name="TOOLS_TOOL_GET_CURRENT_DISCORD_USER_AUTHORIZATION_DESCRIPTION" xml:space="preserve">
     <value>Checks the current Discord message author's trusted server-side permission.</value>
   </data>
+  <data name="TOOLS_TOOL_READ_STATIC_WEB_PAGE_DESCRIPTION" xml:space="preserve">
+    <value>Reads static text from a public HTTP/HTTPS web page without browser rendering or JavaScript execution.</value>
+  </data>
+  <data name="TOOLS_TOOL_READ_STATIC_WEB_PAGE_PARAM_URL" xml:space="preserve">
+    <value>The public HTTP/HTTPS web page URL to read.</value>
+  </data>
+  <data name="TOOLS_TOOL_READ_STATIC_WEB_PAGE_PARAM_MAX_CHARACTERS" xml:space="preserve">
+    <value>Maximum extracted text characters to include.</value>
+  </data>
   <data name="TOOLS_TOOL_CALCULATE_DESCRIPTION" xml:space="preserve">
     <value>Evaluates arithmetic and common math expressions accurately.</value>
   </data>

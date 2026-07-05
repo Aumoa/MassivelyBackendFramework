@@ -27,6 +27,7 @@ public class OllamaChatHistory(
         "load_chat_attachments",
         "search_chat_attachments",
         "get_current_date",
+        "read_static_web_page",
         "calculate"
     };
 
