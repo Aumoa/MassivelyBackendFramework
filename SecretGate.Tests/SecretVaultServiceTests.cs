@@ -81,6 +81,21 @@ public sealed class SecretVaultServiceTests
     }
 
     [Fact]
+    public async Task VerifyVaultKeyDoesNotChangeCurrentLockState()
+    {
+        var repository = new FakeSecretRepository();
+        var service = new SecretVaultService(repository, new SecretVaultSession());
+        await service.InitializeAsync("user-sub", "correct-password");
+
+        var wrongPassword = await service.VerifyVaultKeyAsync("user-sub", "wrong-password");
+        var correctPassword = await service.VerifyVaultKeyAsync("user-sub", "correct-password");
+
+        Assert.False(wrongPassword);
+        Assert.True(correctPassword);
+        Assert.True(service.IsUnlocked);
+    }
+
+    [Fact]
     public async Task AddSecretRejectsStaleUnlockedVaultKey()
     {
         var repository = new FakeSecretRepository();

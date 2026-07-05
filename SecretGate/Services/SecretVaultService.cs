@@ -67,6 +67,18 @@ public sealed class SecretVaultService(
         session.Lock();
     }
 
+    public async Task<bool> VerifyVaultKeyAsync(
+        string ownerSubject,
+        string vaultKey,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerSubject);
+        ArgumentException.ThrowIfNullOrWhiteSpace(vaultKey);
+
+        var profile = await repository.GetVaultProfileAsync(ownerSubject, cancellationToken);
+        return profile != null && VerifyProfile(ownerSubject, profile, vaultKey);
+    }
+
     public async Task<bool> ChangePasswordAsync(
         string ownerSubject,
         string newVaultKey,
