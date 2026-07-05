@@ -362,11 +362,12 @@ else
 
     private void ClearChangePasswordDialog()
     {
+        var isSubmitting = isChangingPassword;
         changeCurrentVaultKey = string.Empty;
         changeVaultKey = string.Empty;
         changeVaultKeyConfirm = string.Empty;
         changePasswordDialogError = null;
-        isChangingPassword = false;
+        isChangingPassword = isSubmitting;
     }
 
     private async Task SetupVaultAsync()
@@ -465,14 +466,18 @@ else
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(changeCurrentVaultKey))
+        var currentVaultKey = changeCurrentVaultKey;
+        var newVaultKey = changeVaultKey;
+        var newVaultKeyConfirm = changeVaultKeyConfirm;
+
+        if (string.IsNullOrWhiteSpace(currentVaultKey))
         {
             changePasswordDialogError = Strings.MESSAGE_VAULT_KEY_REQUIRED;
             SetStatus(Strings.MESSAGE_VAULT_KEY_REQUIRED, true);
             return;
         }
 
-        if (!TryValidatePasswordPair(changeVaultKey, changeVaultKeyConfirm, out var validationError))
+        if (!TryValidatePasswordPair(newVaultKey, newVaultKeyConfirm, out var validationError))
         {
             changePasswordDialogError = validationError;
             SetStatus(validationError, true);
@@ -482,7 +487,7 @@ else
         isChangingPassword = true;
         try
         {
-            if (!await VaultService.VerifyVaultKeyAsync(subject, changeCurrentVaultKey))
+            if (!await VaultService.VerifyVaultKeyAsync(subject, currentVaultKey))
             {
                 changeCurrentVaultKey = string.Empty;
                 changePasswordDialogError = Strings.MESSAGE_VAULT_KEY_INVALID;
@@ -490,8 +495,8 @@ else
                 return;
             }
 
-            if (!await VaultService.TryUnlockAsync(subject, changeCurrentVaultKey) ||
-                !await VaultService.ChangePasswordAsync(subject, changeVaultKey))
+            if (!await VaultService.TryUnlockAsync(subject, currentVaultKey) ||
+                !await VaultService.ChangePasswordAsync(subject, newVaultKey))
             {
                 changeCurrentVaultKey = string.Empty;
                 changeVaultKey = string.Empty;
