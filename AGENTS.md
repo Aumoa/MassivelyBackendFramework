@@ -52,6 +52,12 @@
 - Place test projects under the solution's `Tests` solution folder/filter. If the solution lacks that folder when adding a test project, create it and classify the test project there.
 - Before committing feature work with tests, run the relevant tests when practical and report the result.
 
+## Generated Code Verification Policy
+
+- Before final build or test validation, and before creating a commit, check whether the current work affects Visual Studio or MSBuild generated files, such as `Strings.Designer.cs`, other `.Designer.cs` files, strongly typed resource wrappers, settings designer files, generated service references, or similar generated artifacts.
+- When affected, refresh the relevant generated code through the repository's normal generator, Visual Studio/MSBuild tooling, or established local workflow, treating this step like analyzer or formatter validation.
+- Inspect any generated-code diffs before committing. Include them in the same commit only when they are caused by or required for the current context's changes; leave unrelated generated changes uncommitted and report them.
+
 ## Dependency Security Policy
 
 - Before adding or using an external library such as a NuGet package, make a first-pass judgment that the library is trustworthy, maintained, and appropriate for the repository.
@@ -97,7 +103,7 @@
 - When implementing a requested feature, split the work into meaningful feature-sized commits.
 - Create one commit per independently reviewable feature unit.
 - Do not mix unrelated refactors, formatting, dependency updates, or bug fixes into the same commit unless they are required for that feature.
-- Before committing, run the relevant build or test command when it is known and practical.
+- Before committing, perform generated-code verification, then run the relevant build or test command when it is known and practical.
 - Unless the user explicitly asks not to commit, create the commit after requested changes pass the relevant build or tests.
 - If the relevant build or tests fail, do not commit until the failure is fixed or the user explicitly asks to commit anyway.
 - If validation cannot be run, mention that in the final response.
