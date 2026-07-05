@@ -15,6 +15,53 @@ namespace GatewayServer.Tests.Services;
 public sealed class BackendGatewayConnectionManagerTests
 {
     [Fact]
+    public async Task StartAsync_WhenListenerDisabled_LeavesPortForExternalDataPlane()
+    {
+        var port = GetFreeTcpPort();
+        var manager = CreateManager(
+            new GatewayListenerOptions
+            {
+                Enabled = false,
+                IPAddress = "127.0.0.1",
+                Port = port,
+                UseTls = true,
+                CertificateSubjectName = "missing-cpp-sidecar-cert"
+            },
+            new RecordingWorldRuntime(),
+            new RecordingDirectConnectCodeValidator(MasterNodeKind.Backend));
+        await manager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            var status = manager.GetStatusItems();
+            Assert.Contains(status, item =>
+                item.Group == "Gateway" &&
+                item.Name == "Listener" &&
+                item.Value == "Disabled");
+            Assert.Contains(status, item =>
+                item.Group == "Gateway" &&
+                item.Name == "Data plane owner" &&
+                item.Value == "External");
+            Assert.Contains(status, item =>
+                item.Group == "Gateway" &&
+                item.Name == "Advertised endpoint" &&
+                item.Value == $"127.0.0.1:{port}");
+            Assert.Contains(status, item =>
+                item.Group == "Gateway" &&
+                item.Name == "TLS" &&
+                item.Value == "Enabled");
+
+            var externalDataPlane = new TcpListener(IPAddress.Loopback, port);
+            externalDataPlane.Start();
+            externalDataPlane.Stop();
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task GatewayHandshake_AcceptsBackendTicketAndRoutesChannelData()
     {
         var port = GetFreeTcpPort();
@@ -511,14 +558,27 @@ public sealed class BackendGatewayConnectionManagerTests
         IDirectConnectCodeValidator validator,
         GatewayChannelSender? sender = null)
     {
-        return new GatewayConnectionManager(
-            Microsoft.Extensions.Options.Options.Create(new GatewayListenerOptions
+        return CreateManager(
+            new GatewayListenerOptions
             {
                 IPAddress = "127.0.0.1",
                 Port = port,
                 UseTls = false,
                 HandshakeTimeoutMilliseconds = 5000
-            }),
+            },
+            runtime,
+            validator,
+            sender);
+    }
+
+    private static GatewayConnectionManager CreateManager(
+        GatewayListenerOptions options,
+        IBackendRuntime runtime,
+        IDirectConnectCodeValidator validator,
+        GatewayChannelSender? sender = null)
+    {
+        return new GatewayConnectionManager(
+            Microsoft.Extensions.Options.Options.Create(options),
             runtime,
             validator,
             sender ?? new GatewayChannelSender(new TestLogger<GatewayChannelSender>()),

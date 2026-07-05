@@ -79,6 +79,9 @@
   <data name="NAVMENU_LABEL_TOOLS" xml:space="preserve">
     <value>도구</value>
   </data>
+  <data name="NAVMENU_LABEL_USERS" xml:space="preserve">
+    <value>사용자</value>
+  </data>
   <data name="NAVMENU_LABEL_AI_SKILLS" xml:space="preserve">
     <value>AI Skill</value>
   </data>
@@ -270,6 +273,95 @@
     <value>AI Skill을 업데이트하지 못했습니다.</value>
   </data>
 
+  <!-- UserPermissions -->
+  <data name="USER_PERMISSIONS_TITLE" xml:space="preserve">
+    <value>사용자</value>
+  </data>
+  <data name="USER_PERMISSIONS_SUBTITLE" xml:space="preserve">
+    <value>Discord 사용자 권한 등록</value>
+  </data>
+  <data name="USER_PERMISSIONS_DETAIL_TITLE" xml:space="preserve">
+    <value>사용자 권한 상세</value>
+  </data>
+  <data name="USER_PERMISSIONS_DETAIL_SUBTITLE" xml:space="preserve">
+    <value>등록된 권한 설정</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_USER_ID" xml:space="preserve">
+    <value>사용자 ID</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_DISPLAY_NAME" xml:space="preserve">
+    <value>표시 이름</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_PERMISSION" xml:space="preserve">
+    <value>권한</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_STATUS" xml:space="preserve">
+    <value>상태</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_ENABLED" xml:space="preserve">
+    <value>활성</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_DISABLED" xml:space="preserve">
+    <value>비활성</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_MEMO" xml:space="preserve">
+    <value>메모</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_CREATED_BY" xml:space="preserve">
+    <value>생성자</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_CREATED_AT" xml:space="preserve">
+    <value>생성일</value>
+  </data>
+  <data name="USER_PERMISSIONS_LABEL_UPDATED_AT" xml:space="preserve">
+    <value>수정일</value>
+  </data>
+  <data name="USER_PERMISSIONS_PERMISSION_USER" xml:space="preserve">
+    <value>일반 사용자</value>
+  </data>
+  <data name="USER_PERMISSIONS_PERMISSION_ADMINISTRATOR" xml:space="preserve">
+    <value>관리자</value>
+  </data>
+  <data name="USER_PERMISSIONS_BUTTON_ADD" xml:space="preserve">
+    <value>추가</value>
+  </data>
+  <data name="USER_PERMISSIONS_BUTTON_BACK" xml:space="preserve">
+    <value>뒤로</value>
+  </data>
+  <data name="USER_PERMISSIONS_BUTTON_SAVE" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="USER_PERMISSIONS_BUTTON_DELETE" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="USER_PERMISSIONS_STATUS_LOADING" xml:space="preserve">
+    <value>불러오는 중...</value>
+  </data>
+  <data name="USER_PERMISSIONS_EMPTY" xml:space="preserve">
+    <value>설정된 사용자가 없습니다.</value>
+  </data>
+  <data name="USER_PERMISSIONS_STATUS_NOT_FOUND" xml:space="preserve">
+    <value>사용자 권한 항목을 찾을 수 없습니다.</value>
+  </data>
+  <data name="USER_PERMISSIONS_STATUS_ADDED" xml:space="preserve">
+    <value>사용자 권한을 추가했습니다.</value>
+  </data>
+  <data name="USER_PERMISSIONS_STATUS_SAVED" xml:space="preserve">
+    <value>사용자 권한을 저장했습니다.</value>
+  </data>
+  <data name="USER_PERMISSIONS_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>사용자 권한 목록을 불러오지 못했습니다.</value>
+  </data>
+  <data name="USER_PERMISSIONS_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>사용자 권한을 저장하지 못했습니다.</value>
+  </data>
+  <data name="USER_PERMISSIONS_ERROR_ACTION_FAILED" xml:space="preserve">
+    <value>사용자 권한을 업데이트하지 못했습니다.</value>
+  </data>
+  <data name="USER_PERMISSIONS_ERROR_USER_ID_REQUIRED" xml:space="preserve">
+    <value>Discord 사용자 ID를 입력하세요.</value>
+  </data>
+
   <!-- Tools -->
   <data name="TOOLS_TITLE" xml:space="preserve">
     <value>도구</value>
@@ -444,6 +536,9 @@
   </data>
   <data name="TOOLS_TOOL_GET_CURRENT_DATE_PARAM_TIMEZONE" xml:space="preserve">
     <value>IANA 타임존 ID입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_GET_CURRENT_DISCORD_USER_AUTHORIZATION_DESCRIPTION" xml:space="preserve">
+    <value>현재 Discord 메시지 작성자의 신뢰 가능한 서버 측 권한을 확인합니다.</value>
   </data>
   <data name="TOOLS_TOOL_CALCULATE_DESCRIPTION" xml:space="preserve">
     <value>사칙연산과 일반적인 수학 수식을 정확하게 계산합니다.</value>

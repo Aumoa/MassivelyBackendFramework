@@ -276,6 +276,10 @@ internal sealed class ConnectionManager(
             {
                 await PushGatewayDiscoveryUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
             }
+            else if (BackendNodeEndpoint.IsBackendNodeKind(connection.NodeKind))
+            {
+                await PushBackendControlSnapshotsUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
+            }
             else
             {
                 await DrainUntilClosedAsync(connection, activeStream, cancellationToken).ConfigureAwait(false);
@@ -383,9 +387,10 @@ internal sealed class ConnectionManager(
                 connection.AuthorizedBackendKind!,
                 advertised.GatewayEndpoint,
                 advertised.ManifestId,
-                advertised.ManifestHash);
+                advertised.ManifestHash,
+                advertised.Descriptor);
             logger.LogInformation(
-                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, BackendKind={BackendKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}, ManifestId={ManifestId}, ManifestHash={ManifestHash}.",
+                "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, BackendKind={BackendKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}, ManifestId={ManifestId}, ManifestHash={ManifestHash}, State={State}, DescriptorVersion={DescriptorVersion}, DescriptorHash={DescriptorHash}.",
                 connection.ConnectionId,
                 connection.NodeKind,
                 connection.AuthorizedBackendKind,
@@ -394,7 +399,10 @@ internal sealed class ConnectionManager(
                 advertised.GatewayEndpoint.Port,
                 advertised.GatewayEndpoint.UseTls,
                 advertised.ManifestId.Value,
-                advertised.ManifestHash.Value);
+                advertised.ManifestHash.Value,
+                advertised.Descriptor.State,
+                advertised.Descriptor.DescriptorVersion,
+                advertised.Descriptor.DescriptorHash);
             return;
         }
 
@@ -568,6 +576,15 @@ internal sealed class ConnectionManager(
         await WriteGatewayClientSecretCredentialSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task PushBackendControlSnapshotsUntilClosedAsync(
+        MasterConnection connection,
+        Stream stream,
+        CancellationToken cancellationToken)
+    {
+        await WriteBackendPacketManifestSnapshotAsync(connection, cancellationToken).ConfigureAwait(false);
+        await DrainUntilClosedAsync(connection, stream, cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task WriteDedicatedNodeSnapshotAsync(MasterConnection connection, CancellationToken cancellationToken)
     {
         await connection.WriteControlAsync(
@@ -687,15 +704,18 @@ internal sealed class ConnectionManager(
 
     private async Task BroadcastBackendPacketManifestSnapshotAsync(CancellationToken cancellationToken)
     {
-        var gateways = m_Connections.Values
-            .Where(static connection => connection.IsTrusted && connection.NodeKind == MasterNodeKind.Gateway)
+        var recipients = m_Connections.Values
+            .Where(static connection =>
+                connection.IsTrusted &&
+                (connection.NodeKind == MasterNodeKind.Gateway ||
+                 BackendNodeEndpoint.IsBackendNodeKind(connection.NodeKind)))
             .ToArray();
 
-        foreach (var gateway in gateways)
+        foreach (var recipient in recipients)
         {
             try
             {
-                await WriteBackendPacketManifestSnapshotAsync(gateway, cancellationToken).ConfigureAwait(false);
+                await WriteBackendPacketManifestSnapshotAsync(recipient, cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -706,17 +726,17 @@ internal sealed class ConnectionManager(
                 logger.LogDebug(
                     e,
                     "Backend packet manifest snapshot write failed because the remote connection closed. ConnectionId={ConnectionId}, NodeId={NodeId}.",
-                    gateway.ConnectionId,
-                    gateway.NodeId);
-                gateway.Dispose();
+                    recipient.ConnectionId,
+                    recipient.NodeId);
+                recipient.Dispose();
             }
             catch (Exception e)
             {
                 logger.LogWarning(
                     e,
                     "Failed to push Backend packet manifest snapshot. ConnectionId={ConnectionId}, NodeId={NodeId}.",
-                    gateway.ConnectionId,
-                    gateway.NodeId);
+                    recipient.ConnectionId,
+                    recipient.NodeId);
             }
         }
     }
@@ -1721,6 +1741,8 @@ internal sealed class ConnectionManager(
 
         public BackendPacketManifestHash? BackendManifestHash { get; private set; }
 
+        public BackendServerDescriptor? BackendDescriptor { get; private set; }
+
         public DateTimeOffset? BackendGatewayEndpointAdvertisedAt { get; private set; }
 
         public void AttachStream(Stream stream)
@@ -1755,12 +1777,14 @@ internal sealed class ConnectionManager(
             string backendKind,
             MasterSocketEndpoint endpoint,
             BackendPacketManifestId manifestId,
-            BackendPacketManifestHash manifestHash)
+            BackendPacketManifestHash manifestHash,
+            BackendServerDescriptor descriptor)
         {
             BackendKind = backendKind;
             BackendGatewayEndpoint = endpoint;
             BackendManifestId = manifestId;
             BackendManifestHash = manifestHash;
+            BackendDescriptor = descriptor;
             BackendGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
             MarkSeen();
         }
@@ -1826,6 +1850,7 @@ internal sealed class ConnectionManager(
                 endpoint == null ||
                 !BackendManifestId.HasValue ||
                 !BackendManifestHash.HasValue ||
+                BackendDescriptor == null ||
                 !advertisedAt.HasValue)
             {
                 return null;
@@ -1839,6 +1864,7 @@ internal sealed class ConnectionManager(
                 endpoint,
                 BackendManifestId.Value,
                 BackendManifestHash.Value,
+                BackendDescriptor,
                 advertisedAt.Value);
         }
 

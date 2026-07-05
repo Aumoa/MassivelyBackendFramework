@@ -31,9 +31,14 @@
 
 - When working on DiscordBot chat persistence, chat history lookup, search, context loading, message inspection, or chat-related attachment/image retrieval, read and follow `.codex/skills/discordbot-channel-chat-scope/SKILL.md`.
 
+## C++ Backend Style Skill
+
+- When working on C++ Backend source files, C++ formatting, CMake files, CMake presets, or IDE project support, read and follow `.codex/skills/cpp-backend-style/SKILL.md`.
+
 ## Coding Style Policy
 
 - Follow Microsoft's standard C# coding conventions by default.
+- For C++ Backend source, formatting, CMake, and IDE support work, follow `.codex/skills/cpp-backend-style/SKILL.md`; it is the more specific source for C++ naming and formatting decisions.
 - Keep repository-specific deviations from the standard documented only under `Coding Style Exceptions`.
 
 ## Coding Style Exceptions
@@ -46,6 +51,12 @@
 - Use tests as self-validation for code that can be isolated without brittle infrastructure or excessive setup.
 - Place test projects under the solution's `Tests` solution folder/filter. If the solution lacks that folder when adding a test project, create it and classify the test project there.
 - Before committing feature work with tests, run the relevant tests when practical and report the result.
+
+## Generated Code Verification Policy
+
+- Before final build or test validation, and before creating a commit, check whether the current work affects Visual Studio or MSBuild generated files, such as `Strings.Designer.cs`, other `.Designer.cs` files, strongly typed resource wrappers, settings designer files, generated service references, or similar generated artifacts.
+- When affected, refresh the relevant generated code through the repository's normal generator, Visual Studio/MSBuild tooling, or established local workflow, treating this step like analyzer or formatter validation.
+- Inspect any generated-code diffs before committing. Include them in the same commit only when they are caused by or required for the current context's changes; leave unrelated generated changes uncommitted and report them.
 
 ## Dependency Security Policy
 
@@ -92,7 +103,7 @@
 - When implementing a requested feature, split the work into meaningful feature-sized commits.
 - Create one commit per independently reviewable feature unit.
 - Do not mix unrelated refactors, formatting, dependency updates, or bug fixes into the same commit unless they are required for that feature.
-- Before committing, run the relevant build or test command when it is known and practical.
+- Before committing, perform generated-code verification, then run the relevant build or test command when it is known and practical.
 - Unless the user explicitly asks not to commit, create the commit after requested changes pass the relevant build or tests.
 - If the relevant build or tests fail, do not commit until the failure is fixed or the user explicitly asks to commit anyway.
 - If validation cannot be run, mention that in the final response.

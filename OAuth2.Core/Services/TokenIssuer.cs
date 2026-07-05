@@ -1,8 +1,10 @@
+using Microsoft.Extensions.Options;
 using OAuth2.DTO;
+using OAuth2.Options;
 
 namespace OAuth2.Services;
 
-internal class TokenIssuer(IAccesses accesses, IAccountClaims accountClaims, IClientUserGroups groups, IJwt jwt) : ITokenIssuer
+internal class TokenIssuer(IAccesses accesses, IAccountClaims accountClaims, IClientUserGroups groups, IJwt jwt, IOptions<HostOptions> hostOptions) : ITokenIssuer
 {
     public async ValueTask<TokenIssueResult> IssueAsync(string accountId, RawAccount rawAccount, string clientId, string scope, string? nonce, CancellationToken cancellationToken = default, long? authTime = null, string? acr = null, string? userInfoClaims = null)
     {
@@ -17,14 +19,16 @@ internal class TokenIssuer(IAccesses accesses, IAccountClaims accountClaims, ICl
             idToken = jwt.Issue(clientId, jwt.ConfigureClaims(rawAccount, scope, [.. claims, .. groupsClaim], nonce, true, authTime, acr));
         }
 
+        var canReturnRefreshToken = clientId == hostOptions.Value.ClientId || ScopePolicy.HasOfflineAccess(scope);
+
         return new TokenIssueResult(new TokenResponse
         {
             AccessToken = access.AccessToken,
             TokenType = "Bearer",
             ExpiresIn = (int)jwt.ExpiresIn.TotalSeconds,
             Scope = access.Scope,
-            RefreshToken = access.RefreshToken,
-            RefreshExpiresIn = (int)jwt.RefreshTokenExpiresIn.TotalSeconds,
+            RefreshToken = canReturnRefreshToken ? access.RefreshToken : null,
+            RefreshExpiresIn = canReturnRefreshToken ? (int)jwt.RefreshTokenExpiresIn.TotalSeconds : null,
             IdToken = idToken
         }, access);
     }

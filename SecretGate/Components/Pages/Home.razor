@@ -1,0 +1,485 @@
+@page "/"
+@page "/vault"
+@rendermode InteractiveServer
+@using System.Globalization
+@inject AuthenticationStateProvider AuthState
+@inject SecretVaultService VaultService
+@inject IJSRuntime JS
+
+<PageTitle>@Strings.HOME_TITLE - @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1>@Strings.HOME_TITLE</h1>
+    <span class="status-pill @GetStatusClass()">
+        <span class="material-symbols-outlined" aria-hidden="true">@GetStatusIcon()</span>
+        @GetStatusText()
+    </span>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="message @(statusIsError ? "message-error" : "message-success")">@statusMessage</div>
+}
+
+@if (isLoading)
+{
+    <section class="tool-panel">
+        <div class="empty-state">@Strings.LOADING</div>
+    </section>
+}
+else if (!isVaultInitialized)
+{
+    <section class="tool-panel">
+        <div class="panel-header">
+            <h2>@Strings.SETUP_VAULT_TITLE</h2>
+        </div>
+
+        <form class="secret-form" @onsubmit="SetupVaultAsync" @onsubmit:preventDefault="true">
+            <label class="field">
+                <span>@Strings.SETUP_VAULT_PASSWORD_LABEL</span>
+                <input class="form-input" type="password" autocomplete="new-password" @bind="setupVaultKey" />
+            </label>
+            <label class="field">
+                <span>@Strings.SETUP_VAULT_CONFIRM_LABEL</span>
+                <input class="form-input" type="password" autocomplete="new-password" @bind="setupVaultKeyConfirm" />
+            </label>
+            <div class="form-actions">
+                <button class="btn-primary" type="submit">
+                    <span class="material-symbols-outlined" aria-hidden="true">key</span>
+                    @Strings.SETUP_VAULT_BUTTON
+                </button>
+            </div>
+        </form>
+    </section>
+}
+else
+{
+    <section class="tool-panel">
+        <div class="panel-header">
+            <h2>@Strings.VAULT_TITLE</h2>
+        </div>
+
+        @if (!VaultService.IsUnlocked)
+        {
+            <form class="inline-form" @onsubmit="UnlockVaultAsync" @onsubmit:preventDefault="true">
+                <label class="field field-grow">
+                    <span>@Strings.VAULT_KEY_LABEL</span>
+                    <input class="form-input" type="password" autocomplete="current-password" @bind="unlockVaultKey" />
+                </label>
+                <button class="btn-primary" type="submit">
+                    <span class="material-symbols-outlined" aria-hidden="true">lock_open</span>
+                    @Strings.UNLOCK_BUTTON
+                </button>
+            </form>
+        }
+        else
+        {
+            <div class="form-actions">
+                <button class="btn-secondary" type="button" @onclick="LockVaultAsync">
+                    <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+                    @Strings.LOCK_BUTTON
+                </button>
+            </div>
+        }
+
+        <form class="secret-form" @onsubmit="SaveSecretAsync" @onsubmit:preventDefault="true">
+            <label class="field">
+                <span>@Strings.SECRET_NAME_LABEL</span>
+                <input class="form-input" maxlength="160" @bind="newSecretName" disabled="@(!VaultService.IsUnlocked)" />
+            </label>
+            <label class="field">
+                <span>@Strings.SECRET_VALUE_LABEL</span>
+                <textarea class="form-textarea" rows="4" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" @bind="newSecretValue" disabled="@(!VaultService.IsUnlocked)"></textarea>
+            </label>
+            <div class="form-actions">
+                <button class="btn-primary" type="submit" disabled="@(!VaultService.IsUnlocked)">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                    @Strings.ADD_SECRET_BUTTON
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <section class="tool-panel">
+        <div class="panel-header">
+            <h2>@Strings.STORED_SECRETS_TITLE</h2>
+        </div>
+
+        @if (secrets.Count == 0)
+        {
+            <div class="empty-state">@Strings.EMPTY_VAULT</div>
+        }
+        else
+        {
+            <div class="secret-list">
+                @foreach (var secret in secrets)
+                {
+                    <article class="secret-row" @key="secret.Id">
+                        <div class="secret-row-main">
+                            <div class="secret-row-title">@secret.Name</div>
+                            <div class="secret-row-meta">
+                                @Strings.UPDATED_AT @FormatLocal(secret.UpdatedAtUtc)
+                            </div>
+                            @if (secret.IsDecrypted)
+                            {
+                                <textarea class="secret-output" readonly rows="3" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">@secret.Secret</textarea>
+                            }
+                            else
+                            {
+                                <div class="secret-placeholder">
+                                    @(VaultService.IsUnlocked ? Strings.DECRYPT_FAILED : Strings.LOCKED_SECRET)
+                                </div>
+                            }
+                        </div>
+                        <div class="secret-row-actions">
+                            @if (secret.IsDecrypted && secret.Secret is not null)
+                            {
+                                <button class="icon-button" type="button" title="@Strings.COPY_BUTTON" @onclick="() => CopyAsync(secret.Secret)">
+                                    <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>
+                                </button>
+                            }
+                            <button class="icon-button danger" type="button" disabled="@(!VaultService.IsUnlocked)" title="@Strings.DELETE_BUTTON" @onclick="() => DeleteSecretAsync(secret.Id)">
+                                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                            </button>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="tool-panel">
+        <div class="panel-header">
+            <h2>@Strings.CHANGE_VAULT_TITLE</h2>
+        </div>
+
+        <form class="secret-form" @onsubmit="ChangePasswordAsync" @onsubmit:preventDefault="true">
+            <label class="field">
+                <span>@Strings.CHANGE_VAULT_PASSWORD_LABEL</span>
+                <input class="form-input" type="password" autocomplete="new-password" @bind="changeVaultKey" disabled="@(!VaultService.IsUnlocked)" />
+            </label>
+            <label class="field">
+                <span>@Strings.CHANGE_VAULT_CONFIRM_LABEL</span>
+                <input class="form-input" type="password" autocomplete="new-password" @bind="changeVaultKeyConfirm" disabled="@(!VaultService.IsUnlocked)" />
+            </label>
+            <div class="form-actions">
+                <button class="btn-primary" type="submit" disabled="@(!VaultService.IsUnlocked)">
+                    <span class="material-symbols-outlined" aria-hidden="true">sync_lock</span>
+                    @Strings.CHANGE_VAULT_BUTTON
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <section class="tool-panel danger-panel">
+        <div class="panel-header">
+            <h2>@Strings.RESET_VAULT_TITLE</h2>
+        </div>
+
+        <form class="inline-form" @onsubmit="ResetVaultAsync" @onsubmit:preventDefault="true">
+            <label class="field field-grow">
+                <span>@Strings.RESET_VAULT_LABEL</span>
+                <input class="form-input code-input" autocomplete="off" placeholder="@Strings.RESET_CONFIRMATION_VALUE" @bind="resetConfirmation" />
+            </label>
+            <button class="btn-secondary danger-action" type="submit">
+                <span class="material-symbols-outlined" aria-hidden="true">delete_forever</span>
+                @Strings.RESET_VAULT_BUTTON
+            </button>
+        </form>
+    </section>
+}
+
+@code {
+    private IReadOnlyList<StoredSecretView> secrets = [];
+    private string? ownerSubject;
+    private string setupVaultKey = string.Empty;
+    private string setupVaultKeyConfirm = string.Empty;
+    private string unlockVaultKey = string.Empty;
+    private string changeVaultKey = string.Empty;
+    private string changeVaultKeyConfirm = string.Empty;
+    private string resetConfirmation = string.Empty;
+    private string newSecretName = string.Empty;
+    private string newSecretValue = string.Empty;
+    private string? statusMessage;
+    private bool statusIsError;
+    private bool isLoading = true;
+    private bool isVaultInitialized;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        ownerSubject = auth.User.FindFirst("sub")?.Value;
+        await RefreshVaultAsync();
+    }
+
+    private async Task SetupVaultAsync()
+    {
+        if (!TryGetOwnerSubject(out var subject))
+        {
+            return;
+        }
+
+        if (!TryValidatePasswordPair(setupVaultKey, setupVaultKeyConfirm))
+        {
+            return;
+        }
+
+        if (!await VaultService.InitializeAsync(subject, setupVaultKey))
+        {
+            setupVaultKey = string.Empty;
+            setupVaultKeyConfirm = string.Empty;
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_VAULT_ALREADY_INITIALIZED, true);
+            return;
+        }
+
+        setupVaultKey = string.Empty;
+        setupVaultKeyConfirm = string.Empty;
+        await RefreshVaultAsync();
+        SetStatus(Strings.MESSAGE_VAULT_INITIALIZED, false);
+    }
+
+    private async Task UnlockVaultAsync()
+    {
+        if (string.IsNullOrWhiteSpace(unlockVaultKey))
+        {
+            SetStatus(Strings.MESSAGE_VAULT_KEY_REQUIRED, true);
+            return;
+        }
+
+        if (!TryGetOwnerSubject(out var subject))
+        {
+            return;
+        }
+
+        if (!await VaultService.TryUnlockAsync(subject, unlockVaultKey))
+        {
+            unlockVaultKey = string.Empty;
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
+            return;
+        }
+
+        unlockVaultKey = string.Empty;
+        await RefreshVaultAsync();
+        SetStatus(Strings.MESSAGE_VAULT_UNLOCKED, false);
+    }
+
+    private async Task LockVaultAsync()
+    {
+        VaultService.Lock();
+        await RefreshVaultAsync();
+        SetStatus(Strings.MESSAGE_VAULT_LOCKED, false);
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (!VaultService.IsUnlocked)
+        {
+            SetStatus(Strings.MESSAGE_CHANGE_REQUIRES_UNLOCK, true);
+            return;
+        }
+
+        if (!TryGetOwnerSubject(out var subject))
+        {
+            return;
+        }
+
+        if (!TryValidatePasswordPair(changeVaultKey, changeVaultKeyConfirm))
+        {
+            return;
+        }
+
+        if (!await VaultService.ChangePasswordAsync(subject, changeVaultKey))
+        {
+            changeVaultKey = string.Empty;
+            changeVaultKeyConfirm = string.Empty;
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
+            return;
+        }
+
+        changeVaultKey = string.Empty;
+        changeVaultKeyConfirm = string.Empty;
+        await RefreshVaultAsync();
+        SetStatus(Strings.MESSAGE_PASSWORD_CHANGED, false);
+    }
+
+    private async Task ResetVaultAsync()
+    {
+        if (!TryGetOwnerSubject(out var subject))
+        {
+            return;
+        }
+
+        if (!string.Equals(resetConfirmation.Trim(), Strings.RESET_CONFIRMATION_VALUE, StringComparison.OrdinalIgnoreCase))
+        {
+            SetStatus(Strings.MESSAGE_RESET_CONFIRMATION_REQUIRED, true);
+            return;
+        }
+
+        await VaultService.ResetAsync(subject);
+        resetConfirmation = string.Empty;
+        newSecretName = string.Empty;
+        newSecretValue = string.Empty;
+        await RefreshVaultAsync();
+        SetStatus(Strings.MESSAGE_VAULT_RESET, false);
+    }
+
+    private async Task SaveSecretAsync()
+    {
+        if (!VaultService.IsUnlocked)
+        {
+            SetStatus(Strings.MESSAGE_UNLOCK_REQUIRED, true);
+            return;
+        }
+
+        if (!TryGetOwnerSubject(out var subject))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newSecretName) || string.IsNullOrWhiteSpace(newSecretValue))
+        {
+            SetStatus(Strings.MESSAGE_SECRET_REQUIRED, true);
+            return;
+        }
+
+        if (!await VaultService.AddSecretAsync(subject, newSecretName, newSecretValue))
+        {
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
+            return;
+        }
+
+        newSecretName = string.Empty;
+        newSecretValue = string.Empty;
+        await RefreshVaultAsync();
+        SetStatus(Strings.MESSAGE_SECRET_SAVED, false);
+    }
+
+    private async Task DeleteSecretAsync(Guid id)
+    {
+        if (!VaultService.IsUnlocked)
+        {
+            SetStatus(Strings.MESSAGE_UNLOCK_REQUIRED, true);
+            return;
+        }
+
+        if (!TryGetOwnerSubject(out var subject))
+        {
+            return;
+        }
+
+        if (!await VaultService.DeleteSecretAsync(subject, id))
+        {
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
+            return;
+        }
+
+        await RefreshVaultAsync();
+        SetStatus(Strings.MESSAGE_SECRET_DELETED, false);
+    }
+
+    private async Task RefreshVaultAsync()
+    {
+        isLoading = true;
+        if (TryGetOwnerSubject(out var subject, showError: false))
+        {
+            isVaultInitialized = await VaultService.IsInitializedAsync(subject);
+            secrets = isVaultInitialized
+                ? await VaultService.GetSecretsAsync(subject)
+                : [];
+        }
+        else
+        {
+            isVaultInitialized = false;
+            secrets = [];
+        }
+
+        isLoading = false;
+    }
+
+    private bool TryValidatePasswordPair(string password, string confirmation)
+    {
+        if (string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(confirmation))
+        {
+            SetStatus(Strings.MESSAGE_PASSWORD_REQUIRED, true);
+            return false;
+        }
+
+        if (!string.Equals(password, confirmation, StringComparison.Ordinal))
+        {
+            SetStatus(Strings.MESSAGE_PASSWORD_MISMATCH, true);
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool TryGetOwnerSubject(out string subject, bool showError = true)
+    {
+        subject = ownerSubject ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(subject))
+        {
+            return true;
+        }
+
+        if (showError)
+        {
+            SetStatus(Strings.MESSAGE_INVALID_SUBJECT, true);
+        }
+
+        return false;
+    }
+
+    private async Task CopyAsync(string? value)
+    {
+        if (!string.IsNullOrEmpty(value))
+        {
+            await JS.InvokeVoidAsync("secretGate.copyText", value);
+        }
+    }
+
+    private void SetStatus(string message, bool isError)
+    {
+        statusMessage = message;
+        statusIsError = isError;
+    }
+
+    private string GetStatusClass()
+    {
+        if (!isVaultInitialized)
+        {
+            return "status-locked";
+        }
+
+        return VaultService.IsUnlocked ? "status-unlocked" : "status-locked";
+    }
+
+    private string GetStatusIcon()
+    {
+        if (!isVaultInitialized)
+        {
+            return "key";
+        }
+
+        return VaultService.IsUnlocked ? "lock_open" : "lock";
+    }
+
+    private string GetStatusText()
+    {
+        if (!isVaultInitialized)
+        {
+            return Strings.STATUS_UNINITIALIZED;
+        }
+
+        return VaultService.IsUnlocked ? Strings.STATUS_UNLOCKED : Strings.STATUS_LOCKED;
+    }
+
+    private static string FormatLocal(DateTime utc)
+    {
+        return utc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+    }
+}

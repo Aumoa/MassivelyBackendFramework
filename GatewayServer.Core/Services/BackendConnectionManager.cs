@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Security.Authentication;
+using System.Text;
 using GatewayServer.Options;
 using GatewayServer.Protocols;
 using MasterServer.ControlPlane;
@@ -24,8 +26,17 @@ internal interface IBackendRouteManager
 
     string[] GetDiscoveredBackendKinds();
 
+    BackendServerDirectorySnapshot ListServers(
+        string backendKind,
+        int maximumEntries);
+
     ValueTask<IBackendRouteSession> ConnectAsync(
         string backendKind,
+        CancellationToken cancellationToken);
+
+    ValueTask<IBackendRouteSession> ConnectAsync(
+        string backendKind,
+        GatewayBackendServerHandle serverHandle,
         CancellationToken cancellationToken);
 
     ValueTask RelayFrameAsync(
@@ -53,6 +64,12 @@ internal interface IBackendRouteSession
 
     BackendPacketManifestHash ManifestHash { get; }
 
+    GatewayBackendServerHandle? ServerHandle { get; }
+
+    string DescriptorVersion { get; }
+
+    string DescriptorHash { get; }
+
     BackendRouteBinding Binding { get; }
 
     ValueTask WriteAsync(PacketFrame frame, CancellationToken cancellationToken);
@@ -73,6 +90,10 @@ internal delegate ValueTask BackendRouteCloseFrameReceivedHandler(
 internal delegate ValueTask BackendRouteSessionClosedHandler(
     BackendRouteSessionClosed frame,
     CancellationToken cancellationToken);
+
+internal sealed record BackendServerDirectorySnapshot(
+    GatewayBackendServerListEntry[] Entries,
+    DateTimeOffset ObservedAt);
 
 internal sealed class BackendRouteFrameReceived(
     string backendKind,
@@ -157,6 +178,7 @@ internal sealed class BackendConnectionManager(
     private readonly Dictionary<string, BackendPeer> m_Peers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> m_PeerStates = [];
     private readonly ConcurrentDictionary<string, string> m_PeerDirectConnectionIds = [];
+    private DateTimeOffset m_BackendSnapshotObservedAt = DateTimeOffset.UtcNow;
     private string? m_MasterConnectionId;
 
     public event BackendRouteFrameReceivedHandler? RouteFrameReceived;
@@ -218,6 +240,32 @@ internal sealed class BackendConnectionManager(
         }
     }
 
+    public BackendServerDirectorySnapshot ListServers(
+        string backendKind,
+        int maximumEntries)
+    {
+        var normalizedBackendKind = NormalizeBackendKind(backendKind);
+        var limit = maximumEntries <= 0
+            ? int.MaxValue
+            : maximumEntries;
+
+        lock (m_RoutesSync)
+        {
+            if (!m_NodesByKind.TryGetValue(normalizedBackendKind, out var nodes) ||
+                nodes.Length == 0)
+            {
+                return new BackendServerDirectorySnapshot([], m_BackendSnapshotObservedAt);
+            }
+
+            return new BackendServerDirectorySnapshot(
+                [.. nodes
+                    .Where(static node => node.State != BackendNodeState.Unavailable)
+                    .Take(limit)
+                    .Select(CreateServerListEntry)],
+                m_BackendSnapshotObservedAt);
+        }
+    }
+
     public async ValueTask<IBackendRouteSession> ConnectAsync(
         string backendKind,
         CancellationToken cancellationToken)
@@ -228,6 +276,26 @@ internal sealed class BackendConnectionManager(
         }
 
         var node = SelectBackendNode(backendKind);
+        var peer = GetOrCreatePeer(node);
+        return await ConnectPeerAsync(peer, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async ValueTask<IBackendRouteSession> ConnectAsync(
+        string backendKind,
+        GatewayBackendServerHandle serverHandle,
+        CancellationToken cancellationToken)
+    {
+        if (serverHandle == null)
+        {
+            throw new ArgumentNullException(nameof(serverHandle));
+        }
+
+        if (!m_Options.Enabled)
+        {
+            throw new InvalidOperationException("Gateway Backend direct connections are disabled.");
+        }
+
+        var node = SelectBackendNode(backendKind, serverHandle);
         var peer = GetOrCreatePeer(node);
         return await ConnectPeerAsync(peer, cancellationToken).ConfigureAwait(false);
     }
@@ -351,6 +419,7 @@ internal sealed class BackendConnectionManager(
 
         lock (m_RoutesSync)
         {
+            m_BackendSnapshotObservedAt = snapshot.ObservedAt;
             m_NodesByKind.Clear();
             foreach (var pair in nodesByKind)
             {
@@ -360,6 +429,7 @@ internal sealed class BackendConnectionManager(
             foreach (var current in m_Peers.Values.ToArray())
             {
                 if (!desired.TryGetValue(current.Node.MasterConnectionId, out var next) ||
+                    next.State == BackendNodeState.Unavailable ||
                     !HasSameEndpoint(current.Node, next) ||
                     !string.Equals(current.Node.BackendKind, next.BackendKind, StringComparison.Ordinal) ||
                     !HasSameManifest(current.Node, next))
@@ -368,6 +438,10 @@ internal sealed class BackendConnectionManager(
                     m_PeerStates.TryRemove(current.Node.MasterConnectionId, out _);
                     m_PeerDirectConnectionIds.TryRemove(current.Node.MasterConnectionId, out _);
                     removed.Add(current);
+                }
+                else
+                {
+                    current.Node = next;
                 }
             }
         }
@@ -394,7 +468,39 @@ internal sealed class BackendConnectionManager(
                 throw new InvalidOperationException($"No Backend nodes are available for kind '{normalizedBackendKind}'.");
             }
 
-            return nodes.FirstOrDefault(node => m_Peers.ContainsKey(node.MasterConnectionId)) ?? nodes[0];
+            return nodes.FirstOrDefault(node => node.State == BackendNodeState.Open &&
+                                                m_Peers.ContainsKey(node.MasterConnectionId)) ??
+                   nodes.FirstOrDefault(static node => node.State == BackendNodeState.Open) ??
+                   throw new InvalidOperationException($"No routable Backend nodes are open for kind '{normalizedBackendKind}'.");
+        }
+    }
+
+    private BackendNodeEndpoint SelectBackendNode(
+        string backendKind,
+        GatewayBackendServerHandle serverHandle)
+    {
+        var normalizedBackendKind = NormalizeBackendKind(backendKind);
+
+        lock (m_RoutesSync)
+        {
+            if (!m_NodesByKind.TryGetValue(normalizedBackendKind, out var nodes) ||
+                nodes.Length == 0)
+            {
+                throw new InvalidOperationException($"No Backend nodes are available for kind '{normalizedBackendKind}'.");
+            }
+
+            var selected = nodes.FirstOrDefault(node => GenerateServerHandle(node).Equals(serverHandle));
+            if (selected == null)
+            {
+                throw new InvalidOperationException("Backend server handle is stale or unknown.");
+            }
+
+            if (selected.State != BackendNodeState.Open)
+            {
+                throw new InvalidOperationException($"Backend server handle is not routable while the node state is '{selected.State}'.");
+            }
+
+            return selected;
         }
     }
 
@@ -564,6 +670,9 @@ internal sealed class BackendConnectionManager(
                 accepted.ConnectionId,
                 node.ManifestId,
                 node.ManifestHash,
+                GenerateServerHandle(node),
+                node.DescriptorVersion,
+                node.DescriptorHash,
                 activeStream,
                 socket);
         }
@@ -944,6 +1053,41 @@ internal sealed class BackendConnectionManager(
                left.ManifestHash == right.ManifestHash;
     }
 
+    private static GatewayBackendServerListEntry CreateServerListEntry(BackendNodeEndpoint node)
+    {
+        return new GatewayBackendServerListEntry(
+            GenerateServerHandle(node),
+            node.BackendKind,
+            ToGatewayServerState(node.State),
+            node.DescriptorVersion,
+            node.DescriptorHash,
+            node.DescriptorJson);
+    }
+
+    private static GatewayBackendServerState ToGatewayServerState(BackendNodeState state)
+    {
+        return state switch
+        {
+            BackendNodeState.Open => GatewayBackendServerState.Open,
+            BackendNodeState.Full => GatewayBackendServerState.Full,
+            BackendNodeState.Draining => GatewayBackendServerState.Draining,
+            BackendNodeState.Maintenance => GatewayBackendServerState.Maintenance,
+            BackendNodeState.Unavailable => GatewayBackendServerState.Unavailable,
+            _ => throw new ArgumentOutOfRangeException(nameof(state), state, "Unknown Backend node state.")
+        };
+    }
+
+    private static GatewayBackendServerHandle GenerateServerHandle(BackendNodeEndpoint node)
+    {
+        var identity = string.Concat(
+            node.BackendKind,
+            "\0",
+            node.NodeId,
+            "\0",
+            node.MasterConnectionId);
+        return new GatewayBackendServerHandle(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity))));
+    }
+
     private static string NormalizeBackendKind(string backendKind)
     {
         if (string.IsNullOrWhiteSpace(backendKind))
@@ -975,7 +1119,7 @@ internal sealed class BackendConnectionManager(
         BackendNodeEndpoint node,
         CancellationTokenSource cancellation)
     {
-        public BackendNodeEndpoint Node { get; } = node;
+        public BackendNodeEndpoint Node { get; set; } = node;
 
         public CancellationTokenSource Cancellation { get; } = cancellation;
 
@@ -1011,6 +1155,9 @@ internal sealed class BackendConnectionManager(
         string directConnectionId,
         BackendPacketManifestId manifestId,
         BackendPacketManifestHash manifestHash,
+        GatewayBackendServerHandle serverHandle,
+        string descriptorVersion,
+        string descriptorHash,
         Stream stream,
         Socket socket) : IBackendRouteSession, IAsyncDisposable
     {
@@ -1028,6 +1175,12 @@ internal sealed class BackendConnectionManager(
         public BackendPacketManifestId ManifestId { get; } = manifestId;
 
         public BackendPacketManifestHash ManifestHash { get; } = manifestHash;
+
+        public GatewayBackendServerHandle ServerHandle { get; } = serverHandle;
+
+        public string DescriptorVersion { get; } = descriptorVersion;
+
+        public string DescriptorHash { get; } = descriptorHash;
 
         public BackendRouteBinding Binding { get; } = new(
             backendKind,
