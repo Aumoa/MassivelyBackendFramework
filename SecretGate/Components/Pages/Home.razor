@@ -10,10 +10,36 @@
 
 <div class="page-header">
     <h1>@Strings.HOME_TITLE</h1>
-    <span class="status-pill @GetStatusClass()">
-        <span class="material-symbols-outlined" aria-hidden="true">@GetStatusIcon()</span>
-        @GetStatusText()
-    </span>
+    @if (!isLoading)
+    {
+        <div class="page-actions">
+            @if (!isVaultInitialized)
+            {
+                <span class="status-pill status-locked">
+                    <span class="material-symbols-outlined" aria-hidden="true">key</span>
+                    @Strings.STATUS_UNINITIALIZED
+                </span>
+            }
+            else if (VaultService.IsUnlocked)
+            {
+                <button class="btn-secondary" type="button" @onclick="ShowChangePasswordDialogAsync">
+                    <span class="material-symbols-outlined" aria-hidden="true">sync_lock</span>
+                    @Strings.CHANGE_VAULT_BUTTON
+                </button>
+                <button class="btn-secondary" type="button" @onclick="LockVaultAsync">
+                    <span class="material-symbols-outlined" aria-hidden="true">lock</span>
+                    @Strings.LOCK_BUTTON
+                </button>
+            }
+            else
+            {
+                <button class="btn-primary" type="button" @onclick="ShowUnlockDialogAsync">
+                    <span class="material-symbols-outlined" aria-hidden="true">lock_open</span>
+                    @Strings.UNLOCK_BUTTON
+                </button>
+            }
+        </div>
+    }
 </div>
 
 @if (!string.IsNullOrWhiteSpace(statusMessage))
@@ -56,53 +82,11 @@ else
 {
     <section class="tool-panel">
         <div class="panel-header">
-            <h2>@Strings.VAULT_TITLE</h2>
-        </div>
-
-        @if (!VaultService.IsUnlocked)
-        {
-            <form class="inline-form" @onsubmit="UnlockVaultAsync" @onsubmit:preventDefault="true">
-                <label class="field field-grow">
-                    <span>@Strings.VAULT_KEY_LABEL</span>
-                    <input class="form-input" type="password" autocomplete="current-password" @bind="unlockVaultKey" />
-                </label>
-                <button class="btn-primary" type="submit">
-                    <span class="material-symbols-outlined" aria-hidden="true">lock_open</span>
-                    @Strings.UNLOCK_BUTTON
-                </button>
-            </form>
-        }
-        else
-        {
-            <div class="form-actions">
-                <button class="btn-secondary" type="button" @onclick="LockVaultAsync">
-                    <span class="material-symbols-outlined" aria-hidden="true">lock</span>
-                    @Strings.LOCK_BUTTON
-                </button>
-            </div>
-        }
-
-        <form class="secret-form" @onsubmit="SaveSecretAsync" @onsubmit:preventDefault="true">
-            <label class="field">
-                <span>@Strings.SECRET_NAME_LABEL</span>
-                <input class="form-input" maxlength="160" @bind="newSecretName" disabled="@(!VaultService.IsUnlocked)" />
-            </label>
-            <label class="field">
-                <span>@Strings.SECRET_VALUE_LABEL</span>
-                <textarea class="form-textarea" rows="4" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" @bind="newSecretValue" disabled="@(!VaultService.IsUnlocked)"></textarea>
-            </label>
-            <div class="form-actions">
-                <button class="btn-primary" type="submit" disabled="@(!VaultService.IsUnlocked)">
-                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
-                    @Strings.ADD_SECRET_BUTTON
-                </button>
-            </div>
-        </form>
-    </section>
-
-    <section class="tool-panel">
-        <div class="panel-header">
             <h2>@Strings.STORED_SECRETS_TITLE</h2>
+            <button class="btn-primary" type="button" disabled="@(!VaultService.IsUnlocked)" title="@(VaultService.IsUnlocked ? Strings.ADD_SECRET_BUTTON : Strings.MESSAGE_UNLOCK_REQUIRED)" @onclick="ShowAddSecretDialogAsync">
+                <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                @Strings.ADD_SECRET_BUTTON
+            </button>
         </div>
 
         @if (secrets.Count == 0)
@@ -148,29 +132,6 @@ else
         }
     </section>
 
-    <section class="tool-panel">
-        <div class="panel-header">
-            <h2>@Strings.CHANGE_VAULT_TITLE</h2>
-        </div>
-
-        <form class="secret-form" @onsubmit="ChangePasswordAsync" @onsubmit:preventDefault="true">
-            <label class="field">
-                <span>@Strings.CHANGE_VAULT_PASSWORD_LABEL</span>
-                <input class="form-input" type="password" autocomplete="new-password" @bind="changeVaultKey" disabled="@(!VaultService.IsUnlocked)" />
-            </label>
-            <label class="field">
-                <span>@Strings.CHANGE_VAULT_CONFIRM_LABEL</span>
-                <input class="form-input" type="password" autocomplete="new-password" @bind="changeVaultKeyConfirm" disabled="@(!VaultService.IsUnlocked)" />
-            </label>
-            <div class="form-actions">
-                <button class="btn-primary" type="submit" disabled="@(!VaultService.IsUnlocked)">
-                    <span class="material-symbols-outlined" aria-hidden="true">sync_lock</span>
-                    @Strings.CHANGE_VAULT_BUTTON
-                </button>
-            </div>
-        </form>
-    </section>
-
     <section class="tool-panel danger-panel">
         <div class="panel-header">
             <h2>@Strings.RESET_VAULT_TITLE</h2>
@@ -189,27 +150,224 @@ else
     </section>
 }
 
+@if (isVaultInitialized)
+{
+    <Dialog @ref="unlockDialog" OnClose="ClearUnlockDialog">
+        <form class="vault-dialog" @onsubmit="UnlockVaultAsync" @onsubmit:preventDefault="true">
+            <div class="dialog-header">
+                <div class="dialog-icon">
+                    <span class="material-symbols-outlined" aria-hidden="true">lock_open</span>
+                </div>
+                <h2 class="dialog-title">@Strings.UNLOCK_VAULT_TITLE</h2>
+            </div>
+            <div class="dialog-body">
+                <label class="field">
+                    <span>@Strings.VAULT_KEY_LABEL</span>
+                    <input class="form-input" type="password" autocomplete="current-password" @bind="unlockVaultKey" />
+                </label>
+                @if (!string.IsNullOrWhiteSpace(unlockDialogError))
+                {
+                    <div class="dialog-error">
+                        <span class="material-symbols-outlined" aria-hidden="true">error</span>
+                        @unlockDialogError
+                    </div>
+                }
+            </div>
+            <div class="dialog-actions">
+                <button class="btn-secondary" type="button" disabled="@isUnlockingVault" @onclick="CloseUnlockDialogAsync">
+                    @Strings.CANCEL_BUTTON
+                </button>
+                <button class="btn-primary" type="submit" disabled="@isUnlockingVault">
+                    <span class="material-symbols-outlined" aria-hidden="true">lock_open</span>
+                    @Strings.UNLOCK_BUTTON
+                </button>
+            </div>
+        </form>
+    </Dialog>
+
+    <Dialog @ref="addSecretDialog" OnClose="ClearAddSecretDialog">
+        <form class="vault-dialog" @onsubmit="SaveSecretAsync" @onsubmit:preventDefault="true">
+            <div class="dialog-header">
+                <div class="dialog-icon">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                </div>
+                <h2 class="dialog-title">@Strings.ADD_SECRET_TITLE</h2>
+            </div>
+            <div class="dialog-body">
+                <label class="field">
+                    <span>@Strings.SECRET_NAME_LABEL</span>
+                    <input class="form-input" maxlength="160" @bind="newSecretName" />
+                </label>
+                <label class="field">
+                    <span>@Strings.SECRET_VALUE_LABEL</span>
+                    <textarea class="form-textarea" rows="4" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" @bind="newSecretValue"></textarea>
+                </label>
+                @if (!string.IsNullOrWhiteSpace(addSecretDialogError))
+                {
+                    <div class="dialog-error">
+                        <span class="material-symbols-outlined" aria-hidden="true">error</span>
+                        @addSecretDialogError
+                    </div>
+                }
+            </div>
+            <div class="dialog-actions">
+                <button class="btn-secondary" type="button" disabled="@isSavingSecret" @onclick="CloseAddSecretDialogAsync">
+                    @Strings.CANCEL_BUTTON
+                </button>
+                <button class="btn-primary" type="submit" disabled="@isSavingSecret">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                    @Strings.ADD_SECRET_BUTTON
+                </button>
+            </div>
+        </form>
+    </Dialog>
+
+    <Dialog @ref="changePasswordDialog" OnClose="ClearChangePasswordDialog">
+        <form class="vault-dialog" @onsubmit="ChangePasswordAsync" @onsubmit:preventDefault="true">
+            <div class="dialog-header">
+                <div class="dialog-icon">
+                    <span class="material-symbols-outlined" aria-hidden="true">sync_lock</span>
+                </div>
+                <h2 class="dialog-title">@Strings.CHANGE_VAULT_TITLE</h2>
+            </div>
+            <div class="dialog-body">
+                <label class="field">
+                    <span>@Strings.CHANGE_VAULT_CURRENT_LABEL</span>
+                    <input class="form-input" type="password" autocomplete="current-password" @bind="changeCurrentVaultKey" />
+                </label>
+                <label class="field">
+                    <span>@Strings.CHANGE_VAULT_PASSWORD_LABEL</span>
+                    <input class="form-input" type="password" autocomplete="new-password" @bind="changeVaultKey" />
+                </label>
+                <label class="field">
+                    <span>@Strings.CHANGE_VAULT_CONFIRM_LABEL</span>
+                    <input class="form-input" type="password" autocomplete="new-password" @bind="changeVaultKeyConfirm" />
+                </label>
+                @if (!string.IsNullOrWhiteSpace(changePasswordDialogError))
+                {
+                    <div class="dialog-error">
+                        <span class="material-symbols-outlined" aria-hidden="true">error</span>
+                        @changePasswordDialogError
+                    </div>
+                }
+            </div>
+            <div class="dialog-actions">
+                <button class="btn-secondary" type="button" disabled="@isChangingPassword" @onclick="CloseChangePasswordDialogAsync">
+                    @Strings.CANCEL_BUTTON
+                </button>
+                <button class="btn-primary" type="submit" disabled="@isChangingPassword">
+                    <span class="material-symbols-outlined" aria-hidden="true">sync_lock</span>
+                    @Strings.CHANGE_VAULT_BUTTON
+                </button>
+            </div>
+        </form>
+    </Dialog>
+}
+
 @code {
     private IReadOnlyList<StoredSecretView> secrets = [];
+    private Dialog unlockDialog = null!;
+    private Dialog addSecretDialog = null!;
+    private Dialog changePasswordDialog = null!;
     private string? ownerSubject;
     private string setupVaultKey = string.Empty;
     private string setupVaultKeyConfirm = string.Empty;
     private string unlockVaultKey = string.Empty;
+    private string changeCurrentVaultKey = string.Empty;
     private string changeVaultKey = string.Empty;
     private string changeVaultKeyConfirm = string.Empty;
     private string resetConfirmation = string.Empty;
     private string newSecretName = string.Empty;
     private string newSecretValue = string.Empty;
+    private string? unlockDialogError;
+    private string? addSecretDialogError;
+    private string? changePasswordDialogError;
     private string? statusMessage;
     private bool statusIsError;
     private bool isLoading = true;
     private bool isVaultInitialized;
+    private bool isUnlockingVault;
+    private bool isSavingSecret;
+    private bool isChangingPassword;
 
     protected override async Task OnInitializedAsync()
     {
         var auth = await AuthState.GetAuthenticationStateAsync();
         ownerSubject = auth.User.FindFirst("sub")?.Value;
         await RefreshVaultAsync();
+    }
+
+    private async Task ShowUnlockDialogAsync()
+    {
+        ClearUnlockDialog();
+        await unlockDialog.ShowAsync();
+    }
+
+    private async Task CloseUnlockDialogAsync()
+    {
+        ClearUnlockDialog();
+        await unlockDialog.CloseAsync();
+    }
+
+    private void ClearUnlockDialog()
+    {
+        unlockVaultKey = string.Empty;
+        unlockDialogError = null;
+        isUnlockingVault = false;
+    }
+
+    private async Task ShowAddSecretDialogAsync()
+    {
+        if (!VaultService.IsUnlocked)
+        {
+            SetStatus(Strings.MESSAGE_UNLOCK_REQUIRED, true);
+            return;
+        }
+
+        ClearAddSecretDialog();
+        await addSecretDialog.ShowAsync();
+    }
+
+    private async Task CloseAddSecretDialogAsync()
+    {
+        ClearAddSecretDialog();
+        await addSecretDialog.CloseAsync();
+    }
+
+    private void ClearAddSecretDialog()
+    {
+        newSecretName = string.Empty;
+        newSecretValue = string.Empty;
+        addSecretDialogError = null;
+        isSavingSecret = false;
+    }
+
+    private async Task ShowChangePasswordDialogAsync()
+    {
+        if (!VaultService.IsUnlocked)
+        {
+            SetStatus(Strings.MESSAGE_CHANGE_REQUIRES_UNLOCK, true);
+            return;
+        }
+
+        ClearChangePasswordDialog();
+        await changePasswordDialog.ShowAsync();
+    }
+
+    private async Task CloseChangePasswordDialogAsync()
+    {
+        ClearChangePasswordDialog();
+        await changePasswordDialog.CloseAsync();
+    }
+
+    private void ClearChangePasswordDialog()
+    {
+        var isSubmitting = isChangingPassword;
+        changeCurrentVaultKey = string.Empty;
+        changeVaultKey = string.Empty;
+        changeVaultKeyConfirm = string.Empty;
+        changePasswordDialogError = null;
+        isChangingPassword = isSubmitting;
     }
 
     private async Task SetupVaultAsync()
@@ -241,8 +399,14 @@ else
 
     private async Task UnlockVaultAsync()
     {
+        if (isUnlockingVault)
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(unlockVaultKey))
         {
+            unlockDialogError = Strings.MESSAGE_VAULT_KEY_REQUIRED;
             SetStatus(Strings.MESSAGE_VAULT_KEY_REQUIRED, true);
             return;
         }
@@ -252,17 +416,28 @@ else
             return;
         }
 
-        if (!await VaultService.TryUnlockAsync(subject, unlockVaultKey))
+        isUnlockingVault = true;
+        try
         {
-            unlockVaultKey = string.Empty;
-            await RefreshVaultAsync();
-            SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
-            return;
-        }
+            if (!await VaultService.TryUnlockAsync(subject, unlockVaultKey))
+            {
+                unlockVaultKey = string.Empty;
+                unlockDialogError = Strings.MESSAGE_VAULT_KEY_INVALID;
+                await RefreshVaultAsync();
+                SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
+                return;
+            }
 
-        unlockVaultKey = string.Empty;
-        await RefreshVaultAsync();
-        SetStatus(Strings.MESSAGE_VAULT_UNLOCKED, false);
+            unlockVaultKey = string.Empty;
+            unlockDialogError = null;
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_VAULT_UNLOCKED, false);
+            await unlockDialog.CloseAsync();
+        }
+        finally
+        {
+            isUnlockingVault = false;
+        }
     }
 
     private async Task LockVaultAsync()
@@ -274,8 +449,14 @@ else
 
     private async Task ChangePasswordAsync()
     {
+        if (isChangingPassword)
+        {
+            return;
+        }
+
         if (!VaultService.IsUnlocked)
         {
+            changePasswordDialogError = Strings.MESSAGE_CHANGE_REQUIRES_UNLOCK;
             SetStatus(Strings.MESSAGE_CHANGE_REQUIRES_UNLOCK, true);
             return;
         }
@@ -285,24 +466,60 @@ else
             return;
         }
 
-        if (!TryValidatePasswordPair(changeVaultKey, changeVaultKeyConfirm))
+        var currentVaultKey = changeCurrentVaultKey;
+        var newVaultKey = changeVaultKey;
+        var newVaultKeyConfirm = changeVaultKeyConfirm;
+
+        if (string.IsNullOrWhiteSpace(currentVaultKey))
         {
+            changePasswordDialogError = Strings.MESSAGE_VAULT_KEY_REQUIRED;
+            SetStatus(Strings.MESSAGE_VAULT_KEY_REQUIRED, true);
             return;
         }
 
-        if (!await VaultService.ChangePasswordAsync(subject, changeVaultKey))
+        if (!TryValidatePasswordPair(newVaultKey, newVaultKeyConfirm, out var validationError))
         {
+            changePasswordDialogError = validationError;
+            SetStatus(validationError, true);
+            return;
+        }
+
+        isChangingPassword = true;
+        try
+        {
+            if (!await VaultService.VerifyVaultKeyAsync(subject, currentVaultKey))
+            {
+                changeCurrentVaultKey = string.Empty;
+                changePasswordDialogError = Strings.MESSAGE_VAULT_KEY_INVALID;
+                SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
+                return;
+            }
+
+            if (!await VaultService.TryUnlockAsync(subject, currentVaultKey) ||
+                !await VaultService.ChangePasswordAsync(subject, newVaultKey))
+            {
+                changeCurrentVaultKey = string.Empty;
+                changeVaultKey = string.Empty;
+                changeVaultKeyConfirm = string.Empty;
+                changePasswordDialogError = Strings.MESSAGE_VAULT_KEY_INVALID;
+                await RefreshVaultAsync();
+                SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
+                await changePasswordDialog.CloseAsync();
+                return;
+            }
+
+            changeCurrentVaultKey = string.Empty;
             changeVaultKey = string.Empty;
             changeVaultKeyConfirm = string.Empty;
+            changePasswordDialogError = null;
             await RefreshVaultAsync();
-            SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
-            return;
+            SetStatus(Strings.MESSAGE_PASSWORD_CHANGED, false);
+            await changePasswordDialog.CloseAsync();
         }
-
-        changeVaultKey = string.Empty;
-        changeVaultKeyConfirm = string.Empty;
-        await RefreshVaultAsync();
-        SetStatus(Strings.MESSAGE_PASSWORD_CHANGED, false);
+        finally
+        {
+            isChangingPassword = false;
+        }
     }
 
     private async Task ResetVaultAsync()
@@ -320,6 +537,9 @@ else
 
         await VaultService.ResetAsync(subject);
         resetConfirmation = string.Empty;
+        changeCurrentVaultKey = string.Empty;
+        changeVaultKey = string.Empty;
+        changeVaultKeyConfirm = string.Empty;
         newSecretName = string.Empty;
         newSecretValue = string.Empty;
         await RefreshVaultAsync();
@@ -328,8 +548,14 @@ else
 
     private async Task SaveSecretAsync()
     {
+        if (isSavingSecret)
+        {
+            return;
+        }
+
         if (!VaultService.IsUnlocked)
         {
+            addSecretDialogError = Strings.MESSAGE_UNLOCK_REQUIRED;
             SetStatus(Strings.MESSAGE_UNLOCK_REQUIRED, true);
             return;
         }
@@ -341,21 +567,34 @@ else
 
         if (string.IsNullOrWhiteSpace(newSecretName) || string.IsNullOrWhiteSpace(newSecretValue))
         {
+            addSecretDialogError = Strings.MESSAGE_SECRET_REQUIRED;
             SetStatus(Strings.MESSAGE_SECRET_REQUIRED, true);
             return;
         }
 
-        if (!await VaultService.AddSecretAsync(subject, newSecretName, newSecretValue))
+        isSavingSecret = true;
+        try
         {
-            await RefreshVaultAsync();
-            SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
-            return;
-        }
+            if (!await VaultService.AddSecretAsync(subject, newSecretName, newSecretValue))
+            {
+                addSecretDialogError = Strings.MESSAGE_VAULT_KEY_INVALID;
+                await RefreshVaultAsync();
+                SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
+                await addSecretDialog.CloseAsync();
+                return;
+            }
 
-        newSecretName = string.Empty;
-        newSecretValue = string.Empty;
-        await RefreshVaultAsync();
-        SetStatus(Strings.MESSAGE_SECRET_SAVED, false);
+            newSecretName = string.Empty;
+            newSecretValue = string.Empty;
+            addSecretDialogError = null;
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_SECRET_SAVED, false);
+            await addSecretDialog.CloseAsync();
+        }
+        finally
+        {
+            isSavingSecret = false;
+        }
     }
 
     private async Task DeleteSecretAsync(Guid id)
@@ -403,18 +642,33 @@ else
 
     private bool TryValidatePasswordPair(string password, string confirmation)
     {
+        if (!TryValidatePasswordPair(password, confirmation, out var error))
+        {
+            SetStatus(error, true);
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryValidatePasswordPair(
+        string password,
+        string confirmation,
+        out string error)
+    {
         if (string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(confirmation))
         {
-            SetStatus(Strings.MESSAGE_PASSWORD_REQUIRED, true);
+            error = Strings.MESSAGE_PASSWORD_REQUIRED;
             return false;
         }
 
         if (!string.Equals(password, confirmation, StringComparison.Ordinal))
         {
-            SetStatus(Strings.MESSAGE_PASSWORD_MISMATCH, true);
+            error = Strings.MESSAGE_PASSWORD_MISMATCH;
             return false;
         }
 
+        error = string.Empty;
         return true;
     }
 
@@ -446,36 +700,6 @@ else
     {
         statusMessage = message;
         statusIsError = isError;
-    }
-
-    private string GetStatusClass()
-    {
-        if (!isVaultInitialized)
-        {
-            return "status-locked";
-        }
-
-        return VaultService.IsUnlocked ? "status-unlocked" : "status-locked";
-    }
-
-    private string GetStatusIcon()
-    {
-        if (!isVaultInitialized)
-        {
-            return "key";
-        }
-
-        return VaultService.IsUnlocked ? "lock_open" : "lock";
-    }
-
-    private string GetStatusText()
-    {
-        if (!isVaultInitialized)
-        {
-            return Strings.STATUS_UNINITIALIZED;
-        }
-
-        return VaultService.IsUnlocked ? Strings.STATUS_UNLOCKED : Strings.STATUS_LOCKED;
     }
 
     private static string FormatLocal(DateTime utc)

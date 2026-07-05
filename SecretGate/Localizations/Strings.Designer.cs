@@ -44,11 +44,14 @@ internal class Strings
     }
 
     internal static string ADD_SECRET_BUTTON => GetString(nameof(ADD_SECRET_BUTTON));
+    internal static string ADD_SECRET_TITLE => GetString(nameof(ADD_SECRET_TITLE));
     internal static string APP_TITLE => GetString(nameof(APP_TITLE));
+    internal static string CANCEL_BUTTON => GetString(nameof(CANCEL_BUTTON));
     internal static string COPY_BUTTON => GetString(nameof(COPY_BUTTON));
     internal static string COPY_SHARE_BUNDLE_BUTTON => GetString(nameof(COPY_SHARE_BUNDLE_BUTTON));
     internal static string CREATE_SHARE_BUTTON => GetString(nameof(CREATE_SHARE_BUTTON));
     internal static string CHANGE_VAULT_BUTTON => GetString(nameof(CHANGE_VAULT_BUTTON));
+    internal static string CHANGE_VAULT_CURRENT_LABEL => GetString(nameof(CHANGE_VAULT_CURRENT_LABEL));
     internal static string CHANGE_VAULT_CONFIRM_LABEL => GetString(nameof(CHANGE_VAULT_CONFIRM_LABEL));
     internal static string CHANGE_VAULT_PASSWORD_LABEL => GetString(nameof(CHANGE_VAULT_PASSWORD_LABEL));
     internal static string CHANGE_VAULT_TITLE => GetString(nameof(CHANGE_VAULT_TITLE));
@@ -118,6 +121,7 @@ internal class Strings
     internal static string STATUS_UNLOCKED => GetString(nameof(STATUS_UNLOCKED));
     internal static string STORED_SECRETS_TITLE => GetString(nameof(STORED_SECRETS_TITLE));
     internal static string UNLOCK_BUTTON => GetString(nameof(UNLOCK_BUTTON));
+    internal static string UNLOCK_VAULT_TITLE => GetString(nameof(UNLOCK_VAULT_TITLE));
     internal static string UPDATED_AT => GetString(nameof(UPDATED_AT));
     internal static string VAULT_KEY_LABEL => GetString(nameof(VAULT_KEY_LABEL));
     internal static string VAULT_TITLE => GetString(nameof(VAULT_TITLE));

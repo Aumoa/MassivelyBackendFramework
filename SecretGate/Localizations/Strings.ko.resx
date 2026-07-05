@@ -13,10 +13,16 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="ADD_SECRET_BUTTON" xml:space="preserve">
-    <value>시크릿 저장</value>
+    <value>추가</value>
+  </data>
+  <data name="ADD_SECRET_TITLE" xml:space="preserve">
+    <value>시크릿 추가</value>
   </data>
   <data name="APP_TITLE" xml:space="preserve">
     <value>Secret Gate</value>
+  </data>
+  <data name="CANCEL_BUTTON" xml:space="preserve">
+    <value>취소</value>
   </data>
   <data name="COPY_BUTTON" xml:space="preserve">
     <value>복사</value>
@@ -55,7 +61,7 @@
     <value>로딩 중</value>
   </data>
   <data name="LOCK_BUTTON" xml:space="preserve">
-    <value>잠금</value>
+    <value>잠그기</value>
   </data>
   <data name="LOCKED_SECRET" xml:space="preserve">
     <value>잠김</value>
@@ -172,7 +178,10 @@
     <value>저장된 시크릿</value>
   </data>
   <data name="UNLOCK_BUTTON" xml:space="preserve">
-    <value>열기</value>
+    <value>잠금 해제</value>
+  </data>
+  <data name="UNLOCK_VAULT_TITLE" xml:space="preserve">
+    <value>Vault 잠금 해제</value>
   </data>
   <data name="UPDATED_AT" xml:space="preserve">
     <value>수정</value>
@@ -185,6 +194,9 @@
   </data>
   <data name="CHANGE_VAULT_BUTTON" xml:space="preserve">
     <value>암호 변경</value>
+  </data>
+  <data name="CHANGE_VAULT_CURRENT_LABEL" xml:space="preserve">
+    <value>현재 Vault 암호</value>
   </data>
   <data name="CHANGE_VAULT_CONFIRM_LABEL" xml:space="preserve">
     <value>새 Vault 암호 확인</value>

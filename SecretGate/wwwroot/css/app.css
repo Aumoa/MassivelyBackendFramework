@@ -219,6 +219,14 @@ button:disabled {
     margin-bottom: var(--space-6);
 }
 
+.page-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
 .tool-panel {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
@@ -296,6 +304,83 @@ button:disabled {
     align-items: center;
     gap: var(--space-3);
     flex-wrap: wrap;
+}
+
+body .display-overlay {
+    padding: var(--space-4);
+}
+
+body .display-overlay .dialog-container {
+    width: min(520px, calc(100vw - 32px)) !important;
+    min-width: 0 !important;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto !important;
+    background: var(--color-surface) !important;
+    border: 1px solid var(--color-border);
+    color: var(--color-text) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22) !important;
+    padding: var(--space-6) !important;
+}
+
+.vault-dialog {
+    display: grid;
+    gap: var(--space-5);
+}
+
+.dialog-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.dialog-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-muted);
+    color: var(--color-accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.dialog-icon .material-symbols-outlined {
+    font-size: 1.35rem;
+}
+
+.dialog-title {
+    font-size: var(--text-lg);
+}
+
+.dialog-body {
+    display: grid;
+    gap: var(--space-4);
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.dialog-error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--color-danger);
+    background: var(--color-danger-bg);
+    border: 1px solid color-mix(in srgb, var(--color-danger) 28%, transparent);
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+
+.dialog-error .material-symbols-outlined {
+    font-size: 1rem;
 }
 
 .btn-primary {
@@ -515,6 +600,17 @@ button:disabled {
         padding: var(--space-4);
     }
 
+    .page-header,
+    .panel-header,
+    .page-actions {
+        align-items: stretch;
+    }
+
+    .page-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
     .inline-form,
     .secret-row {
         grid-template-columns: 1fr;
@@ -528,5 +624,13 @@ button:disabled {
     .form-input,
     .form-textarea {
         min-height: 44px;
+    }
+
+    .dialog-actions {
+        flex-direction: column-reverse;
+    }
+
+    .dialog-actions button {
+        width: 100%;
     }
 }

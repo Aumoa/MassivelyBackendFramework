@@ -13,10 +13,16 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="ADD_SECRET_BUTTON" xml:space="preserve">
-    <value>Save secret</value>
+    <value>Add</value>
+  </data>
+  <data name="ADD_SECRET_TITLE" xml:space="preserve">
+    <value>Add secret</value>
   </data>
   <data name="APP_TITLE" xml:space="preserve">
     <value>Secret Gate</value>
+  </data>
+  <data name="CANCEL_BUTTON" xml:space="preserve">
+    <value>Cancel</value>
   </data>
   <data name="COPY_BUTTON" xml:space="preserve">
     <value>Copy</value>
@@ -174,6 +180,9 @@
   <data name="UNLOCK_BUTTON" xml:space="preserve">
     <value>Unlock</value>
   </data>
+  <data name="UNLOCK_VAULT_TITLE" xml:space="preserve">
+    <value>Unlock vault</value>
+  </data>
   <data name="UPDATED_AT" xml:space="preserve">
     <value>Updated</value>
   </data>
@@ -185,6 +194,9 @@
   </data>
   <data name="CHANGE_VAULT_BUTTON" xml:space="preserve">
     <value>Change password</value>
+  </data>
+  <data name="CHANGE_VAULT_CURRENT_LABEL" xml:space="preserve">
+    <value>Current vault password</value>
   </data>
   <data name="CHANGE_VAULT_CONFIRM_LABEL" xml:space="preserve">
     <value>Confirm new password</value>
