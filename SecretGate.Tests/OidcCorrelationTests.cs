@@ -8,10 +8,10 @@ using OpenIDConnect.Extensions;
 
 namespace SecretGate.Tests;
 
-public sealed class OidcCorrelationTests
+public sealed class OidcPkceStateTests
 {
     [Fact]
-    public async Task AcceptRejectsCallbackWithoutCorrelationCookie()
+    public async Task AcceptRejectsCallbackWithoutPkceStateCookie()
     {
         using var services = CreateServices();
         using var scope = services.CreateScope();
@@ -20,7 +20,7 @@ public sealed class OidcCorrelationTests
         var redirectUri = "https://secret.example/auth/redirect";
 
         accessor.HttpContext = CreateHttpContext();
-        var loginUri = auth.GenerateLoginUri(accessor.HttpContext, redirectUri, "openid profile email");
+        var loginUri = auth.GenerateLoginUri(redirectUri, "openid profile email");
         var state = GetState(loginUri);
 
         accessor.HttpContext = CreateHttpContext();
@@ -32,7 +32,7 @@ public sealed class OidcCorrelationTests
     }
 
     [Fact]
-    public async Task AcceptRejectsCallbackWithMismatchedCorrelationCookie()
+    public async Task AcceptRejectsCallbackWithInvalidPkceStateCookie()
     {
         using var services = CreateServices();
         using var scope = services.CreateScope();
@@ -41,12 +41,12 @@ public sealed class OidcCorrelationTests
         var redirectUri = "https://secret.example/auth/redirect";
 
         accessor.HttpContext = CreateHttpContext();
-        var loginUri = auth.GenerateLoginUri(accessor.HttpContext, redirectUri, "openid profile email");
+        var loginUri = auth.GenerateLoginUri(redirectUri, "openid profile email");
         var state = GetState(loginUri);
-        var correlationCookieName = GetCorrelationCookieName(accessor.HttpContext);
+        var pkceCookieName = GetPkceStateCookieName(accessor.HttpContext, state);
 
         accessor.HttpContext = CreateHttpContext();
-        accessor.HttpContext.Request.Headers.Cookie = $"{correlationCookieName}=mismatched-correlation";
+        accessor.HttpContext.Request.Headers.Cookie = $"{pkceCookieName}=invalid-protected-state";
         await auth.AcceptAsync("authorization-code", redirectUri, state);
 
         Assert.DoesNotContain(
@@ -91,11 +91,11 @@ public sealed class OidcCorrelationTests
         return state;
     }
 
-    private static string GetCorrelationCookieName(HttpContext httpContext)
+    private static string GetPkceStateCookieName(HttpContext httpContext, string state)
     {
         var setCookie = Assert.Single(
             httpContext.Response.Headers.SetCookie,
-            value => value?.Contains("-oidc-correlation=", StringComparison.Ordinal) == true);
+            value => value?.Contains("-pkce-" + state + "=", StringComparison.Ordinal) == true);
         Assert.NotNull(setCookie);
         var separatorIndex = setCookie.IndexOf("=", StringComparison.Ordinal);
         Assert.True(separatorIndex > 0);

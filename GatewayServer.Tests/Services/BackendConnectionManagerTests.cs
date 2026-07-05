@@ -14,6 +14,79 @@ namespace GatewayServer.Tests.Services;
 public sealed class BackendConnectionManagerTests
 {
     [Fact]
+    public async Task ListServers_ReturnsClientSafeEntriesFromSnapshot()
+    {
+        var descriptor = BackendServerDescriptor.Create(
+            BackendNodeState.Open,
+            "v1",
+            "{\"name\":\"Alpha\"}");
+        var catalog = new FakeBackendNodeCatalog(CreateSnapshot(new BackendNodeEndpoint(
+            "alpha",
+            "backend-a",
+            "Backend A",
+            "master-a",
+            new MasterSocketEndpoint("10.0.0.12", 19001, useTls: true),
+            new BackendPacketManifestId("test"),
+            new BackendPacketManifestHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            descriptor,
+            DateTimeOffset.UtcNow)));
+        var manager = CreateManager(catalog);
+
+        await manager.StartAsync(CancellationToken.None);
+        BackendServerDirectorySnapshot snapshot;
+        try
+        {
+            snapshot = manager.ListServers(" alpha ", maximumEntries: 8);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+
+        var entry = Assert.Single(snapshot.Entries);
+        Assert.Equal("alpha", entry.BackendKind);
+        Assert.Equal(GatewayBackendServerState.Open, entry.State);
+        Assert.Equal("v1", entry.DescriptorVersion);
+        Assert.Equal(descriptor.DescriptorHash, entry.DescriptorHash);
+        Assert.Equal("{\"name\":\"Alpha\"}", entry.DescriptorJson);
+        Assert.DoesNotContain("10.0.0.12", entry.DescriptorJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_RejectsFullServerHandleBeforeOpeningSocket()
+    {
+        var descriptor = BackendServerDescriptor.Create(
+            BackendNodeState.Full,
+            "v1",
+            "{\"name\":\"Alpha\"}");
+        var catalog = new FakeBackendNodeCatalog(CreateSnapshot(new BackendNodeEndpoint(
+            "alpha",
+            "backend-a",
+            "Backend A",
+            "master-a",
+            new MasterSocketEndpoint("127.0.0.1", 1, useTls: false),
+            new BackendPacketManifestId("test"),
+            new BackendPacketManifestHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            descriptor,
+            DateTimeOffset.UtcNow)));
+        var manager = CreateManager(catalog);
+        await manager.StartAsync(CancellationToken.None);
+        try
+        {
+            var handle = Assert.Single(manager.ListServers("alpha", maximumEntries: 8).Entries).ServerHandle;
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+                await manager.ConnectAsync("alpha", handle, CancellationToken.None));
+
+            Assert.Contains("not routable", exception.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            await manager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task StartAsync_AppliesBackendSnapshot_ByKind()
     {
         var catalog = new FakeBackendNodeCatalog(CreateSnapshot(

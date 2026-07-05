@@ -36,6 +36,8 @@ internal class ConnectionManager(
     private readonly BackendRouteOptions m_BackendRouteOptions = backendRouteOptions.Value;
     private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_ClientOriginPrincipalExchangeCounters = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_BackendOriginPrincipalExchangeCounters = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Client, FixedWindowRateCounter> m_ServerListClientCounters = new();
+    private readonly ConcurrentDictionary<string, FixedWindowRateCounter> m_ServerListPrincipalCounters = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, long> m_PacketManifestRejectCounters = new(StringComparer.Ordinal);
     private readonly PersistentBackendRouteRegistry<Client> m_PersistentBackendRouteRegistry = new(
         backendRouteOptions.Value,
@@ -463,6 +465,12 @@ internal class ConnectionManager(
             return;
         }
 
+        if (packet.Header.PacketId == Pid.GATE_BACKEND_SERVER_LIST)
+        {
+            await HandleBackendServerListPacketAsync(client, authenticationContext, packet, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         if (packet.Header.PacketId == Pid.GATE_BACKEND_ROUTE_DATA)
         {
             await HandleBackendRouteDataPacketAsync(client, authenticationContext, packet, cancellationToken).ConfigureAwait(false);
@@ -495,19 +503,18 @@ internal class ConnectionManager(
                 throw new InvalidOperationException("Backend route open packets must be Request packets.");
             }
 
-            if (packet.Header.Version != GatewayBackendRouteOpenRequest.ProtocolVersion)
-            {
-                throw new InvalidOperationException($"Unsupported Backend route open protocol version {packet.Header.Version}.");
-            }
-
-            var request = PacketCodec.Decode(packet, GatewayBackendRouteOpenRequest.Codec);
+            var request = DecodeBackendRouteOpenRequest(packet);
             backendKind = request.BackendKind;
             var principalSubjectId = authenticationContext.Principal?.SubjectId;
             m_PersistentBackendRouteRegistry.RequireOpenAttemptAllowed(client, principalSubjectId);
             var normalizedBackendKind = m_PersistentBackendRouteRegistry.RequireAllowedBackendKind(request.BackendKind);
-            var backendSession = await backendRouteManager
-                .ConnectAsync(normalizedBackendKind, cancellationToken)
-                .ConfigureAwait(false);
+            var backendSession = request.ServerHandle == null
+                ? await backendRouteManager
+                    .ConnectAsync(normalizedBackendKind, cancellationToken)
+                    .ConfigureAwait(false)
+                : await backendRouteManager
+                    .ConnectAsync(normalizedBackendKind, request.ServerHandle, cancellationToken)
+                    .ConfigureAwait(false);
             if (!string.Equals(backendSession.BackendKind, normalizedBackendKind, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("Selected Backend session kind does not match the requested Backend kind.");
@@ -533,7 +540,12 @@ internal class ConnectionManager(
             await WriteBackendRouteOpenResponseAsync(
                 client,
                 packet.Header.Version,
-                GatewayBackendRouteOpenResponse.Accepted(route.RouteToken, route.BackendKind),
+                GatewayBackendRouteOpenResponse.Accepted(
+                    route.RouteToken,
+                    route.BackendKind,
+                    backendSession.ServerHandle,
+                    backendSession.DescriptorVersion,
+                    backendSession.DescriptorHash),
                 cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -570,6 +582,68 @@ internal class ConnectionManager(
                     client,
                     packet.Header.Version,
                     GatewayBackendRouteOpenResponse.Rejected(GetResponseBackendKind(backendKind), "Backend route open was rejected."),
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task HandleBackendServerListPacketAsync(
+        Client client,
+        GatewayClientAuthenticationContext authenticationContext,
+        PacketFrame packet,
+        CancellationToken cancellationToken)
+    {
+        var backendKind = string.Empty;
+
+        try
+        {
+            if (packet.Header.Kind != PacketKind.Request)
+            {
+                throw new InvalidOperationException("Backend server list packets must be Request packets.");
+            }
+
+            if (packet.Header.Version != GatewayBackendServerListRequest.ProtocolVersion)
+            {
+                throw new InvalidOperationException($"Unsupported Backend server list protocol version {packet.Header.Version}.");
+            }
+
+            var request = PacketCodec.Decode(packet, GatewayBackendServerListRequest.Codec);
+            backendKind = request.BackendKind;
+            var principalSubjectId = authenticationContext.Principal?.SubjectId;
+            RequireServerListAllowed(client, principalSubjectId);
+            var normalizedBackendKind = m_PersistentBackendRouteRegistry.RequireAllowedBackendKind(request.BackendKind);
+            var snapshot = backendRouteManager.ListServers(
+                normalizedBackendKind,
+                GetServerListEntryLimit(request));
+
+            await WriteBackendServerListResponseAsync(
+                client,
+                packet.Header.Version,
+                GatewayBackendServerListResponse.Accepted(
+                    normalizedBackendKind,
+                    snapshot.Entries,
+                    snapshot.ObservedAt),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(
+                e,
+                "Gateway rejected Backend server list packet. BackendKind={BackendKind}, PacketKind={PacketKind}, PacketId={PacketId}.",
+                backendKind,
+                packet.Header.Kind,
+                packet.Header.PacketId);
+
+            if (packet.Header.Kind == PacketKind.Request)
+            {
+                await WriteBackendServerListResponseAsync(
+                    client,
+                    packet.Header.Version,
+                    GatewayBackendServerListResponse.Rejected(GetResponseBackendKind(backendKind), "Backend server list was rejected."),
                     cancellationToken).ConfigureAwait(false);
             }
         }
@@ -795,6 +869,18 @@ internal class ConnectionManager(
                 client,
                 packet.Header.Version,
                 GatewayBackendRouteOpenResponse.Rejected(backendKind, "Client is not authenticated."),
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (packet.Header.PacketId == Pid.GATE_BACKEND_SERVER_LIST &&
+            packet.Header.Kind == PacketKind.Request)
+        {
+            var backendKind = GetBackendServerListResponseBackendKind(packet);
+            await WriteBackendServerListResponseAsync(
+                client,
+                packet.Header.Version,
+                GatewayBackendServerListResponse.Rejected(backendKind, "Client is not authenticated."),
                 cancellationToken).ConfigureAwait(false);
         }
     }
@@ -1138,12 +1224,20 @@ internal class ConnectionManager(
         GatewayBackendRouteOpenResponse routeResponse,
         CancellationToken cancellationToken)
     {
+        if (!TryGetBackendRouteOpenResponseCodec(version, out var codec))
+        {
+            logger.LogWarning(
+                "Gateway skipped Backend route open response for unsupported protocol version {ProtocolVersion}.",
+                version);
+            return;
+        }
+
         using var response = PacketCodec.Encode(
             PacketKind.Response,
             Pid.GATE_BACKEND_ROUTE_OPEN,
             version,
             routeResponse,
-            GatewayBackendRouteOpenResponse.Codec);
+            codec);
         await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
@@ -1159,6 +1253,21 @@ internal class ConnectionManager(
             version,
             routeClose,
             GatewayBackendRouteClose.Codec);
+        await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task WriteBackendServerListResponseAsync(
+        Client client,
+        ushort version,
+        GatewayBackendServerListResponse serverListResponse,
+        CancellationToken cancellationToken)
+    {
+        using var response = PacketCodec.Encode(
+            PacketKind.Response,
+            Pid.GATE_BACKEND_SERVER_LIST,
+            version,
+            serverListResponse,
+            GatewayBackendServerListResponse.Codec);
         await client.WriteAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
@@ -1218,6 +1327,7 @@ internal class ConnectionManager(
     private void RemoveBackendRoutes(Client client)
     {
         var routes = m_PersistentBackendRouteRegistry.RemoveOwnerRoutesAndReturn(client, "client disconnected");
+        m_ServerListClientCounters.TryRemove(client, out _);
         if (routes.Length == 0)
         {
             return;
@@ -1296,6 +1406,7 @@ internal class ConnectionManager(
         return packet.Header.PacketId is
             Pid.GATE_BACKEND_ROUTE or
             Pid.GATE_BACKEND_ROUTE_OPEN or
+            Pid.GATE_BACKEND_SERVER_LIST or
             Pid.GATE_BACKEND_ROUTE_DATA or
             Pid.GATE_BACKEND_ROUTE_CLOSE;
     }
@@ -1321,9 +1432,9 @@ internal class ConnectionManager(
     {
         try
         {
-            if (packet.Header.Version == GatewayBackendRouteOpenRequest.ProtocolVersion)
+            if (TryGetBackendRouteOpenRequestCodec(packet.Header.Version, out var codec))
             {
-                var request = PacketCodec.Decode(packet, GatewayBackendRouteOpenRequest.Codec);
+                var request = PacketCodec.Decode(packet, codec);
                 return GetResponseBackendKind(request.BackendKind);
             }
         }
@@ -1332,6 +1443,132 @@ internal class ConnectionManager(
         }
 
         return "unknown";
+    }
+
+    private static GatewayBackendRouteOpenRequest DecodeBackendRouteOpenRequest(PacketFrame packet)
+    {
+        if (!TryGetBackendRouteOpenRequestCodec(packet.Header.Version, out var codec))
+        {
+            throw new InvalidOperationException($"Unsupported Backend route open protocol version {packet.Header.Version}.");
+        }
+
+        return PacketCodec.Decode(packet, codec);
+    }
+
+    private static bool TryGetBackendRouteOpenRequestCodec(
+        ushort version,
+        out IPacketCodec<GatewayBackendRouteOpenRequest> codec)
+    {
+        if (version == GatewayBackendRouteOpenRequest.LegacyProtocolVersion)
+        {
+            codec = GatewayBackendRouteOpenRequest.LegacyCodec;
+            return true;
+        }
+
+        if (version == GatewayBackendRouteOpenRequest.ProtocolVersion)
+        {
+            codec = GatewayBackendRouteOpenRequest.Codec;
+            return true;
+        }
+
+        codec = GatewayBackendRouteOpenRequest.Codec;
+        return false;
+    }
+
+    private static bool TryGetBackendRouteOpenResponseCodec(
+        ushort version,
+        out IPacketCodec<GatewayBackendRouteOpenResponse> codec)
+    {
+        if (version == GatewayBackendRouteOpenResponse.LegacyProtocolVersion)
+        {
+            codec = GatewayBackendRouteOpenResponse.LegacyCodec;
+            return true;
+        }
+
+        if (version == GatewayBackendRouteOpenResponse.ProtocolVersion)
+        {
+            codec = GatewayBackendRouteOpenResponse.Codec;
+            return true;
+        }
+
+        codec = GatewayBackendRouteOpenResponse.Codec;
+        return false;
+    }
+
+    private static string GetBackendServerListResponseBackendKind(PacketFrame packet)
+    {
+        try
+        {
+            if (packet.Header.Version == GatewayBackendServerListRequest.ProtocolVersion)
+            {
+                var request = PacketCodec.Decode(packet, GatewayBackendServerListRequest.Codec);
+                return GetResponseBackendKind(request.BackendKind);
+            }
+        }
+        catch
+        {
+        }
+
+        return "unknown";
+    }
+
+    private void RequireServerListAllowed(
+        Client client,
+        string? principalSubjectId)
+    {
+        if (client == null)
+        {
+            throw new ArgumentNullException(nameof(client));
+        }
+
+        var limit = m_BackendRouteOptions.MaxServerListRequestsPerClientPerWindow;
+        if (limit > 0)
+        {
+            var counter = m_ServerListClientCounters.GetOrAdd(
+                client,
+                static _ => new FixedWindowRateCounter());
+            counter.IncrementOrThrow(
+                limit,
+                GetServerListRateLimitWindowMilliseconds(),
+                DateTimeOffset.UtcNow,
+                "Gateway Backend server list rate limit was exceeded.");
+        }
+
+        var normalizedPrincipalSubjectId = string.IsNullOrWhiteSpace(principalSubjectId)
+            ? null
+            : principalSubjectId.Trim();
+        var principalLimit = m_BackendRouteOptions.MaxServerListRequestsPerPrincipalPerWindow;
+        if (normalizedPrincipalSubjectId == null ||
+            principalLimit <= 0)
+        {
+            return;
+        }
+
+        var principalCounter = m_ServerListPrincipalCounters.GetOrAdd(
+            normalizedPrincipalSubjectId,
+            static _ => new FixedWindowRateCounter());
+        principalCounter.IncrementOrThrow(
+            principalLimit,
+            GetServerListRateLimitWindowMilliseconds(),
+            DateTimeOffset.UtcNow,
+            "Gateway Backend server list principal rate limit was exceeded.");
+    }
+
+    private int GetServerListEntryLimit(GatewayBackendServerListRequest request)
+    {
+        var configuredLimit = m_BackendRouteOptions.MaxServerListEntries <= 0
+            ? GatewayBackendServerListRequest.MaxRequestedEntries
+            : Math.Min(
+                m_BackendRouteOptions.MaxServerListEntries,
+                GatewayBackendServerListRequest.MaxRequestedEntries);
+        return request.MaximumEntries <= 0
+            ? configuredLimit
+            : Math.Min(request.MaximumEntries, configuredLimit);
+    }
+
+    private int GetServerListRateLimitWindowMilliseconds()
+    {
+        return Math.Max(1, m_BackendRouteOptions.ServerListRateLimitWindowMilliseconds);
     }
 
     private static string GetResponseBackendKind(string backendKind)

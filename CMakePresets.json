@@ -1,0 +1,65 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 20,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/.codex-build/cmake/${presetName}",
+            "cacheVariables": {
+                "CMAKE_CXX_STANDARD": "20",
+                "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+                "CMAKE_CXX_EXTENSIONS": "OFF",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "ninja-debug",
+            "displayName": "Ninja Debug",
+            "inherits": "base",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "mingw-debug",
+            "displayName": "MinGW Makefiles Debug",
+            "inherits": "base",
+            "generator": "MinGW Makefiles",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "ninja-debug",
+            "configurePreset": "ninja-debug"
+        },
+        {
+            "name": "mingw-debug",
+            "configurePreset": "mingw-debug"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "ninja-debug",
+            "configurePreset": "ninja-debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "mingw-debug",
+            "configurePreset": "mingw-debug",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
+    ]
+}

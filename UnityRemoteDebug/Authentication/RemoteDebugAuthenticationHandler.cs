@@ -38,7 +38,7 @@ internal sealed class RemoteDebugAuthenticationHandler(
             Request.Host,
             Request.PathBase,
             LoginRedirectPath);
-        Response.Redirect(oidcAuthenticationStateProvider.GenerateLoginUri(Context, redirectUri, LoginScope));
+        Response.Redirect(oidcAuthenticationStateProvider.GenerateLoginUri(redirectUri, LoginScope));
         return Task.CompletedTask;
     }
 

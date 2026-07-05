@@ -1,5 +1,7 @@
 namespace BackendServer.Options;
 
+using MasterServer.ControlPlane;
+
 public sealed record MasterConnectionOptions
 {
     public bool Enabled { get; set; } = true;
@@ -21,6 +23,12 @@ public sealed record MasterConnectionOptions
     public string BackendPacketManifestId { get; set; } = string.Empty;
 
     public string BackendPacketManifestHash { get; set; } = string.Empty;
+
+    public BackendNodeState ServerState { get; set; } = BackendNodeState.Open;
+
+    public string ServerDescriptorVersion { get; set; } = "1";
+
+    public string ServerDescriptorJson { get; set; } = "{}";
 
     public string SharedSecret { get; set; } = string.Empty;
 
