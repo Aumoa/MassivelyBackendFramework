@@ -92,6 +92,7 @@ if (app.Environment.IsDevelopment())
 }
 
 await InitializeClaudeSettingsAsync(app.Lifetime.ApplicationStopping);
+await InitializeAutoResponseSettingsAsync(app.Lifetime.ApplicationStopping);
 await InitializeAiSkillsAsync(app.Lifetime.ApplicationStopping);
 
 app.Run();
@@ -104,6 +105,10 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddMemoryCache();
 
     sc.Configure<DiscordService.Configuration>(conf.GetRequiredSection("Discord"));
+    sc.Configure<AutoResponseOptions>(conf.GetSection("AutoResponse"));
+    sc.AddSingleton<IAutoResponseSettingsService, AutoResponseSettingsService>();
+    sc.AddSingleton<IDiscordAutoResponseEvaluator, DiscordAutoResponseEvaluator>();
+    sc.AddSingleton<IDiscordAutoResponseCoordinator, DiscordAutoResponseCoordinator>();
     sc.AddHostedService<DiscordService>();
 
     sc.Configure<ImageGenerationOptions>(conf.GetRequiredSection("ImageGeneration"));
@@ -158,16 +163,17 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddTransient<IChatAttachmentRepository, MySqlChatAttachmentRepository>();
     sc.AddTransient<IAppointmentRepository, MySqlAppointmentRepository>();
     sc.AddTransient<IChannelNoteRepository, MySqlChannelNoteRepository>();
-    sc.AddTransient<IAllowedChannelRepository, MySqlAllowedChannelRepository>();
-    sc.AddScoped<IAllowedChannelService, AllowedChannelService>();
-    sc.AddTransient<IAllowedChannelRequestRepository, MySqlAllowedChannelRequestRepository>();
-    sc.AddScoped<IAllowedChannelRequestService, AllowedChannelRequestService>();
     sc.AddTransient<IToolSettingsRepository, MySqlToolSettingsRepository>();
     sc.AddScoped<IToolSettingsService, ToolSettingsService>();
     sc.AddTransient<IDiscordUserPermissionRepository, MySqlDiscordUserPermissionRepository>();
     sc.AddScoped<IDiscordUserPermissionService, DiscordUserPermissionService>();
     sc.AddSingleton<IClaudeSettingsRepository, MySqlClaudeSettingsRepository>();
     sc.AddSingleton<IClaudeSettingsService, ClaudeSettingsService>();
+    sc.AddSingleton<MySqlAutoResponseSettingsRepository>();
+    sc.AddSingleton<IAutoResponseSettingsRepository>(
+        sp => sp.GetRequiredService<MySqlAutoResponseSettingsRepository>());
+    sc.AddSingleton<IAutoResponseEventRepository>(
+        sp => sp.GetRequiredService<MySqlAutoResponseSettingsRepository>());
     sc.AddSingleton<IAiSkillRepository, MySqlAiSkillRepository>();
 }
 
@@ -184,6 +190,13 @@ async ValueTask InitializeClaudeSettingsAsync(CancellationToken cancellationToke
 {
     using var scope = app.Services.CreateScope();
     var settings = scope.ServiceProvider.GetRequiredService<IClaudeSettingsService>();
+    await settings.GetAsync(cancellationToken);
+}
+
+async ValueTask InitializeAutoResponseSettingsAsync(CancellationToken cancellationToken)
+{
+    using var scope = app.Services.CreateScope();
+    var settings = scope.ServiceProvider.GetRequiredService<IAutoResponseSettingsService>();
     await settings.GetAsync(cancellationToken);
 }
 

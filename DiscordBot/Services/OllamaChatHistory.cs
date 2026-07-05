@@ -57,6 +57,7 @@ public class OllamaChatHistory(
         ToolsProvider toolsProvider,
         IReadOnlyList<ChatImage>? images = null,
         bool filterToolsBySelectedSkills = true,
+        bool rememberConversation = true,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (author.IsBot)
@@ -242,11 +243,14 @@ public class OllamaChatHistory(
                 }
             }
 
-            m_Messages.AddRange(messagesAppend.Select(TrimForMemory).Where(ShouldRemember));
-
-            if (m_Messages.Count >= options.MemorySize)
+            if (rememberConversation)
             {
-                await SummarizeHistoryAsync(cancellationToken);
+                m_Messages.AddRange(messagesAppend.Select(TrimForMemory).Where(ShouldRemember));
+
+                if (m_Messages.Count >= options.MemorySize)
+                {
+                    await SummarizeHistoryAsync(cancellationToken);
+                }
             }
 
             yield break;

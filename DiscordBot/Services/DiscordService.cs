@@ -10,13 +10,11 @@ using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
-internal class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IDiscordAttachmentDownloader attachmentDownloader, IImageGenerationClient imageGenerationClient, IChessGameService chessGameService, IOthelloGameService othelloGameService) : IHostedService, IAsyncDisposable
+internal class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IDiscordAttachmentDownloader attachmentDownloader, IImageGenerationClient imageGenerationClient, IChessGameService chessGameService, IOthelloGameService othelloGameService, IDiscordAutoResponseCoordinator autoResponse) : IHostedService, IAsyncDisposable
 {
     public record Configuration
     {
         public required string Token { get; set; }
-
-        public string? AdminBaseUrl { get; set; }
     }
 
     private readonly DiscordSocketClient m_Socket = new(new DiscordSocketConfig
@@ -73,30 +71,6 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         var channelId = message.Channel.Id.ToString();
 
         using var scope = scopeFactory.CreateScope();
-        var channelAccess = scope.ServiceProvider.GetRequiredService<IAllowedChannelService>();
-        if (!await channelAccess.IsAllowedAsync(channelId))
-        {
-            if (shouldRespond)
-            {
-                var requestService = scope.ServiceProvider.GetRequiredService<IAllowedChannelRequestService>();
-                var guildChannel = message.Channel as SocketGuildChannel;
-                var request = await requestService.GetOrCreateAsync(
-                    channelId,
-                    guildId,
-                    guildChannel?.Name,
-                    guildChannel?.Guild.Name,
-                    message.Author.Id.ToString(),
-                    message.Author.Username,
-                    message.Id.ToString());
-                var approvalUrl = BuildAdminUrl($"/channel-requests/{request.Token}");
-                await message.Channel.SendMessageAsync(
-                    "허용되지 않은 채널입니다. 관리자에게 아래 승인 링크를 전달해 주세요.\n" +
-                    approvalUrl);
-            }
-
-            return;
-        }
-
         var processedImages = await ProcessImageAttachmentsAsync(message, scope.ServiceProvider);
         var processedAttachments = await ProcessDocumentAttachmentsAsync(message, scope.ServiceProvider);
         var referencedMessageId = GetReferencedMessageId(message);
@@ -116,13 +90,52 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
         if (!shouldRespond)
         {
+            if (!isDirectMessage)
+            {
+                await QueueAutoResponseAsync(
+                    message,
+                    guildId,
+                    channelId,
+                    isMentioned,
+                    processedImages,
+                    processedAttachments,
+                    scope.ServiceProvider);
+            }
+
             return;
         }
 
+        autoResponse.CancelPending(channelId);
+        await GenerateResponseAsync(
+            message,
+            guildId,
+            channelId,
+            processedImages,
+            processedAttachments);
+    }
+
+    private async Task GenerateResponseAsync(
+        SocketMessage message,
+        string? guildId,
+        string channelId,
+        IReadOnlyList<ProcessedChatImage> processedImages,
+        IReadOnlyList<ProcessedChatAttachment> processedAttachments,
+        DiscordAutoResponseRequest? autoResponseRequest = null,
+        CancellationToken cancellationToken = default)
+    {
+        var isAutomaticResponse = autoResponseRequest != null;
         var activeChessGame = chessGameService.FindActiveByUser(message.Author.Id.ToString());
         var activeOthelloGame = othelloGameService.FindActiveByUser(message.Author.Id.ToString());
         var activeGameName = activeChessGame != null ? "체스" : activeOthelloGame != null ? "오셀로" : null;
         var activeGameChannelId = activeChessGame?.ChannelId ?? activeOthelloGame?.ChannelId;
+        if (isAutomaticResponse && activeGameChannelId != null)
+        {
+            logger.LogDebug(
+                "Skipping automatic response for user {UserId}: active game is in progress.",
+                message.Author.Id);
+            return;
+        }
+
         if (activeGameChannelId != null && activeGameChannelId != channelId)
         {
             var notice = await message.Channel.SendMessageAsync($"이미 다른 채널에서 {activeGameName} 게임을 진행 중입니다. 게임을 시작한 채널에서 계속하거나 먼저 종료해 주세요.");
@@ -139,6 +152,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         RestUserMessage? sentMessage = null;
         DateTime? lastEditTime = default;
 
+        using var scope = scopeFactory.CreateScope();
         var chatLogRepository = scope.ServiceProvider.GetRequiredService<IChatLogRepository>();
         var chatImageRepository = scope.ServiceProvider.GetRequiredService<IChatImageRepository>();
         var chatAttachmentRepository = scope.ServiceProvider.GetRequiredService<IChatAttachmentRepository>();
@@ -184,7 +198,11 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
         bool shouldSeparateNextAssistantContent = false;
         try
         {
-            var promptContent = DiscordMessageAttachmentPlanner.BuildPromptContent(message.Content, processedAttachments);
+            var promptContent = isAutomaticResponse
+                ? DiscordAutoResponseEvaluator.BuildAutomaticResponsePrompt(
+                    autoResponseRequest!.Messages,
+                    autoResponseRequest.Decision)
+                : DiscordMessageAttachmentPlanner.BuildPromptContent(message.Content, processedAttachments);
             var referencedChatLog = await GetReferencedChatLogAsync(
                 message,
                 chatLogRepository,
@@ -211,10 +229,12 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                 prompt,
                 toolsProvider,
                 imageData,
-                filterToolsBySelectedSkills: !isChessMode && !isOthelloMode))
+                filterToolsBySelectedSkills: !isChessMode && !isOthelloMode,
+                rememberConversation: !isAutomaticResponse,
+                cancellationToken: cancellationToken))
             {
                 totalReasoning += responseMessage.Thinking;
-                if (responseMessage.SkillNames.Count > 0)
+                if (!isAutomaticResponse && responseMessage.SkillNames.Count > 0)
                 {
                     totalMessage = AppendSkillUseNotice(
                         totalMessage,
@@ -222,7 +242,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                         ref shouldSeparateNextAssistantContent);
                 }
 
-                if (!string.IsNullOrEmpty(responseMessage.Content) && pendingToolUseCount > 0)
+                if (!isAutomaticResponse && !string.IsNullOrEmpty(responseMessage.Content) && pendingToolUseCount > 0)
                 {
                     totalMessage = AppendToolUseNotice(
                         totalMessage,
@@ -238,8 +258,11 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
                 if (!string.IsNullOrEmpty(responseMessage.ToolName))
                 {
-                    pendingToolUseCount++;
-                    shouldSeparateNextAssistantContent = !string.IsNullOrWhiteSpace(totalMessage);
+                    if (!isAutomaticResponse)
+                    {
+                        pendingToolUseCount++;
+                        shouldSeparateNextAssistantContent = !string.IsNullOrWhiteSpace(totalMessage);
+                    }
                 }
 
                 if (logger.IsEnabled(LogLevel.Debug))
@@ -254,6 +277,11 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
 
                 var span = DateTime.UtcNow - lastEditTime.Value;
                 if (span < s_ResponseEditInterval)
+                {
+                    continue;
+                }
+
+                if (isAutomaticResponse && string.IsNullOrEmpty(totalMessage))
                 {
                     continue;
                 }
@@ -347,7 +375,66 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             logger.LogInformation("Response: {message}", totalMessage);
         }
 
-        await channel.TrySummarizeAsync();
+        if (!isAutomaticResponse)
+        {
+            await channel.TrySummarizeAsync();
+        }
+    }
+
+    private async Task QueueAutoResponseAsync(
+        SocketMessage message,
+        string? guildId,
+        string channelId,
+        bool isMentioned,
+        IReadOnlyList<ProcessedChatImage> processedImages,
+        IReadOnlyList<ProcessedChatAttachment> processedAttachments,
+        IServiceProvider serviceProvider)
+    {
+        var referencesBotMessage = await ReferencesBotMessageAsync(
+            message,
+            channelId,
+            serviceProvider);
+        var autoResponseMessage = new DiscordAutoResponseMessage(
+            message.Id.ToString(),
+            guildId,
+            channelId,
+            message.Author.Id.ToString(),
+            message.Author.Username,
+            message.Content,
+            message.Timestamp,
+            IsDirectMessage: false,
+            MentionsBot: isMentioned,
+            ReferencesBotMessage: referencesBotMessage,
+            HasAttachments: message.Attachments.Count > 0 || message.Embeds.Count > 0);
+
+        await autoResponse.ObserveAsync(
+            autoResponseMessage,
+            async (request, cancellationToken) => await GenerateResponseAsync(
+                message,
+                guildId,
+                channelId,
+                processedImages,
+                processedAttachments,
+                request,
+                cancellationToken));
+    }
+
+    private async ValueTask<bool> ReferencesBotMessageAsync(
+        SocketMessage message,
+        string channelId,
+        IServiceProvider serviceProvider)
+    {
+        if (GetReferencedMessageId(message) == null)
+        {
+            return false;
+        }
+
+        var chatLogRepository = serviceProvider.GetRequiredService<IChatLogRepository>();
+        var referencedChatLog = await GetReferencedChatLogAsync(
+            message,
+            chatLogRepository,
+            channelId);
+        return referencedChatLog?.UserId == m_Socket.CurrentUser.Id.ToString();
     }
 
     private static string BuildDiscordPreview(string content)
@@ -698,18 +785,6 @@ MessageId: {referencedChatLog.MessageId ?? "(unknown)"}
                 exception,
                 "Failed to process attachment document: {url}",
                 attachment.Url));
-    }
-
-    private string BuildAdminUrl(string path)
-    {
-        var normalizedPath = path.StartsWith('/') ? path : "/" + path;
-        var baseUrl = options.Value.AdminBaseUrl?.Trim().TrimEnd('/');
-        if (Uri.TryCreate(baseUrl, UriKind.Absolute, out _))
-        {
-            return baseUrl + normalizedPath;
-        }
-
-        return normalizedPath;
     }
 
     private static async ValueTask<ChatLogData?> GetReferencedChatLogAsync(
