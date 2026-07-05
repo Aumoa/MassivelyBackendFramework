@@ -48,6 +48,8 @@ builder.Services.AddSingleton<SecretGateTokenGenerator>();
 
 var app = builder.Build();
 
+ConfigureSecurityHeaders(app);
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/error", createScopeForErrors: true);
@@ -107,6 +109,15 @@ static void ConfigureDataProtection(WebApplicationBuilder builder)
     builder.Services.AddDataProtection()
         .PersistKeysToStackExchangeRedis(ConnectionMultiplexer.Connect(redisConnectionString))
         .SetApplicationName("SecretGate");
+}
+
+static void ConfigureSecurityHeaders(WebApplication app)
+{
+    app.Use(async (context, next) =>
+    {
+        context.Response.Headers["Referrer-Policy"] = "no-referrer";
+        await next(context);
+    });
 }
 
 async ValueTask StartMigrationAsync(CancellationToken cancellationToken)

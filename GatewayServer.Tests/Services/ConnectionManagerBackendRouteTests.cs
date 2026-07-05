@@ -692,6 +692,66 @@ public sealed class ConnectionManagerBackendRouteTests
     }
 
     [Fact]
+    public async Task RouteDataNotify_AllowsCppBackendKindWithManifestPolicy()
+    {
+        var manifest = CreatePacketManifest(
+            "cpp-world",
+            CreateManifestEntry(BackendPacketManifestDirection.ClientToBackend, PacketKind.Notify, 101, 1, 0, 8));
+        var routeManager = new RecordingBackendRouteManager("cpp-world", manifest);
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000,
+                MaxOpenRoutes = 8,
+                RouteLifetimeMilliseconds = 5000
+            },
+            out var port,
+            allowedBackendKinds: ["cpp-world"],
+            backendPacketManifestProvider: new StaticBackendPacketManifestProvider(manifest));
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            var routeToken = await OpenPersistentBackendRouteAsync(stream, " cpp-world ");
+            byte[] payload = [1, 2, 3, 4];
+            var dataEnvelope = new GatewayBackendRouteDataEnvelope(
+                routeToken,
+                GatewayBackendRouteDirection.ClientToBackend,
+                PacketKind.Notify,
+                routedPacketId: 101,
+                routedVersion: 1,
+                exchangeId: null,
+                payload);
+
+            await WriteBackendRouteDataEnvelopeAsync(stream, PacketKind.Notify, dataEnvelope);
+
+            var relayed = await routeManager.RelayedDataFrame.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal("cpp-world", relayed.BackendKind);
+            Assert.Equal(routeManager.DefaultBinding, relayed.Binding);
+            Assert.NotEqual(0u, relayed.Envelope.ChannelId);
+            Assert.Equal(PacketKind.Notify, relayed.Envelope.RoutedKind);
+            Assert.Equal((ushort)101, relayed.Envelope.RoutedPacketId);
+            Assert.Equal((ushort)1, relayed.Envelope.RoutedVersion);
+            Assert.False(relayed.Envelope.ExchangeId.HasValue);
+            Assert.Equal(payload, relayed.Envelope.RoutedPayload);
+            Assert.Equal(2, routeManager.RelayCount);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
     public async Task RouteDataNotify_RejectsVerifierFailureFromClientManifest()
     {
         var verifierProgram = new BackendPacketVerifierProgram(
@@ -3050,8 +3110,15 @@ public sealed class ConnectionManagerBackendRouteTests
 
     private static BackendPacketManifest CreatePacketManifest(params BackendPacketManifestEntry[] entries)
     {
+        return CreatePacketManifest("alpha", entries);
+    }
+
+    private static BackendPacketManifest CreatePacketManifest(
+        string backendKind,
+        params BackendPacketManifestEntry[] entries)
+    {
         return new BackendPacketManifest(
-            "alpha",
+            backendKind,
             RecordingBackendRouteManager.TestManifestId,
             entries);
     }
@@ -3195,11 +3262,7 @@ public sealed class ConnectionManagerBackendRouteTests
     {
         public static readonly BackendPacketManifestId TestManifestId = new("test");
         public static readonly BackendPacketManifestHash TestManifestHash = new("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-        private readonly BackendRouteBinding m_DefaultBinding = new(
-            "alpha",
-            "backend-a",
-            "master-a",
-            "backend-direct-a");
+        private readonly BackendRouteBinding m_DefaultBinding;
         private readonly GatewayBackendServerHandle m_DefaultServerHandle = new("server-alpha");
         private readonly BackendPacketManifestId m_ManifestId;
         private readonly BackendPacketManifestHash m_ManifestHash;
@@ -3223,7 +3286,17 @@ public sealed class ConnectionManagerBackendRouteTests
         }
 
         public RecordingBackendRouteManager(BackendPacketManifest? manifest)
+            : this("alpha", manifest)
         {
+        }
+
+        public RecordingBackendRouteManager(string backendKind, BackendPacketManifest? manifest = null)
+        {
+            m_DefaultBinding = new BackendRouteBinding(
+                backendKind,
+                "backend-a",
+                "master-a",
+                "backend-direct-a");
             m_ManifestId = manifest?.ManifestId ?? TestManifestId;
             m_ManifestHash = manifest?.Hash ?? TestManifestHash;
         }
@@ -3252,7 +3325,7 @@ public sealed class ConnectionManagerBackendRouteTests
 
         public string[] GetDiscoveredBackendKinds()
         {
-            return ["alpha"];
+            return [m_DefaultBinding.BackendKind];
         }
 
         public BackendServerDirectorySnapshot ListServers(

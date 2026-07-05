@@ -20,7 +20,7 @@ public sealed class SecretVaultService(
         return await repository.GetVaultProfileAsync(ownerSubject, cancellationToken) != null;
     }
 
-    public async Task InitializeAsync(
+    public async Task<bool> InitializeAsync(
         string ownerSubject,
         string vaultKey,
         CancellationToken cancellationToken = default)
@@ -29,13 +29,18 @@ public sealed class SecretVaultService(
         ArgumentException.ThrowIfNullOrWhiteSpace(vaultKey);
 
         var profileEnvelope = CreateProfileEnvelope(ownerSubject, vaultKey);
-        await repository.InitializeVaultAsync(
+        var initialized = await repository.InitializeVaultAsync(
             ownerSubject,
             profileEnvelope,
             DateTime.UtcNow,
             cancellationToken);
+        if (!initialized)
+        {
+            return false;
+        }
 
         session.Unlock(vaultKey);
+        return true;
     }
 
     public async Task<bool> TryUnlockAsync(
@@ -71,42 +76,49 @@ public sealed class SecretVaultService(
         ArgumentException.ThrowIfNullOrWhiteSpace(newVaultKey);
 
         var currentVaultKey = session.GetVaultKeyOrThrow();
-        var profile = await repository.GetVaultProfileAsync(ownerSubject, cancellationToken);
-        if (profile == null || !VerifyProfile(ownerSubject, profile, currentVaultKey))
+        var changed = await repository.ReplaceVaultEncryptionAsync(
+            ownerSubject,
+            (profile, records) =>
+            {
+                if (!VerifyProfile(ownerSubject, profile, currentVaultKey))
+                {
+                    session.Lock();
+                    return null;
+                }
+
+                var updates = new List<VaultSecretEncryptionUpdate>(records.Count);
+                foreach (var record in records)
+                {
+                    var envelope = new SecretEncryptionEnvelope(record.Salt, record.Nonce, record.CipherText, record.Tag);
+                    if (!SecretCrypto.TryDecrypt(
+                        envelope,
+                        currentVaultKey,
+                        GetVaultPurpose(ownerSubject, record.Id),
+                        out var secret))
+                    {
+                        session.Lock();
+                        return null;
+                    }
+
+                    updates.Add(new VaultSecretEncryptionUpdate(
+                        record.Id,
+                        SecretCrypto.Encrypt(
+                            secret,
+                            newVaultKey,
+                            GetVaultPurpose(ownerSubject, record.Id))));
+                }
+
+                return new VaultEncryptionReplacement(
+                    CreateProfileEnvelope(ownerSubject, newVaultKey),
+                    updates);
+            },
+            DateTime.UtcNow,
+            cancellationToken);
+        if (!changed)
         {
             session.Lock();
             return false;
         }
-
-        var records = await repository.GetVaultSecretsAsync(ownerSubject, cancellationToken);
-        var updates = new List<VaultSecretEncryptionUpdate>(records.Count);
-        foreach (var record in records)
-        {
-            var envelope = new SecretEncryptionEnvelope(record.Salt, record.Nonce, record.CipherText, record.Tag);
-            if (!SecretCrypto.TryDecrypt(
-                envelope,
-                currentVaultKey,
-                GetVaultPurpose(ownerSubject, record.Id),
-                out var secret))
-            {
-                session.Lock();
-                return false;
-            }
-
-            updates.Add(new VaultSecretEncryptionUpdate(
-                record.Id,
-                SecretCrypto.Encrypt(
-                    secret,
-                    newVaultKey,
-                    GetVaultPurpose(ownerSubject, record.Id))));
-        }
-
-        await repository.ReplaceVaultEncryptionAsync(
-            ownerSubject,
-            CreateProfileEnvelope(ownerSubject, newVaultKey),
-            updates,
-            DateTime.UtcNow,
-            cancellationToken);
 
         session.Unlock(newVaultKey);
         return true;
@@ -126,7 +138,8 @@ public sealed class SecretVaultService(
         CancellationToken cancellationToken = default)
     {
         var records = await repository.GetVaultSecretsAsync(ownerSubject, cancellationToken);
-        if (!session.IsUnlocked)
+        var vaultKey = await TryGetVerifiedVaultKeyAsync(ownerSubject, cancellationToken);
+        if (vaultKey == null)
         {
             return records
                 .Select(static record => new StoredSecretView(
@@ -139,7 +152,6 @@ public sealed class SecretVaultService(
                 .ToArray();
         }
 
-        var vaultKey = session.GetVaultKeyOrThrow();
         return records
             .Select(record =>
             {
@@ -161,7 +173,7 @@ public sealed class SecretVaultService(
             .ToArray();
     }
 
-    public async Task AddSecretAsync(
+    public async Task<bool> AddSecretAsync(
         string ownerSubject,
         string name,
         string secret,
@@ -171,27 +183,76 @@ public sealed class SecretVaultService(
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(secret);
 
+        if (!session.IsUnlocked)
+        {
+            return false;
+        }
+
+        var vaultKey = session.GetVaultKeyOrThrow();
         var id = Guid.NewGuid();
         var envelope = SecretCrypto.Encrypt(
             secret,
-            session.GetVaultKeyOrThrow(),
+            vaultKey,
             GetVaultPurpose(ownerSubject, id));
 
-        await repository.AddVaultSecretAsync(
+        var added = await repository.AddVaultSecretAsync(
             ownerSubject,
+            profile => VerifyProfile(ownerSubject, profile, vaultKey),
             id,
             name.Trim(),
             envelope,
             DateTime.UtcNow,
             cancellationToken);
+        if (!added)
+        {
+            session.Lock();
+        }
+
+        return added;
     }
 
-    public Task DeleteSecretAsync(
+    public async Task<bool> DeleteSecretAsync(
         string ownerSubject,
         Guid id,
         CancellationToken cancellationToken = default)
     {
-        return repository.DeleteVaultSecretAsync(ownerSubject, id, cancellationToken);
+        if (await TryGetVerifiedVaultKeyAsync(ownerSubject, cancellationToken) == null)
+        {
+            return false;
+        }
+
+        var vaultKey = session.GetVaultKeyOrThrow();
+        var deleted = await repository.DeleteVaultSecretAsync(
+            ownerSubject,
+            profile => VerifyProfile(ownerSubject, profile, vaultKey),
+            id,
+            cancellationToken);
+        if (!deleted)
+        {
+            session.Lock();
+        }
+
+        return deleted;
+    }
+
+    private async Task<string?> TryGetVerifiedVaultKeyAsync(
+        string ownerSubject,
+        CancellationToken cancellationToken)
+    {
+        if (!session.IsUnlocked)
+        {
+            return null;
+        }
+
+        var vaultKey = session.GetVaultKeyOrThrow();
+        var profile = await repository.GetVaultProfileAsync(ownerSubject, cancellationToken);
+        if (profile == null || !VerifyProfile(ownerSubject, profile, vaultKey))
+        {
+            session.Lock();
+            return null;
+        }
+
+        return vaultKey;
     }
 
     private static string GetVaultPurpose(string ownerSubject, Guid secretId)

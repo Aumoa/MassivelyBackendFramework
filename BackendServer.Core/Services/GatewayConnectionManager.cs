@@ -41,6 +41,15 @@ internal sealed class GatewayConnectionManager(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        if (!m_Options.Enabled)
+        {
+            logger.LogInformation(
+                "Backend Gateway listener is disabled. Advertising external data-plane endpoint {Address}:{Port}.",
+                m_Options.IPAddress,
+                m_Options.Port);
+            return;
+        }
+
         if (m_Options.UseTls)
         {
             m_Cert = await LoadCertificateAsync(m_Options, cancellationToken).ConfigureAwait(false);
@@ -493,6 +502,18 @@ internal sealed class GatewayConnectionManager(
 
     public ServiceAdminStatusItem[] GetStatusItems()
     {
+        if (!m_Options.Enabled)
+        {
+            return
+            [
+                new("Gateway", "Listener", "Disabled"),
+                new("Gateway", "Data plane owner", "External"),
+                new("Gateway", "Advertised endpoint", $"{m_Options.IPAddress}:{m_Options.Port}"),
+                new("Gateway", "TLS", m_Options.UseTls ? "Enabled" : "Disabled"),
+                new("Gateway", "Active connections", "0")
+            ];
+        }
+
         var items = new List<ServiceAdminStatusItem>
         {
             new("Gateway", "Listener", $"{m_Options.IPAddress}:{m_Options.Port}"),

@@ -36,7 +36,7 @@
         {
             <label class="field">
                 <span>@Strings.SHARE_SECRET_RESULT_LABEL</span>
-                <textarea class="form-textarea secret-result" rows="7" readonly>@consumedSecret</textarea>
+                <textarea class="form-textarea secret-result" rows="7" readonly autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">@consumedSecret</textarea>
             </label>
             <button class="btn-secondary" type="button" @onclick="() => CopyAsync(consumedSecret)">
                 <span class="material-symbols-outlined" aria-hidden="true">content_copy</span>

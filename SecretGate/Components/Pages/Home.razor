@@ -89,7 +89,7 @@ else
             </label>
             <label class="field">
                 <span>@Strings.SECRET_VALUE_LABEL</span>
-                <textarea class="form-textarea" rows="4" @bind="newSecretValue" disabled="@(!VaultService.IsUnlocked)"></textarea>
+                <textarea class="form-textarea" rows="4" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" @bind="newSecretValue" disabled="@(!VaultService.IsUnlocked)"></textarea>
             </label>
             <div class="form-actions">
                 <button class="btn-primary" type="submit" disabled="@(!VaultService.IsUnlocked)">
@@ -122,7 +122,7 @@ else
                             </div>
                             @if (secret.IsDecrypted)
                             {
-                                <textarea class="secret-output" readonly rows="3">@secret.Secret</textarea>
+                                <textarea class="secret-output" readonly rows="3" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">@secret.Secret</textarea>
                             }
                             else
                             {
@@ -224,7 +224,15 @@ else
             return;
         }
 
-        await VaultService.InitializeAsync(subject, setupVaultKey);
+        if (!await VaultService.InitializeAsync(subject, setupVaultKey))
+        {
+            setupVaultKey = string.Empty;
+            setupVaultKeyConfirm = string.Empty;
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_VAULT_ALREADY_INITIALIZED, true);
+            return;
+        }
+
         setupVaultKey = string.Empty;
         setupVaultKeyConfirm = string.Empty;
         await RefreshVaultAsync();
@@ -337,7 +345,13 @@ else
             return;
         }
 
-        await VaultService.AddSecretAsync(subject, newSecretName, newSecretValue);
+        if (!await VaultService.AddSecretAsync(subject, newSecretName, newSecretValue))
+        {
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
+            return;
+        }
+
         newSecretName = string.Empty;
         newSecretValue = string.Empty;
         await RefreshVaultAsync();
@@ -357,7 +371,13 @@ else
             return;
         }
 
-        await VaultService.DeleteSecretAsync(subject, id);
+        if (!await VaultService.DeleteSecretAsync(subject, id))
+        {
+            await RefreshVaultAsync();
+            SetStatus(Strings.MESSAGE_VAULT_KEY_INVALID, true);
+            return;
+        }
+
         await RefreshVaultAsync();
         SetStatus(Strings.MESSAGE_SECRET_DELETED, false);
     }

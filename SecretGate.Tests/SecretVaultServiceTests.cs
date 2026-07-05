@@ -23,16 +23,39 @@ public sealed class SecretVaultServiceTests
         var repository = new FakeSecretRepository();
         var service = new SecretVaultService(repository, new SecretVaultSession());
 
-        await service.InitializeAsync("user-sub", "correct-password");
+        var initialized = await service.InitializeAsync("user-sub", "correct-password");
         service.Lock();
 
         var wrongPassword = await service.TryUnlockAsync("user-sub", "wrong-password");
         var correctPassword = await service.TryUnlockAsync("user-sub", "correct-password");
 
+        Assert.True(initialized);
         Assert.True(await service.IsInitializedAsync("user-sub"));
         Assert.False(wrongPassword);
         Assert.True(correctPassword);
         Assert.True(service.IsUnlocked);
+    }
+
+    [Fact]
+    public async Task InitializeDoesNotOverwriteExistingVault()
+    {
+        var repository = new FakeSecretRepository();
+        var service = new SecretVaultService(repository, new SecretVaultSession());
+        var staleSetupService = new SecretVaultService(repository, new SecretVaultSession());
+
+        Assert.True(await service.InitializeAsync("user-sub", "correct-password"));
+        Assert.True(await service.AddSecretAsync("user-sub", "database password", "vault secret"));
+
+        var duplicateInitialized = await staleSetupService.InitializeAsync("user-sub", "new-password");
+        service.Lock();
+
+        Assert.False(duplicateInitialized);
+        Assert.False(staleSetupService.IsUnlocked);
+        Assert.False(await service.TryUnlockAsync("user-sub", "new-password"));
+        Assert.True(await service.TryUnlockAsync("user-sub", "correct-password"));
+        var secret = Assert.Single(await service.GetSecretsAsync("user-sub"));
+        Assert.True(secret.IsDecrypted);
+        Assert.Equal("vault secret", secret.Secret);
     }
 
     [Fact]
@@ -55,6 +78,27 @@ public sealed class SecretVaultServiceTests
         var secret = Assert.Single(secrets);
         Assert.True(secret.IsDecrypted);
         Assert.Equal("vault secret", secret.Secret);
+    }
+
+    [Fact]
+    public async Task AddSecretRejectsStaleUnlockedVaultKey()
+    {
+        var repository = new FakeSecretRepository();
+        var staleSessionService = new SecretVaultService(repository, new SecretVaultSession());
+        var currentSessionService = new SecretVaultService(repository, new SecretVaultSession());
+
+        await staleSessionService.InitializeAsync("user-sub", "old-password");
+        Assert.True(await currentSessionService.TryUnlockAsync("user-sub", "old-password"));
+        Assert.True(await currentSessionService.ChangePasswordAsync("user-sub", "new-password"));
+
+        var savedWithStaleKey = await staleSessionService.AddSecretAsync(
+            "user-sub",
+            "database password",
+            "vault secret");
+
+        Assert.False(savedWithStaleKey);
+        Assert.False(staleSessionService.IsUnlocked);
+        Assert.Empty(await currentSessionService.GetSecretsAsync("user-sub"));
     }
 
     [Fact]
@@ -84,26 +128,40 @@ public sealed class SecretVaultServiceTests
             return Task.FromResult(m_Profile);
         }
 
-        public Task InitializeVaultAsync(
+        public Task<bool> InitializeVaultAsync(
             string ownerSubject,
             SecretEncryptionEnvelope profileEnvelope,
             DateTime nowUtc,
             CancellationToken cancellationToken = default)
         {
-            m_Records.Clear();
+            if (m_Profile != null)
+            {
+                return Task.FromResult(false);
+            }
+
             m_Profile = CreateProfile(ownerSubject, profileEnvelope, nowUtc);
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
-        public Task ReplaceVaultEncryptionAsync(
+        public Task<bool> ReplaceVaultEncryptionAsync(
             string ownerSubject,
-            SecretEncryptionEnvelope profileEnvelope,
-            IReadOnlyList<VaultSecretEncryptionUpdate> secretUpdates,
+            Func<VaultProfileRecord, IReadOnlyList<StoredSecretRecord>, VaultEncryptionReplacement?> replacementFactory,
             DateTime nowUtc,
             CancellationToken cancellationToken = default)
         {
-            m_Profile = CreateProfile(ownerSubject, profileEnvelope, nowUtc);
-            foreach (var update in secretUpdates)
+            if (m_Profile == null)
+            {
+                return Task.FromResult(false);
+            }
+
+            var replacement = replacementFactory(m_Profile, [.. m_Records]);
+            if (replacement == null)
+            {
+                return Task.FromResult(false);
+            }
+
+            m_Profile = CreateProfile(ownerSubject, replacement.ProfileEnvelope, nowUtc);
+            foreach (var update in replacement.SecretUpdates)
             {
                 var index = m_Records.FindIndex(record => record.Id == update.Id);
                 if (index < 0)
@@ -122,7 +180,7 @@ public sealed class SecretVaultServiceTests
                 };
             }
 
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
         public Task ResetVaultAsync(
@@ -141,14 +199,20 @@ public sealed class SecretVaultServiceTests
             return Task.FromResult<IReadOnlyList<StoredSecretRecord>>([.. m_Records]);
         }
 
-        public Task AddVaultSecretAsync(
+        public Task<bool> AddVaultSecretAsync(
             string ownerSubject,
+            Func<VaultProfileRecord, bool> profileValidator,
             Guid id,
             string name,
             SecretEncryptionEnvelope envelope,
             DateTime nowUtc,
             CancellationToken cancellationToken = default)
         {
+            if (m_Profile == null || !profileValidator(m_Profile))
+            {
+                return Task.FromResult(false);
+            }
+
             m_Records.Add(new StoredSecretRecord(
                 id,
                 name,
@@ -159,16 +223,22 @@ public sealed class SecretVaultServiceTests
                 nowUtc,
                 nowUtc));
 
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
-        public Task DeleteVaultSecretAsync(
+        public Task<bool> DeleteVaultSecretAsync(
             string ownerSubject,
+            Func<VaultProfileRecord, bool> profileValidator,
             Guid id,
             CancellationToken cancellationToken = default)
         {
+            if (m_Profile == null || !profileValidator(m_Profile))
+            {
+                return Task.FromResult(false);
+            }
+
             m_Records.RemoveAll(record => record.Id == id);
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
 
         public Task AddShareSecretAsync(

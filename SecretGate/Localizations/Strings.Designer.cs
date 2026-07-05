@@ -77,6 +77,7 @@ internal class Strings
     internal static string MESSAGE_PASSWORD_REQUIRED => GetString(nameof(MESSAGE_PASSWORD_REQUIRED));
     internal static string MESSAGE_RESET_CONFIRMATION_REQUIRED => GetString(nameof(MESSAGE_RESET_CONFIRMATION_REQUIRED));
     internal static string MESSAGE_UNLOCK_REQUIRED => GetString(nameof(MESSAGE_UNLOCK_REQUIRED));
+    internal static string MESSAGE_VAULT_ALREADY_INITIALIZED => GetString(nameof(MESSAGE_VAULT_ALREADY_INITIALIZED));
     internal static string MESSAGE_VAULT_INITIALIZED => GetString(nameof(MESSAGE_VAULT_INITIALIZED));
     internal static string MESSAGE_VAULT_KEY_INVALID => GetString(nameof(MESSAGE_VAULT_KEY_INVALID));
     internal static string MESSAGE_VAULT_KEY_REQUIRED => GetString(nameof(MESSAGE_VAULT_KEY_REQUIRED));
