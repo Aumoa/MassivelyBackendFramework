@@ -540,6 +540,15 @@
   <data name="TOOLS_TOOL_GET_CURRENT_DISCORD_USER_AUTHORIZATION_DESCRIPTION" xml:space="preserve">
     <value>현재 Discord 메시지 작성자의 신뢰 가능한 서버 측 권한을 확인합니다.</value>
   </data>
+  <data name="TOOLS_TOOL_READ_WEB_PAGE_DESCRIPTION" xml:space="preserve">
+    <value>공개 HTTP/HTTPS 웹페이지의 텍스트를 읽습니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_READ_WEB_PAGE_PARAM_URL" xml:space="preserve">
+    <value>읽을 공개 HTTP/HTTPS 웹페이지 URL입니다.</value>
+  </data>
+  <data name="TOOLS_TOOL_READ_WEB_PAGE_PARAM_MAX_CHARACTERS" xml:space="preserve">
+    <value>응답에 포함할 추출 텍스트 최대 글자 수입니다.</value>
+  </data>
   <data name="TOOLS_TOOL_CALCULATE_DESCRIPTION" xml:space="preserve">
     <value>사칙연산과 일반적인 수학 수식을 정확하게 계산합니다.</value>
   </data>

@@ -359,6 +359,7 @@ File: note.txt
         Assert.NotNull(toolsProvider.FindFunction("allowed_tool"));
         Assert.NotNull(toolsProvider.FindFunction("get_chat_history"));
         Assert.NotNull(toolsProvider.FindFunction("get_current_discord_user_authorization"));
+        Assert.NotNull(toolsProvider.FindFunction("read_web_page"));
         Assert.NotNull(toolsProvider.FindFunction("calculate"));
         Assert.Null(toolsProvider.FindFunction("removed_tool"));
     }
@@ -475,6 +476,12 @@ File: note.txt
         private string Calculate()
         {
             return "calculated";
+        }
+
+        [ToolFunction(Name = "read_web_page")]
+        private string ReadWebPage()
+        {
+            return "web page";
         }
 
         [ToolFunction(Name = "removed_tool")]

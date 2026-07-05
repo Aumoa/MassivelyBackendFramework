@@ -111,6 +111,28 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddSingleton<IDiscordAutoResponseCoordinator, DiscordAutoResponseCoordinator>();
     sc.AddHostedService<DiscordService>();
 
+    sc.Configure<WebPageReadOptions>(conf.GetSection("WebPageRead"));
+    sc.AddSingleton<IWebPageAddressResolver, DnsWebPageAddressResolver>();
+    sc.AddHttpClient(WebPageReadOptions.HttpClientName, (sp, client) =>
+    {
+        var webPageOptions = sp.GetRequiredService<IOptions<WebPageReadOptions>>().Value;
+        client.Timeout = TimeSpan.FromSeconds(Math.Max(1, webPageOptions.TimeoutSeconds));
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("MassivelyBackendFramework-DiscordBot/1.0");
+    }).ConfigurePrimaryHttpMessageHandler(sp =>
+    {
+        var resolver = sp.GetRequiredService<IWebPageAddressResolver>();
+        return new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            UseProxy = false,
+            ConnectCallback = (context, cancellationToken) =>
+                WebPageAddressSafety.ConnectToPublicAddressAsync(
+                    context.DnsEndPoint,
+                    resolver,
+                    cancellationToken)
+        };
+    });
+
     sc.Configure<ImageGenerationOptions>(conf.GetRequiredSection("ImageGeneration"));
     sc.AddSingleton<ImagePromptProfileProvider>();
     sc.AddSingleton<IChatLogImageProcessor, ChatLogImageProcessor>();
