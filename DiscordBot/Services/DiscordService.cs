@@ -227,6 +227,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                 toolsProvider,
                 imageData,
                 filterToolsBySelectedSkills: !isChessMode && !isOthelloMode,
+                rememberConversation: !isAutomaticResponse,
                 cancellationToken: cancellationToken))
             {
                 totalReasoning += responseMessage.Thinking;
@@ -371,7 +372,10 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
             logger.LogInformation("Response: {message}", totalMessage);
         }
 
-        await channel.TrySummarizeAsync();
+        if (!isAutomaticResponse)
+        {
+            await channel.TrySummarizeAsync();
+        }
     }
 
     private async Task QueueAutoResponseAsync(

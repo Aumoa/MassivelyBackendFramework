@@ -4,11 +4,11 @@ namespace DiscordBot.SQL.Migration;
 
 public partial class Scripts
 {
-    internal class _17__AddAutoResponseSettings : IScript
+    internal class _18__AddAutoResponseSettings : IScript
     {
         public string Name => "AddAutoResponseSettings";
 
-        public int InstalledRank => 17;
+        public int InstalledRank => 18;
 
         public string UpSql => @"
 CREATE TABLE `auto_response_settings` (
