@@ -5,6 +5,7 @@ public enum AccountPictureError
     None,
     Empty,
     TooLarge,
+    SourceTooLarge,
     UnsupportedFormat,
     InvalidDimensions,
     InvalidUrl,

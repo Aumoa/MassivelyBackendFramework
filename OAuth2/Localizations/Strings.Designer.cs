@@ -1420,7 +1420,16 @@ namespace OAuth2.Localizations {
         }
 
         /// <summary>
-        ///   Picture must be {0} KB or smaller.과(와) 유사한 지역화된 문자열을 찾습니다.
+        ///   Original image must be {0} MB or smaller.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ERROR_SOURCE_TOO_LARGE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_SOURCE_TOO_LARGE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Cropped picture must be {0} KB or smaller.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string MANAGEACCOUNTS_PICTURE_ERROR_TOO_LARGE {
             get {
@@ -1456,11 +1465,29 @@ namespace OAuth2.Localizations {
         }
 
         /// <summary>
+        ///   Reset crop과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_RESET_CROP {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_RESET_CROP", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Select image과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>
         internal static string MANAGEACCOUNTS_PICTURE_UPLOAD_SELECT {
             get {
                 return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_UPLOAD_SELECT", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Zoom과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ZOOM {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ZOOM", resourceCulture);
             }
         }
         

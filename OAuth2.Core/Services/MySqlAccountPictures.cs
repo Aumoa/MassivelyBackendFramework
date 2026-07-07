@@ -143,9 +143,9 @@ internal sealed class MySqlAccountPictures(
                 return AccountPictureUpdateResult.Failure(AccountPictureError.DownloadFailed);
             }
 
-            if (response.Content.Headers.ContentLength > m_Options.MaxBytes)
+            if (response.Content.Headers.ContentLength > m_Options.MaxSourceBytes)
             {
-                return AccountPictureUpdateResult.Failure(AccountPictureError.TooLarge);
+                return AccountPictureUpdateResult.Failure(AccountPictureError.SourceTooLarge);
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
@@ -202,10 +202,10 @@ internal sealed class MySqlAccountPictures(
         CancellationToken cancellationToken,
         bool overwriteExisting = true)
     {
-        var validation = AccountPictureImageValidator.Validate(bytes, m_Options);
-        if (!validation.IsSuccess)
+        var processed = AccountPictureImageProcessor.Normalize(bytes, m_Options);
+        if (!processed.IsSuccess)
         {
-            return AccountPictureUpdateResult.Failure(validation.Error);
+            return AccountPictureUpdateResult.Failure(processed.Error);
         }
 
         await using var connection = GetConnection();
@@ -233,10 +233,10 @@ ON DUPLICATE KEY UPDATE
             new
             {
                 accountId,
-                contentType = validation.ContentType!,
-                imageBytes = bytes,
-                width = validation.Width,
-                height = validation.Height
+                contentType = processed.ContentType!,
+                imageBytes = processed.Bytes!,
+                width = processed.Width,
+                height = processed.Height
             },
             transaction: transaction,
             cancellationToken: cancellationToken);
@@ -262,10 +262,10 @@ ON DUPLICATE KEY UPDATE
 
     private async ValueTask<ReadImageResult> ReadLimitedAsync(Stream stream, CancellationToken cancellationToken)
     {
-        var maxBytes = m_Options.MaxBytes;
+        var maxBytes = m_Options.MaxSourceBytes;
         if (maxBytes <= 0)
         {
-            return ReadImageResult.Failure(AccountPictureError.TooLarge);
+            return ReadImageResult.Failure(AccountPictureError.SourceTooLarge);
         }
 
         var bufferSize = Math.Min(maxBytes, 64 * 1024);
@@ -281,7 +281,7 @@ ON DUPLICATE KEY UPDATE
 
             if (buffer.Length + read > maxBytes)
             {
-                return ReadImageResult.Failure(AccountPictureError.TooLarge);
+                return ReadImageResult.Failure(AccountPictureError.SourceTooLarge);
             }
 
             buffer.Write(rented, 0, read);

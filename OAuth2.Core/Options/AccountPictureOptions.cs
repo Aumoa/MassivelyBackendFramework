@@ -5,12 +5,15 @@ public sealed class AccountPictureOptions
     public const int DefaultMaxBytes = 512 * 1024;
     public const int DefaultMaxWidth = 512;
     public const int DefaultMaxHeight = 512;
+    public const int DefaultMaxSourceBytes = 8 * 1024 * 1024;
 
     public int MaxBytes { get; set; } = DefaultMaxBytes;
 
     public int MaxWidth { get; set; } = DefaultMaxWidth;
 
     public int MaxHeight { get; set; } = DefaultMaxHeight;
+
+    public int MaxSourceBytes { get; set; } = DefaultMaxSourceBytes;
 
     public string DefaultPicturePath { get; set; } = Path.Combine("wwwroot", "default-profile.png");
 

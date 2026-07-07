@@ -465,6 +465,12 @@
   <data name="MANAGEACCOUNTS_PICTURE_UPLOAD_SELECT" xml:space="preserve">
     <value>Select image</value>
   </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ZOOM" xml:space="preserve">
+    <value>Zoom</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_RESET_CROP" xml:space="preserve">
+    <value>Reset crop</value>
+  </data>
   <data name="MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE" xml:space="preserve">
     <value>No changes.</value>
   </data>
@@ -475,7 +481,10 @@
     <value>Select a picture to upload.</value>
   </data>
   <data name="MANAGEACCOUNTS_PICTURE_ERROR_TOO_LARGE" xml:space="preserve">
-    <value>Picture must be {0} KB or smaller.</value>
+    <value>Cropped picture must be {0} KB or smaller.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ERROR_SOURCE_TOO_LARGE" xml:space="preserve">
+    <value>Original image must be {0} MB or smaller.</value>
   </data>
   <data name="MANAGEACCOUNTS_PICTURE_ERROR_UNSUPPORTED_FORMAT" xml:space="preserve">
     <value>Use a PNG or JPEG image.</value>
