@@ -44,7 +44,7 @@ public sealed class AccountPictureImageValidatorTests
     [Fact]
     public void Validate_RejectsImageOverDimensionLimit()
     {
-        var result = AccountPictureImageValidator.Validate(CreatePng(1025, 1024), CreateOptions());
+        var result = AccountPictureImageValidator.Validate(CreatePng(513, 512), CreateOptions());
 
         Assert.False(result.IsSuccess);
         Assert.Equal(AccountPictureError.InvalidDimensions, result.Error);
@@ -67,8 +67,8 @@ public sealed class AccountPictureImageValidatorTests
         return new AccountPictureOptions
         {
             MaxBytes = 512 * 1024,
-            MaxWidth = 1024,
-            MaxHeight = 1024
+            MaxWidth = 512,
+            MaxHeight = 512
         };
     }
 
