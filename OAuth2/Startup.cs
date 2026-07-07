@@ -59,6 +59,19 @@ builder.Services.AddAuthorizationCore();
 
 builder.Services.AddHttpClient();
 builder.Services.AddOAuth2(builder.Configuration.GetRequiredSection("OAuth2"));
+builder.Services.PostConfigure<AccountPictureOptions>(options =>
+{
+    if (string.IsNullOrWhiteSpace(options.DefaultPicturePath))
+    {
+        options.DefaultPicturePath = Path.Combine(builder.Environment.WebRootPath, "default-profile.png");
+        return;
+    }
+
+    if (!Path.IsPathRooted(options.DefaultPicturePath))
+    {
+        options.DefaultPicturePath = Path.Combine(builder.Environment.ContentRootPath, options.DefaultPicturePath);
+    }
+});
 
 builder.Services.Configure<RegisterOptions>(builder.Configuration.GetSection("Register"));
 builder.Services.Configure<EmailVerifyOptions>(builder.Configuration.GetRequiredSection("EmailVerify"));

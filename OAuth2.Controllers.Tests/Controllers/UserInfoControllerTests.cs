@@ -27,7 +27,8 @@ public sealed class UserInfoControllerTests
             new MissingAccountsStub(),
             new AccountClaimsStub(),
             new JwtStub(),
-            new ClientUserGroupsStub())
+            new ClientUserGroupsStub(),
+            new AccountPicturesStub())
         {
             ControllerContext = new ControllerContext
             {
@@ -189,6 +190,29 @@ public sealed class UserInfoControllerTests
         }
 
         public ValueTask RemoveClientUserGroupAsync(long id, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class AccountPicturesStub : IAccountPictures
+    {
+        public ValueTask<AccountPicture?> GetPictureAsync(string accountId, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<AccountPicture> GetOrCreateDefaultPictureAsync(string accountId, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask EnsurePictureAsync(string accountId, string? legacyPictureUrl = null, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<AccountPictureUpdateResult> SetPictureAsync(string accountId, Stream image, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
         }

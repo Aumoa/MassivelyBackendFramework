@@ -21,7 +21,6 @@ internal class Jwt : IJwt
     private readonly string m_Modulus;
     private readonly string m_Exponent;
     private readonly string m_KId;
-    private readonly string m_DefaultPictureUrl;
 
     public Jwt(IOptions<JwtOptions> options)
     {
@@ -32,8 +31,6 @@ internal class Jwt : IJwt
         m_Issuer = options.Value.Issuer;
         m_ExpiresIn = options.Value.ExpiresIn;
         m_RefreshTokenExpiresIn = options.Value.RefreshTokenExpiresIn;
-        m_DefaultPictureUrl = new Uri(new Uri(m_Issuer.TrimEnd('/') + "/"), "default-profile.png").ToString();
-
         var rsaPublic = RSA.Create();
         rsaPublic.ImportFromPem(File.ReadAllText(options.Value.PublicKeyPath));
         m_PublicKey = new RsaSecurityKey(rsaPublic);
@@ -200,6 +197,9 @@ internal class Jwt : IJwt
                 case JwtRegisteredClaimNames.Name:
                     idTokenClaims.Add(new(JwtRegisteredClaimNames.Name, account.Name));
                     break;
+                case JwtRegisteredClaimNames.Picture:
+                    idTokenClaims.Add(new Claim(expectedClaim, BuildAccountPictureUrl(account)));
+                    break;
                 case JwtRegisteredClaimNames.UpdatedAt:
                     var updatedAt = (DateTimeOffset)accountClaims.Select(p => p.CreatedAt).Append(account.UpdatedAt).Max();
                     idTokenClaims.Add(new Claim(JwtRegisteredClaimNames.UpdatedAt, updatedAt.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
@@ -208,15 +208,6 @@ internal class Jwt : IJwt
                     if (claimNames.TryGetValue(expectedClaim, out var value))
                     {
                         idTokenClaims.Add(new Claim(expectedClaim, value, ValueTypeMatch.GetValueOrDefault(expectedClaim, ClaimValueTypes.String)));
-                    }
-                    else
-                    {
-                        switch (expectedClaim)
-                        {
-                            case JwtRegisteredClaimNames.Picture:
-                                idTokenClaims.Add(new Claim(expectedClaim, m_DefaultPictureUrl));
-                                break;
-                        }
                     }
                     break;
             }
@@ -228,6 +219,14 @@ internal class Jwt : IJwt
         }
 
         return [.. idTokenClaims];
+    }
+
+    private string BuildAccountPictureUrl(in RawAccount account)
+    {
+        var builder = new UriBuilder(new Uri(new Uri(m_Issuer.TrimEnd('/') + "/"), "api/v1/account-picture"));
+        var updatedAt = new DateTimeOffset(account.UpdatedAt).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+        builder.Query = $"sub={Uri.EscapeDataString(account.Sub)}&v={updatedAt}";
+        return builder.Uri.ToString();
     }
 
     private static readonly IReadOnlyDictionary<string, string> ValueTypeMatch = new Dictionary<string, string>()

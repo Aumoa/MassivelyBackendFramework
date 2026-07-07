@@ -1,8 +1,13 @@
-﻿@using OAuth2.Services
+@using System.IdentityModel.Tokens.Jwt
+@using Microsoft.Extensions.Options
+@using OAuth2.DTO
+@using OAuth2.Options
+@using OAuth2.Services
 @inject JwtAuthenticationStateProvider Auth
 @inject IAccesses Accesses
+@inject IAccountPictures AccountPictures
 @inject IAccountClaims AccountClaims
-@inject ILogger<DlgChangePicture> Logger
+@inject IOptions<AccountPictureOptions> PictureOptions
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
@@ -18,13 +23,18 @@
     <hr class="dlg-divider" />
     <div class="dlg-body">
         <div class="preview-container">
-            <img src="@m_NewPictureUri" alt="Profile preview" class="preview-img"
-                 onerror="this.src='@kFallbackPictureUrl';" />
+            <img src="@Auth.Picture" alt="Profile preview" class="preview-img" />
         </div>
-        <FloatingInput Placeholder="@Strings.MANAGEACCOUNTS_PICTURE_URI"
-                       Value="@m_NewPictureUri"
-                       ValueChanged="@((v) => { m_NewPictureUri = v; m_Error = string.Empty; })"
-                       HasError="@(!string.IsNullOrEmpty(m_Error))" />
+        <label class="upload-picker @(m_IsSubmitting ? "upload-picker-disabled" : null)">
+            <span class="material-symbols-outlined upload-picker-icon">upload</span>
+            <span class="upload-picker-text">
+                @(m_SelectedFile?.Name ?? Strings.MANAGEACCOUNTS_PICTURE_UPLOAD_SELECT)
+            </span>
+            <InputFile class="upload-picker-input"
+                       OnChange="OnPictureSelectedAsync"
+                       accept="image/png,image/jpeg"
+                       disabled="@m_IsSubmitting" />
+        </label>
         @if (!string.IsNullOrEmpty(m_Error))
         {
             <div class="dlg-error">
@@ -37,7 +47,7 @@
         <button @onclick="OnCancelAsync" class="btn-ghost" disabled="@m_IsSubmitting">
             @Strings.MANAGEACCOUNTS_CHANGE_CANCEL
         </button>
-        <button @onclick="OnConfirmAsync" class="btn-primary" disabled="@m_IsSubmitting">
+        <button @onclick="OnConfirmAsync" class="btn-primary" disabled="@(m_IsSubmitting || m_SelectedFile == null)">
             @Strings.MANAGEACCOUNTS_PICTURE_CHANGE
         </button>
     </div>
@@ -45,15 +55,13 @@
 
 @code {
     private Dialog m_Ref = null!;
-    private string? m_NewPictureUri;
+    private IBrowserFile? m_SelectedFile;
     private string m_Error = string.Empty;
     private bool m_IsSubmitting;
 
-    private const string kFallbackPictureUrl = "/default-profile.png";
-
     public async Task ShowAsync()
     {
-        m_NewPictureUri = Auth.Picture;
+        m_SelectedFile = null;
         m_Error = string.Empty;
         m_IsSubmitting = false;
         await m_Ref.ShowAsync();
@@ -62,6 +70,19 @@
     private async Task OnCancelAsync()
     {
         await m_Ref.CloseAsync();
+    }
+
+    private Task OnPictureSelectedAsync(InputFileChangeEventArgs args)
+    {
+        m_Error = string.Empty;
+        m_SelectedFile = args.File;
+
+        if (m_SelectedFile.Size > PictureOptions.Value.MaxBytes)
+        {
+            m_Error = GetPictureErrorMessage(AccountPictureError.TooLarge);
+        }
+
+        return Task.CompletedTask;
     }
 
     private async Task OnConfirmAsync()
@@ -73,18 +94,15 @@
 
         m_Error = string.Empty;
 
-        if (Auth.Picture == m_NewPictureUri)
+        if (m_SelectedFile == null)
         {
-            m_Error = Strings.MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE;
+            m_Error = Strings.MANAGEACCOUNTS_PICTURE_ERROR_REQUIRED;
             return;
         }
 
-        // Validate that the picture URI is a safe absolute http/https URL
-        if (!string.IsNullOrEmpty(m_NewPictureUri) &&
-            !(Uri.TryCreate(m_NewPictureUri, UriKind.Absolute, out var parsedUri) &&
-              (parsedUri.Scheme == Uri.UriSchemeHttp || parsedUri.Scheme == Uri.UriSchemeHttps)))
+        if (m_SelectedFile.Size > PictureOptions.Value.MaxBytes)
         {
-            m_Error = Strings.MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL;
+            m_Error = GetPictureErrorMessage(AccountPictureError.TooLarge);
             return;
         }
 
@@ -102,8 +120,22 @@
             }
 
             var accountId = Auth.Id;
-            const string kClaimName = "picture";
-            await AccountClaims.SetUniqueClaimAsync(accountId, kClaimName, m_NewPictureUri ?? string.Empty);
+            if (string.IsNullOrEmpty(accountId))
+            {
+                await JS.InvokeVoidAsync("alert", Strings.ERROR_COMMON_AUTHENTICATION_EXPIRED);
+                Nav.NavigateTo("/auth/logout", forceLoad: true);
+                return;
+            }
+
+            await using var stream = m_SelectedFile.OpenReadStream(PictureOptions.Value.MaxBytes + 1L);
+            var result = await AccountPictures.SetPictureAsync(accountId, stream);
+            if (!result.IsSuccess)
+            {
+                m_Error = GetPictureErrorMessage(result.Error);
+                return;
+            }
+
+            await AccountClaims.RemoveClaimsAsync(accountId, JwtRegisteredClaimNames.Picture);
 
             await JS.InvokeVoidAsync("alert", Strings.MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE);
             Nav.NavigateTo("/auth/logout", forceLoad: true);
@@ -113,5 +145,22 @@
             m_IsSubmitting = false;
             StateHasChanged();
         }
+    }
+
+    private string GetPictureErrorMessage(AccountPictureError error)
+    {
+        return error switch
+        {
+            AccountPictureError.Empty => Strings.MANAGEACCOUNTS_PICTURE_ERROR_REQUIRED,
+            AccountPictureError.TooLarge => string.Format(
+                Strings.MANAGEACCOUNTS_PICTURE_ERROR_TOO_LARGE,
+                PictureOptions.Value.MaxBytes / 1024),
+            AccountPictureError.UnsupportedFormat => Strings.MANAGEACCOUNTS_PICTURE_ERROR_UNSUPPORTED_FORMAT,
+            AccountPictureError.InvalidDimensions => string.Format(
+                Strings.MANAGEACCOUNTS_PICTURE_ERROR_INVALID_DIMENSIONS,
+                PictureOptions.Value.MaxWidth,
+                PictureOptions.Value.MaxHeight),
+            _ => Strings.MANAGEACCOUNTS_PICTURE_ERROR_UPLOAD_FAILED
+        };
     }
 }
