@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
         s.Configure<BackendRouteOptions>(config.GetSection("BackendRoute"));
 
         s.AddSingleton<IGatewayClientAuthenticationContextFactory, GatewayClientAuthenticationContextFactory>();
+        s.AddSingleton<IGatewayClientAuthenticationChallengeIssuer, GatewayClientAuthenticationChallengeIssuer>();
         s.AddSingleton<GatewayClientSecretCredentialCatalog>();
         s.TryAddSingleton<IGatewayClientTokenValidator>(p => p.GetRequiredService<GatewayClientSecretCredentialCatalog>());
         s.AddSingleton<IGatewayClientSecretCredentialWriter>(p => p.GetRequiredService<GatewayClientSecretCredentialCatalog>());
