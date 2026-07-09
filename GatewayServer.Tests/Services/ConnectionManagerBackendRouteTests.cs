@@ -2931,7 +2931,7 @@ public sealed class ConnectionManagerBackendRouteTests
             certificateProvider ?? new StaticCertificateProvider(CreateServerCertificate()),
             streamAuthenticator ?? new PassThroughStreamAuthenticator(),
             new StaticGatewayClientAuthenticationContextFactory(authenticateClients),
-            new GatewayClientAuthenticationChallengeIssuer(),
+            new GatewayClientAuthenticationChallengeIssuer(new RejectingGatewayOidcAuthenticationService()),
             clientTokenValidator ?? new RejectingGatewayClientTokenValidator(),
             new GatewayBackendRouteTokenGenerator(),
             NullLogger<ConnectionManager>.Instance);
@@ -3866,6 +3866,40 @@ public sealed class ConnectionManagerBackendRouteTests
 
             return ValueTask.FromResult(
                 GatewayClientTokenValidationResult.Rejected("Invalid Gateway client access token."));
+        }
+    }
+
+    private sealed class RejectingGatewayOidcAuthenticationService : IGatewayOidcAuthenticationService
+    {
+        public ValueTask<GatewayClientAuthenticationMethodChallenge> CreateChallengeAsync(
+            GatewayAuthenticationMethodDefinition method,
+            string backendKind,
+            GatewayBackendServerHandle? serverHandle,
+            CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException("OIDC challenge issuing is not available in this test.");
+        }
+
+        public ValueTask<GatewayOidcCallbackResult> AcceptCallbackAsync(
+            string code,
+            string state,
+            string redirectUri,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(GatewayOidcCallbackResult.Rejected("OIDC callback is not available in this test."));
+        }
+
+        public bool IsOidcCompletionToken(string accessToken)
+        {
+            return false;
+        }
+
+        public ValueTask<GatewayClientTokenValidationResult> ValidateOidcCompletionTokenAsync(
+            string accessToken,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(
+                GatewayClientTokenValidationResult.Rejected("OIDC completion token validation is not available in this test."));
         }
     }
 

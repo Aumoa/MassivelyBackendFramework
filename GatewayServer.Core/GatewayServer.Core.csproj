@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\GatewayServer.Abstractions\GatewayServer.Abstractions.csproj" />
     <ProjectReference Include="..\MasterServer.Abstractions\MasterServer.Abstractions.csproj" />
     <ProjectReference Include="..\PacketCore\PacketCore.csproj" />

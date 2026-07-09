@@ -12,9 +12,10 @@ internal interface IGatewayClientAuthenticationChallengeIssuer
         CancellationToken cancellationToken);
 }
 
-internal sealed class GatewayClientAuthenticationChallengeIssuer : IGatewayClientAuthenticationChallengeIssuer
+internal sealed class GatewayClientAuthenticationChallengeIssuer(
+    IGatewayOidcAuthenticationService oidcAuthentication) : IGatewayClientAuthenticationChallengeIssuer
 {
-    public ValueTask<GatewayClientAuthenticationMethodChallenge[]> CreateChallengesAsync(
+    public async ValueTask<GatewayClientAuthenticationMethodChallenge[]> CreateChallengesAsync(
         GatewayAuthenticationMethodDefinition[] methods,
         string backendKind,
         GatewayBackendServerHandle? serverHandle,
@@ -40,10 +41,18 @@ internal sealed class GatewayClientAuthenticationChallengeIssuer : IGatewayClien
                 continue;
             }
 
+            if (method.Kind == GatewayAuthenticationMethodKind.OidcAuthorizationCode)
+            {
+                challenges.Add(await oidcAuthentication
+                    .CreateChallengeAsync(method, backendKind, serverHandle, cancellationToken)
+                    .ConfigureAwait(false));
+                continue;
+            }
+
             throw new InvalidOperationException(
-                $"Gateway authentication method '{method.MethodId}' of kind '{method.Kind}' is not supported yet.");
+                $"Gateway authentication method '{method.MethodId}' of kind '{method.Kind}' is not supported.");
         }
 
-        return ValueTask.FromResult(challenges.ToArray());
+        return challenges.ToArray();
     }
 }
