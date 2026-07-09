@@ -22,6 +22,7 @@ public sealed class BackendNodeEndpoint
             manifestId,
             manifestHash,
             BackendServerDescriptor.DefaultOpen,
+            Array.Empty<GatewayAuthenticationMethodDefinition>(),
             advertisedAt)
     {
     }
@@ -35,6 +36,31 @@ public sealed class BackendNodeEndpoint
         BackendPacketManifestId manifestId,
         BackendPacketManifestHash manifestHash,
         BackendServerDescriptor descriptor,
+        DateTimeOffset advertisedAt)
+        : this(
+            backendKind,
+            nodeId,
+            displayName,
+            masterConnectionId,
+            gatewayEndpoint,
+            manifestId,
+            manifestHash,
+            descriptor,
+            Array.Empty<GatewayAuthenticationMethodDefinition>(),
+            advertisedAt)
+    {
+    }
+
+    public BackendNodeEndpoint(
+        string backendKind,
+        string nodeId,
+        string displayName,
+        string masterConnectionId,
+        MasterSocketEndpoint gatewayEndpoint,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash manifestHash,
+        BackendServerDescriptor descriptor,
+        GatewayAuthenticationMethodDefinition[] authenticationMethods,
         DateTimeOffset advertisedAt)
     {
         if (string.IsNullOrWhiteSpace(backendKind))
@@ -65,6 +91,7 @@ public sealed class BackendNodeEndpoint
         ManifestId = manifestId;
         ManifestHash = manifestHash;
         Descriptor = descriptor ?? throw new ArgumentNullException(nameof(descriptor));
+        AuthenticationMethods = authenticationMethods ?? throw new ArgumentNullException(nameof(authenticationMethods));
         AdvertisedAt = advertisedAt;
     }
 
@@ -83,6 +110,8 @@ public sealed class BackendNodeEndpoint
     public BackendPacketManifestHash ManifestHash { get; }
 
     public BackendServerDescriptor Descriptor { get; }
+
+    public GatewayAuthenticationMethodDefinition[] AuthenticationMethods { get; }
 
     public BackendNodeState State => Descriptor.State;
 

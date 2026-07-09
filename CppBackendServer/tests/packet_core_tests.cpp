@@ -215,7 +215,7 @@ namespace
         };
 
         auto bytes = encode_header(header);
-        require_equal("c00064000a000000", to_hex(bytes), "PacketCore header");
+        require_equal("c00064000b000000", to_hex(bytes), "PacketCore header");
 
         auto decoded = decode_header(bytes, packet_header::max_payload_length);
         require(decoded.kind == packet_kind::control, "Decoded header kind mismatch.");
@@ -233,7 +233,7 @@ namespace
             challenge.nonce[index] = static_cast<std::uint8_t>(index);
         }
 
-        constexpr auto expected = "c00064000a0000330000000b6368616c6c656e67652d6100000020000102030405060708090a0b0c0d0e"
+        constexpr auto expected = "c00064000b0000330000000b6368616c6c656e67652d6100000020000102030405060708090a0b0c0d0e"
                                   "0f101112131415161718191a1b1c1d1e1f";
         require_equal(expected,
                       encode_frame_hex(packet_kind::control, master_pid_node_auth_challenge,
@@ -252,7 +252,7 @@ namespace
             master_node_kind::gateway, master_control_schema_version, "gateway-a", "Gateway A", "gateway-master-a",
         };
 
-        constexpr auto expected = "c00065000a00003101000a00000009676174657761792d61000000094761746577617920410000001067"
+        constexpr auto expected = "c00065000b00003101000b00000009676174657761792d61000000094761746577617920410000001067"
                                   "6174657761792d6d61737465722d61";
         require_equal(expected,
                       encode_frame_hex(packet_kind::control, master_pid_node_hello, master_control_schema_version,
@@ -274,7 +274,7 @@ namespace
             "code-1",
         };
 
-        constexpr auto expected = "c00073000a00000a00000006636f64652d31";
+        constexpr auto expected = "c00073000b00000a00000006636f64652d31";
         require_equal(expected,
                       encode_frame_hex(packet_kind::control, master_pid_direct_connect_code,
                                        master_control_schema_version, encode_direct_connect_code(code)),
@@ -293,7 +293,7 @@ namespace
         };
 
         constexpr auto expected =
-            "c00067000a00002500000009676174657761792d61000000146261636b656e642d636f6e6e656374696f6e2d61";
+            "c00067000b00002500000009676174657761792d61000000146261636b656e642d636f6e6e656374696f6e2d61";
         require_equal(expected,
                       encode_frame_hex(packet_kind::control, master_pid_node_accepted, master_control_schema_version,
                                        encode_node_accepted(accepted)),

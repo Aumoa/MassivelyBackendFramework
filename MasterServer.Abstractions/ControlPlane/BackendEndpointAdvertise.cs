@@ -17,7 +17,8 @@ public sealed class BackendEndpointAdvertise
             manifestHash,
             BackendServerDescriptor.DefaultOpen.State,
             BackendServerDescriptor.DefaultOpen.DescriptorVersion,
-            BackendServerDescriptor.DefaultOpen.DescriptorJson)
+            BackendServerDescriptor.DefaultOpen.DescriptorJson,
+            Array.Empty<GatewayAuthenticationMethodDefinition>())
     {
     }
 
@@ -29,6 +30,27 @@ public sealed class BackendEndpointAdvertise
         BackendNodeState state,
         string descriptorVersion,
         string descriptorJson)
+        : this(
+            backendKind,
+            gatewayEndpoint,
+            manifestId,
+            manifestHash,
+            state,
+            descriptorVersion,
+            descriptorJson,
+            Array.Empty<GatewayAuthenticationMethodDefinition>())
+    {
+    }
+
+    public BackendEndpointAdvertise(
+        string backendKind,
+        MasterSocketEndpoint gatewayEndpoint,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash manifestHash,
+        BackendNodeState state,
+        string descriptorVersion,
+        string descriptorJson,
+        GatewayAuthenticationMethodDefinition[] authenticationMethods)
     {
         if (string.IsNullOrWhiteSpace(backendKind))
         {
@@ -40,6 +62,7 @@ public sealed class BackendEndpointAdvertise
         ManifestId = manifestId;
         ManifestHash = manifestHash;
         Descriptor = BackendServerDescriptor.Create(state, descriptorVersion, descriptorJson);
+        AuthenticationMethods = authenticationMethods ?? throw new ArgumentNullException(nameof(authenticationMethods));
     }
 
     public string BackendKind { get; }
@@ -51,6 +74,8 @@ public sealed class BackendEndpointAdvertise
     public BackendPacketManifestHash ManifestHash { get; }
 
     public BackendServerDescriptor Descriptor { get; }
+
+    public GatewayAuthenticationMethodDefinition[] AuthenticationMethods { get; }
 
     public static IPacketCodec<BackendEndpointAdvertise> Codec { get; } = new BackendEndpointAdvertiseCodec();
 
@@ -64,7 +89,8 @@ public sealed class BackendEndpointAdvertise
                    PacketWriter.GetStringSize(value.ManifestHash.Value) +
                    sizeof(byte) +
                    PacketWriter.GetStringSize(value.Descriptor.DescriptorVersion) +
-                   PacketWriter.GetStringSize(value.Descriptor.DescriptorJson);
+                   PacketWriter.GetStringSize(value.Descriptor.DescriptorJson) +
+                   GetAuthenticationMethodsSize(value.AuthenticationMethods);
         }
 
         public void Encode(BackendEndpointAdvertise value, ref PacketWriter writer)
@@ -76,6 +102,7 @@ public sealed class BackendEndpointAdvertise
             writer.WriteByte((byte)value.Descriptor.State);
             writer.WriteString(value.Descriptor.DescriptorVersion);
             writer.WriteString(value.Descriptor.DescriptorJson);
+            WriteAuthenticationMethods(value.AuthenticationMethods, ref writer);
         }
 
         public BackendEndpointAdvertise Decode(ref PacketReader reader)
@@ -89,7 +116,48 @@ public sealed class BackendEndpointAdvertise
                 new BackendPacketManifestHash(reader.ReadString()),
                 (BackendNodeState)reader.ReadByte(),
                 reader.ReadString(),
-                reader.ReadString());
+                reader.ReadString(),
+                ReadAuthenticationMethods(ref reader));
+        }
+
+        private static int GetAuthenticationMethodsSize(GatewayAuthenticationMethodDefinition[] value)
+        {
+            int size = sizeof(int);
+            foreach (var method in value)
+            {
+                size += GatewayAuthenticationMethodDefinition.Codec.GetPayloadSize(method);
+            }
+
+            return size;
+        }
+
+        private static void WriteAuthenticationMethods(
+            GatewayAuthenticationMethodDefinition[] value,
+            ref PacketWriter writer)
+        {
+            writer.WriteInt32(value.Length);
+            foreach (var method in value)
+            {
+                GatewayAuthenticationMethodDefinition.Codec.Encode(method, ref writer);
+            }
+        }
+
+        private static GatewayAuthenticationMethodDefinition[] ReadAuthenticationMethods(ref PacketReader reader)
+        {
+            const int MAX_METHOD_COUNT = 32;
+            var methodCount = reader.ReadInt32();
+            if (methodCount < 0 || methodCount > MAX_METHOD_COUNT)
+            {
+                throw new PacketFormatException(PacketValidationError.InvalidStringLength, "Invalid Gateway authentication method count.");
+            }
+
+            var methods = new GatewayAuthenticationMethodDefinition[methodCount];
+            for (int i = 0; i < methods.Length; i++)
+            {
+                methods[i] = GatewayAuthenticationMethodDefinition.Codec.Decode(ref reader);
+            }
+
+            return methods;
         }
 
         private static int GetEndpointSize(MasterSocketEndpoint value)

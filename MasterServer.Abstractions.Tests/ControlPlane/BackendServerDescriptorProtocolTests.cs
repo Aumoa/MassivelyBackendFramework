@@ -11,6 +11,16 @@ public sealed class BackendServerDescriptorProtocolTests
     public void BackendEndpointAdvertiseCodec_RoundTripsDescriptor()
     {
         const string descriptorJson = "{\"name\":\"Alpha\",\"region\":\"KR\"}";
+        var authenticationMethods = new[]
+        {
+            GatewayAuthenticationMethodDefinition.StaticSecret("static", "Access token"),
+            GatewayAuthenticationMethodDefinition.OidcAuthorizationCode(
+                "ayla",
+                "Ayla",
+                "https://accounts.ayla.r-e.kr",
+                "gateway-client",
+                "openid profile email")
+        };
         var advertise = new BackendEndpointAdvertise(
             "inventory",
             new MasterSocketEndpoint("127.0.0.1", 19001, useTls: true),
@@ -18,7 +28,8 @@ public sealed class BackendServerDescriptorProtocolTests
             new BackendPacketManifestHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
             BackendNodeState.Draining,
             "2026.07",
-            descriptorJson);
+            descriptorJson,
+            authenticationMethods);
 
         using var frame = PacketCodec.Encode(
             PacketKind.Control,
@@ -35,6 +46,12 @@ public sealed class BackendServerDescriptorProtocolTests
         Assert.Equal(
             BackendServerDescriptor.ComputeDescriptorHash(descriptorJson),
             decoded.Descriptor.DescriptorHash);
+        Assert.Equal(2, decoded.AuthenticationMethods.Length);
+        Assert.Equal(GatewayAuthenticationMethodKind.StaticSecret, decoded.AuthenticationMethods[0].Kind);
+        Assert.Equal("static", decoded.AuthenticationMethods[0].MethodId);
+        Assert.Equal(GatewayAuthenticationMethodKind.OidcAuthorizationCode, decoded.AuthenticationMethods[1].Kind);
+        Assert.Equal("https://accounts.ayla.r-e.kr", decoded.AuthenticationMethods[1].AuthorityUri);
+        Assert.Equal("gateway-client", decoded.AuthenticationMethods[1].ClientId);
     }
 
     [Fact]
@@ -58,6 +75,14 @@ public sealed class BackendServerDescriptorProtocolTests
                     new BackendPacketManifestId("world-v2"),
                     new BackendPacketManifestHash("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
                     descriptor,
+                    [
+                        GatewayAuthenticationMethodDefinition.OidcAuthorizationCode(
+                            "world-oidc",
+                            "World OIDC",
+                            "https://accounts.example.test",
+                            "world-client",
+                            "openid")
+                    ],
                     advertisedAt)
             ],
             observedAt);
@@ -80,6 +105,21 @@ public sealed class BackendServerDescriptorProtocolTests
         Assert.Equal("v2", node.DescriptorVersion);
         Assert.Equal(descriptor.DescriptorHash, node.DescriptorHash);
         Assert.Equal(descriptorJson, node.DescriptorJson);
+        var method = Assert.Single(node.AuthenticationMethods);
+        Assert.Equal("world-oidc", method.MethodId);
+        Assert.Equal(GatewayAuthenticationMethodKind.OidcAuthorizationCode, method.Kind);
+        Assert.Equal("world-client", method.ClientId);
+    }
+
+    [Fact]
+    public void GatewayAuthenticationMethodDefinition_RejectsOidcWithoutAuthority()
+    {
+        Assert.Throws<ArgumentException>(() => GatewayAuthenticationMethodDefinition.OidcAuthorizationCode(
+            "oidc",
+            "OIDC",
+            string.Empty,
+            "client",
+            "openid"));
     }
 
     [Fact]

@@ -23,14 +23,14 @@ public sealed class BackendCppWireVectorTests
         Span<byte> bytes = stackalloc byte[PacketHeader.Size];
         header.Write(bytes);
 
-        Assert.Equal("c00064000a000000", ToHex(bytes));
+        Assert.Equal("c00064000b000000", ToHex(bytes));
     }
 
     [Fact]
     public void NodeAuthChallenge_VectorMatchesWireContract()
     {
         Assert.Equal(
-            "c00064000a0000330000000b6368616c6c656e67652d6100000020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+            "c00064000b0000330000000b6368616c6c656e67652d6100000020000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
             EncodeFrameHex(
                 PacketKind.Control,
                 MasterControlPacketIds.NodeAuthChallenge,
@@ -50,7 +50,7 @@ public sealed class BackendCppWireVectorTests
             "gateway-master-a");
 
         Assert.Equal(
-            "c00065000a00003101000a00000009676174657761792d610000000947617465776179204100000010676174657761792d6d61737465722d61",
+            "c00065000b00003101000b00000009676174657761792d610000000947617465776179204100000010676174657761792d6d61737465722d61",
             EncodeFrameHex(
                 PacketKind.Control,
                 MasterControlPacketIds.NodeHello,
@@ -65,7 +65,7 @@ public sealed class BackendCppWireVectorTests
         var code = new DirectConnectCode("code-1");
 
         Assert.Equal(
-            "c00073000a00000a00000006636f64652d31",
+            "c00073000b00000a00000006636f64652d31",
             EncodeFrameHex(
                 PacketKind.Control,
                 MasterControlPacketIds.DirectConnectCode,
@@ -80,7 +80,7 @@ public sealed class BackendCppWireVectorTests
         var accepted = new NodeAccepted("gateway-a", "backend-connection-a");
 
         Assert.Equal(
-            "c00067000a00002500000009676174657761792d61000000146261636b656e642d636f6e6e656374696f6e2d61",
+            "c00067000b00002500000009676174657761792d61000000146261636b656e642d636f6e6e656374696f6e2d61",
             EncodeFrameHex(
                 PacketKind.Control,
                 MasterControlPacketIds.NodeAccepted,

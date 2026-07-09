@@ -98,7 +98,7 @@ namespace cpp_backend
     packet_frame make_frame(packet_kind kind, std::uint16_t packet_id, std::uint16_t version,
                             std::vector<std::uint8_t> payload, std::uint8_t flags = 0);
 
-    constexpr std::uint16_t master_control_schema_version = 10;
+    constexpr std::uint16_t master_control_schema_version = 11;
     constexpr std::uint16_t master_pid_node_auth_challenge = 100;
     constexpr std::uint16_t master_pid_node_hello = 101;
     constexpr std::uint16_t master_pid_node_accepted = 103;
