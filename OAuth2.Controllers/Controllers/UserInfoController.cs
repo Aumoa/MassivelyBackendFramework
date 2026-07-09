@@ -9,7 +9,14 @@ namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/userinfo")]
-public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccountClaims claims, IJwt jwt, IClientUserGroups groups) : AuthorizedControllerBase(accesses)
+public class UserInfoController(
+    IAccesses accesses,
+    IAccounts accounts,
+    IAccountClaims claims,
+    IJwt jwt,
+    IClientUserGroups groups,
+    IAccountPictures accountPictures)
+    : AuthorizedControllerBase(accesses)
 {
     [HttpGet]
     public async ValueTask<IActionResult> GetAsync(CancellationToken cancellationToken)
@@ -34,6 +41,13 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
             }
 
             AccountClaim[] accountClaims = [.. await claims.GetClaimsAsync(access.Id, cancellationToken), .. await groups.GetClientUserGroupsAsync(access.ClientId, access.Sub, cancellationToken)];
+            var legacyPictureUrl = GetLatestPictureClaimValue(accountClaims);
+            await accountPictures.EnsurePictureAsync(access.Id, legacyPictureUrl, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(legacyPictureUrl))
+            {
+                await claims.RemoveClaimsAsync(access.Id, JwtRegisteredClaimNames.Picture, cancellationToken);
+            }
+
             var scopedClaims = jwt.ConfigureClaims(rawAccount.Value, access.Scope, accountClaims, null, false, additionalClaims: access.UserInfoClaims);
             return Ok(scopedClaims.ToDictionary(c => c.Type, c => GetClaimValue(c)));
         }, accessToken, cancellationToken);
@@ -55,5 +69,14 @@ public class UserInfoController(IAccesses accesses, IAccounts accounts, IAccount
                     };
             }
         }
+    }
+
+    private static string? GetLatestPictureClaimValue(AccountClaim[] claims)
+    {
+        return claims
+            .Where(claim => claim.Name == JwtRegisteredClaimNames.Picture)
+            .OrderByDescending(claim => claim.CreatedAt)
+            .Select(claim => claim.Value)
+            .FirstOrDefault();
     }
 }

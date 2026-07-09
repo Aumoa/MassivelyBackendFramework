@@ -38,7 +38,8 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    min-width: 380px;
+    width: min(420px, calc(100vw - 48px));
+    min-width: 0;
 }
 
 .preview-container {
@@ -54,6 +55,126 @@
     object-fit: cover;
     border: 2px solid #dadce0;
     background-color: var(--oauth-surface-muted);
+}
+
+.upload-picker {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px dashed var(--oauth-border);
+    border-radius: 8px;
+    background: var(--oauth-surface-muted);
+    color: var(--oauth-accent);
+    cursor: pointer;
+}
+
+.upload-picker:hover {
+    border-color: var(--oauth-accent);
+    background: var(--oauth-accent-soft);
+}
+
+.upload-picker-disabled {
+    color: var(--oauth-text-muted);
+    cursor: not-allowed;
+}
+
+.upload-picker-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.upload-picker-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.upload-picker-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.upload-picker-input:disabled {
+    cursor: not-allowed;
+}
+
+.crop-editor {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.crop-editor-empty {
+    display: none;
+}
+
+.crop-canvas {
+    width: min(320px, 100%);
+    aspect-ratio: 1;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--oauth-border);
+    background: var(--oauth-surface-muted);
+    touch-action: none;
+    cursor: move;
+}
+
+.crop-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36px;
+    align-items: center;
+    gap: 10px;
+    width: min(320px, 100%);
+}
+
+.zoom-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    color: var(--oauth-text-muted);
+    font-size: 0.8125rem;
+}
+
+.zoom-control span {
+    flex: 0 0 auto;
+}
+
+.zoom-control input {
+    flex: 1;
+    min-width: 0;
+}
+
+.crop-reset-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    min-width: unset;
+    padding: 0;
+    border-radius: 6px;
+    border: 1px solid var(--oauth-border);
+    color: var(--oauth-accent);
+    background: transparent;
+}
+
+.crop-reset-btn:hover:not(:disabled) {
+    border-color: var(--oauth-accent);
+    background: var(--oauth-accent-soft);
+}
+
+.crop-reset-btn .material-symbols-outlined {
+    font-size: 19px;
 }
 
 .dlg-error {

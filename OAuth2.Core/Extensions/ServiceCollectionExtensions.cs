@@ -11,6 +11,7 @@ public static class ServiceCollectionExtensions
     {
         s.Configure<MySqlOptions>(config.GetRequiredSection("MySql"));
         s.Configure<RedisOptions>(config.GetRequiredSection("Redis"));
+        s.Configure<AccountPictureOptions>(config.GetSection("AccountPictures"));
         s.AddOptions<HostOptions>()
             .Bind(config.GetRequiredSection("Host"))
             .Validate(static options => !string.IsNullOrWhiteSpace(options.ClientId), "OAuth2:Host:ClientId is required.")
@@ -21,6 +22,8 @@ public static class ServiceCollectionExtensions
 
         s.AddTransient<IAccounts, MySqlAccounts>();
         s.AddTransient<IAccountClaims, MySqlAccountClaims>();
+        s.AddHttpClient<IAccountPictures, MySqlAccountPictures>()
+            .ConfigurePrimaryHttpMessageHandler(AccountPictureRemoteConnection.CreateHandler);
         s.AddTransient<IClients, MySqlClients>();
         s.AddTransient<IClientClaims, MySqlClientClaims>();
         s.AddTransient<IClientUserGroups, MySqlClientUserGroups>();

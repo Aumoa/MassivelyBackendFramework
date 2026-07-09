@@ -6,7 +6,7 @@ using OAuth2.Options;
 
 namespace OAuth2.Services;
 
-internal class MySqlAccounts(IOptions<MySqlOptions> options) : MySqlDbContext(options.Value), IAccounts
+internal class MySqlAccounts(IOptions<MySqlOptions> options, IAccountPictures accountPictures) : MySqlDbContext(options.Value), IAccounts
 {
     public async ValueTask<bool> ExistsAsync(string id, CancellationToken cancellationToken = default)
     {
@@ -46,6 +46,7 @@ internal class MySqlAccounts(IOptions<MySqlOptions> options) : MySqlDbContext(op
 
         var command = new CommandDefinition(QUERY1, new { id, password = PasswordHasher.Hash(password), sub, name, email, verifyPassword }, cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);
+        await accountPictures.GetOrCreateDefaultPictureAsync(id, cancellationToken);
 
         return sub;
     }

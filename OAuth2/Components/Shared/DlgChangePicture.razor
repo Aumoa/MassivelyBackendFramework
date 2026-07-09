@@ -1,8 +1,14 @@
-﻿@using OAuth2.Services
+@using System.IdentityModel.Tokens.Jwt
+@using System.Text.Json.Serialization
+@using Microsoft.Extensions.Options
+@using OAuth2.DTO
+@using OAuth2.Options
+@using OAuth2.Services
 @inject JwtAuthenticationStateProvider Auth
 @inject IAccesses Accesses
+@inject IAccountPictures AccountPictures
 @inject IAccountClaims AccountClaims
-@inject ILogger<DlgChangePicture> Logger
+@inject IOptions<AccountPictureOptions> PictureOptions
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
@@ -18,13 +24,47 @@
     <hr class="dlg-divider" />
     <div class="dlg-body">
         <div class="preview-container">
-            <img src="@m_NewPictureUri" alt="Profile preview" class="preview-img"
-                 onerror="this.src='@kFallbackPictureUrl';" />
+            <img src="@Auth.Picture" alt="Profile preview" class="preview-img" />
         </div>
-        <FloatingInput Placeholder="@Strings.MANAGEACCOUNTS_PICTURE_URI"
-                       Value="@m_NewPictureUri"
-                       ValueChanged="@((v) => { m_NewPictureUri = v; m_Error = string.Empty; })"
-                       HasError="@(!string.IsNullOrEmpty(m_Error))" />
+        <label class="upload-picker @(m_IsSubmitting ? "upload-picker-disabled" : null)">
+            <span class="material-symbols-outlined upload-picker-icon">upload</span>
+            <span class="upload-picker-text">
+                @(m_SelectedFile?.Name ?? Strings.MANAGEACCOUNTS_PICTURE_UPLOAD_SELECT)
+            </span>
+            <InputFile class="upload-picker-input"
+                       id="@kInputId"
+                       OnChange="OnPictureSelectedAsync"
+                       accept="image/png,image/jpeg"
+                       disabled="@m_IsSubmitting" />
+        </label>
+        <div class="crop-editor @(m_EditorReady ? null : "crop-editor-empty")">
+            <canvas id="@kCanvasId"
+                    class="crop-canvas"
+                    width="@PictureOptions.Value.MaxWidth"
+                    height="@PictureOptions.Value.MaxHeight"></canvas>
+            @if (m_EditorReady)
+            {
+                <div class="crop-controls">
+                    <label class="zoom-control">
+                        <span>@Strings.MANAGEACCOUNTS_PICTURE_ZOOM</span>
+                        <input type="range"
+                               min="1"
+                               max="3"
+                               step="0.01"
+                               value="@m_Zoom.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                               @oninput="OnZoomChangedAsync"
+                               disabled="@m_IsSubmitting" />
+                    </label>
+                    <button type="button"
+                            class="crop-reset-btn"
+                            title="@Strings.MANAGEACCOUNTS_PICTURE_RESET_CROP"
+                            @onclick="OnResetCropAsync"
+                            disabled="@m_IsSubmitting">
+                        <span class="material-symbols-outlined">center_focus_strong</span>
+                    </button>
+                </div>
+            }
+        </div>
         @if (!string.IsNullOrEmpty(m_Error))
         {
             <div class="dlg-error">
@@ -37,7 +77,7 @@
         <button @onclick="OnCancelAsync" class="btn-ghost" disabled="@m_IsSubmitting">
             @Strings.MANAGEACCOUNTS_CHANGE_CANCEL
         </button>
-        <button @onclick="OnConfirmAsync" class="btn-primary" disabled="@m_IsSubmitting">
+        <button @onclick="OnConfirmAsync" class="btn-primary" disabled="@(m_IsSubmitting || !m_EditorReady)">
             @Strings.MANAGEACCOUNTS_PICTURE_CHANGE
         </button>
     </div>
@@ -45,23 +85,66 @@
 
 @code {
     private Dialog m_Ref = null!;
-    private string? m_NewPictureUri;
+    private IBrowserFile? m_SelectedFile;
     private string m_Error = string.Empty;
     private bool m_IsSubmitting;
+    private bool m_EditorReady;
+    private double m_Zoom = 1;
 
-    private const string kFallbackPictureUrl = "/default-profile.png";
+    private const string kInputId = "oauth-profile-picture-input";
+    private const string kCanvasId = "oauth-profile-picture-canvas";
 
     public async Task ShowAsync()
     {
-        m_NewPictureUri = Auth.Picture;
+        m_SelectedFile = null;
         m_Error = string.Empty;
         m_IsSubmitting = false;
+        m_EditorReady = false;
+        m_Zoom = 1;
+        await ClearEditorAsync();
         await m_Ref.ShowAsync();
     }
 
     private async Task OnCancelAsync()
     {
+        await ClearEditorAsync();
         await m_Ref.CloseAsync();
+    }
+
+    private async Task OnPictureSelectedAsync(InputFileChangeEventArgs args)
+    {
+        m_Error = string.Empty;
+        m_EditorReady = false;
+        m_Zoom = 1;
+        m_SelectedFile = args.File;
+
+        if (m_SelectedFile.Size > PictureOptions.Value.MaxSourceBytes)
+        {
+            m_Error = GetPictureErrorMessage(AccountPictureError.SourceTooLarge);
+            await ClearEditorAsync();
+            return;
+        }
+
+        if (m_SelectedFile.ContentType is not ("image/png" or "image/jpeg"))
+        {
+            m_Error = GetPictureErrorMessage(AccountPictureError.UnsupportedFormat);
+            await ClearEditorAsync();
+            return;
+        }
+
+        var loadResult = await JS.InvokeAsync<PictureEditorResult>(
+            "oauthProfilePictureEditor.load",
+            kInputId,
+            kCanvasId);
+
+        if (!loadResult.Ok)
+        {
+            m_Error = GetEditorErrorMessage(loadResult.Error);
+            await ClearEditorAsync();
+            return;
+        }
+
+        m_EditorReady = true;
     }
 
     private async Task OnConfirmAsync()
@@ -73,18 +156,9 @@
 
         m_Error = string.Empty;
 
-        if (Auth.Picture == m_NewPictureUri)
+        if (!m_EditorReady)
         {
-            m_Error = Strings.MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE;
-            return;
-        }
-
-        // Validate that the picture URI is a safe absolute http/https URL
-        if (!string.IsNullOrEmpty(m_NewPictureUri) &&
-            !(Uri.TryCreate(m_NewPictureUri, UriKind.Absolute, out var parsedUri) &&
-              (parsedUri.Scheme == Uri.UriSchemeHttp || parsedUri.Scheme == Uri.UriSchemeHttps)))
-        {
-            m_Error = Strings.MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL;
+            m_Error = Strings.MANAGEACCOUNTS_PICTURE_ERROR_REQUIRED;
             return;
         }
 
@@ -102,9 +176,42 @@
             }
 
             var accountId = Auth.Id;
-            const string kClaimName = "picture";
-            await AccountClaims.SetUniqueClaimAsync(accountId, kClaimName, m_NewPictureUri ?? string.Empty);
+            if (string.IsNullOrEmpty(accountId))
+            {
+                await JS.InvokeVoidAsync("alert", Strings.ERROR_COMMON_AUTHENTICATION_EXPIRED);
+                Nav.NavigateTo("/auth/logout", forceLoad: true);
+                return;
+            }
 
+            var exportResult = await JS.InvokeAsync<PictureEditorResult>(
+                "oauthProfilePictureEditor.exportImage",
+                kCanvasId,
+                PictureOptions.Value.MaxBytes,
+                PictureOptions.Value.MaxWidth);
+            if (!exportResult.Ok || string.IsNullOrEmpty(exportResult.Base64))
+            {
+                m_Error = GetEditorErrorMessage(exportResult.Error);
+                return;
+            }
+
+            var imageBytes = Convert.FromBase64String(exportResult.Base64);
+            if (imageBytes.Length > PictureOptions.Value.MaxBytes)
+            {
+                m_Error = GetPictureErrorMessage(AccountPictureError.TooLarge);
+                return;
+            }
+
+            await using var stream = new MemoryStream(imageBytes, writable: false);
+            var result = await AccountPictures.SetPictureAsync(accountId, stream);
+            if (!result.IsSuccess)
+            {
+                m_Error = GetPictureErrorMessage(result.Error);
+                return;
+            }
+
+            await AccountClaims.RemoveClaimsAsync(accountId, JwtRegisteredClaimNames.Picture);
+
+            await ClearEditorAsync();
             await JS.InvokeVoidAsync("alert", Strings.MANAGEACCOUNTS_PICTURE_CHANGE_SUCCESS_MESSAGE);
             Nav.NavigateTo("/auth/logout", forceLoad: true);
         }
@@ -113,5 +220,77 @@
             m_IsSubmitting = false;
             StateHasChanged();
         }
+    }
+
+    private async Task OnZoomChangedAsync(ChangeEventArgs args)
+    {
+        if (!double.TryParse(
+                args.Value?.ToString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var zoom))
+        {
+            return;
+        }
+
+        m_Zoom = Math.Clamp(zoom, 1, 3);
+        await JS.InvokeVoidAsync("oauthProfilePictureEditor.setZoom", kCanvasId, m_Zoom);
+    }
+
+    private async Task OnResetCropAsync()
+    {
+        m_Zoom = 1;
+        await JS.InvokeVoidAsync("oauthProfilePictureEditor.reset", kCanvasId);
+    }
+
+    private async Task ClearEditorAsync()
+    {
+        await JS.InvokeVoidAsync("oauthProfilePictureEditor.clear", kCanvasId);
+    }
+
+    private string GetPictureErrorMessage(AccountPictureError error)
+    {
+        return error switch
+        {
+            AccountPictureError.Empty => Strings.MANAGEACCOUNTS_PICTURE_ERROR_REQUIRED,
+            AccountPictureError.SourceTooLarge => string.Format(
+                Strings.MANAGEACCOUNTS_PICTURE_ERROR_SOURCE_TOO_LARGE,
+                PictureOptions.Value.MaxSourceBytes / 1024 / 1024),
+            AccountPictureError.TooLarge => string.Format(
+                Strings.MANAGEACCOUNTS_PICTURE_ERROR_TOO_LARGE,
+                PictureOptions.Value.MaxBytes / 1024),
+            AccountPictureError.UnsupportedFormat => Strings.MANAGEACCOUNTS_PICTURE_ERROR_UNSUPPORTED_FORMAT,
+            AccountPictureError.InvalidDimensions => string.Format(
+                Strings.MANAGEACCOUNTS_PICTURE_ERROR_INVALID_DIMENSIONS,
+                PictureOptions.Value.MaxWidth,
+                PictureOptions.Value.MaxHeight),
+            _ => Strings.MANAGEACCOUNTS_PICTURE_ERROR_UPLOAD_FAILED
+        };
+    }
+
+    private string GetEditorErrorMessage(string? error)
+    {
+        return error switch
+        {
+            "empty" => Strings.MANAGEACCOUNTS_PICTURE_ERROR_REQUIRED,
+            "unsupported" => Strings.MANAGEACCOUNTS_PICTURE_ERROR_UNSUPPORTED_FORMAT,
+            "tooLarge" => GetPictureErrorMessage(AccountPictureError.TooLarge),
+            _ => Strings.MANAGEACCOUNTS_PICTURE_ERROR_UPLOAD_FAILED
+        };
+    }
+
+    private sealed class PictureEditorResult
+    {
+        [JsonPropertyName("ok")]
+        public bool Ok { get; set; }
+
+        [JsonPropertyName("error")]
+        public string? Error { get; set; }
+
+        [JsonPropertyName("contentType")]
+        public string? ContentType { get; set; }
+
+        [JsonPropertyName("base64")]
+        public string? Base64 { get; set; }
     }
 }

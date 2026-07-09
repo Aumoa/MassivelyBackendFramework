@@ -1400,6 +1400,60 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   Picture must be at most {0}x{1} pixels.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ERROR_INVALID_DIMENSIONS {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_INVALID_DIMENSIONS", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Select a picture to upload.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ERROR_REQUIRED {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_REQUIRED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Original image must be {0} MB or smaller.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ERROR_SOURCE_TOO_LARGE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_SOURCE_TOO_LARGE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Cropped picture must be {0} KB or smaller.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ERROR_TOO_LARGE {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_TOO_LARGE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Picture upload failed. Please try another image.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ERROR_UPLOAD_FAILED {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_UPLOAD_FAILED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Use a PNG or JPEG image.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ERROR_UNSUPPORTED_FORMAT {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ERROR_UNSUPPORTED_FORMAT", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   Picture Uri과(와) 유사한 지역화된 문자열을 찾습니다.
@@ -1407,6 +1461,33 @@ namespace OAuth2.Localizations {
         internal static string MANAGEACCOUNTS_PICTURE_URI {
             get {
                 return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_URI", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Reset crop과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_RESET_CROP {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_RESET_CROP", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Select image과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_UPLOAD_SELECT {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_UPLOAD_SELECT", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Zoom과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGEACCOUNTS_PICTURE_ZOOM {
+            get {
+                return ResourceManager.GetString("MANAGEACCOUNTS_PICTURE_ZOOM", resourceCulture);
             }
         }
         

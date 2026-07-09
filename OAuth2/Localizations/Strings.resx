@@ -462,11 +462,38 @@
   <data name="MANAGEACCOUNTS_PICTURE_URI" xml:space="preserve">
     <value>Picture Uri</value>
   </data>
+  <data name="MANAGEACCOUNTS_PICTURE_UPLOAD_SELECT" xml:space="preserve">
+    <value>Select image</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ZOOM" xml:space="preserve">
+    <value>Zoom</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_RESET_CROP" xml:space="preserve">
+    <value>Reset crop</value>
+  </data>
   <data name="MANAGEACCOUNTS_PICTURE_CHANGE_NOCHANGE" xml:space="preserve">
     <value>No changes.</value>
   </data>
   <data name="MANAGEACCOUNTS_PICTURE_ERROR_INVALID_URL" xml:space="preserve">
     <value>Picture URI must be a valid http or https URL.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ERROR_REQUIRED" xml:space="preserve">
+    <value>Select a picture to upload.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ERROR_TOO_LARGE" xml:space="preserve">
+    <value>Cropped picture must be {0} KB or smaller.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ERROR_SOURCE_TOO_LARGE" xml:space="preserve">
+    <value>Original image must be {0} MB or smaller.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ERROR_UNSUPPORTED_FORMAT" xml:space="preserve">
+    <value>Use a PNG or JPEG image.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ERROR_INVALID_DIMENSIONS" xml:space="preserve">
+    <value>Picture must be at most {0}x{1} pixels.</value>
+  </data>
+  <data name="MANAGEACCOUNTS_PICTURE_ERROR_UPLOAD_FAILED" xml:space="preserve">
+    <value>Picture upload failed. Please try another image.</value>
   </data>
   <data name="ERROR_COMMON_AUTHENTICATION_EXPIRED" xml:space="preserve">
     <value>Authentication has expired.</value>

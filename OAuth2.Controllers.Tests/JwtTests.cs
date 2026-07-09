@@ -43,6 +43,28 @@ public sealed class JwtTests
         Assert.Equal(ClaimValueTypes.Integer64, updatedAt.ValueType);
     }
 
+    [Fact]
+    public void ConfigureClaims_UsesDatabasePictureEndpoint()
+    {
+        using var fixture = new JwtFixture();
+        var jwt = fixture.CreateJwt();
+        var account = new RawAccount
+        {
+            Sub = "subject/with+unsafe=chars",
+            Name = "User Name",
+            Email = "user@example.test",
+            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            UpdatedAt = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        var claims = jwt.ConfigureClaims(account, "profile", [], nonce: null, idToken: false);
+
+        var picture = Assert.Single(claims, claim => claim.Type == JwtRegisteredClaimNames.Picture);
+        Assert.StartsWith("https://oauth.example.test/api/v1/account-picture?", picture.Value);
+        Assert.Contains("sub=subject%2Fwith%2Bunsafe%3Dchars", picture.Value);
+        Assert.DoesNotContain("default-profile.png", picture.Value);
+    }
+
     public static TheoryData<DateTime, DateTime, DateTime> UpdatedAtCases => new()
     {
         {
