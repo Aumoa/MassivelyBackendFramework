@@ -243,7 +243,11 @@ public sealed class BackendGatewayConnectionManagerTests
             await using var stream = client.GetStream();
             var accepted = await CompleteGatewayHandshakeAsync(stream);
 
-            var open = new GatewayBackendChannelOpen(456, "player-1");
+            var open = new GatewayBackendChannelOpen(
+                456,
+                "player-1",
+                GatewayClientAuthenticationMethodKind.OidcAuthorizationCode,
+                "oidc-main");
             using (var frame = PacketCodec.Encode(
                        PacketKind.Notify,
                        Pid.GATE_BACKEND_CHANNEL_OPEN,
@@ -260,6 +264,8 @@ public sealed class BackendGatewayConnectionManagerTests
             Assert.Equal((uint)456, received.ChannelId);
             Assert.Equal(new BackendGatewayChannel(received.GatewayConnectionId, 456), received.Channel);
             Assert.Equal("player-1", received.PrincipalSubjectId);
+            Assert.Equal((byte)GatewayClientAuthenticationMethodKind.OidcAuthorizationCode, received.PrincipalAuthenticationMethodKind);
+            Assert.Equal("oidc-main", received.PrincipalAuthenticationMethodId);
         }
         finally
         {

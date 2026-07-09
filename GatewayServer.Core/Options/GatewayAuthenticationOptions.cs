@@ -8,6 +8,16 @@ public sealed record GatewayAuthenticationOptions
 
     public int OidcLoginLifetimeSeconds { get; set; } = 600;
 
+    public int OidcLoginRateLimitWindowMilliseconds { get; set; } = 30000;
+
+    public int MaxOidcPendingLogins { get; set; } = 1024;
+
+    public int MaxOidcPendingLoginsPerClient { get; set; } = 4;
+
+    public int MaxOidcLoginCreationsPerWindow { get; set; } = 256;
+
+    public int MaxOidcLoginCreationsPerClientPerWindow { get; set; } = 4;
+
     public GatewayOidcClientSecretOptions[] OidcClientSecrets { get; set; } = [];
 }
 

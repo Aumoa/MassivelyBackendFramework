@@ -385,6 +385,10 @@ internal sealed class GatewayConnectionManager(
             connectionId,
             open.ChannelId,
             open.PrincipalSubjectId,
+            open.PrincipalAuthenticationMethodKind.HasValue
+                ? (byte)open.PrincipalAuthenticationMethodKind.Value
+                : null,
+            open.PrincipalAuthenticationMethodId,
             DateTimeOffset.UtcNow);
         await backendRuntime.HandleGatewayChannelOpenedAsync(context, cancellationToken).ConfigureAwait(false);
     }

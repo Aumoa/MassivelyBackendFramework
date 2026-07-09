@@ -2,7 +2,6 @@ using GatewayServer.Options;
 using GatewayServer.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -15,7 +14,7 @@ public static class EndpointRouteBuilderExtensions
     {
         var options = endpoints.ServiceProvider.GetRequiredService<IOptions<GatewayAuthenticationOptions>>().Value;
         endpoints.MapGet(
-            NormalizeCallbackPath(options.OidcCallbackPath),
+            GatewayAuthenticationUriBuilder.NormalizeCallbackPath(options.OidcCallbackPath),
             async (
                 HttpContext httpContext,
                 IGatewayOidcAuthenticationService oidcAuthentication,
@@ -23,11 +22,7 @@ public static class EndpointRouteBuilderExtensions
             {
                 var code = httpContext.Request.Query["code"].ToString();
                 var state = httpContext.Request.Query["state"].ToString();
-                var redirectUri = UriHelper.BuildAbsolute(
-                    httpContext.Request.Scheme,
-                    httpContext.Request.Host,
-                    httpContext.Request.PathBase,
-                    httpContext.Request.Path);
+                var redirectUri = GatewayAuthenticationUriBuilder.BuildOidcRedirectUri(options);
                 var result = await oidcAuthentication
                     .AcceptCallbackAsync(code, state, redirectUri, cancellationToken)
                     .ConfigureAwait(false);
@@ -37,18 +32,5 @@ public static class EndpointRouteBuilderExtensions
             });
 
         return endpoints;
-    }
-
-    private static string NormalizeCallbackPath(string callbackPath)
-    {
-        if (string.IsNullOrWhiteSpace(callbackPath))
-        {
-            return "/auth/gateway/oidc/callback";
-        }
-
-        var normalized = callbackPath.Trim();
-        return normalized.StartsWith("/", StringComparison.Ordinal)
-            ? normalized
-            : "/" + normalized;
     }
 }

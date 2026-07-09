@@ -1,4 +1,5 @@
 using GatewayServer.Protocols;
+using GatewayServer.Behaviors;
 using MasterServer.ControlPlane;
 
 namespace GatewayServer.Services;
@@ -6,21 +7,30 @@ namespace GatewayServer.Services;
 internal interface IGatewayClientAuthenticationChallengeIssuer
 {
     ValueTask<GatewayClientAuthenticationMethodChallenge[]> CreateChallengesAsync(
+        Client client,
         GatewayAuthenticationMethodDefinition[] methods,
         string backendKind,
         GatewayBackendServerHandle? serverHandle,
         CancellationToken cancellationToken);
+
+    void CancelPendingChallenges(Client client);
 }
 
 internal sealed class GatewayClientAuthenticationChallengeIssuer(
     IGatewayOidcAuthenticationService oidcAuthentication) : IGatewayClientAuthenticationChallengeIssuer
 {
     public async ValueTask<GatewayClientAuthenticationMethodChallenge[]> CreateChallengesAsync(
+        Client client,
         GatewayAuthenticationMethodDefinition[] methods,
         string backendKind,
         GatewayBackendServerHandle? serverHandle,
         CancellationToken cancellationToken)
     {
+        if (client == null)
+        {
+            throw new ArgumentNullException(nameof(client));
+        }
+
         if (methods == null)
         {
             throw new ArgumentNullException(nameof(methods));
@@ -44,7 +54,7 @@ internal sealed class GatewayClientAuthenticationChallengeIssuer(
             if (method.Kind == GatewayAuthenticationMethodKind.OidcAuthorizationCode)
             {
                 challenges.Add(await oidcAuthentication
-                    .CreateChallengeAsync(method, backendKind, serverHandle, cancellationToken)
+                    .CreateChallengeAsync(method, client, backendKind, serverHandle, cancellationToken)
                     .ConfigureAwait(false));
                 continue;
             }
@@ -54,5 +64,10 @@ internal sealed class GatewayClientAuthenticationChallengeIssuer(
         }
 
         return challenges.ToArray();
+    }
+
+    public void CancelPendingChallenges(Client client)
+    {
+        oidcAuthentication.CancelPendingLogins(client);
     }
 }

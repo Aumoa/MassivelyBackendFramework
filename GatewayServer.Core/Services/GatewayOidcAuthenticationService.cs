@@ -6,6 +6,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using GatewayServer.Behaviors;
 using GatewayServer.Options;
 using GatewayServer.Protocols;
 using MasterServer.ControlPlane;
@@ -20,9 +21,12 @@ internal interface IGatewayOidcAuthenticationService : IGatewayClientOidcComplet
 {
     ValueTask<GatewayClientAuthenticationMethodChallenge> CreateChallengeAsync(
         GatewayAuthenticationMethodDefinition method,
+        Client client,
         string backendKind,
         GatewayBackendServerHandle? serverHandle,
         CancellationToken cancellationToken);
+
+    void CancelPendingLogins(Client client);
 
     ValueTask<GatewayOidcCallbackResult> AcceptCallbackAsync(
         string code,
@@ -53,6 +57,11 @@ internal sealed class GatewayOidcAuthenticationService(
     internal const string HttpClientName = "GatewayServer.OIDC";
     private const string CompletionTokenPrefix = "gwo_";
     private const int DefaultLoginLifetimeSeconds = 600;
+    private const int DefaultLoginRateLimitWindowMilliseconds = 30000;
+    private const int DefaultMaxPendingLogins = 1024;
+    private const int DefaultMaxPendingLoginsPerClient = 4;
+    private const int DefaultMaxLoginCreationsPerWindow = 256;
+    private const int DefaultMaxLoginCreationsPerClientPerWindow = 4;
 
     private static readonly JwtSecurityTokenHandler TokenHandler = new()
     {
@@ -61,10 +70,14 @@ internal sealed class GatewayOidcAuthenticationService(
 
     private readonly ConcurrentDictionary<string, OidcLoginTransaction> m_Transactions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, OidcProviderConfiguration> m_ProviderConfigurations = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Client, FixedWindowRateCounter> m_ClientLoginCreationCounters = new();
+    private readonly FixedWindowRateCounter m_GlobalLoginCreationCounter = new();
+    private readonly object m_TransactionRegistrationSync = new();
     private readonly SemaphoreSlim m_ProviderConfigurationLock = new(1, 1);
 
     public async ValueTask<GatewayClientAuthenticationMethodChallenge> CreateChallengeAsync(
         GatewayAuthenticationMethodDefinition method,
+        Client client,
         string backendKind,
         GatewayBackendServerHandle? serverHandle,
         CancellationToken cancellationToken)
@@ -74,13 +87,16 @@ internal sealed class GatewayOidcAuthenticationService(
             throw new ArgumentNullException(nameof(method));
         }
 
+        if (client == null)
+        {
+            throw new ArgumentNullException(nameof(client));
+        }
+
         if (method.Kind != GatewayAuthenticationMethodKind.OidcAuthorizationCode)
         {
             throw new ArgumentException("Only OIDC authentication methods can create OIDC challenges.", nameof(method));
         }
 
-        var configuration = await GetProviderConfigurationAsync(method.AuthorityUri, cancellationToken)
-            .ConfigureAwait(false);
         var redirectUri = GetRedirectUri();
         var transactionId = CreateRandomToken();
         var completionSecret = CreateRandomToken();
@@ -93,6 +109,7 @@ internal sealed class GatewayOidcAuthenticationService(
 
         var transaction = new OidcLoginTransaction(
             transactionId,
+            client,
             method,
             backendKind,
             serverHandle,
@@ -102,12 +119,19 @@ internal sealed class GatewayOidcAuthenticationService(
             HashSecret(stateSecret),
             HashSecret(completionSecret),
             expiresAt);
-        if (!m_Transactions.TryAdd(transactionId, transaction))
-        {
-            throw new InvalidOperationException("Duplicate Gateway OIDC login transaction id was generated.");
-        }
+        RegisterTransaction(client, transaction);
 
-        RemoveExpiredTransactions();
+        OidcProviderConfiguration configuration;
+        try
+        {
+            configuration = await GetProviderConfigurationAsync(method.AuthorityUri, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch
+        {
+            m_Transactions.TryRemove(transactionId, out _);
+            throw;
+        }
 
         var loginUri = QueryHelpers.AddQueryString(configuration.AuthorizationEndpoint, new Dictionary<string, string?>
         {
@@ -128,6 +152,24 @@ internal sealed class GatewayOidcAuthenticationService(
             loginUri,
             $"{CompletionTokenPrefix}{transactionId}.{completionSecret}",
             expiresAt);
+    }
+
+    public void CancelPendingLogins(Client client)
+    {
+        if (client == null)
+        {
+            throw new ArgumentNullException(nameof(client));
+        }
+
+        foreach (var pair in m_Transactions.ToArray())
+        {
+            if (ReferenceEquals(pair.Value.Client, client))
+            {
+                m_Transactions.TryRemove(pair.Key, out _);
+            }
+        }
+
+        m_ClientLoginCreationCounters.TryRemove(client, out _);
     }
 
     public bool IsOidcCompletionToken(string accessToken)
@@ -428,29 +470,48 @@ internal sealed class GatewayOidcAuthenticationService(
 
     private string GetRedirectUri()
     {
-        var publicBaseUri = options.Value.PublicBaseUri;
-        if (string.IsNullOrWhiteSpace(publicBaseUri) ||
-            !Uri.TryCreate(publicBaseUri, UriKind.Absolute, out var baseUri) ||
-            baseUri.Scheme is not ("http" or "https"))
-        {
-            throw new InvalidOperationException("GatewayAuthentication:PublicBaseUri must be configured as an absolute HTTP or HTTPS URI for OIDC login.");
-        }
-
-        var callbackPath = NormalizeCallbackPath(options.Value.OidcCallbackPath);
-        return new Uri(baseUri, callbackPath.TrimStart('/')).ToString();
+        return GatewayAuthenticationUriBuilder.BuildOidcRedirectUri(options.Value);
     }
 
-    private static string NormalizeCallbackPath(string callbackPath)
+    private void RegisterTransaction(Client client, OidcLoginTransaction transaction)
     {
-        if (string.IsNullOrWhiteSpace(callbackPath))
+        var now = DateTimeOffset.UtcNow;
+        lock (m_TransactionRegistrationSync)
         {
-            return "/auth/gateway/oidc/callback";
-        }
+            RemoveExpiredTransactions(now);
+            m_GlobalLoginCreationCounter.IncrementOrThrow(
+                GetMaxLoginCreationsPerWindow(),
+                GetLoginRateLimitWindowMilliseconds(),
+                now,
+                "Gateway OIDC login creation rate limit was exceeded.");
+            var clientCounter = m_ClientLoginCreationCounters.GetOrAdd(
+                client,
+                static _ => new FixedWindowRateCounter());
+            clientCounter.IncrementOrThrow(
+                GetMaxLoginCreationsPerClientPerWindow(),
+                GetLoginRateLimitWindowMilliseconds(),
+                now,
+                "Gateway OIDC login creation rate limit was exceeded for this client.");
 
-        var normalized = callbackPath.Trim();
-        return normalized.StartsWith("/", StringComparison.Ordinal)
-            ? normalized
-            : "/" + normalized;
+            var maxPendingLogins = GetMaxPendingLogins();
+            if (maxPendingLogins > 0 &&
+                m_Transactions.Count >= maxPendingLogins)
+            {
+                throw new InvalidOperationException("Gateway OIDC pending login capacity is exhausted.");
+            }
+
+            var maxPendingLoginsPerClient = GetMaxPendingLoginsPerClient();
+            if (maxPendingLoginsPerClient > 0 &&
+                m_Transactions.Values.Count(candidate => ReferenceEquals(candidate.Client, client)) >= maxPendingLoginsPerClient)
+            {
+                throw new InvalidOperationException("Gateway OIDC pending login capacity is exhausted for this client.");
+            }
+
+            if (!m_Transactions.TryAdd(transaction.TransactionId, transaction))
+            {
+                throw new InvalidOperationException("Duplicate Gateway OIDC login transaction id was generated.");
+            }
+        }
     }
 
     private int GetLoginLifetimeSeconds()
@@ -458,6 +519,41 @@ internal sealed class GatewayOidcAuthenticationService(
         return options.Value.OidcLoginLifetimeSeconds <= 0
             ? DefaultLoginLifetimeSeconds
             : options.Value.OidcLoginLifetimeSeconds;
+    }
+
+    private int GetLoginRateLimitWindowMilliseconds()
+    {
+        return options.Value.OidcLoginRateLimitWindowMilliseconds <= 0
+            ? DefaultLoginRateLimitWindowMilliseconds
+            : options.Value.OidcLoginRateLimitWindowMilliseconds;
+    }
+
+    private int GetMaxPendingLogins()
+    {
+        return options.Value.MaxOidcPendingLogins < 0
+            ? DefaultMaxPendingLogins
+            : options.Value.MaxOidcPendingLogins;
+    }
+
+    private int GetMaxPendingLoginsPerClient()
+    {
+        return options.Value.MaxOidcPendingLoginsPerClient < 0
+            ? DefaultMaxPendingLoginsPerClient
+            : options.Value.MaxOidcPendingLoginsPerClient;
+    }
+
+    private int GetMaxLoginCreationsPerWindow()
+    {
+        return options.Value.MaxOidcLoginCreationsPerWindow < 0
+            ? DefaultMaxLoginCreationsPerWindow
+            : options.Value.MaxOidcLoginCreationsPerWindow;
+    }
+
+    private int GetMaxLoginCreationsPerClientPerWindow()
+    {
+        return options.Value.MaxOidcLoginCreationsPerClientPerWindow < 0
+            ? DefaultMaxLoginCreationsPerClientPerWindow
+            : options.Value.MaxOidcLoginCreationsPerClientPerWindow;
     }
 
     private string GetClientSecret(string methodId)
@@ -470,7 +566,11 @@ internal sealed class GatewayOidcAuthenticationService(
 
     private void RemoveExpiredTransactions()
     {
-        var now = DateTimeOffset.UtcNow;
+        RemoveExpiredTransactions(DateTimeOffset.UtcNow);
+    }
+
+    private void RemoveExpiredTransactions(DateTimeOffset now)
+    {
         foreach (var pair in m_Transactions.ToArray())
         {
             if (pair.Value.ExpiresAt <= now)
@@ -573,6 +673,7 @@ internal sealed class GatewayOidcAuthenticationService(
 
     private sealed class OidcLoginTransaction(
         string transactionId,
+        Client client,
         GatewayAuthenticationMethodDefinition method,
         string backendKind,
         GatewayBackendServerHandle? serverHandle,
@@ -586,6 +687,8 @@ internal sealed class GatewayOidcAuthenticationService(
         public object Sync { get; } = new();
 
         public string TransactionId { get; } = transactionId;
+
+        public Client Client { get; } = client;
 
         public GatewayAuthenticationMethodDefinition Method { get; } = method;
 

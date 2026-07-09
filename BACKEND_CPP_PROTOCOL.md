@@ -72,7 +72,7 @@ sidecar is not on this data path.
 
 | Packet id | Version | Kind | Direction | Payload |
 | ---: | ---: | --- | --- | --- |
-| `10` | `1` | Notify | Gateway to Backend | `GatewayBackendChannelOpen` |
+| `10` | `2` | Notify | Gateway to Backend | `GatewayBackendChannelOpen` |
 | `8` | `1` | Request, Response, or Notify | both | `GatewayBackendChannelDataEnvelope` |
 | `9` | `1` | Notify | both | `GatewayBackendChannelClose` |
 
@@ -85,6 +85,11 @@ sidecar is not on this data path.
 | ChannelId | `uint` | Non-zero Gateway-assigned channel id |
 | HasPrincipalSubjectId | `byte` | `0` when absent, non-zero when present |
 | PrincipalSubjectId | `string` | Present only when `HasPrincipalSubjectId` is non-zero |
+| HasPrincipalAuthenticationMethod | `byte` | `0` when absent, non-zero when present |
+| PrincipalAuthenticationMethodKind | `byte` | Present only when `HasPrincipalAuthenticationMethod` is non-zero. `1=StaticSecret`, `2=OidcAuthorizationCode` |
+| PrincipalAuthenticationMethodId | `string` | Present only when `HasPrincipalAuthenticationMethod` is non-zero |
+
+Authenticated principals should be treated as the tuple of authentication method kind, authentication method id, and subject id. OIDC subject values are scoped by issuer/client and are not globally unique by themselves.
 
 ### Channel Data
 
@@ -159,7 +164,7 @@ bytes.
 | Name | Hex |
 | --- | --- |
 | PacketCore control header, no payload | `c000640008000000` |
-| Gateway Backend channel open | `80000a0001000011010203040100000008706c617965722d31` |
+| Gateway Backend channel open | `80000a0002000020010203040100000008706c617965722d310102000000096f6964632d6d61696e` |
 | Gateway Backend channel data request | `00000800010000220102030400123400020133221100554477668899aabbccddeeff00000004deadbeef` |
 | Gateway Backend channel close | `800009000100000c0102030400000004646f6e65` |
 | Sidecar direct-connect validation request | `c00001000100003333221100554477668899aabbccddeeff00000006636f64652d3100000009676174657761792d61000000086d61737465722d61` |

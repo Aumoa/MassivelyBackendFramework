@@ -131,10 +131,12 @@ public sealed class MyBackendRuntime(
         CancellationToken cancellationToken)
     {
         logger.LogInformation(
-            "Channel opened. Gateway={GatewayNodeId}, Channel={ChannelId}, Principal={PrincipalSubjectId}",
+            "Channel opened. Gateway={GatewayNodeId}, Channel={ChannelId}, Principal={PrincipalSubjectId}, AuthMethod={PrincipalAuthenticationMethodKind}:{PrincipalAuthenticationMethodId}",
             context.GatewayNodeId,
             context.ChannelId,
-            context.PrincipalSubjectId);
+            context.PrincipalSubjectId,
+            context.PrincipalAuthenticationMethodKind,
+            context.PrincipalAuthenticationMethodId);
 
         await sender.SendNotifyAsync(
             context.Channel,
@@ -178,7 +180,7 @@ Called when Gateway opens a persistent route and creates a Backend channel.
 
 From this point on, the runtime can use `context.Channel` for server-side push. The Backend can send a notify or request before the client sends its first routed packet.
 
-`PrincipalSubjectId` is populated when Gateway client authentication is enabled and the client has an authenticated principal. It can be `null` in unauthenticated flows.
+`PrincipalSubjectId` is populated when Gateway client authentication is enabled and the client has an authenticated principal. It can be `null` in unauthenticated flows. When it is present, `PrincipalAuthenticationMethodKind` and `PrincipalAuthenticationMethodId` identify the authentication method that produced the subject. Runtime authorization should treat the authenticated identity as the tuple of method kind, method id, and subject id rather than comparing `PrincipalSubjectId` alone.
 
 ### `HandleGatewayPacketAsync`
 

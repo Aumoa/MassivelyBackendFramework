@@ -310,18 +310,25 @@ namespace
         gateway_backend_channel_open open{
             0x01020304,
             std::string("player-1"),
+            gateway_authentication_method_kind::oidc_authorization_code,
+            std::string("oidc-main"),
         };
 
-        constexpr auto expected = "80000a0001000011010203040100000008706c617965722d31";
+        constexpr auto expected =
+            "80000a0002000020010203040100000008706c617965722d310102000000096f6964632d6d61696e";
         require_equal(expected,
                       encode_frame_hex(packet_kind::notify, pid_gate_backend_channel_open,
-                                       gateway_backend_channel_version, encode_gateway_backend_channel_open(open)),
+                                       gateway_backend_channel_open_version, encode_gateway_backend_channel_open(open)),
                       "Gateway Backend channel open");
 
         auto frame = decode_full_frame(expected);
         auto decoded = decode_gateway_backend_channel_open(frame.payload);
         require(decoded.channel_id == open.channel_id, "Decoded channel open id mismatch.");
         require(decoded.principal_subject_id == open.principal_subject_id, "Decoded principal subject mismatch.");
+        require(decoded.principal_authentication_method_kind == open.principal_authentication_method_kind,
+                "Decoded principal authentication method kind mismatch.");
+        require(decoded.principal_authentication_method_id == open.principal_authentication_method_id,
+                "Decoded principal authentication method id mismatch.");
     }
 
     void channel_data_matches_vector()
@@ -712,7 +719,7 @@ namespace
     {
         trusted_gateway_session session("gateway-a", "gateway-master-a");
         auto open_frame =
-            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_version,
+            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_open_version,
                        encode_gateway_backend_channel_open(gateway_backend_channel_open{
                            37,
                            std::string("player-1"),
@@ -774,7 +781,7 @@ namespace
     {
         trusted_gateway_session session("gateway-a", "gateway-master-a");
         auto open_frame =
-            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_version,
+            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_open_version,
                        encode_gateway_backend_channel_open(gateway_backend_channel_open{
                            37,
                            std::nullopt,
@@ -807,7 +814,7 @@ namespace
     {
         trusted_gateway_session session("gateway-a", "gateway-master-a");
         auto open_frame =
-            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_version,
+            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_open_version,
                        encode_gateway_backend_channel_open(gateway_backend_channel_open{
                            37,
                            std::nullopt,
@@ -823,7 +830,7 @@ namespace
     {
         trusted_gateway_session session("gateway-a", "gateway-master-a");
         auto open_frame =
-            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_version,
+            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_open_version,
                        encode_gateway_backend_channel_open(gateway_backend_channel_open{
                            37,
                            std::nullopt,

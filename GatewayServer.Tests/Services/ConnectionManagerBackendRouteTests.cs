@@ -463,6 +463,8 @@ public sealed class ConnectionManagerBackendRouteTests
             Assert.Equal(routeManager.DefaultBinding, opened.Binding);
             Assert.NotEqual(0u, opened.Open.ChannelId);
             Assert.Equal("player-1", opened.Open.PrincipalSubjectId);
+            Assert.Equal(GatewayClientAuthenticationMethodKind.StaticSecret, opened.Open.PrincipalAuthenticationMethodKind);
+            Assert.Equal("static", opened.Open.PrincipalAuthenticationMethodId);
         }
         finally
         {
@@ -618,6 +620,8 @@ public sealed class ConnectionManagerBackendRouteTests
             Assert.Equal(routeManager.DefaultBinding, opened.Binding);
             Assert.NotEqual(0u, opened.Open.ChannelId);
             Assert.Equal("test-client", opened.Open.PrincipalSubjectId);
+            Assert.Equal(GatewayClientAuthenticationMethodKind.StaticSecret, opened.Open.PrincipalAuthenticationMethodKind);
+            Assert.Equal("static", opened.Open.PrincipalAuthenticationMethodId);
 
             Assert.Contains(connectionManager.GetStatusItems(), item =>
                 item.Group == "Persistent Backend routes" &&
@@ -3873,11 +3877,16 @@ public sealed class ConnectionManagerBackendRouteTests
     {
         public ValueTask<GatewayClientAuthenticationMethodChallenge> CreateChallengeAsync(
             GatewayAuthenticationMethodDefinition method,
+            Client client,
             string backendKind,
             GatewayBackendServerHandle? serverHandle,
             CancellationToken cancellationToken)
         {
             throw new InvalidOperationException("OIDC challenge issuing is not available in this test.");
+        }
+
+        public void CancelPendingLogins(Client client)
+        {
         }
 
         public ValueTask<GatewayOidcCallbackResult> AcceptCallbackAsync(

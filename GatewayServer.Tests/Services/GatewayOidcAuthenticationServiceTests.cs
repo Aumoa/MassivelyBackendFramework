@@ -1,8 +1,10 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Net.Sockets;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using GatewayServer.Behaviors;
 using GatewayServer.Options;
 using GatewayServer.Protocols;
 using GatewayServer.Services;
@@ -71,9 +73,11 @@ public sealed class GatewayOidcAuthenticationServiceTests
             "https://accounts.example.test",
             "gateway-client",
             "openid profile email");
+        await using var client = await CreateClientAsync();
 
         var challenge = await service.CreateChallengeAsync(
             method,
+            client.Client,
             "world",
             new GatewayBackendServerHandle("server-alpha"),
             CancellationToken.None);
@@ -110,16 +114,149 @@ public sealed class GatewayOidcAuthenticationServiceTests
         Assert.Equal("oidc", accepted.Principal.AuthenticationMethodId);
     }
 
-    private static GatewayOidcAuthenticationService CreateService(HttpMessageHandler handler)
+    [Fact]
+    public async Task CreateChallenge_RejectsWhenClientPendingCapacityIsExhausted()
+    {
+        var service = CreateService(
+            CreateDiscoveryOnlyHandler(),
+            new GatewayAuthenticationOptions
+            {
+                PublicBaseUri = "https://gateway.example.test",
+                MaxOidcPendingLoginsPerClient = 1,
+                MaxOidcLoginCreationsPerClientPerWindow = 0
+            });
+        var method = CreateMethod();
+        await using var client = await CreateClientAsync();
+
+        _ = await service.CreateChallengeAsync(
+            method,
+            client.Client,
+            "world",
+            null,
+            CancellationToken.None);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            _ = await service.CreateChallengeAsync(
+                method,
+                client.Client,
+                "world",
+                null,
+                CancellationToken.None);
+        });
+        Assert.Equal("Gateway OIDC pending login capacity is exhausted for this client.", ex.Message);
+    }
+
+    [Fact]
+    public async Task CancelPendingLogins_RemovesTransactionsForClient()
+    {
+        var service = CreateService(CreateDiscoveryOnlyHandler());
+        var method = CreateMethod();
+        await using var client = await CreateClientAsync();
+
+        var challenge = await service.CreateChallengeAsync(
+            method,
+            client.Client,
+            "world",
+            null,
+            CancellationToken.None);
+
+        service.CancelPendingLogins(client.Client);
+
+        var result = await service.ValidateOidcCompletionTokenAsync(challenge.CompletionToken, CancellationToken.None);
+        Assert.False(result.Success);
+        Assert.Equal("Gateway OIDC login transaction was not found.", result.ErrorMessage);
+    }
+
+    [Fact]
+    public void BuildOidcRedirectUri_UsesConfiguredPublicBaseUri()
+    {
+        var redirectUri = GatewayAuthenticationUriBuilder.BuildOidcRedirectUri(new GatewayAuthenticationOptions
+        {
+            PublicBaseUri = "https://gateway.example.test/root/",
+            OidcCallbackPath = "auth/callback"
+        });
+
+        Assert.Equal("https://gateway.example.test/root/auth/callback", redirectUri);
+    }
+
+    private static GatewayOidcAuthenticationService CreateService(
+        HttpMessageHandler handler,
+        GatewayAuthenticationOptions? options = null)
     {
         return new GatewayOidcAuthenticationService(
-            Microsoft.Extensions.Options.Options.Create(new GatewayAuthenticationOptions
+            Microsoft.Extensions.Options.Options.Create(options ?? new GatewayAuthenticationOptions
             {
                 PublicBaseUri = "https://gateway.example.test",
                 OidcLoginLifetimeSeconds = 600
             }),
             new StaticHttpClientFactory(new HttpClient(handler)),
             NullLogger<GatewayOidcAuthenticationService>.Instance);
+    }
+
+    private static GatewayAuthenticationMethodDefinition CreateMethod()
+    {
+        return GatewayAuthenticationMethodDefinition.OidcAuthorizationCode(
+            "oidc",
+            "OIDC",
+            "https://accounts.example.test",
+            "gateway-client",
+            "openid profile email");
+    }
+
+    private static HttpMessageHandler CreateDiscoveryOnlyHandler()
+    {
+        return new FakeOidcHandler(request =>
+        {
+            if (request.Method == HttpMethod.Get &&
+                request.RequestUri?.AbsoluteUri == "https://accounts.example.test/.well-known/openid-configuration")
+            {
+                return Json("""
+{
+  "issuer": "https://accounts.example.test",
+  "authorization_endpoint": "https://accounts.example.test/authorize",
+  "token_endpoint": "https://accounts.example.test/token",
+  "jwks_uri": "https://accounts.example.test/jwks"
+}
+""");
+            }
+
+            if (request.Method == HttpMethod.Get &&
+                request.RequestUri?.AbsoluteUri == "https://accounts.example.test/jwks")
+            {
+                return Json("""
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "kid": "test-key",
+      "alg": "RS256",
+      "n": "sXchE1khrct4kQld0M4rZ1m46dD7Zn64iU7cZ2hDbE-Dg7JmEozmVLK3Qa1zWW4l0pXgYOLH2g5B53uTjbAVmw",
+      "e": "AQAB"
+    }
+  ]
+}
+""");
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+    }
+
+    private static async Task<TestClientLease> CreateClientAsync()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port);
+        var accepted = await listener.AcceptTcpClientAsync();
+        listener.Stop();
+        var serverStream = accepted.GetStream();
+        return new TestClientLease(
+            new Client(serverStream, serverStream, NullLogger.Instance),
+            client,
+            accepted);
     }
 
     private static string CreateIdToken(RSA rsa, string nonce)
@@ -185,6 +322,21 @@ public sealed class GatewayOidcAuthenticationServiceTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult(handler(request));
+        }
+    }
+
+    private sealed class TestClientLease(
+        Client client,
+        TcpClient clientSocket,
+        TcpClient serverSocket) : IAsyncDisposable
+    {
+        public Client Client { get; } = client;
+
+        public async ValueTask DisposeAsync()
+        {
+            await Client.DisposeAsync();
+            clientSocket.Dispose();
+            serverSocket.Dispose();
         }
     }
 }

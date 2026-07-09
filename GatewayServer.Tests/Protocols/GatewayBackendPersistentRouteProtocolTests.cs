@@ -315,7 +315,11 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
     [Fact]
     public void ChannelOpen_Codec_RoundTrips_ChannelAndPrincipal()
     {
-        var open = new GatewayBackendChannelOpen(37, "player-1");
+        var open = new GatewayBackendChannelOpen(
+            37,
+            "player-1",
+            GatewayClientAuthenticationMethodKind.OidcAuthorizationCode,
+            "oidc-main");
 
         using var frame = PacketCodec.Encode(
             PacketKind.Notify,
@@ -328,6 +332,8 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
 
         Assert.Equal((uint)37, decoded.ChannelId);
         Assert.Equal("player-1", decoded.PrincipalSubjectId);
+        Assert.Equal(GatewayClientAuthenticationMethodKind.OidcAuthorizationCode, decoded.PrincipalAuthenticationMethodKind);
+        Assert.Equal("oidc-main", decoded.PrincipalAuthenticationMethodId);
     }
 
     [Fact]
@@ -346,6 +352,8 @@ public sealed class GatewayBackendPersistentRouteProtocolTests
 
         Assert.Equal((uint)37, decoded.ChannelId);
         Assert.Null(decoded.PrincipalSubjectId);
+        Assert.Null(decoded.PrincipalAuthenticationMethodKind);
+        Assert.Null(decoded.PrincipalAuthenticationMethodId);
     }
 
     [Fact]

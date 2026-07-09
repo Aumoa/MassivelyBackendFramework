@@ -94,10 +94,12 @@ public sealed class BackendCppWireVectorTests
     {
         var open = new GatewayBackendChannelOpen(
             0x01020304,
-            "player-1");
+            "player-1",
+            GatewayClientAuthenticationMethodKind.OidcAuthorizationCode,
+            "oidc-main");
 
         Assert.Equal(
-            "80000a0001000011010203040100000008706c617965722d31",
+            "80000a0002000020010203040100000008706c617965722d310102000000096f6964632d6d61696e",
             EncodeFrameHex(
                 PacketKind.Notify,
                 Pid.GATE_BACKEND_CHANNEL_OPEN,

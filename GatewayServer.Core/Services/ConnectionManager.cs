@@ -223,6 +223,7 @@ internal class ConnectionManager(
                         Debug.Assert(removed);
                     }
 
+                    authenticationChallengeIssuer.CancelPendingChallenges(client);
                     RemoveBackendRoutes(client);
                 };
 
@@ -349,7 +350,7 @@ internal class ConnectionManager(
             }
 
             var challenges = await authenticationChallengeIssuer
-                .CreateChallengesAsync(methods, normalizedBackendKind, request.ServerHandle, cancellationToken)
+                .CreateChallengesAsync(client, methods, normalizedBackendKind, request.ServerHandle, cancellationToken)
                 .ConfigureAwait(false);
             if (challenges.Length == 0)
             {
@@ -581,7 +582,9 @@ internal class ConnectionManager(
 
             var request = DecodeBackendRouteOpenRequest(packet);
             backendKind = request.BackendKind;
-            var principalSubjectId = authenticationContext.Principal?.SubjectId;
+            var principal = authenticationContext.Principal
+                ?? throw new InvalidOperationException("Authenticated Gateway client context is missing a principal.");
+            var principalSubjectId = principal.SubjectId;
             m_PersistentBackendRouteRegistry.RequireOpenAttemptAllowed(client, principalSubjectId);
             var normalizedBackendKind = m_PersistentBackendRouteRegistry.RequireAllowedBackendKind(request.BackendKind);
             RequireAuthenticationMethodAllowed(
@@ -615,6 +618,8 @@ internal class ConnectionManager(
                 backendSession.Binding,
                 client,
                 principalSubjectId,
+                ToClientAuthenticationMethodKind(principal.AuthenticationMethodKind),
+                principal.AuthenticationMethodId,
                 backendSession.ManifestId,
                 backendSession.ManifestHash,
                 m_GracefulCancellation.Token);
@@ -1489,7 +1494,11 @@ internal class ConnectionManager(
             PacketKind.Notify,
             Pid.GATE_BACKEND_CHANNEL_OPEN,
             GatewayBackendChannelOpen.ProtocolVersion,
-            new GatewayBackendChannelOpen(route.ChannelId, route.PrincipalSubjectId),
+            new GatewayBackendChannelOpen(
+                route.ChannelId,
+                route.PrincipalSubjectId,
+                route.PrincipalAuthenticationMethodKind,
+                route.PrincipalAuthenticationMethodId),
             GatewayBackendChannelOpen.Codec);
         await backendRouteManager.RelayFrameAsync(
             route.BackendBinding,
@@ -1535,6 +1544,17 @@ internal class ConnectionManager(
         }
 
         throw new UnauthorizedAccessException("Gateway client authentication method is not allowed for the selected Backend server.");
+    }
+
+    private static GatewayClientAuthenticationMethodKind ToClientAuthenticationMethodKind(
+        GatewayAuthenticationMethodKind authenticationMethodKind)
+    {
+        return authenticationMethodKind switch
+        {
+            GatewayAuthenticationMethodKind.StaticSecret => GatewayClientAuthenticationMethodKind.StaticSecret,
+            GatewayAuthenticationMethodKind.OidcAuthorizationCode => GatewayClientAuthenticationMethodKind.OidcAuthorizationCode,
+            _ => throw new ArgumentOutOfRangeException(nameof(authenticationMethodKind))
+        };
     }
 
     private static (Guid RouteId, string BackendKind) GetBackendRouteResponseIdentity(PacketFrame packet)
