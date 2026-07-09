@@ -23,10 +23,7 @@ public static class ServiceCollectionExtensions
         s.AddTransient<IAccounts, MySqlAccounts>();
         s.AddTransient<IAccountClaims, MySqlAccountClaims>();
         s.AddHttpClient<IAccountPictures, MySqlAccountPictures>()
-            .ConfigurePrimaryHttpMessageHandler(static () => new System.Net.Http.SocketsHttpHandler
-            {
-                AllowAutoRedirect = false
-            });
+            .ConfigurePrimaryHttpMessageHandler(AccountPictureRemoteConnection.CreateHandler);
         s.AddTransient<IClients, MySqlClients>();
         s.AddTransient<IClientClaims, MySqlClientClaims>();
         s.AddTransient<IClientUserGroups, MySqlClientUserGroups>();

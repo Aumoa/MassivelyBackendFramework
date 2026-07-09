@@ -1,5 +1,4 @@
 using System.Data;
-using System.Net;
 using Dapper;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -114,7 +113,7 @@ internal sealed class MySqlAccountPictures(
             return AccountPictureUpdateResult.Failure(AccountPictureError.InvalidUrl);
         }
 
-        if (!await IsPublicRemoteHostAsync(uri, cancellationToken))
+        if (!await AccountPictureRemoteConnection.IsPublicRemoteHostAsync(uri, cancellationToken))
         {
             return AccountPictureUpdateResult.Failure(AccountPictureError.InvalidUrl);
         }
@@ -345,66 +344,6 @@ WHERE `account_id` = @accountId;";
 
         uri = parsedUri;
         return true;
-    }
-
-    private static async ValueTask<bool> IsPublicRemoteHostAsync(Uri uri, CancellationToken cancellationToken)
-    {
-        IPAddress[] addresses;
-        try
-        {
-            addresses = await Dns.GetHostAddressesAsync(uri.DnsSafeHost, cancellationToken);
-        }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            return false;
-        }
-
-        return addresses.Length > 0 && addresses.All(IsPublicAddress);
-    }
-
-    private static bool IsPublicAddress(IPAddress address)
-    {
-        if (IPAddress.IsLoopback(address) ||
-            IPAddress.Any.Equals(address) ||
-            IPAddress.IPv6Any.Equals(address) ||
-            IPAddress.None.Equals(address) ||
-            IPAddress.IPv6None.Equals(address))
-        {
-            return false;
-        }
-
-        if (address.IsIPv4MappedToIPv6)
-        {
-            address = address.MapToIPv4();
-        }
-
-        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            var bytes = address.GetAddressBytes();
-            return bytes[0] switch
-            {
-                0 or 10 or 127 => false,
-                100 when bytes[1] is >= 64 and <= 127 => false,
-                169 when bytes[1] == 254 => false,
-                172 when bytes[1] is >= 16 and <= 31 => false,
-                192 when bytes[1] == 168 => false,
-                198 when bytes[1] is 18 or 19 => false,
-                >= 224 => false,
-                _ => true
-            };
-        }
-
-        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
-        {
-            var bytes = address.GetAddressBytes();
-            return !address.IsIPv6LinkLocal &&
-                   !address.IsIPv6Multicast &&
-                   !address.IsIPv6SiteLocal &&
-                   !address.IsIPv6Teredo &&
-                   bytes[0] is not 0xfc and not 0xfd;
-        }
-
-        return false;
     }
 
     private readonly record struct ReadImageResult(byte[]? Bytes, AccountPictureError Error)

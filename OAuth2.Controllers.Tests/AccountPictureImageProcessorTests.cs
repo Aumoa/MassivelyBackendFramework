@@ -58,6 +58,30 @@ public sealed class AccountPictureImageProcessorTests
         Assert.Equal(AccountPictureError.SourceTooLarge, result.Error);
     }
 
+    [Fact]
+    public void Normalize_RejectsImageOverSourcePixelLimit()
+    {
+        var options = CreateOptions();
+        options.MaxSourcePixels = 1024;
+
+        var result = AccountPictureImageProcessor.Normalize(CreatePng(64, 64), options);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AccountPictureError.InvalidDimensions, result.Error);
+    }
+
+    [Fact]
+    public void Normalize_RejectsImageOverSourceWidthLimit()
+    {
+        var options = CreateOptions();
+        options.MaxSourceWidth = 32;
+
+        var result = AccountPictureImageProcessor.Normalize(CreatePng(64, 16), options);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(AccountPictureError.InvalidDimensions, result.Error);
+    }
+
     private static AccountPictureOptions CreateOptions()
     {
         return new AccountPictureOptions
@@ -65,7 +89,10 @@ public sealed class AccountPictureImageProcessorTests
             MaxBytes = 512 * 1024,
             MaxWidth = 512,
             MaxHeight = 512,
-            MaxSourceBytes = 8 * 1024 * 1024
+            MaxSourceBytes = 8 * 1024 * 1024,
+            MaxSourceWidth = 4096,
+            MaxSourceHeight = 4096,
+            MaxSourcePixels = 4096L * 4096L
         };
     }
 

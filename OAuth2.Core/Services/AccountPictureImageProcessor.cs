@@ -40,6 +40,12 @@ internal static class AccountPictureImageProcessor
                 return AccountPictureImageProcessResult.Failure(AccountPictureError.UnsupportedFormat);
             }
 
+            var imageInfo = Image.Identify(bytes);
+            if (imageInfo == null || !IsSupportedSourceDimensions(imageInfo, options))
+            {
+                return AccountPictureImageProcessResult.Failure(AccountPictureError.InvalidDimensions);
+            }
+
             using var image = Image.Load(bytes);
             image.Metadata.ExifProfile = null;
             image.Metadata.IccProfile = null;
@@ -75,6 +81,24 @@ internal static class AccountPictureImageProcessor
     {
         return string.Equals(format.DefaultMimeType, JpegContentType, StringComparison.OrdinalIgnoreCase) ||
                string.Equals(format.DefaultMimeType, PngContentType, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSupportedSourceDimensions(ImageInfo imageInfo, AccountPictureOptions options)
+    {
+        if (options.MaxSourceWidth <= 0 ||
+            options.MaxSourceHeight <= 0 ||
+            options.MaxSourcePixels <= 0)
+        {
+            return false;
+        }
+
+        var width = imageInfo.Width;
+        var height = imageInfo.Height;
+        return width > 0 &&
+               height > 0 &&
+               width <= options.MaxSourceWidth &&
+               height <= options.MaxSourceHeight &&
+               (long)width * height <= options.MaxSourcePixels;
     }
 
     private static byte[]? SaveAsBoundedJpeg(Image image, int maxBytes)
