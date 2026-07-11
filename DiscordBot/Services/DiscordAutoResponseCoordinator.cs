@@ -142,6 +142,7 @@ internal sealed class DiscordAutoResponseCoordinator(
     {
         var cancellationToken = delayCts.Token;
         IReadOnlyList<DiscordAutoResponseMessage> batch = [];
+        var errorStage = "setup";
         try
         {
             var currentOptions = (await autoResponseSettings.GetAsync(cancellationToken)).ToOptions();
@@ -190,6 +191,7 @@ internal sealed class DiscordAutoResponseCoordinator(
                 return;
             }
 
+            errorStage = "classifier";
             var decision = await evaluator.EvaluateAsync(batch, cancellationToken);
             if (!decision.ShouldRespond)
             {
@@ -232,6 +234,7 @@ internal sealed class DiscordAutoResponseCoordinator(
                 decision.Reason,
                 decision.Focus,
                 cancellationToken);
+            errorStage = "response";
             await respondAsync(new DiscordAutoResponseRequest(batch, decision), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -239,13 +242,18 @@ internal sealed class DiscordAutoResponseCoordinator(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to evaluate Discord auto response for channel {ChannelId}.", channelId);
+            logger.LogError(
+                e,
+                "Discord auto response failed during {Stage} stage for channel {ChannelId}.",
+                errorStage,
+                channelId);
             await RecordEventAsync(
                 batch,
                 "error",
                 e.GetType().Name,
                 string.Empty,
-                CancellationToken.None);
+                CancellationToken.None,
+                AutoResponseEventDiagnostic.FromException(errorStage, e));
             ClearActiveEvaluation(channelId, evaluationVersion);
         }
         finally
@@ -345,7 +353,8 @@ internal sealed class DiscordAutoResponseCoordinator(
         string decision,
         string reason,
         string focus,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        AutoResponseEventDiagnostic? diagnostic = null)
     {
         if (batch.Count == 0)
         {
@@ -359,6 +368,7 @@ internal sealed class DiscordAutoResponseCoordinator(
                 decision,
                 reason,
                 focus,
+                diagnostic,
                 cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

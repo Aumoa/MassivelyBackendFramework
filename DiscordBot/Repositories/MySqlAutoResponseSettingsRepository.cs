@@ -78,9 +78,9 @@ ON DUPLICATE KEY UPDATE
 
         const string QUERY = @"
 INSERT INTO `auto_response_events`
-    (`guild_id`, `channel_id`, `trigger_message_id`, `message_ids_json`, `decision`, `reason`, `focus`)
+    (`guild_id`, `channel_id`, `trigger_message_id`, `message_ids_json`, `decision`, `reason`, `focus`, `error_stage`, `http_status_code`, `error_message`)
 VALUES
-    (@guildId, @channelId, @triggerMessageId, @messageIdsJson, @decision, @reason, @focus)";
+    (@guildId, @channelId, @triggerMessageId, @messageIdsJson, @decision, @reason, @focus, @errorStage, @httpStatusCode, @errorMessage)";
 
         var command = new CommandDefinition(
             QUERY,
@@ -92,7 +92,10 @@ VALUES
                 input.MessageIdsJson,
                 input.Decision,
                 input.Reason,
-                input.Focus
+                input.Focus,
+                input.ErrorStage,
+                input.HttpStatusCode,
+                input.ErrorMessage
             },
             cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);
@@ -114,6 +117,9 @@ SELECT
     `decision` AS Decision,
     `reason` AS Reason,
     `focus` AS Focus,
+    `error_stage` AS ErrorStage,
+    `http_status_code` AS HttpStatusCode,
+    `error_message` AS ErrorMessage,
     `created_at` AS CreatedAt
 FROM `auto_response_events`
 ORDER BY `created_at` DESC, `id` DESC

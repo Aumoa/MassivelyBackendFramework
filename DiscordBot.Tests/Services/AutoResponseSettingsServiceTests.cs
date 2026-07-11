@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using DiscordBot.Options;
 using DiscordBot.Repositories;
@@ -91,9 +92,36 @@ public sealed class AutoResponseSettingsServiceTests
         Assert.Equal("accepted", ev.Decision);
         Assert.Equal("bot_alias", ev.Reason);
         Assert.Equal("answer briefly", ev.Focus);
+        Assert.Equal(string.Empty, ev.ErrorStage);
+        Assert.Null(ev.HttpStatusCode);
+        Assert.Equal(string.Empty, ev.ErrorMessage);
         var messageIds = JsonSerializer.Deserialize<string[]>(ev.MessageIdsJson);
         Assert.NotNull(messageIds);
         Assert.Equal(["message-1", "message-2"], messageIds);
+    }
+
+    [Fact]
+    public async Task RecordEventAsync_StoresSanitizedErrorDiagnostic()
+    {
+        var repository = new FakeAutoResponseRepository();
+        var service = CreateService(repository);
+        var exception = new HttpRequestException(
+            "Claude API 429\r\n  overloaded\t request",
+            inner: null,
+            HttpStatusCode.TooManyRequests);
+
+        await service.RecordEventAsync(
+            [CreateMessage("message-1", "channel-1", DateTimeOffset.UtcNow)],
+            "error",
+            nameof(HttpRequestException),
+            string.Empty,
+            AutoResponseEventDiagnostic.FromException("classifier", exception));
+
+        var ev = Assert.Single(repository.Events);
+        Assert.Equal("channel-1", ev.ChannelId);
+        Assert.Equal("classifier", ev.ErrorStage);
+        Assert.Equal(429, ev.HttpStatusCode);
+        Assert.Equal("Claude API 429 overloaded request", ev.ErrorMessage);
     }
 
     private static AutoResponseSettingsService CreateService(

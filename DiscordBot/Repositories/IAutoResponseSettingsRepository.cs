@@ -20,6 +20,9 @@ public sealed record AutoResponseEventData(
     string Decision,
     string Reason,
     string Focus,
+    string ErrorStage,
+    int? HttpStatusCode,
+    string ErrorMessage,
     DateTime CreatedAt);
 
 public sealed record AutoResponseEventInput(
@@ -29,7 +32,10 @@ public sealed record AutoResponseEventInput(
     string MessageIdsJson,
     string Decision,
     string Reason,
-    string Focus);
+    string Focus,
+    string ErrorStage,
+    int? HttpStatusCode,
+    string ErrorMessage);
 
 public interface IAutoResponseSettingsRepository
 {

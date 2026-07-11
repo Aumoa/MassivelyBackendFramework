@@ -25,5 +25,6 @@ public partial class Scripts : IScripts
         yield return new _16__AddAiSkills();
         yield return new _17__AddDiscordUserPermissions();
         yield return new _18__AddAutoResponseSettings();
+        yield return new _19__AddAutoResponseEventDiagnostics();
     }
 }
