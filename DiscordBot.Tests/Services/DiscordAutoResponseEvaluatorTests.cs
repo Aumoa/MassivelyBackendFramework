@@ -119,8 +119,10 @@ public sealed class DiscordAutoResponseEvaluatorTests
     [Fact]
     public async Task ExecuteClassifierRequestAsync_RetriesTransientFailuresWithBackoff()
     {
+        const string SECRET = "secret-token-value";
         var attempts = 0;
         var delays = new List<TimeSpan>();
+        var retryDiagnostics = new List<DiscordAutoResponseRetryDiagnostic>();
 
         var result = await DiscordAutoResponseEvaluator.ExecuteClassifierRequestAsync(
             operation: _ =>
@@ -128,12 +130,12 @@ public sealed class DiscordAutoResponseEvaluatorTests
                 attempts++;
                 return attempts < 3
                     ? Task.FromException<string>(new HttpRequestException(
-                        "service unavailable",
+                        $"service unavailable: {SECRET}",
                         null,
                         HttpStatusCode.ServiceUnavailable))
                     : Task.FromResult("success");
             },
-            onRetry: null,
+            onRetry: (diagnostic, _, _) => retryDiagnostics.Add(diagnostic),
             cancellationToken: CancellationToken.None,
             delayAsync: (delay, _) =>
             {
@@ -146,6 +148,12 @@ public sealed class DiscordAutoResponseEvaluatorTests
         Assert.Equal(
             [TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(500)],
             delays);
+        Assert.All(retryDiagnostics, diagnostic =>
+        {
+            Assert.Equal(nameof(HttpRequestException), diagnostic.ExceptionType);
+            Assert.Equal(503, diagnostic.HttpStatusCode);
+            Assert.DoesNotContain(SECRET, diagnostic.ToString(), StringComparison.Ordinal);
+        });
     }
 
     [Fact]

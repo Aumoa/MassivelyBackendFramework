@@ -101,12 +101,13 @@ public sealed class AutoResponseSettingsServiceTests
     }
 
     [Fact]
-    public async Task RecordEventAsync_StoresSanitizedErrorDiagnostic()
+    public async Task RecordEventAsync_DoesNotStoreSensitiveExceptionMessage()
     {
         var repository = new FakeAutoResponseRepository();
         var service = CreateService(repository);
+        const string SECRET = "secret-token-value";
         var exception = new HttpRequestException(
-            "Claude API 429\r\n  overloaded\t request",
+            $"Claude API 429 response included {SECRET}",
             inner: null,
             HttpStatusCode.TooManyRequests);
 
@@ -121,7 +122,8 @@ public sealed class AutoResponseSettingsServiceTests
         Assert.Equal("channel-1", ev.ChannelId);
         Assert.Equal("classifier", ev.ErrorStage);
         Assert.Equal(429, ev.HttpStatusCode);
-        Assert.Equal("Claude API 429 overloaded request", ev.ErrorMessage);
+        Assert.Equal("HTTP request failed with status 429.", ev.ErrorMessage);
+        Assert.DoesNotContain(SECRET, ev.ErrorMessage, StringComparison.Ordinal);
     }
 
     private static AutoResponseSettingsService CreateService(

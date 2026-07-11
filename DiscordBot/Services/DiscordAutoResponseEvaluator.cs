@@ -25,6 +25,10 @@ internal sealed record DiscordAutoResponseDecision(
     string Reason,
     string Focus);
 
+internal sealed record DiscordAutoResponseRetryDiagnostic(
+    string ExceptionType,
+    int? HttpStatusCode);
+
 internal interface IDiscordAutoResponseEvaluator
 {
     ValueTask<DiscordAutoResponseDecision> EvaluateAsync(
@@ -107,10 +111,11 @@ internal sealed partial class DiscordAutoResponseEvaluator(
                 completionOptions,
                 BuildClassificationSystemPrompt(),
                 token),
-            onRetry: (exception, attempt, delay) => logger.LogWarning(
-                exception,
-                "Transient auto response classifier request failure on attempt {Attempt}; retrying after {DelayMilliseconds} ms.",
+            onRetry: (diagnostic, attempt, delay) => logger.LogWarning(
+                "Transient auto response classifier request failure on attempt {Attempt} with {ExceptionType} and HTTP status {HttpStatusCode}; retrying after {DelayMilliseconds} ms.",
                 attempt,
+                diagnostic.ExceptionType,
+                diagnostic.HttpStatusCode,
                 delay.TotalMilliseconds),
             cancellationToken: cancellationToken);
 
@@ -129,7 +134,7 @@ internal sealed partial class DiscordAutoResponseEvaluator(
 
     internal static async Task<T> ExecuteClassifierRequestAsync<T>(
         Func<CancellationToken, Task<T>> operation,
-        Action<HttpRequestException, int, TimeSpan>? onRetry,
+        Action<DiscordAutoResponseRetryDiagnostic, int, TimeSpan>? onRetry,
         CancellationToken cancellationToken,
         Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
     {
@@ -147,7 +152,12 @@ internal sealed partial class DiscordAutoResponseEvaluator(
             {
                 var delay = TimeSpan.FromMilliseconds(
                     InitialClassifierRetryDelayMilliseconds * (1 << (attempt - 1)));
-                onRetry?.Invoke(exception, attempt, delay);
+                onRetry?.Invoke(
+                    new DiscordAutoResponseRetryDiagnostic(
+                        exception.GetType().Name,
+                        exception.StatusCode is { } statusCode ? (int)statusCode : null),
+                    attempt,
+                    delay);
                 await delayAsync(delay, cancellationToken);
             }
         }

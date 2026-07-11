@@ -55,18 +55,50 @@ internal sealed record AutoResponseEventView(
     string ErrorMessage,
     DateTime CreatedAt);
 
-internal sealed record AutoResponseEventDiagnostic(
-    string Stage,
-    int? HttpStatusCode,
-    string ErrorMessage)
+internal sealed record AutoResponseEventDiagnostic
 {
+    private AutoResponseEventDiagnostic(
+        string stage,
+        int? httpStatusCode,
+        string errorMessage)
+    {
+        Stage = stage;
+        HttpStatusCode = httpStatusCode;
+        ErrorMessage = errorMessage;
+    }
+
+    public string Stage { get; }
+
+    public int? HttpStatusCode { get; }
+
+    public string ErrorMessage { get; }
+
     public static AutoResponseEventDiagnostic FromException(string stage, Exception exception)
     {
         var httpException = FindHttpRequestException(exception);
         return new AutoResponseEventDiagnostic(
             stage,
             httpException?.StatusCode is { } statusCode ? (int)statusCode : null,
-            httpException?.Message ?? exception.Message);
+            BuildSafeSummary(exception, httpException));
+    }
+
+    private static string BuildSafeSummary(
+        Exception exception,
+        HttpRequestException? httpException)
+    {
+        if (httpException?.StatusCode is { } statusCode)
+        {
+            return $"HTTP request failed with status {(int)statusCode}.";
+        }
+
+        if (httpException != null)
+        {
+            return "HTTP transport request failed.";
+        }
+
+        return exception is TimeoutException
+            ? "Operation timed out."
+            : "Unexpected application failure.";
     }
 
     private static HttpRequestException? FindHttpRequestException(Exception exception)
