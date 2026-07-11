@@ -66,6 +66,11 @@ internal sealed class DiscordAutoResponseCoordinator(
 
         lock (m_Lock)
         {
+            if (m_Disposed)
+            {
+                return;
+            }
+
             if (!m_Channels.TryGetValue(message.ChannelId, out var state))
             {
                 state = new ChannelState();

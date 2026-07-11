@@ -49,6 +49,29 @@ public sealed class DiscordAutoResponseCoordinatorTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ObserveAsync_DoesNotScheduleEvaluationWhenDisposedDuringSettingsLookup()
+    {
+        var settings = new BlockingAutoResponseSettingsService();
+        var responseCallCount = 0;
+        var coordinator = CreateCoordinator(settings);
+        var observeTask = coordinator.ObserveAsync(
+            CreateMessage(),
+            (_, _) =>
+            {
+                Interlocked.Increment(ref responseCallCount);
+                return Task.CompletedTask;
+            }).AsTask();
+        await settings.GetStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        coordinator.Dispose();
+        settings.CompleteGet();
+        await observeTask.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, settings.GetCallCount);
+        Assert.Equal(0, responseCallCount);
+    }
+
     private static DiscordAutoResponseCoordinator CreateCoordinator(
         IAutoResponseSettingsService settings)
     {
@@ -141,6 +164,75 @@ public sealed class DiscordAutoResponseCoordinatorTests
             CancellationToken cancellationToken = default)
         {
             throw new InvalidOperationException("Evaluator should not be called.");
+        }
+    }
+
+    private sealed class BlockingAutoResponseSettingsService : IAutoResponseSettingsService
+    {
+        private readonly TaskCompletionSource<AutoResponseSettingsView> m_GetCompletion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int m_GetCallCount;
+
+        public int GetCallCount => Volatile.Read(ref m_GetCallCount);
+
+        public TaskCompletionSource GetStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ValueTask<AutoResponseSettingsView> GetAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var callCount = Interlocked.Increment(ref m_GetCallCount);
+            if (callCount == 1)
+            {
+                GetStarted.TrySetResult();
+                return new ValueTask<AutoResponseSettingsView>(m_GetCompletion.Task);
+            }
+
+            return ValueTask.FromResult(CreateEnabledSettings());
+        }
+
+        public void CompleteGet()
+        {
+            m_GetCompletion.TrySetResult(CreateEnabledSettings());
+        }
+
+        public ValueTask SaveAsync(
+            AutoResponseSettingsSaveRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask RecordEventAsync(
+            IReadOnlyList<DiscordAutoResponseMessage> messages,
+            string decision,
+            string reason,
+            string focus,
+            AutoResponseEventDiagnostic? diagnostic = null,
+            CancellationToken cancellationToken = default)
+        {
+            throw new InvalidOperationException("No event should be recorded after disposal.");
+        }
+
+        public ValueTask<IReadOnlyList<AutoResponseEventView>> GetRecentEventsAsync(
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        private static AutoResponseSettingsView CreateEnabledSettings()
+        {
+            return new AutoResponseSettingsView(
+                Enabled: true,
+                IntervalSeconds: 1,
+                CooldownSeconds: 180,
+                MaxBufferedMessages: 20,
+                ClassifierMaxTokens: 160,
+                ClassifierModel: "classifier-model",
+                BotNameAliases: ["봇"],
+                CreatedAt: DateTime.UtcNow,
+                UpdatedAt: null);
         }
     }
 
