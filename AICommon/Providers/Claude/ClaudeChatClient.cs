@@ -258,7 +258,10 @@ public class ClaudeChatClient(HttpClient http, IOptions<ClaudeChatClientOptions>
         catch
         {
         }
-        throw new HttpRequestException($"Claude API {(int)response.StatusCode} {response.StatusCode}: {body}");
+        throw new HttpRequestException(
+            $"Claude API {(int)response.StatusCode} {response.StatusCode}: {body}",
+            inner: null,
+            response.StatusCode);
     }
 
     private static string ReadStreamError(JsonElement evt)

@@ -50,7 +50,70 @@ internal sealed record AutoResponseEventView(
     string Decision,
     string Reason,
     string Focus,
+    string ErrorStage,
+    int? HttpStatusCode,
+    string ErrorMessage,
     DateTime CreatedAt);
+
+internal sealed record AutoResponseEventDiagnostic
+{
+    private AutoResponseEventDiagnostic(
+        string stage,
+        int? httpStatusCode,
+        string errorMessage)
+    {
+        Stage = stage;
+        HttpStatusCode = httpStatusCode;
+        ErrorMessage = errorMessage;
+    }
+
+    public string Stage { get; }
+
+    public int? HttpStatusCode { get; }
+
+    public string ErrorMessage { get; }
+
+    public static AutoResponseEventDiagnostic FromException(string stage, Exception exception)
+    {
+        var httpException = FindHttpRequestException(exception);
+        return new AutoResponseEventDiagnostic(
+            stage,
+            httpException?.StatusCode is { } statusCode ? (int)statusCode : null,
+            BuildSafeSummary(exception, httpException));
+    }
+
+    private static string BuildSafeSummary(
+        Exception exception,
+        HttpRequestException? httpException)
+    {
+        if (httpException?.StatusCode is { } statusCode)
+        {
+            return $"HTTP request failed with status {(int)statusCode}.";
+        }
+
+        if (httpException != null)
+        {
+            return "HTTP transport request failed.";
+        }
+
+        return exception is TimeoutException
+            ? "Operation timed out."
+            : "Unexpected application failure.";
+    }
+
+    private static HttpRequestException? FindHttpRequestException(Exception exception)
+    {
+        for (var current = exception; current != null; current = current.InnerException)
+        {
+            if (current is HttpRequestException httpException)
+            {
+                return httpException;
+            }
+        }
+
+        return null;
+    }
+}
 
 internal interface IAutoResponseSettingsService
 {
@@ -65,6 +128,7 @@ internal interface IAutoResponseSettingsService
         string decision,
         string reason,
         string focus,
+        AutoResponseEventDiagnostic? diagnostic = null,
         CancellationToken cancellationToken = default);
 
     ValueTask<IReadOnlyList<AutoResponseEventView>> GetRecentEventsAsync(
@@ -129,6 +193,7 @@ internal sealed class AutoResponseSettingsService(
         string decision,
         string reason,
         string focus,
+        AutoResponseEventDiagnostic? diagnostic = null,
         CancellationToken cancellationToken = default)
     {
         if (messages.Count == 0)
@@ -152,7 +217,10 @@ internal sealed class AutoResponseSettingsService(
             JsonSerializer.Serialize(messageIds),
             NormalizeText(decision, "unknown", 32),
             NormalizeText(reason, string.Empty, MaxTextLength),
-            NormalizeText(focus, string.Empty, MaxTextLength));
+            NormalizeText(focus, string.Empty, MaxTextLength),
+            NormalizeText(diagnostic?.Stage, string.Empty, 32),
+            diagnostic?.HttpStatusCode,
+            NormalizeErrorMessage(diagnostic?.ErrorMessage));
 
         await eventRepository.AddAsync(input, cancellationToken);
     }
@@ -254,6 +322,9 @@ internal sealed class AutoResponseSettingsService(
             data.Decision,
             data.Reason,
             data.Focus,
+            data.ErrorStage,
+            data.HttpStatusCode,
+            data.ErrorMessage,
             data.CreatedAt);
     }
 
@@ -335,6 +406,22 @@ internal sealed class AutoResponseSettingsService(
         }
 
         return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+    }
+
+    internal static string NormalizeErrorMessage(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var characters = value
+            .Trim()
+            .Select(character => char.IsControl(character) || char.IsWhiteSpace(character) ? ' ' : character)
+            .ToArray();
+        var normalized = string.Join(' ', new string(characters)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length <= MaxTextLength ? normalized : normalized[..MaxTextLength];
     }
 
     private static int NormalizeRange(int value, int fallback, int min, int max)

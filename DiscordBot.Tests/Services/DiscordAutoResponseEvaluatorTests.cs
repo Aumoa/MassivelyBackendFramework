@@ -1,3 +1,4 @@
+using System.Net;
 using DiscordBot.Options;
 using DiscordBot.Services;
 
@@ -95,6 +96,86 @@ public sealed class DiscordAutoResponseEvaluatorTests
         Assert.Contains("[자동 응답 모드]", prompt);
         Assert.Contains("현재 채널의 채팅 조회 도구", prompt);
         Assert.Contains("이전 설명 보충", prompt);
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(HttpStatusCode.RequestTimeout, true)]
+    [InlineData(HttpStatusCode.TooManyRequests, true)]
+    [InlineData(HttpStatusCode.InternalServerError, true)]
+    [InlineData(HttpStatusCode.BadRequest, false)]
+    [InlineData(HttpStatusCode.Unauthorized, false)]
+    public void IsTransientClassifierFailure_ClassifiesStatusCodes(
+        HttpStatusCode? statusCode,
+        bool expected)
+    {
+        var exception = new HttpRequestException("request failed", null, statusCode);
+
+        var result = DiscordAutoResponseEvaluator.IsTransientClassifierFailure(exception);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public async Task ExecuteClassifierRequestAsync_RetriesTransientFailuresWithBackoff()
+    {
+        const string SECRET = "secret-token-value";
+        var attempts = 0;
+        var delays = new List<TimeSpan>();
+        var retryDiagnostics = new List<DiscordAutoResponseRetryDiagnostic>();
+
+        var result = await DiscordAutoResponseEvaluator.ExecuteClassifierRequestAsync(
+            operation: _ =>
+            {
+                attempts++;
+                return attempts < 3
+                    ? Task.FromException<string>(new HttpRequestException(
+                        $"service unavailable: {SECRET}",
+                        null,
+                        HttpStatusCode.ServiceUnavailable))
+                    : Task.FromResult("success");
+            },
+            onRetry: (diagnostic, _, _) => retryDiagnostics.Add(diagnostic),
+            cancellationToken: CancellationToken.None,
+            delayAsync: (delay, _) =>
+            {
+                delays.Add(delay);
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal("success", result);
+        Assert.Equal(3, attempts);
+        Assert.Equal(
+            [TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(500)],
+            delays);
+        Assert.All(retryDiagnostics, diagnostic =>
+        {
+            Assert.Equal(nameof(HttpRequestException), diagnostic.ExceptionType);
+            Assert.Equal(503, diagnostic.HttpStatusCode);
+            Assert.DoesNotContain(SECRET, diagnostic.ToString(), StringComparison.Ordinal);
+        });
+    }
+
+    [Fact]
+    public async Task ExecuteClassifierRequestAsync_DoesNotRetryPermanentFailure()
+    {
+        var attempts = 0;
+
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            DiscordAutoResponseEvaluator.ExecuteClassifierRequestAsync(
+                operation: _ =>
+                {
+                    attempts++;
+                    return Task.FromException<string>(new HttpRequestException(
+                        "bad request",
+                        null,
+                        HttpStatusCode.BadRequest));
+                },
+                onRetry: null,
+                cancellationToken: CancellationToken.None,
+                delayAsync: (_, _) => Task.CompletedTask));
+
+        Assert.Equal(1, attempts);
     }
 
     private static DiscordAutoResponseMessage CreateMessage(

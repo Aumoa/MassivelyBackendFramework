@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -24,6 +25,10 @@ internal sealed record DiscordAutoResponseDecision(
     string Reason,
     string Focus);
 
+internal sealed record DiscordAutoResponseRetryDiagnostic(
+    string ExceptionType,
+    int? HttpStatusCode);
+
 internal interface IDiscordAutoResponseEvaluator
 {
     ValueTask<DiscordAutoResponseDecision> EvaluateAsync(
@@ -41,6 +46,8 @@ internal sealed partial class DiscordAutoResponseEvaluator(
     private const int MaxBufferedMessagesLimit = 50;
     private const int DefaultClassifierMaxTokens = 160;
     private const int MaxClassifierMaxTokensLimit = 512;
+    private const int MaxClassifierRequestAttempts = 3;
+    private const int InitialClassifierRetryDelayMilliseconds = 250;
 
     private static readonly string[] QuestionMarkers =
     [
@@ -90,17 +97,27 @@ internal sealed partial class DiscordAutoResponseEvaluator(
             DefaultClassifierMaxTokens,
             MaxClassifierMaxTokensLimit);
 
-        var response = await chatClient.GenerateAsync(
-            BuildClassificationPrompt(normalizedMessages, currentOptions),
-            new ChatCompletionOptions
-            {
-                Model = model,
-                Temperature = 0,
-                MaxTokens = maxTokens,
-                ContextLength = 4096
-            },
-            BuildClassificationSystemPrompt(),
-            cancellationToken);
+        var prompt = BuildClassificationPrompt(normalizedMessages, currentOptions);
+        var completionOptions = new ChatCompletionOptions
+        {
+            Model = model,
+            Temperature = 0,
+            MaxTokens = maxTokens,
+            ContextLength = 4096
+        };
+        var response = await ExecuteClassifierRequestAsync(
+            operation: token => chatClient.GenerateAsync(
+                prompt,
+                completionOptions,
+                BuildClassificationSystemPrompt(),
+                token),
+            onRetry: (diagnostic, attempt, delay) => logger.LogWarning(
+                "Transient auto response classifier request failure on attempt {Attempt} with {ExceptionType} and HTTP status {HttpStatusCode}; retrying after {DelayMilliseconds} ms.",
+                attempt,
+                diagnostic.ExceptionType,
+                diagnostic.HttpStatusCode,
+                delay.TotalMilliseconds),
+            cancellationToken: cancellationToken);
 
         var decision = ParseDecision(response);
         if (logger.IsEnabled(LogLevel.Debug))
@@ -113,6 +130,49 @@ internal sealed partial class DiscordAutoResponseEvaluator(
         }
 
         return decision;
+    }
+
+    internal static async Task<T> ExecuteClassifierRequestAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        Action<DiscordAutoResponseRetryDiagnostic, int, TimeSpan>? onRetry,
+        CancellationToken cancellationToken,
+        Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
+    {
+        delayAsync ??= static (delay, token) => Task.Delay(delay, token);
+
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await operation(cancellationToken);
+            }
+            catch (HttpRequestException exception) when (
+                attempt < MaxClassifierRequestAttempts
+                && IsTransientClassifierFailure(exception))
+            {
+                var delay = TimeSpan.FromMilliseconds(
+                    InitialClassifierRetryDelayMilliseconds * (1 << (attempt - 1)));
+                onRetry?.Invoke(
+                    new DiscordAutoResponseRetryDiagnostic(
+                        exception.GetType().Name,
+                        exception.StatusCode is { } statusCode ? (int)statusCode : null),
+                    attempt,
+                    delay);
+                await delayAsync(delay, cancellationToken);
+            }
+        }
+    }
+
+    internal static bool IsTransientClassifierFailure(HttpRequestException exception)
+    {
+        if (exception.StatusCode == null)
+        {
+            return true;
+        }
+
+        var statusCode = exception.StatusCode.Value;
+        return statusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
+               || (int)statusCode >= 500;
     }
 
     internal static bool PassesStaticFilter(

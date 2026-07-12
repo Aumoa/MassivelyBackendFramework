@@ -102,7 +102,19 @@ else
                                 </td>
                                 <td class="mono">@entry.ChannelId</td>
                                 <td class="mono">@FormatMessageIds(entry)</td>
-                                <td>@entry.Reason</td>
+                                <td>
+                                    <div>@entry.Reason</div>
+                                    @if (HasErrorDiagnostic(entry))
+                                    {
+                                        <div class="event-error-diagnostic">
+                                            <span class="mono">@FormatErrorDiagnostic(entry)</span>
+                                            @if (!string.IsNullOrWhiteSpace(entry.ErrorMessage))
+                                            {
+                                                <span>@entry.ErrorMessage</span>
+                                            }
+                                        </div>
+                                    }
+                                </td>
                                 <td>@entry.Focus</td>
                             </tr>
                         }
@@ -246,6 +258,29 @@ else
         return string.IsNullOrWhiteSpace(decision)
             ? "unknown"
             : decision;
+    }
+
+    private static bool HasErrorDiagnostic(AutoResponseEventView entry)
+    {
+        return !string.IsNullOrWhiteSpace(entry.ErrorStage)
+               || entry.HttpStatusCode != null
+               || !string.IsNullOrWhiteSpace(entry.ErrorMessage);
+    }
+
+    private static string FormatErrorDiagnostic(AutoResponseEventView entry)
+    {
+        var parts = new List<string>(2);
+        if (!string.IsNullOrWhiteSpace(entry.ErrorStage))
+        {
+            parts.Add(entry.ErrorStage);
+        }
+
+        if (entry.HttpStatusCode is { } statusCode)
+        {
+            parts.Add($"HTTP {statusCode}");
+        }
+
+        return string.Join(" · ", parts);
     }
 
     private static string GetDecisionClass(string decision)
