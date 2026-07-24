@@ -120,6 +120,27 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
         BackendPacketManifestHash manifestHash,
         CancellationToken cancellationToken)
     {
+        return Open(
+            backendBinding,
+            owner,
+            principalSubjectId,
+            principalAuthenticationMethodKind: null,
+            principalAuthenticationMethodId: null,
+            manifestId,
+            manifestHash,
+            cancellationToken);
+    }
+
+    public PersistentBackendRoute<TOwner> Open(
+        BackendRouteBinding backendBinding,
+        TOwner owner,
+        string? principalSubjectId,
+        GatewayClientAuthenticationMethodKind? principalAuthenticationMethodKind,
+        string? principalAuthenticationMethodId,
+        BackendPacketManifestId manifestId,
+        BackendPacketManifestHash manifestHash,
+        CancellationToken cancellationToken)
+    {
         if (backendBinding == null)
         {
             throw new ArgumentNullException(nameof(backendBinding));
@@ -132,6 +153,25 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
 
         var normalizedBackendKind = RequireAllowedBackendKind(backendBinding.BackendKind);
         var normalizedPrincipalSubjectId = NormalizePrincipalSubjectId(principalSubjectId);
+        var normalizedPrincipalAuthenticationMethodId = NormalizePrincipalAuthenticationMethodId(
+            principalAuthenticationMethodId);
+        if (principalAuthenticationMethodKind.HasValue &&
+            !Enum.IsDefined(typeof(GatewayClientAuthenticationMethodKind), principalAuthenticationMethodKind.Value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(principalAuthenticationMethodKind));
+        }
+
+        if (principalAuthenticationMethodKind.HasValue != (normalizedPrincipalAuthenticationMethodId != null))
+        {
+            throw new ArgumentException("Principal authentication method kind and id must be provided together.");
+        }
+
+        if (normalizedPrincipalSubjectId == null &&
+            (principalAuthenticationMethodKind.HasValue || normalizedPrincipalAuthenticationMethodId != null))
+        {
+            throw new ArgumentException("Principal authentication method cannot be provided without a principal subject id.");
+        }
+
         var normalizedBackendBinding = string.Equals(
             normalizedBackendKind,
             backendBinding.BackendKind,
@@ -159,6 +199,8 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
                     manifestHash,
                     owner,
                     normalizedPrincipalSubjectId,
+                    principalAuthenticationMethodKind,
+                    normalizedPrincipalAuthenticationMethodId,
                     now,
                     now.AddMilliseconds(GetRouteLifetimeMilliseconds()),
                     GetExchangeTimeoutMilliseconds(),
@@ -482,6 +524,13 @@ internal sealed class PersistentBackendRouteRegistry<TOwner>(
             ? null
             : principalSubjectId.Trim();
     }
+
+    private static string? NormalizePrincipalAuthenticationMethodId(string? principalAuthenticationMethodId)
+    {
+        return string.IsNullOrWhiteSpace(principalAuthenticationMethodId)
+            ? null
+            : principalAuthenticationMethodId.Trim();
+    }
 }
 
 internal enum PersistentBackendRouteState
@@ -535,6 +584,8 @@ internal sealed class PersistentBackendRoute<TOwner>(
     BackendPacketManifestHash manifestHash,
     TOwner owner,
     string? principalSubjectId,
+    GatewayClientAuthenticationMethodKind? principalAuthenticationMethodKind,
+    string? principalAuthenticationMethodId,
     DateTimeOffset createdAt,
     DateTimeOffset expiresAt,
     int exchangeTimeoutMilliseconds,
@@ -567,6 +618,10 @@ internal sealed class PersistentBackendRoute<TOwner>(
     public TOwner Owner { get; } = owner;
 
     public string? PrincipalSubjectId { get; } = principalSubjectId;
+
+    public GatewayClientAuthenticationMethodKind? PrincipalAuthenticationMethodKind { get; } = principalAuthenticationMethodKind;
+
+    public string? PrincipalAuthenticationMethodId { get; } = principalAuthenticationMethodId;
 
     public DateTimeOffset CreatedAt { get; } = createdAt;
 

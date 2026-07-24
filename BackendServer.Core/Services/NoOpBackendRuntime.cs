@@ -21,10 +21,12 @@ internal sealed class NoOpBackendRuntime(ILogger<NoOpBackendRuntime> logger) : I
         CancellationToken cancellationToken)
     {
         logger.LogDebug(
-            "Ignored Gateway channel open because no Backend runtime is configured. GatewayNodeId={GatewayNodeId}, ChannelId={ChannelId}, PrincipalSubjectId={PrincipalSubjectId}.",
+            "Ignored Gateway channel open because no Backend runtime is configured. GatewayNodeId={GatewayNodeId}, ChannelId={ChannelId}, PrincipalSubjectId={PrincipalSubjectId}, PrincipalAuthenticationMethod={PrincipalAuthenticationMethodKind}:{PrincipalAuthenticationMethodId}.",
             context.GatewayNodeId,
             context.ChannelId,
-            context.PrincipalSubjectId);
+            context.PrincipalSubjectId,
+            context.PrincipalAuthenticationMethodKind,
+            context.PrincipalAuthenticationMethodId);
         return ValueTask.CompletedTask;
     }
 

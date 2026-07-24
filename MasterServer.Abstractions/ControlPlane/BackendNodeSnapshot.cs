@@ -76,6 +76,7 @@ public sealed class BackendNodeSnapshot
                    PacketWriter.GetStringSize(value.ManifestId.Value) +
                    PacketWriter.GetStringSize(value.ManifestHash.Value) +
                    GetDescriptorSize(value.Descriptor) +
+                   GetAuthenticationMethodsSize(value.AuthenticationMethods) +
                    sizeof(long);
         }
 
@@ -89,6 +90,7 @@ public sealed class BackendNodeSnapshot
             writer.WriteString(value.ManifestId.Value);
             writer.WriteString(value.ManifestHash.Value);
             WriteDescriptor(value.Descriptor, ref writer);
+            WriteAuthenticationMethods(value.AuthenticationMethods, ref writer);
             writer.WriteInt64(value.AdvertisedAt.ToUnixTimeMilliseconds());
         }
 
@@ -102,6 +104,7 @@ public sealed class BackendNodeSnapshot
             var manifestId = new BackendPacketManifestId(reader.ReadString());
             var manifestHash = new BackendPacketManifestHash(reader.ReadString());
             var descriptor = ReadDescriptor(ref reader);
+            var authenticationMethods = ReadAuthenticationMethods(ref reader);
             var advertisedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.ReadInt64());
             return new BackendNodeEndpoint(
                 backendKind,
@@ -112,6 +115,7 @@ public sealed class BackendNodeSnapshot
                 manifestId,
                 manifestHash,
                 descriptor,
+                authenticationMethods,
                 advertisedAt);
         }
 
@@ -138,6 +142,46 @@ public sealed class BackendNodeSnapshot
                 reader.ReadString(),
                 reader.ReadString(),
                 reader.ReadString());
+        }
+
+        private static int GetAuthenticationMethodsSize(GatewayAuthenticationMethodDefinition[] value)
+        {
+            int size = sizeof(int);
+            foreach (var method in value)
+            {
+                size += GatewayAuthenticationMethodDefinition.Codec.GetPayloadSize(method);
+            }
+
+            return size;
+        }
+
+        private static void WriteAuthenticationMethods(
+            GatewayAuthenticationMethodDefinition[] value,
+            ref PacketWriter writer)
+        {
+            writer.WriteInt32(value.Length);
+            foreach (var method in value)
+            {
+                GatewayAuthenticationMethodDefinition.Codec.Encode(method, ref writer);
+            }
+        }
+
+        private static GatewayAuthenticationMethodDefinition[] ReadAuthenticationMethods(ref PacketReader reader)
+        {
+            const int MAX_METHOD_COUNT = 32;
+            var methodCount = reader.ReadInt32();
+            if (methodCount < 0 || methodCount > MAX_METHOD_COUNT)
+            {
+                throw new PacketFormatException(PacketValidationError.InvalidStringLength, "Invalid Gateway authentication method count.");
+            }
+
+            var methods = new GatewayAuthenticationMethodDefinition[methodCount];
+            for (int i = 0; i < methods.Length; i++)
+            {
+                methods[i] = GatewayAuthenticationMethodDefinition.Codec.Decode(ref reader);
+            }
+
+            return methods;
         }
 
         private static int GetEndpointSize(MasterSocketEndpoint value)

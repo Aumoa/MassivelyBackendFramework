@@ -19,4 +19,5 @@ builder.Services.AddGatewayServer(builder.Configuration);
 
 var app = builder.Build();
 app.MapGet("/healthz", static () => "OK");
+app.MapGatewayAuthenticationCallbacks();
 await app.RunAsync();

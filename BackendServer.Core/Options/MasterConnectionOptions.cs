@@ -30,6 +30,8 @@ public sealed record MasterConnectionOptions
 
     public string ServerDescriptorJson { get; set; } = "{}";
 
+    public GatewayAuthenticationMethodOptions[] GatewayAuthenticationMethods { get; set; } = [];
+
     public string SharedSecret { get; set; } = string.Empty;
 
     public int ReconnectDelayMilliseconds { get; set; } = 5000;

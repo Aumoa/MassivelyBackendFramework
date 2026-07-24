@@ -30,6 +30,10 @@ internal interface IBackendRouteManager
         string backendKind,
         int maximumEntries);
 
+    GatewayAuthenticationMethodDefinition[] GetAuthenticationMethods(
+        string backendKind,
+        GatewayBackendServerHandle? serverHandle);
+
     ValueTask<IBackendRouteSession> ConnectAsync(
         string backendKind,
         CancellationToken cancellationToken);
@@ -263,6 +267,36 @@ internal sealed class BackendConnectionManager(
                     .Take(limit)
                     .Select(CreateServerListEntry)],
                 m_BackendSnapshotObservedAt);
+        }
+    }
+
+    public GatewayAuthenticationMethodDefinition[] GetAuthenticationMethods(
+        string backendKind,
+        GatewayBackendServerHandle? serverHandle)
+    {
+        var normalizedBackendKind = NormalizeBackendKind(backendKind);
+        lock (m_RoutesSync)
+        {
+            if (!m_NodesByKind.TryGetValue(normalizedBackendKind, out var nodes) ||
+                nodes.Length == 0)
+            {
+                return [];
+            }
+
+            if (serverHandle != null)
+            {
+                var node = nodes.FirstOrDefault(node => GenerateServerHandle(node).Equals(serverHandle));
+                return node == null
+                    ? []
+                    : GetEffectiveAuthenticationMethods(node);
+            }
+
+            return [.. nodes
+                .Where(static node => node.State != BackendNodeState.Unavailable)
+                .SelectMany(GetEffectiveAuthenticationMethods)
+                .GroupBy(static method => method.MethodId, StringComparer.Ordinal)
+                .Select(static group => group.First())
+                .OrderBy(static method => method.MethodId, StringComparer.Ordinal)];
         }
     }
 
@@ -1062,6 +1096,15 @@ internal sealed class BackendConnectionManager(
             node.DescriptorVersion,
             node.DescriptorHash,
             node.DescriptorJson);
+    }
+
+    private static GatewayAuthenticationMethodDefinition[] GetEffectiveAuthenticationMethods(BackendNodeEndpoint node)
+    {
+        return node.AuthenticationMethods.Length == 0
+            ? [GatewayAuthenticationMethodDefinition.StaticSecret(
+                GatewayAuthenticationDefaults.StaticSecretMethodId,
+                "Access token")]
+            : [.. node.AuthenticationMethods];
     }
 
     private static GatewayBackendServerState ToGatewayServerState(BackendNodeState state)

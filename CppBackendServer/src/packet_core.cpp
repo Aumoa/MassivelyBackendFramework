@@ -118,6 +118,12 @@ namespace cpp_backend
                    status == backend_packet_manifest_entry_status::deprecated;
         }
 
+        bool is_valid_gateway_authentication_method_kind(gateway_authentication_method_kind kind) noexcept
+        {
+            return kind == gateway_authentication_method_kind::static_secret ||
+                   kind == gateway_authentication_method_kind::oidc_authorization_code;
+        }
+
         void write_bool(packet_writer& writer, bool value)
         {
             writer.write_byte(value ? 1 : 0);
@@ -1217,7 +1223,37 @@ namespace cpp_backend
         if (value.principal_subject_id.has_value())
         {
             writer.write_byte(1);
+            require_non_empty(*value.principal_subject_id, "Principal subject id");
             writer.write_string(*value.principal_subject_id);
+        }
+        else
+        {
+            writer.write_byte(0);
+        }
+
+        if (value.principal_authentication_method_kind.has_value() ||
+            value.principal_authentication_method_id.has_value())
+        {
+            if (!value.principal_subject_id.has_value())
+            {
+                throw packet_error("Principal authentication method requires a principal subject id.");
+            }
+
+            if (!value.principal_authentication_method_kind.has_value() ||
+                !value.principal_authentication_method_id.has_value())
+            {
+                throw packet_error("Principal authentication method kind and id must both be present.");
+            }
+
+            if (!is_valid_gateway_authentication_method_kind(*value.principal_authentication_method_kind))
+            {
+                throw packet_error("Invalid Gateway authentication method kind.");
+            }
+
+            require_non_empty(*value.principal_authentication_method_id, "Principal authentication method id");
+            writer.write_byte(1);
+            writer.write_byte(static_cast<std::uint8_t>(*value.principal_authentication_method_kind));
+            writer.write_string(*value.principal_authentication_method_id);
         }
         else
         {
@@ -1236,6 +1272,24 @@ namespace cpp_backend
         if (reader.read_byte() != 0)
         {
             value.principal_subject_id = reader.read_string();
+            require_non_empty(*value.principal_subject_id, "Principal subject id");
+        }
+
+        if (reader.read_byte() != 0)
+        {
+            auto method_kind = static_cast<gateway_authentication_method_kind>(reader.read_byte());
+            if (!is_valid_gateway_authentication_method_kind(method_kind))
+            {
+                throw packet_error("Invalid Gateway authentication method kind.");
+            }
+
+            value.principal_authentication_method_kind = method_kind;
+            value.principal_authentication_method_id = reader.read_string();
+            require_non_empty(*value.principal_authentication_method_id, "Principal authentication method id");
+            if (!value.principal_subject_id.has_value())
+            {
+                throw packet_error("Principal authentication method requires a principal subject id.");
+            }
         }
 
         reader.require_finished();
@@ -1812,7 +1866,8 @@ namespace cpp_backend
     {
         if (frame.header.packet_id == pid_gate_backend_channel_open)
         {
-            if (frame.header.kind != packet_kind::notify || frame.header.version != gateway_backend_channel_version ||
+            if (frame.header.kind != packet_kind::notify ||
+                frame.header.version != gateway_backend_channel_open_version ||
                 frame.header.payload_length != frame.payload.size())
             {
                 throw packet_error("Invalid Gateway Backend channel open frame.");

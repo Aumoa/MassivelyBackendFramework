@@ -566,7 +566,7 @@ namespace
         require(validator.code == "code-1", "Validator code mismatch.");
 
         auto channel_open_frame =
-            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_version,
+            make_frame(packet_kind::notify, pid_gate_backend_channel_open, gateway_backend_channel_open_version,
                        encode_gateway_backend_channel_open(gateway_backend_channel_open{
                            37,
                            std::string("player-1"),

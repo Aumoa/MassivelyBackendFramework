@@ -463,6 +463,109 @@ public sealed class ConnectionManagerBackendRouteTests
             Assert.Equal(routeManager.DefaultBinding, opened.Binding);
             Assert.NotEqual(0u, opened.Open.ChannelId);
             Assert.Equal("player-1", opened.Open.PrincipalSubjectId);
+            Assert.Equal(GatewayClientAuthenticationMethodKind.StaticSecret, opened.Open.PrincipalAuthenticationMethodKind);
+            Assert.Equal("static", opened.Open.PrincipalAuthenticationMethodId);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task AuthenticationOptionsRequest_ReturnsStaticChallengeBeforeAuthentication()
+    {
+        var routeManager = new RecordingBackendRouteManager();
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000
+            },
+            out var port,
+            authenticateClients: false);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteAuthenticationOptionsRequestAsync(
+                stream,
+                new GatewayClientAuthenticationOptionsRequest(" alpha "));
+
+            using var optionsFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, optionsFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_CLIENT_AUTHENTICATION_OPTIONS, optionsFrame.Header.PacketId);
+
+            var options = PacketCodec.Decode(optionsFrame, GatewayClientAuthenticationOptionsResponse.Codec);
+            Assert.True(options.Success);
+            Assert.Equal("alpha", options.BackendKind);
+            var challenge = Assert.Single(options.Challenges);
+            Assert.Equal(GatewayClientAuthenticationMethodKind.StaticSecret, challenge.Kind);
+            Assert.Equal("static", challenge.MethodId);
+            Assert.Equal(string.Empty, challenge.LoginUri);
+            Assert.Equal(string.Empty, challenge.CompletionToken);
+            Assert.Equal(0, routeManager.ConnectCount);
+        }
+        finally
+        {
+            await connectionManager.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task RouteOpenRequest_RejectsWhenPrincipalMethodIsNotAllowedForServer()
+    {
+        var routeManager = new RecordingBackendRouteManager
+        {
+            AuthenticationMethods =
+            [
+                GatewayAuthenticationMethodDefinition.OidcAuthorizationCode(
+                    "oidc",
+                    "OIDC",
+                    "https://accounts.example.test",
+                    "gateway-client",
+                    "openid profile email")
+            ]
+        };
+        var connectionManager = CreateConnectionManager(
+            routeManager,
+            new BackendRouteOptions
+            {
+                RequestTimeoutMilliseconds = 5000
+            },
+            out var port);
+
+        await connectionManager.StartAsync(CancellationToken.None);
+
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(IPAddress.Loopback, port);
+            await using var stream = client.GetStream();
+            using (await ReadRequiredFrameAsync(stream))
+            {
+            }
+
+            await WriteBackendRouteOpenRequestAsync(
+                stream,
+                new GatewayBackendRouteOpenRequest("alpha", routeManager.DefaultServerHandle));
+
+            using var rejectedFrame = await ReadRequiredFrameAsync(stream);
+            Assert.Equal(PacketKind.Response, rejectedFrame.Header.Kind);
+            Assert.Equal(Pid.GATE_BACKEND_ROUTE_OPEN, rejectedFrame.Header.PacketId);
+
+            var rejected = PacketCodec.Decode(rejectedFrame, GatewayBackendRouteOpenResponse.Codec);
+            Assert.False(rejected.Success);
+            Assert.Equal("Backend route open was rejected.", rejected.ErrorMessage);
+            Assert.Equal(0, routeManager.ConnectCount);
         }
         finally
         {
@@ -517,6 +620,8 @@ public sealed class ConnectionManagerBackendRouteTests
             Assert.Equal(routeManager.DefaultBinding, opened.Binding);
             Assert.NotEqual(0u, opened.Open.ChannelId);
             Assert.Equal("test-client", opened.Open.PrincipalSubjectId);
+            Assert.Equal(GatewayClientAuthenticationMethodKind.StaticSecret, opened.Open.PrincipalAuthenticationMethodKind);
+            Assert.Equal("static", opened.Open.PrincipalAuthenticationMethodId);
 
             Assert.Contains(connectionManager.GetStatusItems(), item =>
                 item.Group == "Persistent Backend routes" &&
@@ -2830,6 +2935,7 @@ public sealed class ConnectionManagerBackendRouteTests
             certificateProvider ?? new StaticCertificateProvider(CreateServerCertificate()),
             streamAuthenticator ?? new PassThroughStreamAuthenticator(),
             new StaticGatewayClientAuthenticationContextFactory(authenticateClients),
+            new GatewayClientAuthenticationChallengeIssuer(new RejectingGatewayOidcAuthenticationService()),
             clientTokenValidator ?? new RejectingGatewayClientTokenValidator(),
             new GatewayBackendRouteTokenGenerator(),
             NullLogger<ConnectionManager>.Instance);
@@ -3093,6 +3199,20 @@ public sealed class ConnectionManagerBackendRouteTests
         await PacketFrameWriter.WriteAsync(stream, frame, timeout.Token);
     }
 
+    private static async Task WriteAuthenticationOptionsRequestAsync(
+        Stream stream,
+        GatewayClientAuthenticationOptionsRequest request)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var frame = PacketCodec.Encode(
+            PacketKind.Request,
+            Pid.GATE_CLIENT_AUTHENTICATION_OPTIONS,
+            GatewayClientAuthenticationOptionsRequest.ProtocolVersion,
+            request,
+            GatewayClientAuthenticationOptionsRequest.Codec);
+        await PacketFrameWriter.WriteAsync(stream, frame, timeout.Token);
+    }
+
     private static async Task<GatewayBackendRouteToken> OpenPersistentBackendRouteAsync(
         Stream stream,
         string backendKind = "alpha")
@@ -3323,6 +3443,10 @@ public sealed class ConnectionManagerBackendRouteTests
 
         public int RelayCount => Volatile.Read(ref m_RelayCount);
 
+        public GatewayBackendServerHandle DefaultServerHandle => m_DefaultServerHandle;
+
+        public GatewayAuthenticationMethodDefinition[] AuthenticationMethods { get; set; } = [];
+
         public string[] GetDiscoveredBackendKinds()
         {
             return [m_DefaultBinding.BackendKind];
@@ -3352,6 +3476,26 @@ public sealed class ConnectionManagerBackendRouteTests
                         descriptor.DescriptorJson)
                 ],
                 DateTimeOffset.UtcNow);
+        }
+
+        public GatewayAuthenticationMethodDefinition[] GetAuthenticationMethods(
+            string backendKind,
+            GatewayBackendServerHandle? serverHandle)
+        {
+            if (!string.Equals(backendKind, m_DefaultBinding.BackendKind, StringComparison.Ordinal))
+            {
+                return [];
+            }
+
+            if (serverHandle != null &&
+                !m_DefaultServerHandle.Equals(serverHandle))
+            {
+                return [];
+            }
+
+            return AuthenticationMethods.Length == 0
+                ? [GatewayAuthenticationMethodDefinition.StaticSecret("static", "Access token")]
+                : [.. AuthenticationMethods];
         }
 
         public ValueTask<IBackendRouteSession> ConnectAsync(
@@ -3726,6 +3870,45 @@ public sealed class ConnectionManagerBackendRouteTests
 
             return ValueTask.FromResult(
                 GatewayClientTokenValidationResult.Rejected("Invalid Gateway client access token."));
+        }
+    }
+
+    private sealed class RejectingGatewayOidcAuthenticationService : IGatewayOidcAuthenticationService
+    {
+        public ValueTask<GatewayClientAuthenticationMethodChallenge> CreateChallengeAsync(
+            GatewayAuthenticationMethodDefinition method,
+            Client client,
+            string backendKind,
+            GatewayBackendServerHandle? serverHandle,
+            CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException("OIDC challenge issuing is not available in this test.");
+        }
+
+        public void CancelPendingLogins(Client client)
+        {
+        }
+
+        public ValueTask<GatewayOidcCallbackResult> AcceptCallbackAsync(
+            string code,
+            string state,
+            string redirectUri,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(GatewayOidcCallbackResult.Rejected("OIDC callback is not available in this test."));
+        }
+
+        public bool IsOidcCompletionToken(string accessToken)
+        {
+            return false;
+        }
+
+        public ValueTask<GatewayClientTokenValidationResult> ValidateOidcCompletionTokenAsync(
+            string accessToken,
+            CancellationToken cancellationToken)
+        {
+            return ValueTask.FromResult(
+                GatewayClientTokenValidationResult.Rejected("OIDC completion token validation is not available in this test."));
         }
     }
 

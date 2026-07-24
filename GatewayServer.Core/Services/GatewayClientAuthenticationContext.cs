@@ -1,4 +1,5 @@
 using GatewayServer.Behaviors;
+using MasterServer.ControlPlane;
 
 namespace GatewayServer.Services;
 
@@ -11,16 +12,48 @@ internal enum GatewayClientAuthenticationState
 public sealed class GatewayClientPrincipal
 {
     public GatewayClientPrincipal(string subjectId)
+        : this(
+            subjectId,
+            GatewayAuthenticationMethodKind.StaticSecret,
+            GatewayAuthenticationDefaults.StaticSecretMethodId)
+    {
+    }
+
+    public GatewayClientPrincipal(
+        string subjectId,
+        GatewayAuthenticationMethodKind authenticationMethodKind,
+        string authenticationMethodId)
     {
         if (string.IsNullOrWhiteSpace(subjectId))
         {
             throw new ArgumentException("Gateway client subject id is required.", nameof(subjectId));
         }
 
+        if (!Enum.IsDefined(typeof(GatewayAuthenticationMethodKind), authenticationMethodKind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(authenticationMethodKind));
+        }
+
+        if (string.IsNullOrWhiteSpace(authenticationMethodId))
+        {
+            throw new ArgumentException("Gateway client authentication method id is required.", nameof(authenticationMethodId));
+        }
+
         SubjectId = subjectId.Trim();
+        AuthenticationMethodKind = authenticationMethodKind;
+        AuthenticationMethodId = authenticationMethodId.Trim();
     }
 
     public string SubjectId { get; }
+
+    public GatewayAuthenticationMethodKind AuthenticationMethodKind { get; }
+
+    public string AuthenticationMethodId { get; }
+}
+
+internal static class GatewayAuthenticationDefaults
+{
+    public const string StaticSecretMethodId = "static";
 }
 
 internal sealed class GatewayClientAuthenticationContext

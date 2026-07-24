@@ -10,7 +10,7 @@ internal interface IGatewayClientSecretCredentialWriter
 }
 
 internal sealed class GatewayClientSecretCredentialCatalog :
-    IGatewayClientTokenValidator,
+    IGatewayClientStaticTokenValidator,
     IGatewayClientSecretCredentialWriter
 {
     private const string AccessTokenPrefix = "gwc_";
@@ -19,6 +19,13 @@ internal sealed class GatewayClientSecretCredentialCatalog :
     private Dictionary<string, SecretCredential> m_Secrets = new(StringComparer.Ordinal);
 
     public ValueTask<GatewayClientTokenValidationResult> ValidateAsync(
+        string accessToken,
+        CancellationToken cancellationToken)
+    {
+        return ValidateStaticTokenAsync(accessToken, cancellationToken);
+    }
+
+    public ValueTask<GatewayClientTokenValidationResult> ValidateStaticTokenAsync(
         string accessToken,
         CancellationToken cancellationToken)
     {

@@ -98,7 +98,7 @@ namespace cpp_backend
     packet_frame make_frame(packet_kind kind, std::uint16_t packet_id, std::uint16_t version,
                             std::vector<std::uint8_t> payload, std::uint8_t flags = 0);
 
-    constexpr std::uint16_t master_control_schema_version = 10;
+    constexpr std::uint16_t master_control_schema_version = 11;
     constexpr std::uint16_t master_pid_node_auth_challenge = 100;
     constexpr std::uint16_t master_pid_node_hello = 101;
     constexpr std::uint16_t master_pid_node_accepted = 103;
@@ -116,6 +116,7 @@ namespace cpp_backend
     };
 
     constexpr std::uint16_t gateway_backend_channel_version = 1;
+    constexpr std::uint16_t gateway_backend_channel_open_version = 2;
     constexpr std::uint16_t pid_gate_backend_channel_data = 8;
     constexpr std::uint16_t pid_gate_backend_channel_close = 9;
     constexpr std::uint16_t pid_gate_backend_channel_open = 10;
@@ -150,10 +151,18 @@ namespace cpp_backend
         deprecated = 2,
     };
 
+    enum class gateway_authentication_method_kind : std::uint8_t
+    {
+        static_secret = 1,
+        oidc_authorization_code = 2,
+    };
+
     struct gateway_backend_channel_open
     {
         std::uint32_t channel_id = 0;
         std::optional<std::string> principal_subject_id;
+        std::optional<gateway_authentication_method_kind> principal_authentication_method_kind;
+        std::optional<std::string> principal_authentication_method_id;
     };
 
     struct gateway_backend_channel_data_envelope

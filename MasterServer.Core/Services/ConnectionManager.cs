@@ -388,7 +388,8 @@ internal sealed class ConnectionManager(
                 advertised.GatewayEndpoint,
                 advertised.ManifestId,
                 advertised.ManifestHash,
-                advertised.Descriptor);
+                advertised.Descriptor,
+                advertised.AuthenticationMethods);
             logger.LogInformation(
                 "Backend node advertised Gateway endpoint. ConnectionId={ConnectionId}, NodeKind={NodeKind}, BackendKind={BackendKind}, NodeId={NodeId}, Endpoint={Address}:{Port}, UseTls={UseTls}, ManifestId={ManifestId}, ManifestHash={ManifestHash}, State={State}, DescriptorVersion={DescriptorVersion}, DescriptorHash={DescriptorHash}.",
                 connection.ConnectionId,
@@ -1743,6 +1744,8 @@ internal sealed class ConnectionManager(
 
         public BackendServerDescriptor? BackendDescriptor { get; private set; }
 
+        public GatewayAuthenticationMethodDefinition[] BackendAuthenticationMethods { get; private set; } = [];
+
         public DateTimeOffset? BackendGatewayEndpointAdvertisedAt { get; private set; }
 
         public void AttachStream(Stream stream)
@@ -1778,13 +1781,15 @@ internal sealed class ConnectionManager(
             MasterSocketEndpoint endpoint,
             BackendPacketManifestId manifestId,
             BackendPacketManifestHash manifestHash,
-            BackendServerDescriptor descriptor)
+            BackendServerDescriptor descriptor,
+            GatewayAuthenticationMethodDefinition[] authenticationMethods)
         {
             BackendKind = backendKind;
             BackendGatewayEndpoint = endpoint;
             BackendManifestId = manifestId;
             BackendManifestHash = manifestHash;
             BackendDescriptor = descriptor;
+            BackendAuthenticationMethods = authenticationMethods;
             BackendGatewayEndpointAdvertisedAt = DateTimeOffset.UtcNow;
             MarkSeen();
         }
@@ -1865,6 +1870,7 @@ internal sealed class ConnectionManager(
                 BackendManifestId.Value,
                 BackendManifestHash.Value,
                 BackendDescriptor,
+                BackendAuthenticationMethods,
                 advertisedAt.Value);
         }
 

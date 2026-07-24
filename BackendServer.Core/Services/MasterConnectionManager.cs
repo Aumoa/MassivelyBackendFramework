@@ -318,7 +318,8 @@ internal sealed class MasterConnectionManager(
             new BackendPacketManifestHash(manifestHash),
             m_Options.ServerState,
             m_Options.ServerDescriptorVersion,
-            m_Options.ServerDescriptorJson);
+            m_Options.ServerDescriptorJson,
+            CreateGatewayAuthenticationMethods());
         using var frame = PacketCodec.Encode(
             PacketKind.Control,
             MasterControlPacketIds.BackendEndpointAdvertise,
@@ -548,6 +549,13 @@ internal sealed class MasterConnectionManager(
             m_Options.ServerState,
             m_Options.ServerDescriptorVersion,
             m_Options.ServerDescriptorJson);
+        _ = CreateGatewayAuthenticationMethods();
+    }
+
+    private GatewayAuthenticationMethodDefinition[] CreateGatewayAuthenticationMethods()
+    {
+        return [.. m_Options.GatewayAuthenticationMethods
+            .Select(static method => method.ToDefinition())];
     }
 
     private void SetStatus(

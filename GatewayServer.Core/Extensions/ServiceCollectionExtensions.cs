@@ -14,10 +14,17 @@ public static class ServiceCollectionExtensions
         s.Configure<MasterConnectionOptions>(config.GetSection("MasterConnection"));
         s.Configure<BackendConnectionOptions>(config.GetSection("BackendConnection"));
         s.Configure<BackendRouteOptions>(config.GetSection("BackendRoute"));
+        s.Configure<GatewayAuthenticationOptions>(config.GetSection("GatewayAuthentication"));
 
         s.AddSingleton<IGatewayClientAuthenticationContextFactory, GatewayClientAuthenticationContextFactory>();
+        s.AddHttpClient(GatewayOidcAuthenticationService.HttpClientName);
+        s.AddSingleton<GatewayOidcAuthenticationService>();
+        s.AddSingleton<IGatewayOidcAuthenticationService>(p => p.GetRequiredService<GatewayOidcAuthenticationService>());
+        s.AddSingleton<IGatewayClientOidcCompletionTokenValidator>(p => p.GetRequiredService<GatewayOidcAuthenticationService>());
+        s.AddSingleton<IGatewayClientAuthenticationChallengeIssuer, GatewayClientAuthenticationChallengeIssuer>();
         s.AddSingleton<GatewayClientSecretCredentialCatalog>();
-        s.TryAddSingleton<IGatewayClientTokenValidator>(p => p.GetRequiredService<GatewayClientSecretCredentialCatalog>());
+        s.AddSingleton<IGatewayClientStaticTokenValidator>(p => p.GetRequiredService<GatewayClientSecretCredentialCatalog>());
+        s.TryAddSingleton<IGatewayClientTokenValidator, GatewayClientTokenValidator>();
         s.AddSingleton<IGatewayClientSecretCredentialWriter>(p => p.GetRequiredService<GatewayClientSecretCredentialCatalog>());
         s.AddSingleton<GatewayBackendRoutePolicyCatalog>();
         s.AddSingleton<IGatewayBackendRoutePolicyProvider>(p => p.GetRequiredService<GatewayBackendRoutePolicyCatalog>());
