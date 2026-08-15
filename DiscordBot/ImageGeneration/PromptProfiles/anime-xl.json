@@ -3,7 +3,7 @@
   "fixedPositive": "masterpiece, best quality, score_9, score_8, newest, highres, absurdres, very aesthetic, anime illustration, sharp focus, clean lineart, detailed eyes, detailed background, vivid colors, detailed shading, soft shading, ambient occlusion, specular highlight, subsurface scattering, glossy hair, glossy fabric, detailed clothing texture",
   "fixedNegative": "worst quality, low quality, bad quality, normal quality, average quality, score_1, score_2, score_3, oldest, old, early, very displeasing, displeasing, lowres, blurry, jpeg artifacts, bad anatomy, bad hands, missing fingers, extra fingers, extra digits, fewer digits, text, watermark, artist name, thick lineart, bold lineart, flat shading, flat color, simple shading",
   "recommendedPositive": "layered depth, rim light, ambient light, soft lighting, bokeh, depth of field, volumetric lighting",
-  "recommendedNegative": "cropped, deformed, mutated, ugly, disfigured, censor",
+  "recommendedNegative": "cropped, deformed, mutated, ugly, disfigured",
   "rules": [
     "사용자가 이미지 생성, 그림 그리기 등을 요청하면 반드시 generate_image 도구를 호출한다.",
     "고정 긍정/부정 태그는 시스템이 자동으로 추가하므로 positive_prompt와 negative_prompt에 직접 포함하지 않는다.",
