@@ -196,6 +196,10 @@ public class OllamaChatHistory(
                             if (function != null)
                             {
                                 var args = function.BuildArguments(toolCall.Arguments, cancellationToken);
+                                logger.LogInformation(
+                                    "Invoking tool {FunctionName} with arguments {Arguments}",
+                                    toolCall.FunctionName,
+                                    toolCall.Arguments.GetRawText());
                                 var result = function.Invocable(args);
                                 var toolResult = await NormalizeToolResultAsync(result);
 
@@ -223,6 +227,10 @@ public class OllamaChatHistory(
                             }
                             else
                             {
+                                logger.LogWarning(
+                                    "Tool call requested unknown function {FunctionName} with arguments {Arguments}",
+                                    toolCall.FunctionName,
+                                    toolCall.Arguments.GetRawText());
                                 messagesAppend.Add(new ChatMessage
                                 {
                                     Role = ChatRole.Tool,
