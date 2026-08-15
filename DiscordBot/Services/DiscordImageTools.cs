@@ -238,7 +238,7 @@ internal class DiscordImageTools(
 
             if (TryParsePromptDraft(response, out var promptDraft))
             {
-                return NormalizePromptDraft(promptDraft, fallback);
+                return ApplyFixedTags(NormalizePromptDraft(promptDraft, fallback));
             }
 
             logger.LogWarning("Failed to parse image prompt draft. Response: {Response}", response);
@@ -248,7 +248,15 @@ internal class DiscordImageTools(
             logger.LogWarning(e, "Failed to generate image prompt draft. Falling back to direct request prompt.");
         }
 
-        return fallback;
+        return ApplyFixedTags(fallback);
+    }
+
+    private ImagePromptDraft ApplyFixedTags(ImagePromptDraft promptDraft)
+    {
+        var (positivePrompt, negativePrompt) = promptProfileProvider.ApplyFixedTags(
+            promptDraft.PositivePrompt,
+            promptDraft.NegativePrompt);
+        return new ImagePromptDraft(positivePrompt, negativePrompt);
     }
 
     private static string BuildPromptGenerationUserMessage(string userRequest)

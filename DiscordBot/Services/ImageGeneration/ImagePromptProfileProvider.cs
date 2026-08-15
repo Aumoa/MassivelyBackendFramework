@@ -34,17 +34,31 @@ public sealed class ImagePromptProfileProvider(
             sb.AppendLine();
         }
 
-        if (!string.IsNullOrWhiteSpace(profile.QualityPositive))
+        if (!string.IsNullOrWhiteSpace(profile.FixedPositive))
         {
-            sb.AppendLine("[공통 긍정 품질 태그]");
-            sb.AppendLine(profile.QualityPositive.Trim());
+            sb.AppendLine("[고정 긍정 품질 태그 (시스템이 자동 추가)]");
+            sb.AppendLine(profile.FixedPositive.Trim());
             sb.AppendLine();
         }
 
-        if (!string.IsNullOrWhiteSpace(profile.QualityNegative))
+        if (!string.IsNullOrWhiteSpace(profile.FixedNegative))
         {
-            sb.AppendLine("[공통 부정 품질 태그]");
-            sb.AppendLine(profile.QualityNegative.Trim());
+            sb.AppendLine("[고정 부정 품질 태그 (시스템이 자동 추가)]");
+            sb.AppendLine(profile.FixedNegative.Trim());
+            sb.AppendLine();
+        }
+
+        if (!string.IsNullOrWhiteSpace(profile.RecommendedPositive))
+        {
+            sb.AppendLine("[권장 긍정 태그 (기본 포함, 요청과 충돌 시 제외 가능)]");
+            sb.AppendLine(profile.RecommendedPositive.Trim());
+            sb.AppendLine();
+        }
+
+        if (!string.IsNullOrWhiteSpace(profile.RecommendedNegative))
+        {
+            sb.AppendLine("[권장 부정 태그 (기본 포함, 요청과 충돌 시 제외 가능)]");
+            sb.AppendLine(profile.RecommendedNegative.Trim());
             sb.AppendLine();
         }
 
@@ -73,6 +87,8 @@ public sealed class ImagePromptProfileProvider(
         sb.AppendLine(@"출력 형식: {""positive_prompt"":""..."",""negative_prompt"":""...""}");
         sb.AppendLine("positive_prompt와 negative_prompt는 영어 태그와 짧은 영어 구문 중심으로 작성하세요.");
         sb.AppendLine("사용자 요청에 없는 구체적인 캐릭터 특징, 머리색, 의상, 배경, 구도는 예시에서 가져오지 마세요.");
+        sb.AppendLine("고정 품질 태그는 시스템이 응답 이후 자동으로 추가하므로, positive_prompt와 negative_prompt에 절대 포함하지 마세요.");
+        sb.AppendLine("권장 태그는 기본적으로 positive_prompt 또는 negative_prompt에 포함하되, 사용자 요청과 형식적으로 충돌하는 개별 항목만 제외하세요.");
         sb.AppendLine();
 
         var profile = LoadProfile();
@@ -96,17 +112,17 @@ public sealed class ImagePromptProfileProvider(
             sb.AppendLine();
         }
 
-        if (!string.IsNullOrWhiteSpace(profile.QualityPositive))
+        if (!string.IsNullOrWhiteSpace(profile.RecommendedPositive))
         {
-            sb.AppendLine("[positive_prompt에 포함할 공통 긍정 품질 태그]");
-            sb.AppendLine(profile.QualityPositive.Trim());
+            sb.AppendLine("[positive_prompt에 기본 포함할 권장 태그 (충돌 시에만 제외)]");
+            sb.AppendLine(profile.RecommendedPositive.Trim());
             sb.AppendLine();
         }
 
-        if (!string.IsNullOrWhiteSpace(profile.QualityNegative))
+        if (!string.IsNullOrWhiteSpace(profile.RecommendedNegative))
         {
-            sb.AppendLine("[negative_prompt에 포함할 공통 부정 품질 태그]");
-            sb.AppendLine(profile.QualityNegative.Trim());
+            sb.AppendLine("[negative_prompt에 기본 포함할 권장 태그 (충돌 시에만 제외)]");
+            sb.AppendLine(profile.RecommendedNegative.Trim());
             sb.AppendLine();
         }
 
@@ -137,19 +153,46 @@ public sealed class ImagePromptProfileProvider(
             return (positivePrompt, negativePrompt);
         }
 
-        if (!string.IsNullOrWhiteSpace(profile.QualityPositive))
+        if (!string.IsNullOrWhiteSpace(profile.RecommendedPositive))
         {
             positivePrompt = string.IsNullOrWhiteSpace(positivePrompt)
-                ? profile.QualityPositive.Trim()
-                : positivePrompt + ", " + profile.QualityPositive.Trim();
+                ? profile.RecommendedPositive.Trim()
+                : positivePrompt + ", " + profile.RecommendedPositive.Trim();
         }
 
-        if (!string.IsNullOrWhiteSpace(profile.QualityNegative))
+        if (!string.IsNullOrWhiteSpace(profile.RecommendedNegative))
         {
-            negativePrompt = profile.QualityNegative.Trim();
+            negativePrompt = profile.RecommendedNegative.Trim();
         }
 
         return (positivePrompt, negativePrompt);
+    }
+
+    // LLM 초안/폴백 결과와 무관하게 고정 품질 태그를 항상 강제로 덧붙인다.
+    public (string PositivePrompt, string NegativePrompt) ApplyFixedTags(string positivePrompt, string negativePrompt)
+    {
+        var profile = LoadProfile();
+        if (profile == null)
+        {
+            return (positivePrompt, negativePrompt);
+        }
+
+        var mergedPositive = string.IsNullOrWhiteSpace(profile.FixedPositive)
+            ? positivePrompt
+            : Combine(profile.FixedPositive.Trim(), positivePrompt);
+
+        var mergedNegative = string.IsNullOrWhiteSpace(profile.FixedNegative)
+            ? negativePrompt
+            : Combine(profile.FixedNegative.Trim(), negativePrompt);
+
+        return (mergedPositive, mergedNegative);
+    }
+
+    private static string Combine(string fixedTags, string rest)
+    {
+        return string.IsNullOrWhiteSpace(rest)
+            ? fixedTags
+            : fixedTags + ", " + rest.Trim();
     }
 
     private ImagePromptProfile? LoadProfile()
@@ -182,9 +225,13 @@ public sealed class ImagePromptProfileProvider(
     {
         public string Name { get; init; } = "";
 
-        public string QualityPositive { get; init; } = "";
+        public string FixedPositive { get; init; } = "";
 
-        public string QualityNegative { get; init; } = "";
+        public string FixedNegative { get; init; } = "";
+
+        public string RecommendedPositive { get; init; } = "";
+
+        public string RecommendedNegative { get; init; } = "";
 
         public List<string> Rules { get; init; } = [];
 
