@@ -21,6 +21,7 @@ public class OllamaChatHistory(
         "get_reply_thread_context",
         "get_chat_context",
         "get_current_discord_user_authorization",
+        "generate_image",
         "load_chat_image",
         "load_chat_images",
         "load_chat_attachment",
