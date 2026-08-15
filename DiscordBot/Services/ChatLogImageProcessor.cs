@@ -19,7 +19,7 @@ internal interface IChatLogImageProcessor
 
 internal sealed class ChatLogImageProcessor : IChatLogImageProcessor
 {
-    private const int MaxDimension = 512;
+    private const int MaxDimension = 1024;
     private const string StoredContentType = "image/png";
 
     public async ValueTask<ProcessedChatImage> ProcessAsync(
