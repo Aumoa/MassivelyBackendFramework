@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using DiscordBot.Options;
+using DiscordBot.Repositories;
 using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services.ImageGeneration;
@@ -10,7 +11,7 @@ namespace DiscordBot.Services.ImageGeneration;
 public sealed class ComfyUIClient(
     HttpClient http,
     IOptions<ImageGenerationOptions> options,
-    IHostEnvironment environment,
+    IImageGenerationWorkflowRepository workflowRepository,
     ILogger<ComfyUIClient> logger) : IImageGenerationClient
 {
     private readonly ImageGenerationOptions m_Options = options.Value;
@@ -68,20 +69,15 @@ public sealed class ComfyUIClient(
 
     private async Task<JsonObject> LoadWorkflowAsync(CancellationToken cancellationToken)
     {
-        var path = m_Options.WorkflowPath;
-        if (!Path.IsPathRooted(path))
+        var workflow = await workflowRepository.GetAsync(cancellationToken);
+        if (workflow == null)
         {
-            path = Path.Combine(environment.ContentRootPath, path);
+            throw new InvalidOperationException(
+                "No ComfyUI workflow is configured. Upsert one into the image_generation_workflows table.");
         }
 
-        if (!File.Exists(path))
-        {
-            throw new FileNotFoundException($"ComfyUI workflow file was not found: {path}", path);
-        }
-
-        var json = await File.ReadAllTextAsync(path, cancellationToken);
-        return JsonNode.Parse(json)?.AsObject()
-            ?? throw new InvalidOperationException($"ComfyUI workflow file is not a JSON object: {path}");
+        return JsonNode.Parse(workflow.WorkflowJson)?.AsObject()
+            ?? throw new InvalidOperationException("Stored ComfyUI workflow is not a JSON object.");
     }
 
     private async Task<string> QueuePromptAsync(JsonObject workflow, string clientId, CancellationToken cancellationToken)

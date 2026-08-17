@@ -4,8 +4,6 @@ public class ImageGenerationOptions
 {
     public string BaseUrl { get; set; } = "http://localhost:8188";
 
-    public string WorkflowPath { get; set; } = Path.Combine("ImageGeneration", "Workflows", "anime-xl.api.json");
-
     public string PromptProfilePath { get; set; } = Path.Combine("ImageGeneration", "PromptProfiles", "anime-xl.json");
 
     public string ClientId { get; set; } = "discordbot";
