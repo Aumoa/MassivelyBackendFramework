@@ -7,7 +7,7 @@
     {
         if (firstRender)
         {
-            Auth.NavigateToLogin(Nav, "auth/redirect", "openid profile email groups");
+            Auth.NavigateToLogin(Nav, "auth/redirect", "openid profile email roles");
         }
         return base.OnAfterRenderAsync(firstRender);
     }

@@ -12,7 +12,8 @@ public static class ScopePolicy
         "email",
         "address",
         "phone",
-        "groups"
+        "groups",
+        "roles"
     ];
 
     public static readonly string[] SupportedScopes =
@@ -23,6 +24,7 @@ public static class ScopePolicy
         "address",
         "phone",
         "groups",
+        "roles",
         OfflineAccessScope
     ];
 

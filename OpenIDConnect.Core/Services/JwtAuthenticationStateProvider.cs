@@ -98,6 +98,12 @@ internal class JwtAuthenticationStateProvider(
                 identity.AddClaim(new Claim(ClaimTypes.Role, role));
             }
 
+            foreach (var claim in identity.FindAll("roles").ToArray())
+            {
+                var role = claim.Value;
+                identity.AddClaim(new Claim(ClaimTypes.Role, role));
+            }
+
             m_CurrentUser = new ClaimsPrincipal(identity);
 
             var tokenExpiryUtc = validatedToken.Token.ValidTo.ToUniversalTime();
