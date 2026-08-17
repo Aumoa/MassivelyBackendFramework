@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
@@ -28,6 +29,7 @@ internal class JwtAuthenticationStateProvider(
     IDataProtectionProvider dataProtectionProvider) : AuthenticationStateProvider, IAuthenticationStateProvider
 {
     private const int PkceStateLifetimeMinutes = 10;
+    private static readonly string[] RoleClaimTypes = ["groups", "roles"];
     private static readonly JwtSecurityTokenHandler TokenReader = new()
     {
         MapInboundClaims = false
@@ -93,21 +95,15 @@ internal class JwtAuthenticationStateProvider(
 
             var identity = new ClaimsIdentity(validatedToken.Principal.Claims, "JwtAuthType");
 
-            // Temporary diagnostic for the OAuth2 v1 roles-claim cutover; remove once confirmed.
-            logger.LogInformation(
-                "ID token claims: {Claims}",
-                string.Join(", ", identity.Claims.Select(c => $"{c.Type}={c.Value}")));
-
-            foreach (var claim in identity.FindAll("groups").ToArray())
+            foreach (var claimType in RoleClaimTypes)
             {
-                var role = claim.Value;
-                identity.AddClaim(new Claim(ClaimTypes.Role, role));
-            }
-
-            foreach (var claim in identity.FindAll("roles").ToArray())
-            {
-                var role = claim.Value;
-                identity.AddClaim(new Claim(ClaimTypes.Role, role));
+                foreach (var claim in identity.FindAll(claimType).ToArray())
+                {
+                    foreach (var role in ParseRoleClaimValues(claim.Value))
+                    {
+                        identity.AddClaim(new Claim(ClaimTypes.Role, role));
+                    }
+                }
             }
 
             m_CurrentUser = new ClaimsPrincipal(identity);
@@ -449,6 +445,18 @@ internal class JwtAuthenticationStateProvider(
             .Replace('+', '-')
             .Replace('/', '_')
             .TrimEnd('=');
+    }
+
+    private static IEnumerable<string> ParseRoleClaimValues(string value)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<string[]>(value) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [value];
+        }
     }
 
     private static bool IsValidPkceParameter(string value)
