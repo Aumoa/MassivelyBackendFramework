@@ -528,6 +528,12 @@
   <data name="MANAGE_APPLICATION_USERGROUPS_SECTION_DESC" xml:space="preserve">
     <value>이 애플리케이션에 대한 사용자 그룹을 지정합니다</value>
   </data>
+  <data name="MANAGE_APPLICATION_ROLES_SECTION" xml:space="preserve">
+    <value>역할</value>
+  </data>
+  <data name="MANAGE_APPLICATION_ROLES_SECTION_DESC" xml:space="preserve">
+    <value>이 애플리케이션의 역할을 정의하고 계정을 할당합니다. Role ID는 roles claim에 포함됩니다.</value>
+  </data>
   <data name="CLIENTFORM_BUTTON_ADD_URI" xml:space="preserve">
     <value>URI 추가</value>
   </data>

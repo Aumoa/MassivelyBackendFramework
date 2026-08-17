@@ -20,5 +20,6 @@ public partial class Scripts : IScripts
         yield return new _11__Add_oauth_grant();
         yield return new _12__Add_account_updated_at();
         yield return new _13__Add_account_picture();
+        yield return new _14__Add_client_role();
     }
 }

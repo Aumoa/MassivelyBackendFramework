@@ -11,7 +11,7 @@ namespace OAuth2.Controllers;
 
 [ApiController]
 [Route("api/v1/token")]
-public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IClientUserGroups groups, ITokenIssuer tokenIssuer, IOptions<HostOptions> hostOptions, IApiKeys apiKeys, IClients clients, ILogger<TokenController> logger) : ControllerBase
+public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses accesses, IJwt jwt, IAccounts accounts, IAccountClaims accountClaims, IClientClaims clientClaims, IClientUserGroups groups, IClientRoles roles, ITokenIssuer tokenIssuer, IOptions<HostOptions> hostOptions, IApiKeys apiKeys, IClients clients, ILogger<TokenController> logger) : ControllerBase
 {
     [HttpPost]
     public async ValueTask<IActionResult> PostAsync([FromForm] TokenRequest request, CancellationToken cancellationToken)
@@ -332,12 +332,13 @@ public class TokenController(IAuthorizationCodes authorizationCodes, IAccesses a
 
         var claims = await accountClaims.GetClaimsAsync(newAccess.Value.Id, cancellationToken);
         var groupsClaim = await groups.GetClientUserGroupsAsync(request.ClientId, newAccess.Value.Sub, cancellationToken);
+        var rolesClaim = await roles.GetAccountRolesAsync(request.ClientId, newAccess.Value.Id, cancellationToken);
 
         // Issue IdToken only when openid scope is present
         string? idToken = null;
         if (newAccess.Value.Scope.Split(' ').Any(p => p is "openid" or "all"))
         {
-            idToken = jwt.Issue(newAccess.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, newAccess.Value.Scope, [.. claims, .. groupsClaim], null, true, newAccess.Value.AuthTime));
+            idToken = jwt.Issue(newAccess.Value.ClientId, jwt.ConfigureClaims(rawAccount.Value, newAccess.Value.Scope, [.. claims, .. groupsClaim, .. rolesClaim], null, true, newAccess.Value.AuthTime));
         }
 
         var canReturnRefreshToken = newAccess.Value.ClientId == hostOptions.Value.ClientId ||

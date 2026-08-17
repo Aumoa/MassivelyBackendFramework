@@ -9,6 +9,7 @@ internal class TokenIssuer(
     IAccesses accesses,
     IAccountClaims accountClaims,
     IClientUserGroups groups,
+    IClientRoles roles,
     IJwt jwt,
     IOptions<HostOptions> hostOptions,
     IAccountPictures accountPictures)
@@ -27,11 +28,12 @@ internal class TokenIssuer(
         }
 
         var groupsClaim = await groups.GetClientUserGroupsAsync(clientId, sub, cancellationToken);
+        var rolesClaim = await roles.GetAccountRolesAsync(clientId, accountId, cancellationToken);
 
         string? idToken = null;
         if (scope.Split(' ').Any(p => p is "openid" or "all"))
         {
-            idToken = jwt.Issue(clientId, jwt.ConfigureClaims(rawAccount, scope, [.. claims, .. groupsClaim], nonce, true, authTime, acr));
+            idToken = jwt.Issue(clientId, jwt.ConfigureClaims(rawAccount, scope, [.. claims, .. groupsClaim, .. rolesClaim], nonce, true, authTime, acr));
         }
 
         var canReturnRefreshToken = clientId == hostOptions.Value.ClientId || ScopePolicy.HasOfflineAccess(scope);

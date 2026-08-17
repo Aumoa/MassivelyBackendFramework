@@ -4,6 +4,7 @@
 @using OAuth2.DTO
 @inject IClientClaims Claims
 @inject IClientUserGroups UserGroups
+@inject IClientRoles Roles
 @inject IAccounts Accounts
 @inject IClients Clients
 @inject NavigationManager Nav
@@ -179,6 +180,95 @@
         <div class="form-section">
             <div class="section-header">
                 <div class="section-header-text">
+                    <h3 class="section-title">@Strings.MANAGE_APPLICATION_ROLES_SECTION</h3>
+                    <p class="section-desc">@Strings.MANAGE_APPLICATION_ROLES_SECTION_DESC</p>
+                </div>
+            </div>
+            <div class="section-body">
+                <div class="redirect-uris-container">
+                    @foreach (var role in m_ClientRoles)
+                    {
+                        var roleId = role.Id;
+                        <div class="uri-row">
+                            <div class="uri-input-wrap">
+                                <code>@role.Id</code> &mdash; @role.Name
+                            </div>
+                            <button type="button" class="btn-icon-action btn-delete" @onclick="() => DeleteClientRoleAsync(roleId)" title="@Strings.CLIENTFORM_BUTTON_REMOVE">
+                                <span class="material-symbols-outlined">delete</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+                <div class="add-user-group-panel">
+                    <div class="add-user-group-inputs">
+                        <FloatingInput @bind-Value="m_NewRoleId" Type="text" Placeholder="Role ID" />
+                        <FloatingInput @bind-Value="m_NewRoleName" Type="text" Placeholder="Role name" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(m_NewRoleErrorMessage))
+                    {
+                        <div class="add-user-group-error">
+                            <span class="material-symbols-outlined add-user-group-error-icon">error</span>
+                            <span>@m_NewRoleErrorMessage</span>
+                        </div>
+                    }
+                    <button @onclick="AddClientRoleAsync" type="button" class="btn-text-add">
+                        <span class="material-symbols-outlined">add</span>
+                        @Strings.CLIENTFORM_BUTTON_ADD
+                    </button>
+                </div>
+
+                @foreach (var accountRoles in m_RoleAssignments.GroupBy(r => r.AccountId))
+                {
+                    var firstItem = accountRoles.First();
+                    <div class="user-group-block">
+                        <div class="user-group-account">
+                            <span class="material-symbols-outlined user-icon">person</span>
+                            <span class="user-account-id">@firstItem.AccountId</span>
+                        </div>
+                        @foreach (var assignment in accountRoles)
+                        {
+                            var roleId = assignment.RoleId;
+                            var accountId = assignment.AccountId;
+                            <div class="uri-row">
+                                <div class="uri-input-wrap">
+                                    <code>@assignment.RoleId</code> &mdash; @assignment.RoleName
+                                </div>
+                                <button type="button" class="btn-icon-action btn-delete" @onclick="() => RemoveRoleAssignmentAsync(roleId, accountId)" title="@Strings.CLIENTFORM_BUTTON_REMOVE">
+                                    <span class="material-symbols-outlined">delete</span>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+                <div class="add-user-group-panel">
+                    <div class="add-user-group-inputs">
+                        <FloatingInput @bind-Value="m_NewAssignmentUserIdentifier" HasError="@m_HasNewAssignmentUserError" Type="text" Placeholder="User ID / Email / Sub" />
+                        <select class="form-select" @bind="m_NewAssignmentRoleId">
+                            <option value="">Role</option>
+                            @foreach (var role in m_ClientRoles)
+                            {
+                                <option value="@role.Id">@role.Id (@role.Name)</option>
+                            }
+                        </select>
+                    </div>
+                    @if (!string.IsNullOrEmpty(m_NewAssignmentErrorMessage))
+                    {
+                        <div class="add-user-group-error">
+                            <span class="material-symbols-outlined add-user-group-error-icon">error</span>
+                            <span>@m_NewAssignmentErrorMessage</span>
+                        </div>
+                    }
+                    <button @onclick="AddRoleAssignmentAsync" type="button" class="btn-text-add">
+                        <span class="material-symbols-outlined">person_add</span>
+                        @Strings.CLIENTFORM_BUTTON_ADD
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-header">
+                <div class="section-header-text">
                     <h3 class="section-title">@Strings.MANAGE_APPLICATION_SECRETS_SECTION</h3>
                     <p class="section-desc">@Strings.MANAGE_APPLICATION_SECRETS_SECTION_DESC</p>
                 </div>
@@ -278,6 +368,15 @@
     private string? m_NewGroupName;
     private bool m_HasNewUserError;
     private string? m_NewUserErrorMessage;
+    private ClientRole[] m_ClientRoles = [];
+    private ClientRoleAssignment[] m_RoleAssignments = [];
+    private string? m_NewRoleId;
+    private string? m_NewRoleName;
+    private string? m_NewRoleErrorMessage;
+    private string? m_NewAssignmentUserIdentifier;
+    private string? m_NewAssignmentRoleId;
+    private bool m_HasNewAssignmentUserError;
+    private string? m_NewAssignmentErrorMessage;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -289,6 +388,7 @@
         await RefreshRedirectUrisAsync(Id);
         await RefreshScopesAsync(Id);
         await RefreshUserGroupsAsync(Id);
+        await RefreshClientRolesAsync(Id);
         await RefreshSecretsAsync(Id);
     }
 
@@ -479,6 +579,74 @@
                 OriginGroup = g.Group,
                 Group = g.Group
             })];
+    }
+
+    public async Task AddClientRoleAsync()
+    {
+        m_NewRoleErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(m_NewRoleId) || string.IsNullOrWhiteSpace(m_NewRoleName))
+        {
+            return;
+        }
+
+        await Roles.AddClientRoleAsync(Id, m_NewRoleId.Trim(), m_NewRoleName.Trim());
+        m_NewRoleId = null;
+        m_NewRoleName = null;
+        await RefreshClientRolesAsync(Id);
+    }
+
+    public async Task DeleteClientRoleAsync(string roleId)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        await Roles.RemoveClientRoleAsync(Id, roleId);
+        await RefreshClientRolesAsync(Id);
+    }
+
+    public async Task AddRoleAssignmentAsync()
+    {
+        m_HasNewAssignmentUserError = false;
+        m_NewAssignmentErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(m_NewAssignmentUserIdentifier) || string.IsNullOrWhiteSpace(m_NewAssignmentRoleId))
+        {
+            return;
+        }
+
+        var sub = await Accounts.ResolveSubAsync(m_NewAssignmentUserIdentifier.Trim());
+        var accountId = sub == null ? null : await Accounts.GetIdFromSubAsync(sub);
+        if (accountId == null)
+        {
+            m_HasNewAssignmentUserError = true;
+            m_NewAssignmentErrorMessage = Strings.CLIENTFORM_ERROR_USER_NOT_FOUND;
+            return;
+        }
+
+        await Roles.AssignRoleAsync(Id, m_NewAssignmentRoleId, accountId);
+        m_NewAssignmentUserIdentifier = null;
+        m_NewAssignmentRoleId = null;
+        await RefreshClientRolesAsync(Id);
+    }
+
+    public async Task RemoveRoleAssignmentAsync(string roleId, string accountId)
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            return;
+        }
+
+        await Roles.RemoveRoleAssignmentAsync(Id, roleId, accountId);
+        await RefreshClientRolesAsync(Id);
+    }
+
+    private async ValueTask RefreshClientRolesAsync(string id)
+    {
+        m_ClientRoles = await Roles.GetClientRolesAsync(id);
+        m_RoleAssignments = await Roles.GetClientRoleAssignmentsAsync(id);
     }
 
     private Task OnCancelAsync()

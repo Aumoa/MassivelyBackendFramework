@@ -878,7 +878,25 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("MANAGE_APPLICATION_USERGROUPS_SECTION_DESC", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Roles과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_ROLES_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_ROLES_SECTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Define roles for this application and assign accounts to them. The role ID is included in the roles claim.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_APPLICATION_ROLES_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGE_APPLICATION_ROLES_SECTION_DESC", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Create your first client application to get started과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>

@@ -528,6 +528,12 @@
   <data name="MANAGE_APPLICATION_USERGROUPS_SECTION_DESC" xml:space="preserve">
     <value>Assign users to groups for this application</value>
   </data>
+  <data name="MANAGE_APPLICATION_ROLES_SECTION" xml:space="preserve">
+    <value>Roles</value>
+  </data>
+  <data name="MANAGE_APPLICATION_ROLES_SECTION_DESC" xml:space="preserve">
+    <value>Define roles for this application and assign accounts to them. The role ID is included in the roles claim.</value>
+  </data>
   <data name="CLIENTFORM_BUTTON_ADD_URI" xml:space="preserve">
     <value>Add URI</value>
   </data>

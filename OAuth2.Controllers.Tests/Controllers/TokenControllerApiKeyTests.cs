@@ -124,6 +124,7 @@ public sealed class TokenControllerApiKeyTests
             new AccountClaimsStub(),
             clientClaims ?? new ClientClaimsStub("profile"),
             new ClientUserGroupsStub(),
+            new ClientRolesStub(),
             tokenIssuer ?? new TokenIssuerStub(),
             Microsoft.Extensions.Options.Options.Create(new HostOptions
             {
@@ -470,6 +471,44 @@ public sealed class TokenControllerApiKeyTests
         }
 
         public ValueTask RemoveClientUserGroupAsync(long id, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class ClientRolesStub : IClientRoles
+    {
+        public ValueTask<AccountClaim[]> GetAccountRolesAsync(string clientId, string accountId, CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult(Array.Empty<AccountClaim>());
+        }
+
+        public ValueTask<ClientRole[]> GetClientRolesAsync(string clientId, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<ClientRoleAssignment[]> GetClientRoleAssignmentsAsync(string clientId, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask AddClientRoleAsync(string clientId, string roleId, string name, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask RemoveClientRoleAsync(string clientId, string roleId, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask AssignRoleAsync(string clientId, string roleId, string accountId, CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask RemoveRoleAssignmentAsync(string clientId, string roleId, string accountId, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
         }

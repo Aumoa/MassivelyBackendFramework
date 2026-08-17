@@ -266,6 +266,16 @@
     width: 100%;
 }
 
+.form-select {
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 4px;
+    border: 1px solid #dadce0;
+    background: #fff;
+    color: #202124;
+    font-size: 0.875rem;
+}
+
     .add-user-group-inputs > * {
         flex: 1 1 0;
         min-width: 0;

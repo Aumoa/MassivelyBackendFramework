@@ -65,6 +65,56 @@ public sealed class JwtTests
         Assert.DoesNotContain("default-profile.png", picture.Value);
     }
 
+    [Fact]
+    public void ConfigureClaims_EmitsRolesClaimAsJsonArray()
+    {
+        using var fixture = new JwtFixture();
+        var jwt = fixture.CreateJwt();
+        var account = new RawAccount
+        {
+            Sub = "subject",
+            Name = "User Name",
+            Email = "user@example.test",
+            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        var claims = jwt.ConfigureClaims(
+            account,
+            "roles",
+            [new AccountClaim("roles", "[\"admin\"]", DateTime.UtcNow)],
+            nonce: null,
+            idToken: false);
+
+        var roles = Assert.Single(claims, claim => claim.Type == "roles");
+        Assert.Equal("[\"admin\"]", roles.Value);
+        Assert.Equal(JsonClaimValueTypes.Json, roles.ValueType);
+    }
+
+    [Fact]
+    public void ConfigureClaims_OmitsRolesClaimWhenScopeNotRequested()
+    {
+        using var fixture = new JwtFixture();
+        var jwt = fixture.CreateJwt();
+        var account = new RawAccount
+        {
+            Sub = "subject",
+            Name = "User Name",
+            Email = "user@example.test",
+            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        var claims = jwt.ConfigureClaims(
+            account,
+            "profile",
+            [new AccountClaim("roles", "[\"admin\"]", DateTime.UtcNow)],
+            nonce: null,
+            idToken: false);
+
+        Assert.DoesNotContain(claims, claim => claim.Type == "roles");
+    }
+
     public static TheoryData<DateTime, DateTime, DateTime> UpdatedAtCases => new()
     {
         {
