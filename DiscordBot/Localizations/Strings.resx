@@ -169,6 +169,38 @@
     <value>Default max tokens must be greater than 0.</value>
   </data>
 
+  <!-- ImageGenerationWorkflow -->
+  <data name="IMAGE_GENERATION_WORKFLOW_TITLE" xml:space="preserve">
+    <value>Image Generation Workflow</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_SUBTITLE" xml:space="preserve">
+    <value>ComfyUI API-format workflow JSON used by generate_image</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_JSON" xml:space="preserve">
+    <value>Workflow JSON</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_BUTTON_APPLY" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_STATUS_LOADING" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_STATUS_SAVED" xml:space="preserve">
+    <value>Workflow saved.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>Failed to load the workflow.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>Failed to save the workflow.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_ERROR_JSON_REQUIRED" xml:space="preserve">
+    <value>Workflow JSON is required.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_ERROR_JSON_INVALID" xml:space="preserve">
+    <value>Workflow JSON is not a valid JSON object.</value>
+  </data>
+
   <!-- AISkills -->
   <data name="AI_SKILLS_TITLE" xml:space="preserve">
     <value>AI Skills</value>

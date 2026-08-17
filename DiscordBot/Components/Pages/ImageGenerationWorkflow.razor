@@ -1,0 +1,105 @@
+@page "/image-generation-workflow"
+@rendermode InteractiveServer
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IImageGenerationWorkflowService WorkflowService
+
+<PageTitle>@Strings.IMAGE_GENERATION_WORKFLOW_TITLE — @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">@Strings.IMAGE_GENERATION_WORKFLOW_TITLE</h1>
+    <p class="page-subtitle">@Strings.IMAGE_GENERATION_WORKFLOW_SUBTITLE</p>
+</div>
+
+@if (isLoading)
+{
+    <p class="empty-state">@Strings.IMAGE_GENERATION_WORKFLOW_STATUS_LOADING</p>
+}
+else
+{
+    <form class="settings-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <label class="settings-form-full">
+            <span>@Strings.IMAGE_GENERATION_WORKFLOW_LABEL_JSON</span>
+            <textarea class="mono" @bind="workflowJson" disabled="@isBusy" rows="24"></textarea>
+        </label>
+        <button class="btn-primary save-button" type="submit" disabled="@isBusy">
+            <span class="material-symbols-outlined">save</span>
+            @Strings.IMAGE_GENERATION_WORKFLOW_BUTTON_APPLY
+        </button>
+    </form>
+}
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@code {
+    private string workflowJson = string.Empty;
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            workflowJson = await WorkflowService.GetWorkflowJsonAsync() ?? string.Empty;
+        }
+        catch
+        {
+            SetStatus("error", Strings.IMAGE_GENERATION_WORKFLOW_ERROR_LOAD_FAILED);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(workflowJson))
+        {
+            SetStatus("error", Strings.IMAGE_GENERATION_WORKFLOW_ERROR_JSON_REQUIRED);
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await WorkflowService.SaveWorkflowJsonAsync(workflowJson);
+            SetStatus("success", Strings.IMAGE_GENERATION_WORKFLOW_STATUS_SAVED);
+        }
+        catch (ArgumentException)
+        {
+            SetStatus("error", Strings.IMAGE_GENERATION_WORKFLOW_ERROR_JSON_INVALID);
+        }
+        catch
+        {
+            SetStatus("error", Strings.IMAGE_GENERATION_WORKFLOW_ERROR_SAVE_FAILED);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+}

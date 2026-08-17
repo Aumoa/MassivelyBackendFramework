@@ -169,6 +169,38 @@
     <value>기본 최대 토큰은 0보다 커야 합니다.</value>
   </data>
 
+  <!-- ImageGenerationWorkflow -->
+  <data name="IMAGE_GENERATION_WORKFLOW_TITLE" xml:space="preserve">
+    <value>이미지 생성 워크플로</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_SUBTITLE" xml:space="preserve">
+    <value>generate_image에서 사용하는 ComfyUI API 포맷 워크플로 JSON</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_JSON" xml:space="preserve">
+    <value>워크플로 JSON</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_BUTTON_APPLY" xml:space="preserve">
+    <value>적용</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_STATUS_LOADING" xml:space="preserve">
+    <value>불러오는 중...</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_STATUS_SAVED" xml:space="preserve">
+    <value>워크플로를 저장했습니다.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>워크플로를 불러오지 못했습니다.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>워크플로를 저장하지 못했습니다.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_ERROR_JSON_REQUIRED" xml:space="preserve">
+    <value>워크플로 JSON을 입력하세요.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_ERROR_JSON_INVALID" xml:space="preserve">
+    <value>워크플로 JSON이 올바른 JSON 객체가 아닙니다.</value>
+  </data>
+
   <!-- AISkills -->
   <data name="AI_SKILLS_TITLE" xml:space="preserve">
     <value>AI Skill</value>

@@ -266,7 +266,97 @@ namespace DiscordBot.Localizations {
                 return ResourceManager.GetString("CLAUDE_SETTINGS_ERROR_MAX_TOKENS_RANGE", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Image Generation Workflow과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string IMAGE_GENERATION_WORKFLOW_TITLE {
+            get {
+                return ResourceManager.GetString("IMAGE_GENERATION_WORKFLOW_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   ComfyUI API-format workflow JSON used by generate_image과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string IMAGE_GENERATION_WORKFLOW_SUBTITLE {
+            get {
+                return ResourceManager.GetString("IMAGE_GENERATION_WORKFLOW_SUBTITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Workflow JSON과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string IMAGE_GENERATION_WORKFLOW_LABEL_JSON {
+            get {
+                return ResourceManager.GetString("IMAGE_GENERATION_WORKFLOW_LABEL_JSON", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Apply과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string IMAGE_GENERATION_WORKFLOW_BUTTON_APPLY {
+            get {
+                return ResourceManager.GetString("IMAGE_GENERATION_WORKFLOW_BUTTON_APPLY", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Loading...과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string IMAGE_GENERATION_WORKFLOW_STATUS_LOADING {
+            get {
+                return ResourceManager.GetString("IMAGE_GENERATION_WORKFLOW_STATUS_LOADING", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Workflow saved.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string IMAGE_GENERATION_WORKFLOW_STATUS_SAVED {
+            get {
+                return ResourceManager.GetString("IMAGE_GENERATION_WORKFLOW_STATUS_SAVED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Failed to load the workflow.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string IMAGE_GENERATION_WORKFLOW_ERROR_LOAD_FAILED {
+            get {
+                return ResourceManager.GetString("IMAGE_GENERATION_WORKFLOW_ERROR_LOAD_FAILED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Failed to save the workflow.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string IMAGE_GENERATION_WORKFLOW_ERROR_SAVE_FAILED {
+            get {
+                return ResourceManager.GetString("IMAGE_GENERATION_WORKFLOW_ERROR_SAVE_FAILED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Workflow JSON is required.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string IMAGE_GENERATION_WORKFLOW_ERROR_JSON_REQUIRED {
+            get {
+                return ResourceManager.GetString("IMAGE_GENERATION_WORKFLOW_ERROR_JSON_REQUIRED", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Workflow JSON is not a valid JSON object.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string IMAGE_GENERATION_WORKFLOW_ERROR_JSON_INVALID {
+            get {
+                return ResourceManager.GetString("IMAGE_GENERATION_WORKFLOW_ERROR_JSON_INVALID", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Sorry, the content you are looking for does not exist.과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>

@@ -190,6 +190,7 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddTransient<IDiscordUserPermissionRepository, MySqlDiscordUserPermissionRepository>();
     sc.AddScoped<IDiscordUserPermissionService, DiscordUserPermissionService>();
     sc.AddTransient<IImageGenerationWorkflowRepository, MySqlImageGenerationWorkflowRepository>();
+    sc.AddTransient<IImageGenerationWorkflowService, ImageGenerationWorkflowService>();
     sc.AddSingleton<IClaudeSettingsRepository, MySqlClaudeSettingsRepository>();
     sc.AddSingleton<IClaudeSettingsService, ClaudeSettingsService>();
     sc.AddSingleton<MySqlAutoResponseSettingsRepository>();
