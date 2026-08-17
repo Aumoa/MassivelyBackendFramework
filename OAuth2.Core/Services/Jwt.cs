@@ -123,12 +123,16 @@ internal class Jwt : IJwt
                 case "groups":
                     AddGroups();
                     break;
+                case "roles":
+                    AddRoles();
+                    break;
                 case "all":
                     AddProfile();
                     AddEmail();
                     AddAddress();
                     AddPhone();
                     AddGroups();
+                    AddRoles();
                     break;
             }
 
@@ -175,6 +179,11 @@ internal class Jwt : IJwt
             void AddGroups()
             {
                 expectedClaims.Add("groups");
+            }
+
+            void AddRoles()
+            {
+                expectedClaims.Add("roles");
             }
         }
 
@@ -234,7 +243,8 @@ internal class Jwt : IJwt
         [JwtRegisteredClaimNames.EmailVerified] = ClaimValueTypes.Boolean,
         [JwtRegisteredClaimNames.PhoneNumberVerified] = ClaimValueTypes.Boolean,
         [JwtRegisteredClaimNames.Address] = JsonClaimValueTypes.Json,
-        ["groups"] = JsonClaimValueTypes.Json
+        ["groups"] = JsonClaimValueTypes.Json,
+        ["roles"] = JsonClaimValueTypes.Json
     };
 
     public string Issue(string audience, params Claim[] claims)

@@ -1571,7 +1571,43 @@ namespace OAuth2.Localizations {
                 return ResourceManager.GetString("NAVMENU_LABEL_MANAGE_APPLICATIONS", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Manage Roles과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string NAVMENU_LABEL_MANAGE_ROLES {
+            get {
+                return ResourceManager.GetString("NAVMENU_LABEL_MANAGE_ROLES", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Manage Roles과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_ROLES_TITLE {
+            get {
+                return ResourceManager.GetString("MANAGE_ROLES_TITLE", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Account roles과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_ROLES_SECTION {
+            get {
+                return ResourceManager.GetString("MANAGE_ROLES_SECTION", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Assign accounts to roles. The role name is included in the roles claim.과(와) 유사한 지역화된 문자열을 찾습니다.
+        /// </summary>
+        internal static string MANAGE_ROLES_SECTION_DESC {
+            get {
+                return ResourceManager.GetString("MANAGE_ROLES_SECTION_DESC", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Manage My Account과(와) 유사한 지역화된 문자열을 찾습니다.
         /// </summary>

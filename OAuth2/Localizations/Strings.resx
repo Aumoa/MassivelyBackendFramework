@@ -324,6 +324,18 @@
   <data name="NAVMENU_LABEL_MANAGE_APPLICATIONS" xml:space="preserve">
     <value>Manage Applications</value>
   </data>
+  <data name="NAVMENU_LABEL_MANAGE_ROLES" xml:space="preserve">
+    <value>Manage Roles</value>
+  </data>
+  <data name="MANAGE_ROLES_TITLE" xml:space="preserve">
+    <value>Manage Roles</value>
+  </data>
+  <data name="MANAGE_ROLES_SECTION" xml:space="preserve">
+    <value>Account roles</value>
+  </data>
+  <data name="MANAGE_ROLES_SECTION_DESC" xml:space="preserve">
+    <value>Assign accounts to roles. The role name is included in the roles claim.</value>
+  </data>
   <data name="NEWCLIENT_FORM_LABEL_NAME" xml:space="preserve">
     <value>Name</value>
   </data>
