@@ -15,7 +15,6 @@ public class UserInfoController(
     IAccountClaims claims,
     IJwt jwt,
     IClientUserGroups groups,
-    IAccountRoles roles,
     IAccountPictures accountPictures)
     : AuthorizedControllerBase(accesses)
 {
@@ -41,7 +40,7 @@ public class UserInfoController(
                 return Unauthorized("access_token account is invalid.");
             }
 
-            AccountClaim[] accountClaims = [.. await claims.GetClaimsAsync(access.Id, cancellationToken), .. await groups.GetClientUserGroupsAsync(access.ClientId, access.Sub, cancellationToken), .. await roles.GetAccountRolesAsync(access.Sub, cancellationToken)];
+            AccountClaim[] accountClaims = [.. await claims.GetClaimsAsync(access.Id, cancellationToken), .. await groups.GetClientUserGroupsAsync(access.ClientId, access.Sub, cancellationToken)];
             var legacyPictureUrl = GetLatestPictureClaimValue(accountClaims);
             await accountPictures.EnsurePictureAsync(access.Id, legacyPictureUrl, cancellationToken);
             if (!string.IsNullOrWhiteSpace(legacyPictureUrl))
@@ -66,7 +65,6 @@ public class UserInfoController(
                     {
                         JwtRegisteredClaimNames.Address => JsonSerializer.Deserialize<Dictionary<string, object>>(claim.Value),
                         "groups" => JsonSerializer.Deserialize<string[]>(claim.Value),
-                        "roles" => JsonSerializer.Deserialize<string[]>(claim.Value),
                         _ => claim.Value,
                     };
             }

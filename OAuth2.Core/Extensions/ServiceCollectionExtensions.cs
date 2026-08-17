@@ -27,7 +27,6 @@ public static class ServiceCollectionExtensions
         s.AddTransient<IClients, MySqlClients>();
         s.AddTransient<IClientClaims, MySqlClientClaims>();
         s.AddTransient<IClientUserGroups, MySqlClientUserGroups>();
-        s.AddTransient<IAccountRoles, MySqlAccountRoles>();
         s.AddTransient<IOAuthGrants, MySqlOAuthGrants>();
         s.AddTransient<IApiKeys, MySqlApiKeys>();
         s.AddTransient<IApiKeyCreationService, ApiKeyCreationService>();

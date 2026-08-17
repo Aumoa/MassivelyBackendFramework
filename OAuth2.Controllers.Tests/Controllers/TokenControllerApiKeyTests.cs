@@ -124,7 +124,6 @@ public sealed class TokenControllerApiKeyTests
             new AccountClaimsStub(),
             clientClaims ?? new ClientClaimsStub("profile"),
             new ClientUserGroupsStub(),
-            new AccountRolesStub(),
             tokenIssuer ?? new TokenIssuerStub(),
             Microsoft.Extensions.Options.Options.Create(new HostOptions
             {
@@ -471,39 +470,6 @@ public sealed class TokenControllerApiKeyTests
         }
 
         public ValueTask RemoveClientUserGroupAsync(long id, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-    }
-
-    private sealed class AccountRolesStub : IAccountRoles
-    {
-        public ValueTask<AccountClaim[]> GetAccountRolesAsync(string accountId, CancellationToken cancellationToken = default)
-        {
-            return ValueTask.FromResult(Array.Empty<AccountClaim>());
-        }
-
-        public ValueTask<bool> HasRoleAsync(string accountId, string role, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public ValueTask<AccountRole[]> GetAllAccountRolesAsync(CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public ValueTask AddAccountRoleAsync(string accountId, string role, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public ValueTask ModifyAccountRoleAsync(long id, string newRole, CancellationToken cancellationToken = default)
-        {
-            throw new NotSupportedException();
-        }
-
-        public ValueTask RemoveAccountRoleAsync(long id, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
         }
