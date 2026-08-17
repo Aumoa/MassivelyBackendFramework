@@ -92,6 +92,12 @@ internal class JwtAuthenticationStateProvider(
             }
 
             var identity = new ClaimsIdentity(validatedToken.Principal.Claims, "JwtAuthType");
+
+            // Temporary diagnostic for the OAuth2 v1 roles-claim cutover; remove once confirmed.
+            logger.LogInformation(
+                "ID token claims: {Claims}",
+                string.Join(", ", identity.Claims.Select(c => $"{c.Type}={c.Value}")));
+
             foreach (var claim in identity.FindAll("groups").ToArray())
             {
                 var role = claim.Value;
