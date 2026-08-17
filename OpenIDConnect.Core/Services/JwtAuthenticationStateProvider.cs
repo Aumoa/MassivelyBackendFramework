@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -73,6 +74,7 @@ internal class JwtAuthenticationStateProvider(
                 if (tokenResponse?.IdToken != null)
                 {
                     jwtToken = tokenResponse.IdToken;
+                    await PersistRolesFromUserInfoAsync(httpContext, tokenResponse);
                 }
             }
 
@@ -102,6 +104,17 @@ internal class JwtAuthenticationStateProvider(
                     {
                         identity.AddClaim(new Claim(ClaimTypes.Role, role));
                     }
+                }
+            }
+
+            // The provider deliberately omits "roles" from the id_token (access-token/userinfo only),
+            // so roles fetched from userinfo at login/refresh time are cached in their own cookie.
+            var rolesJson = cookieManager.ReadRoles(httpContext);
+            if (!string.IsNullOrEmpty(rolesJson))
+            {
+                foreach (var role in ParseRoleClaimValues(rolesJson))
+                {
+                    identity.AddClaim(new Claim(ClaimTypes.Role, role));
                 }
             }
 
@@ -207,6 +220,8 @@ internal class JwtAuthenticationStateProvider(
                     httpContext,
                     tokenResponse.IdToken,
                     DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn));
+
+                await PersistRolesFromUserInfoAsync(httpContext, tokenResponse, cancellationToken);
             }
 
             if (tokenResponse.RefreshToken != null && tokenResponse.RefreshExpiresIn.HasValue)
@@ -306,6 +321,7 @@ internal class JwtAuthenticationStateProvider(
             }
 
             jwtToken = tokenResponse.IdToken;
+            await PersistRolesFromUserInfoAsync(accessor.HttpContext, tokenResponse);
         }
 
         try
@@ -323,6 +339,7 @@ internal class JwtAuthenticationStateProvider(
                 return null;
             }
 
+            await PersistRolesFromUserInfoAsync(accessor.HttpContext, tokenResponse);
             return await tokenValidator.ValidateAsync(tokenResponse.IdToken);
         }
     }
@@ -444,6 +461,39 @@ internal class JwtAuthenticationStateProvider(
             .Replace('+', '-')
             .Replace('/', '_')
             .TrimEnd('=');
+    }
+
+    private async Task PersistRolesFromUserInfoAsync(HttpContext? httpContext, TokenResponse tokenResponse, CancellationToken cancellationToken = default)
+    {
+        if (httpContext == null || string.IsNullOrEmpty(tokenResponse.AccessToken))
+        {
+            return;
+        }
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, options.Value.Uri.TrimEnd('/') + "/userinfo");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenResponse.AccessToken);
+            using var response = await http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+            if (document.RootElement.TryGetProperty("roles", out var rolesElement) && rolesElement.ValueKind == JsonValueKind.Array)
+            {
+                var roles = rolesElement.EnumerateArray()
+                    .Where(e => e.ValueKind == JsonValueKind.String)
+                    .Select(e => e.GetString()!)
+                    .ToArray();
+                cookieManager.AppendRoles(httpContext, JsonSerializer.Serialize(roles), DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn));
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Failed to fetch roles from the userinfo endpoint.");
+        }
     }
 
     private static IEnumerable<string> ParseRoleClaimValues(string value)

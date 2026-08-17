@@ -14,6 +14,8 @@ internal sealed class OidcTokenCookieManager(IOptions<OIDCOptions> options)
 
     public string RefreshTokenCookieName => CookiePrefix + "-refresh-token";
 
+    public string RolesCookieName => CookiePrefix + "-roles";
+
     internal string CookiePrefix => NormalizePrefix(options.Value.CookiePrefix, options.Value.ClientId);
 
     public string? ReadIdToken(HttpContext httpContext)
@@ -38,11 +40,25 @@ internal sealed class OidcTokenCookieManager(IOptions<OIDCOptions> options)
         DeleteLegacyTokenCookie(httpContext, LegacyRefreshTokenCookieName);
     }
 
+    public string? ReadRoles(HttpContext httpContext)
+    {
+        return httpContext.Request.Cookies.TryGetValue(RolesCookieName, out var value) &&
+               !string.IsNullOrWhiteSpace(value)
+            ? value
+            : null;
+    }
+
+    public void AppendRoles(HttpContext httpContext, string rolesJson, DateTimeOffset expires)
+    {
+        httpContext.Response.Cookies.Append(RolesCookieName, rolesJson, CreateTokenCookieOptions(expires));
+    }
+
     public void ClearTokenCookies(HttpContext httpContext)
     {
         var deleteOptions = CreateDeleteCookieOptions();
         httpContext.Response.Cookies.Delete(IdTokenCookieName, deleteOptions);
         httpContext.Response.Cookies.Delete(RefreshTokenCookieName, deleteOptions);
+        httpContext.Response.Cookies.Delete(RolesCookieName, deleteOptions);
         DeleteLegacyTokenCookie(httpContext, LegacyIdTokenCookieName);
         DeleteLegacyTokenCookie(httpContext, LegacyRefreshTokenCookieName);
     }
