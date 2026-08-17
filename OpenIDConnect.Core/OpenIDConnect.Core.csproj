@@ -12,7 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OAuth2.Abstractions\OAuth2.Abstractions.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OpenIDConnect.Abstractions\OpenIDConnect.Abstractions.csproj" />
   </ItemGroup>
 

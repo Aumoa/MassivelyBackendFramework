@@ -13,8 +13,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using OAuth2;
-using OAuth2.DTO;
+using OpenIDConnect;
 
 namespace OpenIDConnect.Services;
 

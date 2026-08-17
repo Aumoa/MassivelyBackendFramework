@@ -16,7 +16,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BlazorSharedComponent\BlazorSharedComponent.csproj" />
-    <ProjectReference Include="..\OAuth2.Abstractions\OAuth2.Abstractions.csproj" />
     <ProjectReference Include="..\OpenIDConnect.Core\OpenIDConnect.Core.csproj" />
   </ItemGroup>
 
