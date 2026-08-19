@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -471,10 +472,9 @@ internal class JwtAuthenticationStateProvider(
 
         try
         {
-            using var response = await http.PostAsJsonAsync(
-                options.Value.Uri.TrimEnd('/') + "/userinfo",
-                new { token = tokenResponse.AccessToken },
-                cancellationToken);
+            using var request = new HttpRequestMessage(HttpMethod.Get, options.Value.Uri.TrimEnd('/') + "/userinfo");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenResponse.AccessToken);
+            using var response = await http.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return;
