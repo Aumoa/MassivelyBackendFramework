@@ -48,7 +48,7 @@ internal class TokenRefreshService(
             };
 
             using var content = new FormUrlEncodedContent(formData);
-            using var response = await httpClient.PostAsync($"{oidcOptions.Value.Uri}/api/v1/token", content, cancellationToken);
+            using var response = await httpClient.PostAsync($"{oidcOptions.Value.Uri.TrimEnd('/')}/token", content, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
