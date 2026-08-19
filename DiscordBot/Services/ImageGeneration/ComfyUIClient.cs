@@ -32,12 +32,12 @@ public sealed class ComfyUIClient(
         {
             var workflow = await LoadWorkflowAsync(cancellationToken);
             var positivePromptNodeId = FindNodeIdByMetaTitle(workflow, m_Options.PositivePromptTitle);
-            var negativePromptNodeId = FindNodeIdByMetaTitle(workflow, m_Options.NegativePromptTitle);
             var saveImageNodeId = FindNodeIdByMetaTitle(workflow, m_Options.SaveImageTitle);
             var nodeTitles = BuildNodeTitleMap(workflow);
 
+            // The negative prompt stays fixed as whatever is already baked into the workflow JSON;
+            // only the positive prompt node is overwritten per request.
             SetWorkflowInput(workflow, positivePromptNodeId, "text", positivePrompt);
-            SetWorkflowInput(workflow, negativePromptNodeId, "text", negativePrompt);
             SetWorkflowInput(workflow, saveImageNodeId, "filename_prefix", BuildFilenamePrefix());
 
             var clientId = BuildClientId();

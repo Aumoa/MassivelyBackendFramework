@@ -218,7 +218,7 @@ internal class DiscordImageTools(
             ? message.Content
             : userRequest.Trim();
 
-        var fallback = BuildFallbackPromptDraft(normalizedRequest);
+        var fallback = await BuildFallbackPromptDraftAsync(normalizedRequest, cancellationToken);
         try
         {
             var settings = await claudeSettings.GetAsync(cancellationToken);
@@ -230,10 +230,11 @@ internal class DiscordImageTools(
                 ContextLength = 8192
             };
 
+            var systemPrompt = await promptProfileProvider.BuildPromptGenerationSystemAsync(cancellationToken);
             var response = await chatClient.GenerateAsync(
                 BuildPromptGenerationUserMessage(normalizedRequest),
                 options,
-                promptProfileProvider.BuildPromptGenerationSystem(),
+                systemPrompt,
                 cancellationToken);
 
             if (TryParsePromptDraft(response, out var promptDraft))
@@ -264,9 +265,9 @@ internal class DiscordImageTools(
         return "다음 사용자 요청을 이미지 생성 프롬프트로 변환하세요.\n\n[사용자 요청]\n" + userRequest;
     }
 
-    private ImagePromptDraft BuildFallbackPromptDraft(string userRequest)
+    private async Task<ImagePromptDraft> BuildFallbackPromptDraftAsync(string userRequest, CancellationToken cancellationToken)
     {
-        var (positivePrompt, negativePrompt) = promptProfileProvider.BuildFallbackPrompts(userRequest);
+        var (positivePrompt, negativePrompt) = await promptProfileProvider.BuildFallbackPromptsAsync(userRequest, cancellationToken);
         return new ImagePromptDraft(positivePrompt, negativePrompt);
     }
 

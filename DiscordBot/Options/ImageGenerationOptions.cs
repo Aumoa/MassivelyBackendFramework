@@ -10,8 +10,6 @@ public class ImageGenerationOptions
 
     public string PositivePromptTitle { get; set; } = "PositivePrompt";
 
-    public string NegativePromptTitle { get; set; } = "NegativePrompt";
-
     public string SaveImageTitle { get; set; } = "SaveImage";
 
     public string FilenamePrefix { get; set; } = "DiscordBot";

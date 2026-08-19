@@ -1,84 +1,21 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using DiscordBot.Options;
+using DiscordBot.Repositories;
 using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services.ImageGeneration;
 
 public sealed class ImagePromptProfileProvider(
     IOptions<ImageGenerationOptions> options,
+    IImageGenerationWorkflowRepository workflowRepository,
     IHostEnvironment environment,
     ILogger<ImagePromptProfileProvider> logger)
 {
     private readonly ImageGenerationOptions m_Options = options.Value;
 
-    public string BuildToolDescription(string baseDescription)
-    {
-        var profile = LoadProfile();
-        if (profile == null)
-        {
-            return baseDescription;
-        }
-
-        var sb = new StringBuilder(baseDescription.Trim());
-        sb.AppendLine();
-        sb.AppendLine();
-
-        if (profile.Rules.Count > 0)
-        {
-            sb.AppendLine("[프롬프트 작성 규칙]");
-            foreach (var rule in profile.Rules)
-            {
-                sb.AppendLine("- " + rule);
-            }
-            sb.AppendLine();
-        }
-
-        if (!string.IsNullOrWhiteSpace(profile.FixedPositive))
-        {
-            sb.AppendLine("[고정 긍정 품질 태그 (시스템이 자동 추가)]");
-            sb.AppendLine(profile.FixedPositive.Trim());
-            sb.AppendLine();
-        }
-
-        if (!string.IsNullOrWhiteSpace(profile.FixedNegative))
-        {
-            sb.AppendLine("[고정 부정 품질 태그 (시스템이 자동 추가)]");
-            sb.AppendLine(profile.FixedNegative.Trim());
-            sb.AppendLine();
-        }
-
-        if (!string.IsNullOrWhiteSpace(profile.RecommendedPositive))
-        {
-            sb.AppendLine("[권장 긍정 태그 (기본 포함, 요청과 충돌 시 제외 가능)]");
-            sb.AppendLine(profile.RecommendedPositive.Trim());
-            sb.AppendLine();
-        }
-
-        if (!string.IsNullOrWhiteSpace(profile.RecommendedNegative))
-        {
-            sb.AppendLine("[권장 부정 태그 (기본 포함, 요청과 충돌 시 제외 가능)]");
-            sb.AppendLine(profile.RecommendedNegative.Trim());
-            sb.AppendLine();
-        }
-
-        for (int i = 0; i < profile.Examples.Count; i++)
-        {
-            var example = profile.Examples[i];
-            sb.AppendLine($"[대표 예시 {i + 1}]");
-            sb.AppendLine("사용자 요청: " + example.UserRequest);
-            sb.AppendLine("positive_prompt: " + example.Positive);
-            sb.AppendLine("negative_prompt: " + example.Negative);
-            if (i < profile.Examples.Count - 1)
-            {
-                sb.AppendLine();
-            }
-        }
-
-        return sb.ToString();
-    }
-
-    public string BuildPromptGenerationSystem()
+    public async Task<string> BuildPromptGenerationSystemAsync(CancellationToken cancellationToken = default)
     {
         var sb = new StringBuilder();
         sb.AppendLine("너는 Discord 이미지 생성 도구 내부의 프롬프트 작성기입니다.");
@@ -112,10 +49,11 @@ public sealed class ImagePromptProfileProvider(
             sb.AppendLine();
         }
 
-        if (!string.IsNullOrWhiteSpace(profile.RecommendedPositive))
+        var recommendedPositive = await GetRecommendedPositiveAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(recommendedPositive))
         {
             sb.AppendLine("[positive_prompt에 기본 포함할 권장 태그 (충돌 시에만 제외)]");
-            sb.AppendLine(profile.RecommendedPositive.Trim());
+            sb.AppendLine(recommendedPositive.Trim());
             sb.AppendLine();
         }
 
@@ -142,30 +80,68 @@ public sealed class ImagePromptProfileProvider(
         return sb.ToString();
     }
 
-    public (string PositivePrompt, string NegativePrompt) BuildFallbackPrompts(string userRequest)
+    public async Task<(string PositivePrompt, string NegativePrompt)> BuildFallbackPromptsAsync(
+        string userRequest,
+        CancellationToken cancellationToken = default)
     {
         var profile = LoadProfile();
         var positivePrompt = userRequest.Trim();
         var negativePrompt = string.Empty;
 
-        if (profile == null)
-        {
-            return (positivePrompt, negativePrompt);
-        }
-
-        if (!string.IsNullOrWhiteSpace(profile.RecommendedPositive))
+        var recommendedPositive = await GetRecommendedPositiveAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(recommendedPositive))
         {
             positivePrompt = string.IsNullOrWhiteSpace(positivePrompt)
-                ? profile.RecommendedPositive.Trim()
-                : positivePrompt + ", " + profile.RecommendedPositive.Trim();
+                ? recommendedPositive.Trim()
+                : positivePrompt + ", " + recommendedPositive.Trim();
         }
 
-        if (!string.IsNullOrWhiteSpace(profile.RecommendedNegative))
+        if (profile != null && !string.IsNullOrWhiteSpace(profile.RecommendedNegative))
         {
             negativePrompt = profile.RecommendedNegative.Trim();
         }
 
         return (positivePrompt, negativePrompt);
+    }
+
+    // The workflow JSON's own PositivePrompt node text doubles as the human-authored
+    // recommended positive tags; ComfyUIClient overwrites it per request at generation time.
+    private async Task<string?> GetRecommendedPositiveAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var workflow = await workflowRepository.GetFirstAsync(cancellationToken);
+            if (workflow == null)
+            {
+                return null;
+            }
+
+            if (JsonNode.Parse(workflow.WorkflowJson) is not JsonObject workflowJson)
+            {
+                return null;
+            }
+
+            foreach (var (_, nodeValue) in workflowJson)
+            {
+                if (nodeValue is not JsonObject node
+                    || node["_meta"] is not JsonObject meta
+                    || !string.Equals(meta["title"]?.GetValue<string>(), m_Options.PositivePromptTitle, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                return node["inputs"] is JsonObject inputs
+                    ? inputs["text"]?.GetValue<string>()
+                    : null;
+            }
+
+            return null;
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogWarning(e, "Failed to load the recommended positive prompt from the image generation workflow.");
+            return null;
+        }
     }
 
     // LLM 초안/폴백 결과와 무관하게 고정 품질 태그를 항상 강제로 덧붙인다.
@@ -228,8 +204,6 @@ public sealed class ImagePromptProfileProvider(
         public string FixedPositive { get; init; } = "";
 
         public string FixedNegative { get; init; } = "";
-
-        public string RecommendedPositive { get; init; } = "";
 
         public string RecommendedNegative { get; init; } = "";
 
