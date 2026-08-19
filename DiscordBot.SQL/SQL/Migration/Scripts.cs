@@ -27,5 +27,6 @@ public partial class Scripts : IScripts
         yield return new _18__AddAutoResponseSettings();
         yield return new _19__AddAutoResponseEventDiagnostics();
         yield return new _20__AddImageGenerationWorkflows();
+        yield return new _21__AddImageGenerationWorkflowNames();
     }
 }

@@ -69,11 +69,13 @@ public sealed class ComfyUIClient(
 
     private async Task<JsonObject> LoadWorkflowAsync(CancellationToken cancellationToken)
     {
-        var workflow = await workflowRepository.GetAsync(cancellationToken);
+        // Multiple workflows can be registered, but concept-based selection isn't implemented yet;
+        // always run the first one (by sort_order, then name).
+        var workflow = await workflowRepository.GetFirstAsync(cancellationToken);
         if (workflow == null)
         {
             throw new InvalidOperationException(
-                "No ComfyUI workflow is configured. Upsert one into the image_generation_workflows table.");
+                "No ComfyUI workflow is configured. Add one on the image generation workflow admin page.");
         }
 
         return JsonNode.Parse(workflow.WorkflowJson)?.AsObject()

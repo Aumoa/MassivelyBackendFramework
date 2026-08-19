@@ -74,3 +74,68 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: var(--text-sm);
 }
+
+.skill-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    border-top: 1px solid var(--color-border);
+}
+
+.skill-table {
+    width: 100%;
+    min-width: 700px;
+    border-collapse: collapse;
+}
+
+.skill-table th,
+.skill-table td {
+    padding: var(--space-3) var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+    vertical-align: middle;
+}
+
+.skill-table th {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-align: left;
+}
+
+.skill-table td {
+    color: var(--color-text-primary);
+    font-size: var(--text-sm);
+}
+
+.skill-name-link {
+    color: var(--color-accent);
+    font-weight: 700;
+    margin-right: var(--space-2);
+}
+
+.skill-name-link:hover {
+    text-decoration: underline;
+}
+
+.description-cell {
+    max-width: 34rem;
+    color: var(--color-text-secondary) !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    min-width: 4.5rem;
+    height: 1.75rem;
+    border-radius: var(--radius-md);
+    padding: 0 var(--space-3);
+    font-size: var(--text-xs);
+    font-weight: 700;
+}
+
+.status-badge.enabled {
+    color: var(--color-success);
+    background: var(--color-success-bg);
+}

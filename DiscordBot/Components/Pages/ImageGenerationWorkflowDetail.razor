@@ -1,0 +1,216 @@
+@page "/image-generation-workflow/{Name}"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IImageGenerationWorkflowService WorkflowService
+@inject NavigationManager Navigation
+
+<PageTitle>@T("IMAGE_GENERATION_WORKFLOW_DETAIL_TITLE") - @Strings.APP_TITLE</PageTitle>
+
+<div class="detail-toolbar">
+    <a class="btn-ghost back-link" href="/image-generation-workflow" title="@T("IMAGE_GENERATION_WORKFLOW_BUTTON_BACK")">
+        <span class="material-symbols-outlined">arrow_back</span>
+        <span>@T("IMAGE_GENERATION_WORKFLOW_BUTTON_BACK")</span>
+    </a>
+</div>
+
+<div class="page-header">
+    <h1 class="page-title">@T("IMAGE_GENERATION_WORKFLOW_DETAIL_TITLE")</h1>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@if (isLoading)
+{
+    <p class="empty-state">@Strings.IMAGE_GENERATION_WORKFLOW_STATUS_LOADING</p>
+}
+else if (form is null && !loadFailed)
+{
+    <p class="empty-state">@T("IMAGE_GENERATION_WORKFLOW_STATUS_NOT_FOUND")</p>
+}
+else if (form is not null)
+{
+    <form class="skill-detail-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <label>
+            <span>@T("IMAGE_GENERATION_WORKFLOW_LABEL_NAME")</span>
+            <input class="mono" @bind="form.Name" disabled="@isBusy" required maxlength="64" />
+        </label>
+        <label>
+            <span>@T("IMAGE_GENERATION_WORKFLOW_LABEL_SORT_ORDER")</span>
+            <input type="number" @bind="form.SortOrder" disabled="@isBusy" />
+        </label>
+        <label class="description-field">
+            <span>@T("IMAGE_GENERATION_WORKFLOW_LABEL_DESCRIPTION")</span>
+            <textarea @bind="form.Description" disabled="@isBusy" maxlength="1024"></textarea>
+        </label>
+        <label class="settings-form-full">
+            <span>@Strings.IMAGE_GENERATION_WORKFLOW_LABEL_JSON</span>
+            <textarea class="mono" @bind="form.WorkflowJson" disabled="@isBusy" rows="24"></textarea>
+        </label>
+
+        <dl class="metadata-list">
+            <div>
+                <dt>@T("IMAGE_GENERATION_WORKFLOW_LABEL_CREATED_AT")</dt>
+                <dd>@DisplayDate(workflow?.CreatedAt)</dd>
+            </div>
+            <div>
+                <dt>@T("IMAGE_GENERATION_WORKFLOW_LABEL_UPDATED_AT")</dt>
+                <dd>@DisplayDate(workflow?.UpdatedAt)</dd>
+            </div>
+        </dl>
+
+        <div class="form-actions">
+            <button class="btn-primary" type="submit" disabled="@isBusy">
+                <span class="material-symbols-outlined">save</span>
+                @T("IMAGE_GENERATION_WORKFLOW_BUTTON_SAVE")
+            </button>
+            <button class="btn-danger" type="button" disabled="@isBusy" @onclick="DeleteAsync">
+                <span class="material-symbols-outlined">delete</span>
+                @T("IMAGE_GENERATION_WORKFLOW_BUTTON_DELETE")
+            </button>
+        </div>
+    </form>
+}
+
+@code {
+    [Parameter]
+    public string Name { get; set; } = string.Empty;
+
+    private Services.ImageGenerationWorkflowDetail? workflow;
+    private WorkflowForm? form;
+    private bool isLoading = true;
+    private bool isBusy;
+    private bool loadFailed;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        loadFailed = false;
+        try
+        {
+            workflow = await WorkflowService.GetAsync(Name);
+            form = workflow is null ? null : WorkflowForm.From(workflow);
+        }
+        catch
+        {
+            loadFailed = true;
+            form = null;
+            SetStatus("error", Strings.IMAGE_GENERATION_WORKFLOW_ERROR_LOAD_FAILED);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (isBusy || form is null || workflow is null)
+        {
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            var normalizedName = form.Name.Trim();
+            if (!string.Equals(workflow.Name, normalizedName, StringComparison.Ordinal))
+            {
+                await WorkflowService.RenameAsync(workflow.Name, normalizedName);
+            }
+
+            await WorkflowService.SaveAsync(normalizedName, form.Description, form.WorkflowJson, form.SortOrder);
+
+            SetStatus("success", Strings.IMAGE_GENERATION_WORKFLOW_STATUS_SAVED);
+            if (!string.Equals(Name, normalizedName, StringComparison.Ordinal))
+            {
+                Navigation.NavigateTo($"/image-generation-workflow/{Uri.EscapeDataString(normalizedName)}");
+                return;
+            }
+
+            await LoadAsync();
+        }
+        catch (ArgumentException)
+        {
+            SetStatus("error", Strings.IMAGE_GENERATION_WORKFLOW_ERROR_JSON_INVALID);
+        }
+        catch
+        {
+            SetStatus("error", Strings.IMAGE_GENERATION_WORKFLOW_ERROR_SAVE_FAILED);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (isBusy || workflow is null)
+        {
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await WorkflowService.DeleteAsync(workflow.Name);
+            Navigation.NavigateTo("/image-generation-workflow");
+        }
+        catch
+        {
+            SetStatus("error", T("IMAGE_GENERATION_WORKFLOW_ERROR_ACTION_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private static string DisplayDate(DateTime? value)
+    {
+        return value?.ToLocalTime().ToString("G", CultureInfo.CurrentCulture) ?? string.Empty;
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+
+    private sealed class WorkflowForm
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string WorkflowJson { get; set; } = string.Empty;
+        public int SortOrder { get; set; }
+
+        public static WorkflowForm From(Services.ImageGenerationWorkflowDetail workflow)
+        {
+            return new WorkflowForm
+            {
+                Name = workflow.Name,
+                Description = workflow.Description ?? string.Empty,
+                WorkflowJson = workflow.WorkflowJson,
+                SortOrder = workflow.SortOrder
+            };
+        }
+    }
+}

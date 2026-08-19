@@ -1,9 +1,11 @@
 @page "/image-generation-workflow"
 @rendermode InteractiveServer
+@using System.Globalization
 @using DiscordBot.Services
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "admin")]
 @inject IImageGenerationWorkflowService WorkflowService
+@inject NavigationManager Navigation
 
 <PageTitle>@Strings.IMAGE_GENERATION_WORKFLOW_TITLE — @Strings.APP_TITLE</PageTitle>
 
@@ -12,31 +14,78 @@
     <p class="page-subtitle">@Strings.IMAGE_GENERATION_WORKFLOW_SUBTITLE</p>
 </div>
 
-@if (isLoading)
-{
-    <p class="empty-state">@Strings.IMAGE_GENERATION_WORKFLOW_STATUS_LOADING</p>
-}
-else
-{
-    <form class="settings-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
-        <label class="settings-form-full">
-            <span>@Strings.IMAGE_GENERATION_WORKFLOW_LABEL_JSON</span>
-            <textarea class="mono" @bind="workflowJson" disabled="@isBusy" rows="24"></textarea>
-        </label>
-        <button class="btn-primary save-button" type="submit" disabled="@isBusy">
-            <span class="material-symbols-outlined">save</span>
-            @Strings.IMAGE_GENERATION_WORKFLOW_BUTTON_APPLY
-        </button>
-    </form>
-}
+<form class="settings-form" @onsubmit="AddAsync" @onsubmit:preventDefault>
+    <label>
+        <span>@T("IMAGE_GENERATION_WORKFLOW_LABEL_NAME")</span>
+        <input class="mono" @bind="newName" disabled="@isBusy" required maxlength="64" />
+    </label>
+    <label>
+        <span>@T("IMAGE_GENERATION_WORKFLOW_LABEL_DESCRIPTION")</span>
+        <input @bind="newDescription" disabled="@isBusy" maxlength="1024" />
+    </label>
+    <label class="settings-form-full">
+        <span>@Strings.IMAGE_GENERATION_WORKFLOW_LABEL_JSON</span>
+        <textarea class="mono" @bind="newWorkflowJson" disabled="@isBusy" rows="16"></textarea>
+    </label>
+    <button class="btn-primary save-button" type="submit" disabled="@isBusy">
+        <span class="material-symbols-outlined">add</span>
+        @T("IMAGE_GENERATION_WORKFLOW_BUTTON_ADD")
+    </button>
+</form>
 
 @if (!string.IsNullOrEmpty(statusMessage))
 {
     <div class="status-message @statusKind">@statusMessage</div>
 }
 
+@if (isLoading)
+{
+    <p class="empty-state">@Strings.IMAGE_GENERATION_WORKFLOW_STATUS_LOADING</p>
+}
+else if (workflows.Count == 0)
+{
+    <p class="empty-state">@T("IMAGE_GENERATION_WORKFLOW_EMPTY")</p>
+}
+else
+{
+    <div class="skill-table-wrap">
+        <table class="skill-table">
+            <thead>
+                <tr>
+                    <th>@T("IMAGE_GENERATION_WORKFLOW_LABEL_NAME")</th>
+                    <th>@T("IMAGE_GENERATION_WORKFLOW_LABEL_DESCRIPTION")</th>
+                    <th>@T("IMAGE_GENERATION_WORKFLOW_LABEL_SORT_ORDER")</th>
+                    <th>@T("IMAGE_GENERATION_WORKFLOW_LABEL_UPDATED_AT")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var (workflow, index) in workflows.Select((w, i) => (w, i)))
+                {
+                    <tr @key="workflow.Name">
+                        <td>
+                            <a class="skill-name-link mono" href="@($"/image-generation-workflow/{Uri.EscapeDataString(workflow.Name)}")">
+                                @workflow.Name
+                            </a>
+                            @if (index == 0)
+                            {
+                                <span class="status-badge enabled">@T("IMAGE_GENERATION_WORKFLOW_LABEL_ACTIVE")</span>
+                            }
+                        </td>
+                        <td class="description-cell">@workflow.Description</td>
+                        <td>@workflow.SortOrder</td>
+                        <td>@DisplayDate(workflow.UpdatedAt ?? workflow.CreatedAt)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
 @code {
-    private string workflowJson = string.Empty;
+    private IReadOnlyList<ImageGenerationWorkflowSummary> workflows = [];
+    private string newName = string.Empty;
+    private string newDescription = string.Empty;
+    private string newWorkflowJson = string.Empty;
     private bool isLoading = true;
     private bool isBusy;
     private string? statusMessage;
@@ -52,7 +101,7 @@ else
         isLoading = true;
         try
         {
-            workflowJson = await WorkflowService.GetWorkflowJsonAsync() ?? string.Empty;
+            workflows = await WorkflowService.ListAsync();
         }
         catch
         {
@@ -64,24 +113,24 @@ else
         }
     }
 
-    private async Task SaveAsync()
+    private async Task AddAsync()
     {
         if (isBusy)
         {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(workflowJson))
-        {
-            SetStatus("error", Strings.IMAGE_GENERATION_WORKFLOW_ERROR_JSON_REQUIRED);
-            return;
-        }
-
         isBusy = true;
         try
         {
-            await WorkflowService.SaveWorkflowJsonAsync(workflowJson);
-            SetStatus("success", Strings.IMAGE_GENERATION_WORKFLOW_STATUS_SAVED);
+            var sortOrder = workflows.Count == 0 ? 0 : workflows.Max(w => w.SortOrder) + 1;
+            await WorkflowService.SaveAsync(newName, newDescription, newWorkflowJson, sortOrder);
+
+            var createdName = newName.Trim();
+            newName = string.Empty;
+            newDescription = string.Empty;
+            newWorkflowJson = string.Empty;
+            Navigation.NavigateTo($"/image-generation-workflow/{Uri.EscapeDataString(createdName)}");
         }
         catch (ArgumentException)
         {
@@ -97,9 +146,19 @@ else
         }
     }
 
+    private static string DisplayDate(DateTime value)
+    {
+        return value.ToLocalTime().ToString("G", CultureInfo.CurrentCulture);
+    }
+
     private void SetStatus(string kind, string message)
     {
         statusKind = kind;
         statusMessage = message;
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
     }
 }

@@ -200,6 +200,48 @@
   <data name="IMAGE_GENERATION_WORKFLOW_ERROR_JSON_INVALID" xml:space="preserve">
     <value>Workflow JSON is not a valid JSON object.</value>
   </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_NAME" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_DESCRIPTION" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_SORT_ORDER" xml:space="preserve">
+    <value>Sort order</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_UPDATED_AT" xml:space="preserve">
+    <value>Updated at</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_CREATED_AT" xml:space="preserve">
+    <value>Created at</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_ACTIVE" xml:space="preserve">
+    <value>Active</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_BUTTON_ADD" xml:space="preserve">
+    <value>Add workflow</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_BUTTON_BACK" xml:space="preserve">
+    <value>Back</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_BUTTON_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_BUTTON_DELETE" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_EMPTY" xml:space="preserve">
+    <value>No workflows are registered yet.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_DETAIL_TITLE" xml:space="preserve">
+    <value>Image Generation Workflow Detail</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_STATUS_NOT_FOUND" xml:space="preserve">
+    <value>Workflow not found.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_ERROR_ACTION_FAILED" xml:space="preserve">
+    <value>The action failed.</value>
+  </data>
 
   <!-- AISkills -->
   <data name="AI_SKILLS_TITLE" xml:space="preserve">

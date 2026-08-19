@@ -200,6 +200,48 @@
   <data name="IMAGE_GENERATION_WORKFLOW_ERROR_JSON_INVALID" xml:space="preserve">
     <value>워크플로 JSON이 올바른 JSON 객체가 아닙니다.</value>
   </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_NAME" xml:space="preserve">
+    <value>이름</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_DESCRIPTION" xml:space="preserve">
+    <value>설명</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_SORT_ORDER" xml:space="preserve">
+    <value>정렬 순서</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_UPDATED_AT" xml:space="preserve">
+    <value>수정일</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_CREATED_AT" xml:space="preserve">
+    <value>생성일</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_LABEL_ACTIVE" xml:space="preserve">
+    <value>사용 중</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_BUTTON_ADD" xml:space="preserve">
+    <value>워크플로 추가</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_BUTTON_BACK" xml:space="preserve">
+    <value>뒤로</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_BUTTON_SAVE" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_BUTTON_DELETE" xml:space="preserve">
+    <value>삭제</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_EMPTY" xml:space="preserve">
+    <value>등록된 워크플로가 없습니다.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_DETAIL_TITLE" xml:space="preserve">
+    <value>이미지 생성 워크플로 상세</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_STATUS_NOT_FOUND" xml:space="preserve">
+    <value>워크플로를 찾을 수 없습니다.</value>
+  </data>
+  <data name="IMAGE_GENERATION_WORKFLOW_ERROR_ACTION_FAILED" xml:space="preserve">
+    <value>작업에 실패했습니다.</value>
+  </data>
 
   <!-- AISkills -->
   <data name="AI_SKILLS_TITLE" xml:space="preserve">

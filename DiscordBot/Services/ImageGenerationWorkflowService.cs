@@ -4,26 +4,73 @@ using DiscordBot.Repositories;
 
 namespace DiscordBot.Services;
 
+public sealed record ImageGenerationWorkflowSummary(
+    string Name,
+    string? Description,
+    int SortOrder,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt);
+
+public sealed record ImageGenerationWorkflowDetail(
+    string Name,
+    string? Description,
+    string WorkflowJson,
+    int SortOrder,
+    DateTime CreatedAt,
+    DateTime? UpdatedAt);
+
 public interface IImageGenerationWorkflowService
 {
-    ValueTask<string?> GetWorkflowJsonAsync(CancellationToken cancellationToken = default);
+    ValueTask<IReadOnlyList<ImageGenerationWorkflowSummary>> ListAsync(CancellationToken cancellationToken = default);
 
-    ValueTask SaveWorkflowJsonAsync(string workflowJson, CancellationToken cancellationToken = default);
+    ValueTask<ImageGenerationWorkflowDetail?> GetAsync(string name, CancellationToken cancellationToken = default);
+
+    ValueTask SaveAsync(
+        string name,
+        string? description,
+        string workflowJson,
+        int sortOrder,
+        CancellationToken cancellationToken = default);
+
+    ValueTask RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default);
+
+    ValueTask DeleteAsync(string name, CancellationToken cancellationToken = default);
 }
 
 internal sealed class ImageGenerationWorkflowService(IImageGenerationWorkflowRepository repository)
     : IImageGenerationWorkflowService
 {
-    public async ValueTask<string?> GetWorkflowJsonAsync(CancellationToken cancellationToken = default)
+    public async ValueTask<IReadOnlyList<ImageGenerationWorkflowSummary>> ListAsync(CancellationToken cancellationToken = default)
     {
-        var data = await repository.GetAsync(cancellationToken);
-        return data?.WorkflowJson;
+        var rows = await repository.ListAsync(cancellationToken);
+        return rows
+            .Select(row => new ImageGenerationWorkflowSummary(row.Name, row.Description, row.SortOrder, row.CreatedAt, row.UpdatedAt))
+            .ToList();
     }
 
-    public async ValueTask SaveWorkflowJsonAsync(string workflowJson, CancellationToken cancellationToken = default)
+    public async ValueTask<ImageGenerationWorkflowDetail?> GetAsync(string name, CancellationToken cancellationToken = default)
     {
-        var trimmed = workflowJson.Trim();
-        if (trimmed.Length == 0)
+        var row = await repository.GetAsync(name, cancellationToken);
+        return row == null
+            ? null
+            : new ImageGenerationWorkflowDetail(row.Name, row.Description, row.WorkflowJson, row.SortOrder, row.CreatedAt, row.UpdatedAt);
+    }
+
+    public async ValueTask SaveAsync(
+        string name,
+        string? description,
+        string workflowJson,
+        int sortOrder,
+        CancellationToken cancellationToken = default)
+    {
+        var trimmedName = name.Trim();
+        if (trimmedName.Length == 0)
+        {
+            throw new ArgumentException("Workflow name is required.", nameof(name));
+        }
+
+        var trimmedJson = workflowJson.Trim();
+        if (trimmedJson.Length == 0)
         {
             throw new ArgumentException("Workflow JSON is required.", nameof(workflowJson));
         }
@@ -31,7 +78,7 @@ internal sealed class ImageGenerationWorkflowService(IImageGenerationWorkflowRep
         JsonNode? parsed;
         try
         {
-            parsed = JsonNode.Parse(trimmed);
+            parsed = JsonNode.Parse(trimmedJson);
         }
         catch (JsonException e)
         {
@@ -43,6 +90,23 @@ internal sealed class ImageGenerationWorkflowService(IImageGenerationWorkflowRep
             throw new ArgumentException("Workflow JSON must be a JSON object.", nameof(workflowJson));
         }
 
-        await repository.UpsertAsync(trimmed, cancellationToken);
+        var trimmedDescription = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        await repository.UpsertAsync(trimmedName, trimmedDescription, trimmedJson, sortOrder, cancellationToken);
+    }
+
+    public async ValueTask RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+    {
+        var trimmedNewName = newName.Trim();
+        if (trimmedNewName.Length == 0)
+        {
+            throw new ArgumentException("Workflow name is required.", nameof(newName));
+        }
+
+        await repository.RenameAsync(oldName, trimmedNewName, cancellationToken);
+    }
+
+    public async ValueTask DeleteAsync(string name, CancellationToken cancellationToken = default)
+    {
+        await repository.DeleteAsync(name, cancellationToken);
     }
 }
