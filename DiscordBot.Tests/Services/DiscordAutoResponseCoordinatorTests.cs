@@ -81,15 +81,76 @@ public sealed class DiscordAutoResponseCoordinatorTests
             NullLogger<DiscordAutoResponseCoordinator>.Instance);
     }
 
-    private static DiscordAutoResponseMessage CreateMessage()
+    [Fact]
+    public async Task ObserveAsync_DoesNotInvalidateInFlightEvaluation_WhenLaterMessageFailsStaticFilter()
+    {
+        var settings = new StaticAutoResponseSettingsService();
+        var evaluator = new BlockingEvaluator();
+        using var coordinator = new DiscordAutoResponseCoordinator(
+            evaluator,
+            settings,
+            NullLogger<DiscordAutoResponseCoordinator>.Instance);
+
+        var responded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var triggerMessage = CreateMessage();
+
+        await coordinator.ObserveAsync(
+            triggerMessage,
+            (_, _) =>
+            {
+                responded.TrySetResult();
+                return Task.CompletedTask;
+            });
+
+        await evaluator.EvaluateStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Ordinary chatter that does not qualify for buffering arrives while the
+        // classifier call for the trigger message above is still in flight.
+        var unrelatedMessage = CreateMessage(messageId: "message-2", content: "ㅋㅋㅋ");
+        await coordinator.ObserveAsync(unrelatedMessage, static (_, _) => Task.CompletedTask);
+
+        evaluator.CompleteWith(new DiscordAutoResponseDecision(true, "reason", "focus"));
+
+        await responded.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ObserveAsync_StillInvalidatesInFlightEvaluation_WhenLaterMessagePassesStaticFilter()
+    {
+        var settings = new StaticAutoResponseSettingsService();
+        var evaluator = new BlockingEvaluator();
+        using var coordinator = new DiscordAutoResponseCoordinator(
+            evaluator,
+            settings,
+            NullLogger<DiscordAutoResponseCoordinator>.Instance);
+
+        var triggerMessage = CreateMessage();
+        await coordinator.ObserveAsync(triggerMessage, static (_, _) => Task.CompletedTask);
+        await evaluator.EvaluateStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // A new message that itself qualifies for buffering arrives while the
+        // classifier call for the trigger message above is still in flight.
+        var followUpMessage = CreateMessage(messageId: "message-2", content: "이것도 물어봐도 될까?");
+        await coordinator.ObserveAsync(followUpMessage, static (_, _) => Task.CompletedTask);
+
+        evaluator.CompleteWith(new DiscordAutoResponseDecision(true, "reason", "focus"));
+
+        var staleEvent = await settings.RecordedEvent.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("stale", staleEvent.Decision);
+        Assert.Equal("conversation_changed_during_evaluation", staleEvent.Reason);
+    }
+
+    private static DiscordAutoResponseMessage CreateMessage(
+        string messageId = "message-1",
+        string content = "이 질문에 답할 수 있어?")
     {
         return new DiscordAutoResponseMessage(
-            "message-1",
+            messageId,
             "guild-1",
             "channel-1",
             "user-1",
             "tester",
-            "이 질문에 답할 수 있어?",
+            content,
             DateTimeOffset.UtcNow,
             IsDirectMessage: false,
             MentionsBot: false,
@@ -233,6 +294,74 @@ public sealed class DiscordAutoResponseCoordinatorTests
                 BotNameAliases: ["봇"],
                 CreatedAt: DateTime.UtcNow,
                 UpdatedAt: null);
+        }
+    }
+
+    private sealed class StaticAutoResponseSettingsService : IAutoResponseSettingsService
+    {
+        public TaskCompletionSource<RecordedAutoResponseEvent> RecordedEvent { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ValueTask<AutoResponseSettingsView> GetAsync(CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult(new AutoResponseSettingsView(
+                Enabled: true,
+                IntervalSeconds: 1,
+                CooldownSeconds: 180,
+                MaxBufferedMessages: 20,
+                ClassifierMaxTokens: 160,
+                ClassifierModel: "classifier-model",
+                BotNameAliases: ["봇"],
+                CreatedAt: DateTime.UtcNow,
+                UpdatedAt: null));
+        }
+
+        public ValueTask SaveAsync(
+            AutoResponseSettingsSaveRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask RecordEventAsync(
+            IReadOnlyList<DiscordAutoResponseMessage> messages,
+            string decision,
+            string reason,
+            string focus,
+            AutoResponseEventDiagnostic? diagnostic = null,
+            CancellationToken cancellationToken = default)
+        {
+            RecordedEvent.TrySetResult(new RecordedAutoResponseEvent(messages, decision, reason, focus, diagnostic));
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<IReadOnlyList<AutoResponseEventView>> GetRecentEventsAsync(
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class BlockingEvaluator : IDiscordAutoResponseEvaluator
+    {
+        private readonly TaskCompletionSource<DiscordAutoResponseDecision> m_Completion =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource EvaluateStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ValueTask<DiscordAutoResponseDecision> EvaluateAsync(
+            IReadOnlyList<DiscordAutoResponseMessage> messages,
+            CancellationToken cancellationToken = default)
+        {
+            EvaluateStarted.TrySetResult();
+            return new ValueTask<DiscordAutoResponseDecision>(m_Completion.Task);
+        }
+
+        public void CompleteWith(DiscordAutoResponseDecision decision)
+        {
+            m_Completion.TrySetResult(decision);
         }
     }
 

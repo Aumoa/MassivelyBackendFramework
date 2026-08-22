@@ -77,17 +77,23 @@ internal sealed class DiscordAutoResponseCoordinator(
                 m_Channels.Add(message.ChannelId, state);
             }
 
-            if (state.IsEvaluating)
-            {
-                state.EvaluationVersion++;
-                state.IsEvaluating = false;
-            }
-
             var hasPendingEvaluation = state.DelayCts != null;
             var startsEvaluation = DiscordAutoResponseEvaluator.PassesStaticFilter(message, currentOptions);
             if (!hasPendingEvaluation && !startsEvaluation)
             {
+                // Messages that don't qualify for buffering must not touch evaluation
+                // state - otherwise unrelated chatter arriving while a classifier call
+                // is in flight would invalidate it as "stale" even though nothing
+                // relevant actually changed, and an active channel (the very condition
+                // needed to trigger auto-response) would almost always discard its own
+                // accepted decisions before they could be sent.
                 return;
+            }
+
+            if (state.IsEvaluating)
+            {
+                state.EvaluationVersion++;
+                state.IsEvaluating = false;
             }
 
             AddMessage(state, message, currentOptions);
