@@ -229,6 +229,17 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                     ? BuildOthelloModePrompt(othelloGameService, message, promptContent)
                     : promptContent;
 
+            AmbientChatContextRequest? ambientChatContext = null;
+            if (!isAutomaticResponse && !isChessMode && !isOthelloMode)
+            {
+                ambientChatContext = new AmbientChatContextRequest(
+                    chatLogRepository,
+                    channelId,
+                    m_Socket.CurrentUser.Id.ToString(),
+                    message.Id.ToString(),
+                    message.Timestamp);
+            }
+
             await foreach (var responseMessage in channel.AddAsync(
                 message.Author,
                 prompt,
@@ -236,6 +247,7 @@ internal class DiscordService(IOptions<DiscordService.Configuration> options, IL
                 imageData,
                 filterToolsBySelectedSkills: !isChessMode && !isOthelloMode,
                 rememberConversation: !isAutomaticResponse,
+                ambientChatContext: ambientChatContext,
                 cancellationToken: cancellationToken))
             {
                 totalReasoning += responseMessage.Thinking;

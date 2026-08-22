@@ -88,6 +88,9 @@
   <data name="NAVMENU_LABEL_AUTO_RESPONSE" xml:space="preserve">
     <value>Auto Response</value>
   </data>
+  <data name="NAVMENU_LABEL_AMBIENT_CHAT_CONTEXT" xml:space="preserve">
+    <value>Ambient Chat Context</value>
+  </data>
   <data name="NAVMENU_LABEL_SERVER_LOGS" xml:space="preserve">
     <value>Logs</value>
   </data>
@@ -705,6 +708,45 @@
   </data>
   <data name="AUTO_RESPONSE_EVENT_LABEL_FOCUS" xml:space="preserve">
     <value>Focus</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_TITLE" xml:space="preserve">
+    <value>Ambient Chat Context</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_SUBTITLE" xml:space="preserve">
+    <value>Settings for automatically injecting recent background channel chat as reference context on mention/DM responses</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_LABEL_ENABLED" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_LABEL_WINDOW_MESSAGE_COUNT" xml:space="preserve">
+    <value>Max message count</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_LABEL_WINDOW_MAX_CHARS" xml:space="preserve">
+    <value>Max characters</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_LABEL_LOOKBACK_MINUTES" xml:space="preserve">
+    <value>Lookback minutes</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_BUTTON_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_BUTTON_REFRESH" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_STATUS_LOADING" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_STATUS_SAVED" xml:space="preserve">
+    <value>Saved ambient chat context settings.</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>Failed to load ambient chat context settings.</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>Failed to save ambient chat context settings.</value>
+  </data>
+  <data name="AMBIENT_CHAT_CONTEXT_ERROR_NUMBER_RANGE" xml:space="preserve">
+    <value>Numeric settings must be greater than 0.</value>
   </data>
 
   <!-- ServerLogs -->

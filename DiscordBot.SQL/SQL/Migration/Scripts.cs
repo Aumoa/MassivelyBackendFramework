@@ -28,5 +28,6 @@ public partial class Scripts : IScripts
         yield return new _19__AddAutoResponseEventDiagnostics();
         yield return new _20__AddImageGenerationWorkflows();
         yield return new _21__AddImageGenerationWorkflowNames();
+        yield return new _22__AddAmbientChatContextSettings();
     }
 }

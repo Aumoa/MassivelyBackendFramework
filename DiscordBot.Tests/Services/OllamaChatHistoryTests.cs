@@ -71,7 +71,96 @@ public sealed class OllamaChatHistoryTests
             message => message.Content.Contains("normal prompt", StringComparison.Ordinal));
     }
 
-    private static OllamaChatHistory CreateHistory(CapturingChatClient chatClient)
+    [Fact]
+    public async Task AddAsync_InjectsAmbientContext_WhenEnabledAndRowsExist()
+    {
+        var chatClient = new CapturingChatClient();
+        var ambientSettings = new FakeAmbientChatContextSettingsService { Enabled = true };
+        var history = CreateHistory(chatClient, ambientChatContextSettings: ambientSettings);
+        var user = new FakeUser();
+        var chatLogRepository = new FakeChatLogRepository(
+        [
+            new ChatLogData(1, "msg-1", null, "channel-1", "user-2", "안녕하세요", new DateTime(2026, 8, 23, 12, 0, 0, DateTimeKind.Utc))
+        ]);
+        var ambientRequest = new AmbientChatContextRequest(
+            chatLogRepository,
+            "channel-1",
+            "self-id",
+            ExcludeMessageId: null,
+            CurrentMessageTimestamp: new DateTimeOffset(2026, 8, 23, 12, 5, 0, TimeSpan.Zero));
+
+        await DrainAsync(history.AddAsync(
+            user,
+            "prompt",
+            ToolsProvider.CreateFrom(),
+            ambientChatContext: ambientRequest));
+
+        Assert.Contains(
+            chatClient.Calls[0],
+            message => message.Role == ChatRole.System
+                       && message.Content.Contains("[참고용 배경 대화", StringComparison.Ordinal)
+                       && message.Content.Contains("안녕하세요", StringComparison.Ordinal));
+        var ambientIndex = chatClient.Calls[0].ToList().FindIndex(
+            message => message.Content.Contains("[참고용 배경 대화", StringComparison.Ordinal));
+        var userIndex = chatClient.Calls[0].ToList().FindIndex(
+            message => message.Content.Contains("prompt", StringComparison.Ordinal));
+        Assert.True(ambientIndex < userIndex);
+    }
+
+    [Fact]
+    public async Task AddAsync_QueriesAmbientContextFreshEachTurn_WithoutAccumulating()
+    {
+        var chatClient = new CapturingChatClient();
+        var ambientSettings = new FakeAmbientChatContextSettingsService { Enabled = true };
+        var history = CreateHistory(chatClient, ambientChatContextSettings: ambientSettings);
+        var user = new FakeUser();
+        var firstRepository = new FakeChatLogRepository(
+        [
+            new ChatLogData(1, "msg-1", null, "channel-1", "user-2", "첫 번째 배경 메시지", new DateTime(2026, 8, 23, 12, 0, 0, DateTimeKind.Utc))
+        ]);
+        var secondRepository = new FakeChatLogRepository(
+        [
+            new ChatLogData(2, "msg-2", null, "channel-1", "user-2", "두 번째 배경 메시지", new DateTime(2026, 8, 23, 12, 10, 0, DateTimeKind.Utc))
+        ]);
+
+        await DrainAsync(history.AddAsync(
+            user,
+            "first prompt",
+            ToolsProvider.CreateFrom(),
+            ambientChatContext: new AmbientChatContextRequest(
+                firstRepository, "channel-1", "self-id", null, new DateTimeOffset(2026, 8, 23, 12, 5, 0, TimeSpan.Zero))));
+        await DrainAsync(history.AddAsync(
+            user,
+            "second prompt",
+            ToolsProvider.CreateFrom(),
+            ambientChatContext: new AmbientChatContextRequest(
+                secondRepository, "channel-1", "self-id", null, new DateTimeOffset(2026, 8, 23, 12, 15, 0, TimeSpan.Zero))));
+
+        Assert.DoesNotContain(
+            chatClient.Calls[1],
+            message => message.Content.Contains("첫 번째 배경 메시지", StringComparison.Ordinal));
+        Assert.Contains(
+            chatClient.Calls[1],
+            message => message.Content.Contains("두 번째 배경 메시지", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AddAsync_OmitsAmbientBlock_WhenAmbientChatContextIsNull()
+    {
+        var chatClient = new CapturingChatClient();
+        var history = CreateHistory(chatClient);
+        var user = new FakeUser();
+
+        await DrainAsync(history.AddAsync(user, "prompt", ToolsProvider.CreateFrom()));
+
+        Assert.DoesNotContain(
+            chatClient.Calls[0],
+            message => message.Content.Contains("[참고용 배경 대화", StringComparison.Ordinal));
+    }
+
+    private static OllamaChatHistory CreateHistory(
+        CapturingChatClient chatClient,
+        IAmbientChatContextSettingsService? ambientChatContextSettings = null)
     {
         return new OllamaChatHistory(
             NullLogger.Instance,
@@ -83,7 +172,8 @@ public sealed class OllamaChatHistoryTests
             },
             chatClient,
             new FakeClaudeSettingsService(),
-            new FakeAiSkillProvider());
+            new FakeAiSkillProvider(),
+            ambientChatContextSettings ?? new FakeAmbientChatContextSettingsService());
     }
 
     private static async Task DrainAsync(IAsyncEnumerable<DiscordBot.Services.ChatResponseChunk> chunks)
@@ -157,6 +247,104 @@ public sealed class OllamaChatHistoryTests
             CancellationToken cancellationToken = default)
         {
             return ValueTask.FromResult(new AiSkillSelection([], new HashSet<string>(StringComparer.Ordinal)));
+        }
+    }
+
+    private sealed class FakeAmbientChatContextSettingsService : IAmbientChatContextSettingsService
+    {
+        public bool Enabled { get; set; }
+
+        public int WindowMessageCount { get; set; } = 12;
+
+        public int WindowMaxChars { get; set; } = 2000;
+
+        public int LookbackMinutes { get; set; } = 60;
+
+        public ValueTask<AmbientChatContextSettingsView> GetAsync(CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult(new AmbientChatContextSettingsView(
+                Enabled,
+                WindowMessageCount,
+                WindowMaxChars,
+                LookbackMinutes,
+                new DateTime(2026, 7, 5),
+                null));
+        }
+
+        public ValueTask SaveAsync(
+            AmbientChatContextSettingsSaveRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+    }
+
+    private sealed class FakeChatLogRepository(IReadOnlyList<ChatLogData> rows) : IChatLogRepository
+    {
+        public ValueTask AddAsync(
+            string? messageId,
+            string? guildId,
+            string channelId,
+            string userId,
+            string content,
+            IReadOnlyList<ChatLogImageInput>? images = null,
+            IReadOnlyList<ChatLogAttachmentInput>? attachments = null,
+            string? referencedMessageId = null,
+            string? referencedChannelId = null,
+            string? referencedGuildId = null,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<IReadOnlyList<ChatLogData>> GetAsync(
+            string channelId,
+            int limit,
+            int offset = 0,
+            DateTimeOffset? from = null,
+            DateTimeOffset? to = null,
+            CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult(rows);
+        }
+
+        public ValueTask<IReadOnlyList<ChatLogData>> SearchAsync(
+            string channelId,
+            IReadOnlyList<string> keywords,
+            int limit,
+            DateTimeOffset? from = null,
+            DateTimeOffset? to = null,
+            string? authorUserId = null,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<IReadOnlyList<ChatLogData>> GetContextAsync(
+            string channelId,
+            long chatLogId,
+            int before,
+            int after,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<ChatLogData?> GetByMessageIdAsync(
+            string channelId,
+            string messageId,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public ValueTask<IReadOnlyList<ChatLogData>> GetRepliesAsync(
+            string channelId,
+            string referencedMessageId,
+            int limit,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
         }
     }
 

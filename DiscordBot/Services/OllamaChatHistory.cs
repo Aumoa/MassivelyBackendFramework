@@ -10,7 +10,8 @@ public class OllamaChatHistory(
     OllamaService.Configuration options,
     IChatClient chatClient,
     IClaudeSettingsService claudeSettings,
-    IAiSkillProvider aiSkillProvider)
+    IAiSkillProvider aiSkillProvider,
+    IAmbientChatContextSettingsService ambientChatContextSettings)
 {
     private static readonly HashSet<string> s_DefaultToolNames = new(StringComparer.Ordinal)
     {
@@ -60,6 +61,7 @@ public class OllamaChatHistory(
         IReadOnlyList<ChatImage>? images = null,
         bool filterToolsBySelectedSkills = true,
         bool rememberConversation = true,
+        AmbientChatContextRequest? ambientChatContext = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         if (author.IsBot)
@@ -117,6 +119,17 @@ public class OllamaChatHistory(
 
             PruneRememberedMessages();
             recentHistory.AddRange(m_Messages);
+
+            if (ambientChatContext != null)
+            {
+                var ambientOptions = (await ambientChatContextSettings.GetAsync(cancellationToken)).ToOptions();
+                var ambientMessage = await AmbientChatContextBuilder.BuildAsync(
+                    ambientChatContext, ambientOptions, logger, cancellationToken);
+                if (ambientMessage != null)
+                {
+                    recentHistory.Add(ambientMessage);
+                }
+            }
 
             var userMessage = new ChatMessage
             {

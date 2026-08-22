@@ -1,0 +1,136 @@
+@page "/ambient-chat-context"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IAmbientChatContextSettingsService AmbientChatContextSettingsService
+
+<PageTitle>@T("AMBIENT_CHAT_CONTEXT_TITLE") - @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">@T("AMBIENT_CHAT_CONTEXT_TITLE")</h1>
+    <p class="page-subtitle">@T("AMBIENT_CHAT_CONTEXT_SUBTITLE")</p>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@if (isLoading)
+{
+    <p class="empty-state">@T("AMBIENT_CHAT_CONTEXT_STATUS_LOADING")</p>
+}
+else
+{
+    <form class="auto-response-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <label class="enabled-field">
+            <input type="checkbox" @bind="enabled" disabled="@isBusy" />
+            <span>@T("AMBIENT_CHAT_CONTEXT_LABEL_ENABLED")</span>
+        </label>
+        <label>
+            <span>@T("AMBIENT_CHAT_CONTEXT_LABEL_WINDOW_MESSAGE_COUNT")</span>
+            <input type="number" min="1" max="50" @bind="windowMessageCount" disabled="@isBusy" required />
+        </label>
+        <label>
+            <span>@T("AMBIENT_CHAT_CONTEXT_LABEL_WINDOW_MAX_CHARS")</span>
+            <input type="number" min="200" max="8000" @bind="windowMaxChars" disabled="@isBusy" required />
+        </label>
+        <label>
+            <span>@T("AMBIENT_CHAT_CONTEXT_LABEL_LOOKBACK_MINUTES")</span>
+            <input type="number" min="1" max="1440" @bind="lookbackMinutes" disabled="@isBusy" required />
+        </label>
+        <div class="form-actions">
+            <button class="btn-primary" type="submit" disabled="@isBusy">
+                <span class="material-symbols-outlined">save</span>
+                @T("AMBIENT_CHAT_CONTEXT_BUTTON_SAVE")
+            </button>
+            <button class="btn-ghost" type="button" @onclick="LoadAsync" disabled="@isBusy">
+                <span class="material-symbols-outlined">refresh</span>
+                @T("AMBIENT_CHAT_CONTEXT_BUTTON_REFRESH")
+            </button>
+        </div>
+    </form>
+}
+
+@code {
+    private bool enabled;
+    private int windowMessageCount;
+    private int windowMaxChars;
+    private int lookbackMinutes;
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var settings = await AmbientChatContextSettingsService.GetAsync();
+            enabled = settings.Enabled;
+            windowMessageCount = settings.WindowMessageCount;
+            windowMaxChars = settings.WindowMaxChars;
+            lookbackMinutes = settings.LookbackMinutes;
+        }
+        catch
+        {
+            SetStatus("error", T("AMBIENT_CHAT_CONTEXT_ERROR_LOAD_FAILED"));
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        if (windowMessageCount <= 0 || windowMaxChars <= 0 || lookbackMinutes <= 0)
+        {
+            SetStatus("error", T("AMBIENT_CHAT_CONTEXT_ERROR_NUMBER_RANGE"));
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await AmbientChatContextSettingsService.SaveAsync(new AmbientChatContextSettingsSaveRequest(
+                enabled,
+                windowMessageCount,
+                windowMaxChars,
+                lookbackMinutes));
+            SetStatus("success", T("AMBIENT_CHAT_CONTEXT_STATUS_SAVED"));
+        }
+        catch
+        {
+            SetStatus("error", T("AMBIENT_CHAT_CONTEXT_ERROR_SAVE_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+}
