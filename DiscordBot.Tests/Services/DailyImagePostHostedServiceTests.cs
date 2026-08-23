@@ -16,7 +16,7 @@ public sealed class DailyImagePostHostedServiceTests
     }
 
     [Fact]
-    public void ShouldRunNow_ReturnsTrue_WhenTargetTimeHasBeenReached_AndNotYetRunToday()
+    public void ShouldRunNow_ReturnsTrue_WhenJustReachedTargetTime_AndNotYetRunToday()
     {
         var now = new DateTime(2026, 8, 23, 10, 48, 5);
         var target = new TimeOnly(10, 48);
@@ -27,9 +27,47 @@ public sealed class DailyImagePostHostedServiceTests
     }
 
     [Fact]
+    public void ShouldRunNow_ReturnsTrue_StillWithinCatchUpWindow()
+    {
+        // 앱이 계속 떠 있는 상태에서 폴링 주기 안에 목표 시각이 지난 경우 - 몇 분 늦어도 잡아줘야 한다.
+        var now = new DateTime(2026, 8, 23, 10, 52, 0);
+        var target = new TimeOnly(10, 48);
+
+        var result = DailyImagePostHostedService.ShouldRunNow(target, now, lastRunDate: null);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void ShouldRunNow_ReturnsFalse_WhenTargetTimePassedLongAgo()
+    {
+        // 회귀 테스트: 목표 시각이 09:00인데 앱이 14:00에 재시작된 경우, 몇 시간 지난 오늘 몫을
+        // 뒤늦게 캐치업해서 쏘면 안 된다.
+        var now = new DateTime(2026, 8, 23, 14, 0, 0);
+        var target = new TimeOnly(9, 0);
+
+        var result = DailyImagePostHostedService.ShouldRunNow(target, now, lastRunDate: null);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ShouldRunNow_ReturnsTrue_WhenTargetTimeChangedWhileAppKeepsRunning_AndReached()
+    {
+        // 앱을 재시작하지 않고 관리자 페이지에서 목표 시각을 바꾼 경우, 재시작 시점과 무관하게
+        // 그 시각이 되면 바로 실행돼야 한다.
+        var now = new DateTime(2026, 8, 23, 11, 14, 5);
+        var newTarget = new TimeOnly(11, 14);
+
+        var result = DailyImagePostHostedService.ShouldRunNow(newTarget, now, lastRunDate: null);
+
+        Assert.True(result);
+    }
+
+    [Fact]
     public void ShouldRunNow_ReturnsFalse_WhenAlreadyRunToday()
     {
-        var now = new DateTime(2026, 8, 23, 11, 0, 0);
+        var now = new DateTime(2026, 8, 23, 10, 49, 0);
         var target = new TimeOnly(10, 48);
         var lastRunDate = new DateOnly(2026, 8, 23);
 
@@ -51,15 +89,24 @@ public sealed class DailyImagePostHostedServiceTests
     }
 
     [Fact]
-    public void ShouldRunNow_ReturnsTrue_RegardlessOfHowLongAgoTargetTimePassed()
+    public void ShouldRunNow_HandlesMidnightWraparound_WithinWindow()
     {
-        // 캐치업 방지 로직을 제거했으므로, 재시작 타이밍과 무관하게 "오늘 아직 실행 안 했고
-        // 목표 시각을 지났다"는 조건만으로 실행돼야 한다.
-        var now = new DateTime(2026, 8, 23, 23, 16, 0);
-        var target = new TimeOnly(11, 14);
+        var now = new DateTime(2026, 8, 24, 0, 2, 0);
+        var target = new TimeOnly(23, 58);
 
         var result = DailyImagePostHostedService.ShouldRunNow(target, now, lastRunDate: null);
 
         Assert.True(result);
+    }
+
+    [Fact]
+    public void ShouldRunNow_HandlesMidnightWraparound_OutsideWindow()
+    {
+        var now = new DateTime(2026, 8, 24, 6, 0, 0);
+        var target = new TimeOnly(23, 58);
+
+        var result = DailyImagePostHostedService.ShouldRunNow(target, now, lastRunDate: null);
+
+        Assert.False(result);
     }
 }
