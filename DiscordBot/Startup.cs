@@ -1,5 +1,7 @@
 using AI;
 using AI.Providers.Claude;
+using Discord;
+using Discord.WebSocket;
 using DiscordBot.Components;
 using DiscordBot.Games.Chess;
 using DiscordBot.Games.Othello;
@@ -105,13 +107,22 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddMemoryCache();
 
     sc.Configure<DiscordService.Configuration>(conf.GetRequiredSection("Discord"));
+    sc.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
+    {
+        GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
+    }));
     sc.Configure<AutoResponseOptions>(conf.GetSection("AutoResponse"));
     sc.AddSingleton<IAutoResponseSettingsService, AutoResponseSettingsService>();
     sc.Configure<AmbientChatContextOptions>(conf.GetSection("AmbientChatContext"));
     sc.AddSingleton<IAmbientChatContextSettingsService, AmbientChatContextSettingsService>();
+    sc.Configure<DailyImagePostOptions>(conf.GetSection("DailyImagePost"));
+    sc.AddSingleton<IDailyImagePostSettingsService, DailyImagePostSettingsService>();
+    sc.AddSingleton<IDiscordChannelSender, DiscordSocketChannelSender>();
+    sc.AddSingleton<DailyImagePostRunner>();
     sc.AddSingleton<IDiscordAutoResponseEvaluator, DiscordAutoResponseEvaluator>();
     sc.AddSingleton<IDiscordAutoResponseCoordinator, DiscordAutoResponseCoordinator>();
     sc.AddHostedService<DiscordService>();
+    sc.AddHostedService<DailyImagePostHostedService>();
 
     sc.Configure<WebPageReadOptions>(conf.GetSection("WebPageRead"));
     sc.AddSingleton<IWebPageAddressResolver, DnsWebPageAddressResolver>();
@@ -203,6 +214,9 @@ void RegisterServices(IServiceCollection sc, IConfiguration conf)
     sc.AddSingleton<MySqlAmbientChatContextSettingsRepository>();
     sc.AddSingleton<IAmbientChatContextSettingsRepository>(
         sp => sp.GetRequiredService<MySqlAmbientChatContextSettingsRepository>());
+    sc.AddSingleton<MySqlDailyImagePostSettingsRepository>();
+    sc.AddSingleton<IDailyImagePostSettingsRepository>(
+        sp => sp.GetRequiredService<MySqlDailyImagePostSettingsRepository>());
     sc.AddSingleton<IAiSkillRepository, MySqlAiSkillRepository>();
 }
 

@@ -10,17 +10,14 @@ using Microsoft.Extensions.Options;
 
 namespace DiscordBot.Services;
 
-internal class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IDiscordAttachmentDownloader attachmentDownloader, IImageGenerationClient imageGenerationClient, IChessGameService chessGameService, IOthelloGameService othelloGameService, IDiscordAutoResponseCoordinator autoResponse) : IHostedService, IAsyncDisposable
+internal class DiscordService(IOptions<DiscordService.Configuration> options, ILogger<DiscordService> logger, OllamaService ollama, IServiceScopeFactory scopeFactory, IDiscordAttachmentDownloader attachmentDownloader, IImageGenerationClient imageGenerationClient, IChessGameService chessGameService, IOthelloGameService othelloGameService, IDiscordAutoResponseCoordinator autoResponse, DiscordSocketClient socket) : IHostedService, IAsyncDisposable
 {
     public record Configuration
     {
         public required string Token { get; set; }
     }
 
-    private readonly DiscordSocketClient m_Socket = new(new DiscordSocketConfig
-    {
-        GatewayIntents = GatewayIntents.AllUnprivileged | GatewayIntents.MessageContent
-    });
+    private readonly DiscordSocketClient m_Socket = socket;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {

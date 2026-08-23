@@ -91,6 +91,9 @@
   <data name="NAVMENU_LABEL_AMBIENT_CHAT_CONTEXT" xml:space="preserve">
     <value>Ambient Chat Context</value>
   </data>
+  <data name="NAVMENU_LABEL_DAILY_IMAGE_POST" xml:space="preserve">
+    <value>Daily Image Post</value>
+  </data>
   <data name="NAVMENU_LABEL_SERVER_LOGS" xml:space="preserve">
     <value>Logs</value>
   </data>
@@ -747,6 +750,57 @@
   </data>
   <data name="AMBIENT_CHAT_CONTEXT_ERROR_NUMBER_RANGE" xml:space="preserve">
     <value>Numeric settings must be greater than 0.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_TITLE" xml:space="preserve">
+    <value>Daily Image Post</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_SUBTITLE" xml:space="preserve">
+    <value>Configure daily ComfyUI image generation and posting to a Discord channel</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_LABEL_ENABLED" xml:space="preserve">
+    <value>Enabled</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_LABEL_CHANNEL_ID" xml:space="preserve">
+    <value>Channel ID (enable Discord developer mode, right-click the channel → Copy ID)</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_LABEL_POST_TIME" xml:space="preserve">
+    <value>Post time (server local time)</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_LABEL_THEME_PROMPT" xml:space="preserve">
+    <value>Theme prompt (optional, given to the AI as a loose hint only)</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_BUTTON_SAVE" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_BUTTON_REFRESH" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_BUTTON_TEST_POST" xml:space="preserve">
+    <value>Test post now</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_STATUS_LOADING" xml:space="preserve">
+    <value>Loading...</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_STATUS_SAVED" xml:space="preserve">
+    <value>Daily image post settings saved.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_STATUS_TEST_SUCCESS" xml:space="preserve">
+    <value>Test post succeeded.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_STATUS_TEST_SKIPPED" xml:space="preserve">
+    <value>Test post was skipped (reason: {0}).</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>Failed to load daily image post settings.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>Failed to save daily image post settings.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_ERROR_TEST_FAILED" xml:space="preserve">
+    <value>An error occurred during the test post.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_ERROR_CHANNEL_ID_FORMAT" xml:space="preserve">
+    <value>Channel ID must contain digits only.</value>
   </data>
 
   <!-- ServerLogs -->

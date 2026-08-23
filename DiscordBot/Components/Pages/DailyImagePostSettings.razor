@@ -1,0 +1,176 @@
+@page "/daily-image-post"
+@rendermode InteractiveServer
+@using System.Globalization
+@using DiscordBot.Services
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "admin")]
+@inject IDailyImagePostSettingsService DailyImagePostSettingsService
+@inject DailyImagePostRunner DailyImagePostRunner
+
+<PageTitle>@T("DAILY_IMAGE_POST_TITLE") - @Strings.APP_TITLE</PageTitle>
+
+<div class="page-header">
+    <h1 class="page-title">@T("DAILY_IMAGE_POST_TITLE")</h1>
+    <p class="page-subtitle">@T("DAILY_IMAGE_POST_SUBTITLE")</p>
+</div>
+
+@if (!string.IsNullOrEmpty(statusMessage))
+{
+    <div class="status-message @statusKind">@statusMessage</div>
+}
+
+@if (isLoading)
+{
+    <p class="empty-state">@T("DAILY_IMAGE_POST_STATUS_LOADING")</p>
+}
+else
+{
+    <form class="auto-response-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <label class="enabled-field">
+            <input type="checkbox" @bind="enabled" disabled="@isBusy" />
+            <span>@T("DAILY_IMAGE_POST_LABEL_ENABLED")</span>
+        </label>
+        <label>
+            <span>@T("DAILY_IMAGE_POST_LABEL_CHANNEL_ID")</span>
+            <input type="text" @bind="channelId" disabled="@isBusy" placeholder="예: 123456789012345678" />
+        </label>
+        <label>
+            <span>@T("DAILY_IMAGE_POST_LABEL_POST_TIME")</span>
+            <input type="time" value="@postTimeOfDay" @onchange="OnPostTimeChanged" disabled="@isBusy" required />
+        </label>
+        <label>
+            <span>@T("DAILY_IMAGE_POST_LABEL_THEME_PROMPT")</span>
+            <textarea @bind="themePrompt" disabled="@isBusy" rows="3" placeholder="비워두면 워크플로우 기본 프롬프트만 사용합니다"></textarea>
+        </label>
+        <div class="form-actions">
+            <button class="btn-primary" type="submit" disabled="@isBusy">
+                <span class="material-symbols-outlined">save</span>
+                @T("DAILY_IMAGE_POST_BUTTON_SAVE")
+            </button>
+            <button class="btn-ghost" type="button" @onclick="LoadAsync" disabled="@isBusy">
+                <span class="material-symbols-outlined">refresh</span>
+                @T("DAILY_IMAGE_POST_BUTTON_REFRESH")
+            </button>
+            <button class="btn-ghost" type="button" @onclick="TestPostAsync" disabled="@isBusy">
+                <span class="material-symbols-outlined">play_arrow</span>
+                @T("DAILY_IMAGE_POST_BUTTON_TEST_POST")
+            </button>
+        </div>
+    </form>
+}
+
+@code {
+    private bool enabled;
+    private string channelId = "";
+    private string postTimeOfDay = "09:00";
+    private string themePrompt = "";
+    private bool isLoading = true;
+    private bool isBusy;
+    private string? statusMessage;
+    private string statusKind = "success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var settings = await DailyImagePostSettingsService.GetAsync();
+            enabled = settings.Enabled;
+            channelId = settings.ChannelId;
+            postTimeOfDay = settings.PostTimeOfDay;
+            themePrompt = settings.ThemePrompt;
+        }
+        catch
+        {
+            SetStatus("error", T("DAILY_IMAGE_POST_ERROR_LOAD_FAILED"));
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(channelId) && !ulong.TryParse(channelId.Trim(), out _))
+        {
+            SetStatus("error", T("DAILY_IMAGE_POST_ERROR_CHANNEL_ID_FORMAT"));
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            await DailyImagePostSettingsService.SaveAsync(new DailyImagePostSettingsSaveRequest(
+                enabled,
+                channelId,
+                postTimeOfDay,
+                themePrompt));
+            SetStatus("success", T("DAILY_IMAGE_POST_STATUS_SAVED"));
+        }
+        catch
+        {
+            SetStatus("error", T("DAILY_IMAGE_POST_ERROR_SAVE_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task TestPostAsync()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            var result = await DailyImagePostRunner.RunOnceAsync(force: true, CancellationToken.None);
+            if (result.Succeeded)
+            {
+                SetStatus("success", T("DAILY_IMAGE_POST_STATUS_TEST_SUCCESS"));
+            }
+            else
+            {
+                SetStatus("error", string.Format(T("DAILY_IMAGE_POST_STATUS_TEST_SKIPPED"), result.Reason));
+            }
+        }
+        catch
+        {
+            SetStatus("error", T("DAILY_IMAGE_POST_ERROR_TEST_FAILED"));
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private void OnPostTimeChanged(ChangeEventArgs e)
+    {
+        postTimeOfDay = e.Value?.ToString() ?? postTimeOfDay;
+    }
+
+    private void SetStatus(string kind, string message)
+    {
+        statusKind = kind;
+        statusMessage = message;
+    }
+
+    private static string T(string key)
+    {
+        return Strings.ResourceManager.GetString(key, CultureInfo.CurrentUICulture) ?? key;
+    }
+}

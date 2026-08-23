@@ -91,6 +91,9 @@
   <data name="NAVMENU_LABEL_AMBIENT_CHAT_CONTEXT" xml:space="preserve">
     <value>배경 대화 주입</value>
   </data>
+  <data name="NAVMENU_LABEL_DAILY_IMAGE_POST" xml:space="preserve">
+    <value>매일 이미지 게시</value>
+  </data>
   <data name="NAVMENU_LABEL_SERVER_LOGS" xml:space="preserve">
     <value>로그</value>
   </data>
@@ -747,6 +750,57 @@
   </data>
   <data name="AMBIENT_CHAT_CONTEXT_ERROR_NUMBER_RANGE" xml:space="preserve">
     <value>숫자 설정은 0보다 커야 합니다.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_TITLE" xml:space="preserve">
+    <value>매일 이미지 게시</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_SUBTITLE" xml:space="preserve">
+    <value>매일 정해진 시각에 ComfyUI로 이미지를 생성해 지정한 채널에 자동으로 게시하는 설정</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_LABEL_ENABLED" xml:space="preserve">
+    <value>사용</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_LABEL_CHANNEL_ID" xml:space="preserve">
+    <value>채널 ID (디스코드 개발자 모드에서 채널 우클릭 → ID 복사)</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_LABEL_POST_TIME" xml:space="preserve">
+    <value>게시 시각 (서버 로컬 시간 기준)</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_LABEL_THEME_PROMPT" xml:space="preserve">
+    <value>테마 문구 (선택, AI에게 느슨한 힌트로만 제공됨)</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_BUTTON_SAVE" xml:space="preserve">
+    <value>저장</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_BUTTON_REFRESH" xml:space="preserve">
+    <value>새로고침</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_BUTTON_TEST_POST" xml:space="preserve">
+    <value>지금 테스트 게시</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_STATUS_LOADING" xml:space="preserve">
+    <value>불러오는 중...</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_STATUS_SAVED" xml:space="preserve">
+    <value>매일 이미지 게시 설정을 저장했습니다.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_STATUS_TEST_SUCCESS" xml:space="preserve">
+    <value>테스트 게시에 성공했습니다.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_STATUS_TEST_SKIPPED" xml:space="preserve">
+    <value>테스트 게시가 건너뛰어졌습니다 (사유: {0}).</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_ERROR_LOAD_FAILED" xml:space="preserve">
+    <value>매일 이미지 게시 설정을 불러오지 못했습니다.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_ERROR_SAVE_FAILED" xml:space="preserve">
+    <value>매일 이미지 게시 설정을 저장하지 못했습니다.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_ERROR_TEST_FAILED" xml:space="preserve">
+    <value>테스트 게시 중 오류가 발생했습니다.</value>
+  </data>
+  <data name="DAILY_IMAGE_POST_ERROR_CHANNEL_ID_FORMAT" xml:space="preserve">
+    <value>채널 ID는 숫자만 입력할 수 있습니다.</value>
   </data>
 
   <!-- ServerLogs -->
