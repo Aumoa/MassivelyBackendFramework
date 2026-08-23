@@ -36,7 +36,7 @@ else
         </label>
         <label>
             <span>@T("DAILY_IMAGE_POST_LABEL_POST_TIME")</span>
-            <input type="time" value="@postTimeOfDay" @onchange="OnPostTimeChanged" disabled="@isBusy" required />
+            <input type="time" @bind="postTimeOfDay" disabled="@isBusy" required />
         </label>
         <label>
             <span>@T("DAILY_IMAGE_POST_LABEL_THEME_PROMPT")</span>
@@ -62,7 +62,7 @@ else
 @code {
     private bool enabled;
     private string channelId = "";
-    private string postTimeOfDay = "09:00";
+    private TimeOnly postTimeOfDay = new(9, 0);
     private string themePrompt = "";
     private bool isLoading = true;
     private bool isBusy;
@@ -82,7 +82,9 @@ else
             var settings = await DailyImagePostSettingsService.GetAsync();
             enabled = settings.Enabled;
             channelId = settings.ChannelId;
-            postTimeOfDay = settings.PostTimeOfDay;
+            postTimeOfDay = TimeOnly.TryParseExact(settings.PostTimeOfDay, "HH:mm", out var parsedTime)
+                ? parsedTime
+                : new TimeOnly(9, 0);
             themePrompt = settings.ThemePrompt;
         }
         catch
@@ -114,7 +116,7 @@ else
             await DailyImagePostSettingsService.SaveAsync(new DailyImagePostSettingsSaveRequest(
                 enabled,
                 channelId,
-                postTimeOfDay,
+                postTimeOfDay.ToString("HH:mm"),
                 themePrompt));
             SetStatus("success", T("DAILY_IMAGE_POST_STATUS_SAVED"));
         }
@@ -156,11 +158,6 @@ else
         {
             isBusy = false;
         }
-    }
-
-    private void OnPostTimeChanged(ChangeEventArgs e)
-    {
-        postTimeOfDay = e.Value?.ToString() ?? postTimeOfDay;
     }
 
     private void SetStatus(string kind, string message)

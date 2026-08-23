@@ -166,6 +166,119 @@ public sealed class DailyImagePostRunnerTests
         Assert.Contains("겨울 밤", chatClient.LastPrompt);
     }
 
+    [Fact]
+    public async Task RunOnceAsync_IncludesRandomHintBlockInChatClientUserMessage()
+    {
+        var chatClient = new FakeChatClient { ShouldThrow = true };
+        var runner = CreateRunner(settingsView: CreateSettingsView(), chatClient: chatClient);
+
+        await runner.RunOnceAsync(force: true, CancellationToken.None);
+
+        Assert.Contains("오늘의 무작위 후보", chatClient.LastPrompt);
+    }
+
+    [Fact]
+    public void PickRandomOptions_WithZeroIndex_ReturnsFirstItemsInOriginalOrder()
+    {
+        string[] pool = ["A", "B", "C", "D"];
+
+        var result = DailyImagePostRunner.PickRandomOptions(pool, 2, _ => 0);
+
+        Assert.Equal(["A", "B"], result);
+    }
+
+    [Fact]
+    public void PickRandomOptions_UsesProvidedIndicesToShuffle()
+    {
+        string[] pool = ["A", "B", "C", "D", "E"];
+
+        var result = DailyImagePostRunner.PickRandomOptions(pool, 3, n => n - 1);
+
+        Assert.Equal(["E", "A", "B"], result);
+    }
+
+    [Fact]
+    public void PickRandomOptions_CountExceedsPoolSize_ReturnsWholePoolWithoutDuplicates()
+    {
+        string[] pool = ["A", "B"];
+
+        var result = DailyImagePostRunner.PickRandomOptions(pool, 5, _ => 0);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(pool.OrderBy(x => x), result.OrderBy(x => x));
+    }
+
+    [Fact]
+    public void PickRandomOptions_NeverReturnsDuplicateItems()
+    {
+        string[] pool = ["A", "B", "C", "D", "E", "F"];
+        var random = new Random(42);
+
+        var result = DailyImagePostRunner.PickRandomOptions(pool, 4, n => random.Next(n));
+
+        Assert.Equal(4, result.Distinct().Count());
+    }
+
+    [Fact]
+    public void BuildRandomHintBlock_ProducesOneLinePerCategory_WithRequestedOptionCountAndNoDuplicates()
+    {
+        var result = DailyImagePostRunner.BuildRandomHintBlock(_ => 0, optionsPerCategory: 2);
+        var lines = result.Block.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.NotEmpty(lines);
+        foreach (var line in lines)
+        {
+            Assert.StartsWith("- ", line);
+            var items = line[(line.IndexOf(':') + 1)..].Trim().Split(", ", StringSplitOptions.RemoveEmptyEntries);
+            Assert.Equal(2, items.Length);
+            Assert.Equal(items.Length, items.Distinct().Count());
+        }
+    }
+
+    [Fact]
+    public void BuildRandomHintBlock_SameNextIndex_ProducesSameResult()
+    {
+        var block1 = DailyImagePostRunner.BuildRandomHintBlock(_ => 0);
+        var block2 = DailyImagePostRunner.BuildRandomHintBlock(_ => 0);
+
+        Assert.Equal(block1.Block, block2.Block);
+    }
+
+    [Fact]
+    public void BuildRandomHintBlock_DifferentNextIndex_ProducesDifferentResult()
+    {
+        var block1 = DailyImagePostRunner.BuildRandomHintBlock(_ => 0);
+        var block2 = DailyImagePostRunner.BuildRandomHintBlock(n => Math.Max(0, n - 1));
+
+        Assert.NotEqual(block1.Block, block2.Block);
+    }
+
+    [Fact]
+    public void BuildRandomHintBlock_ExcludesOptionsShownInThePreviousRound()
+    {
+        var first = DailyImagePostRunner.BuildRandomHintBlock(_ => 0);
+
+        var second = DailyImagePostRunner.BuildRandomHintBlock(_ => 0, recentlyShown: first.PickedByCategory);
+
+        foreach (var (label, previousPicks) in first.PickedByCategory)
+        {
+            var secondPicks = second.PickedByCategory[label];
+            Assert.Empty(secondPicks.Intersect(previousPicks));
+        }
+    }
+
+    [Fact]
+    public void PickRandomOptionsExcluding_FallsBackToFullPool_WhenTooFewOptionsRemain()
+    {
+        string[] pool = ["A", "B", "C"];
+        string[] exclude = ["A", "B"];
+
+        var result = DailyImagePostRunner.PickRandomOptionsExcluding(pool, exclude, 3, _ => 0);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(pool.OrderBy(x => x), result.OrderBy(x => x));
+    }
+
     private static DailyImagePostRunner CreateRunner(
         DailyImagePostSettingsView settingsView,
         FakeImageGenerationClient? imageGenerationClient = null,
