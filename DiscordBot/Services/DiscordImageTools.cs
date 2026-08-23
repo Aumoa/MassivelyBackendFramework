@@ -61,7 +61,6 @@ internal class DiscordImageTools(
 
             var image = await imageGenerationClient.GenerateAsync(
                 promptDraft.PositivePrompt,
-                promptDraft.NegativePrompt,
                 progress,
                 cancellationToken);
 
@@ -77,8 +76,7 @@ internal class DiscordImageTools(
                 message = "이미지를 생성해서 Discord 채널에 업로드했습니다.",
                 file_name = image.FileName,
                 content_type = image.ContentType,
-                positive_prompt = promptDraft.PositivePrompt,
-                negative_prompt = promptDraft.NegativePrompt
+                positive_prompt = promptDraft.PositivePrompt
             });
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -254,10 +252,7 @@ internal class DiscordImageTools(
 
     private ImagePromptDraft ApplyFixedTags(ImagePromptDraft promptDraft)
     {
-        var (positivePrompt, negativePrompt) = promptProfileProvider.ApplyFixedTags(
-            promptDraft.PositivePrompt,
-            promptDraft.NegativePrompt);
-        return new ImagePromptDraft(positivePrompt, negativePrompt);
+        return new ImagePromptDraft(promptProfileProvider.ApplyFixedTags(promptDraft.PositivePrompt));
     }
 
     private static string BuildPromptGenerationUserMessage(string userRequest)
@@ -267,8 +262,8 @@ internal class DiscordImageTools(
 
     private async Task<ImagePromptDraft> BuildFallbackPromptDraftAsync(string userRequest, CancellationToken cancellationToken)
     {
-        var (positivePrompt, negativePrompt) = await promptProfileProvider.BuildFallbackPromptsAsync(userRequest, cancellationToken);
-        return new ImagePromptDraft(positivePrompt, negativePrompt);
+        var positivePrompt = await promptProfileProvider.BuildFallbackPromptsAsync(userRequest, cancellationToken);
+        return new ImagePromptDraft(positivePrompt);
     }
 
     private static ImagePromptDraft NormalizePromptDraft(ImagePromptDraft promptDraft, ImagePromptDraft fallback)
@@ -276,11 +271,8 @@ internal class DiscordImageTools(
         var positivePrompt = string.IsNullOrWhiteSpace(promptDraft.PositivePrompt)
             ? fallback.PositivePrompt
             : promptDraft.PositivePrompt.Trim();
-        var negativePrompt = string.IsNullOrWhiteSpace(promptDraft.NegativePrompt)
-            ? fallback.NegativePrompt
-            : promptDraft.NegativePrompt.Trim();
 
-        return new ImagePromptDraft(positivePrompt, negativePrompt);
+        return new ImagePromptDraft(positivePrompt);
     }
 
     private static bool TryParsePromptDraft(string response, out ImagePromptDraft promptDraft)
@@ -300,9 +292,7 @@ internal class DiscordImageTools(
                 return false;
             }
 
-            promptDraft = new ImagePromptDraft(
-                parsed.PositivePrompt ?? string.Empty,
-                parsed.NegativePrompt ?? string.Empty);
+            promptDraft = new ImagePromptDraft(parsed.PositivePrompt ?? string.Empty);
             return true;
         }
         catch (JsonException)
@@ -321,9 +311,8 @@ internal class DiscordImageTools(
             : null;
     }
 
-    private sealed record ImagePromptDraft(string PositivePrompt, string NegativePrompt);
+    private sealed record ImagePromptDraft(string PositivePrompt);
 
     private sealed record ImagePromptDraftDto(
-        [property: JsonPropertyName("positive_prompt")] string? PositivePrompt,
-        [property: JsonPropertyName("negative_prompt")] string? NegativePrompt);
+        [property: JsonPropertyName("positive_prompt")] string? PositivePrompt);
 }

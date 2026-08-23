@@ -19,7 +19,6 @@ public sealed class ComfyUIClient(
 
     public async Task<GeneratedImage> GenerateAsync(
         string positivePrompt,
-        string negativePrompt,
         IProgress<ImageGenerationProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -31,6 +30,8 @@ public sealed class ComfyUIClient(
         try
         {
             var workflow = await LoadWorkflowAsync(cancellationToken);
+            RandomizeSeeds(workflow, () => Random.Shared.NextInt64(0, long.MaxValue));
+
             var positivePromptNodeId = FindNodeIdByMetaTitle(workflow, m_Options.PositivePromptTitle);
             var saveImageNodeId = FindNodeIdByMetaTitle(workflow, m_Options.SaveImageTitle);
             var nodeTitles = BuildNodeTitleMap(workflow);
@@ -64,6 +65,30 @@ public sealed class ComfyUIClient(
         {
             await StopProgressSocketAsync(progressSocket, progressCts, progressTask);
             m_Semaphore.Release();
+        }
+    }
+
+    // 워크플로우 작성자가 시드 노드에 별도 제목을 붙이는 경우는 드물어서 _meta.title이 아닌
+    // 입력 필드 이름(KSampler/KSamplerAdvanced/RandomNoise 계열이 공통으로 쓰는 이름)으로 찾는다.
+    // 링크(다른 노드 출력에 연결된 입력)는 JsonArray로 표현되므로 JsonValue 체크가 자연스럽게 걸러낸다.
+    internal static void RandomizeSeeds(JsonObject workflow, Func<long> nextSeed)
+    {
+        string[] seedFieldNames = ["seed", "noise_seed"];
+
+        foreach (var (_, nodeValue) in workflow)
+        {
+            if (nodeValue is not JsonObject node || node["inputs"] is not JsonObject inputs)
+            {
+                continue;
+            }
+
+            foreach (var fieldName in seedFieldNames)
+            {
+                if (inputs[fieldName] is JsonValue)
+                {
+                    inputs[fieldName] = nextSeed();
+                }
+            }
         }
     }
 

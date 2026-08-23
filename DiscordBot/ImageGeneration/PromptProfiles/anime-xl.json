@@ -1,29 +1,15 @@
 {
   "name": "anime-xl",
   "fixedPositive": "masterpiece, best quality, score_9, score_8, newest, highres, absurdres, very aesthetic, anime illustration, sharp focus, clean lineart, detailed eyes, vivid colors, detailed shading, soft shading, ambient occlusion, specular highlight, subsurface scattering, glossy hair, glossy fabric, detailed clothing texture",
-  "fixedNegative": "worst quality, low quality, bad quality, normal quality, average quality, score_1, score_2, score_3, oldest, old, early, very displeasing, displeasing, lowres, blurry, jpeg artifacts, bad anatomy, bad hands, missing fingers, extra fingers, extra digits, fewer digits, text, watermark, artist name, thick lineart, bold lineart, flat shading, flat color, simple shading",
-  "recommendedNegative": "cropped, deformed, mutated, ugly, disfigured, elf ears, animal ears, cat ears, fox ears, pointy ears",
   "rules": [
     "사용자가 이미지 생성, 그림 그리기 등을 요청하면 반드시 generate_image 도구를 호출한다.",
-    "고정 긍정/부정 태그는 시스템이 자동으로 추가하므로 positive_prompt와 negative_prompt에 직접 포함하지 않는다.",
-    "권장 긍정/부정 태그는 기본적으로 포함하되, 사용자 요청이 해당 항목과 형식적으로 충돌하면(예: 전신 구도인데 상반신 프레이밍 관련 태그, 평면적인 조명을 원하는데 조명/심도 태그, 단색/단순 배경을 원하는데 detailed background 태그, 동물귀/엘프귀 캐릭터를 원하는데 귀 형태를 제한하는 negative 태그) 충돌하는 항목만 제외한다.",
+    "고정 긍정 태그는 시스템이 자동으로 추가하므로 positive_prompt에 직접 포함하지 않는다.",
+    "negative_prompt는 워크플로우에 고정되어 있어 다루지 않는다.",
+    "권장 긍정 태그는 기본적으로 포함하되, 사용자 요청이 해당 항목과 형식적으로 충돌하면(예: 전신 구도인데 상반신 프레이밍 관련 태그, 평면적인 조명을 원하는데 조명/심도 태그, 단색/단순 배경을 원하는데 detailed background 태그) 충돌하는 항목만 제외한다.",
     "권장 조명 태그는 rim light처럼 국소적인 액센트 조명 위주로 유지하고, backlighting/silhouette처럼 장면 전체의 주 광원 방향을 지정해 정면 인물의 얼굴을 그늘지게 만들 수 있는 태그는 넣지 않는다.",
-    "positive_prompt와 negative_prompt는 영어 태그와 짧은 영어 구문 중심으로 작성한다.",
-    "대표 예시의 구체적인 피사체, 머리색, 의상, 배경, 구도는 복사하지 않는다.",
-    "대표 예시는 프롬프트 구조, 디테일 밀도, 태그 배치 방식만 참고한다.",
+    "positive_prompt는 영어 태그와 짧은 영어 구문 중심으로 작성한다.",
+    "권장 긍정 태그의 구체적인 피사체, 머리색, 의상, 배경, 구도는 그대로 복사하지 않고 스타일·화질 기준만 참고한다.",
     "사용자가 명시한 주제, 스타일, 배경, 구도, 조명, 분위기를 positive_prompt의 중심에 둔다.",
-    "사용자가 금지한 요소는 positive_prompt에서 제거하고 negative_prompt에 추가한다."
-  ],
-  "examples": [
-    {
-      "userRequest": "우주와 오로라가 펼쳐진 밤하늘을 배경으로, 자신감 넘치는 미소를 지으며 한 손 위에 빛나는 육각 별을 띄우고 있는 분홍색 머리의 제복 입은 미소녀. 보라색과 남색 계열의 화려한 아카데미 제복을 입고 있으며, 머리 뒤에는 일식 느낌의 둥근 헤일로가 빛나고 있다. 화려하고 선명한 애니메이션 스타일.",
-      "positive": "year 2025, scenery, 1girl, solo, cute, pink hair, very long hair, choppy bangs, long sidelocks, flowing hair, nebulae cosmic purple eyes, white pupils, rimlit eyes, facing side, looking at viewer, downturned eyes, light smile, red annular solar eclipse halo, red choker, detailed purple blazer with a fitted tailored cut, structured shoulders, gold piping, decorative seams, flap pockets, subtle celestial embroidery, ornate cuffs, collared white shirt with crisp pleats and a clean front placket, big red neckerchief with layered folds and wind-swept fabric, glowing stars swirling, glowing star in her outstretched hand, fingers, dramatic head tilt, torso twist, from side, from below, upper body portrait, extreme dutch angle, dynamic diagonal composition, intense perspective, strong foreshortening, wind-blown hair, fluttering neckerchief, flying fabric, sweeping motion, face focus, vivid foreground light streaks, blurry foreground particles, saturated, (colorful light particles:1.3), glowing star trails, energy arcs, cosmic sky, aurora, chaotic night sky, fantasy background, dreamlike atmosphere, dispersion \\(optics\\), prism",
-      "negative": "cartoon, graphic, painting, crayon, graphite, abstract, glitch, long body"
-    },
-    {
-      "userRequest": "하늘색과 푸른색이 어우러진 긴 머리에 분홍색 눈을 가진 미소녀. 바닷가 일몰을 배경으로 흰색 세일러 원피스를 입고 있으며, 양쪽 머리에 흰 꽃 장식을 하고 있다. 손 주변에 물방울이 떠다니고 파란 나비들이 날아다니는 몽환적이고 아름다운 애니메이션 스타일.",
-      "positive": "1girl, white hair, blue hair, multicolored hair, very long hair, pink eyes, blue nails, nail polish, bangs, breasts, blue neckerchief, white sailor collar, white dress, hair flower ornament, white flower, detached long sleeves, wide sleeves, sleeveless shirt, standing, smile, floating in the air many water balls, blue butterfly, outdoors, sky, sunset, cloud, looking at viewer",
-      "negative": "simple background, text, tooth"
-    }
+    "사용자가 금지한 요소는 positive_prompt에 포함하지 않는다."
   ]
 }
