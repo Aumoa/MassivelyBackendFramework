@@ -34,6 +34,7 @@ public sealed class AutoResponseSettingsServiceTests
         Assert.Equal(96, settings.ClassifierMaxTokens);
         Assert.Equal("classifier-model", settings.ClassifierModel);
         Assert.Equal(["bot", "AI"], settings.BotNameAliases);
+        Assert.Equal(AutoResponseOptions.DefaultClassifierGuidelines, settings.ClassifierGuidelines);
         Assert.NotNull(repository.Settings);
     }
 
@@ -56,7 +57,8 @@ public sealed class AutoResponseSettingsServiceTests
             9999,
             9999,
             " summary ",
-            [" bot ", "bot", "", "AI"]));
+            [" bot ", "bot", "", "AI"],
+            " 커스텀 분류 기준 "));
 
         Assert.NotNull(repository.Settings);
         Assert.True(repository.Settings.Enabled);
@@ -69,6 +71,26 @@ public sealed class AutoResponseSettingsServiceTests
         var aliases = JsonSerializer.Deserialize<string[]>(repository.Settings.BotNameAliasesJson);
         Assert.NotNull(aliases);
         Assert.Equal(["bot", "AI"], aliases);
+        Assert.Equal("커스텀 분류 기준", repository.Settings.ClassifierGuidelines);
+    }
+
+    [Fact]
+    public async Task SaveAsync_FallsBackToDefaultClassifierGuidelines_WhenBlank()
+    {
+        var repository = new FakeAutoResponseRepository();
+        var service = CreateService(repository, new AutoResponseOptions
+        {
+            IntervalSeconds = 45,
+            CooldownSeconds = 180,
+            MaxBufferedMessages = 20,
+            ClassifierMaxTokens = 160
+        });
+
+        await service.SaveAsync(new AutoResponseSettingsSaveRequest(
+            true, 45, 180, 20, 160, null, ["bot"], "   "));
+
+        Assert.NotNull(repository.Settings);
+        Assert.Equal(AutoResponseOptions.DefaultClassifierGuidelines, repository.Settings.ClassifierGuidelines);
     }
 
     [Fact]
@@ -177,6 +199,7 @@ public sealed class AutoResponseSettingsServiceTests
             int classifierMaxTokens,
             string? classifierModel,
             string botNameAliasesJson,
+            string? classifierGuidelines,
             CancellationToken cancellationToken = default)
         {
             Settings = new AutoResponseSettingsData(
@@ -187,6 +210,7 @@ public sealed class AutoResponseSettingsServiceTests
                 classifierMaxTokens,
                 classifierModel,
                 botNameAliasesJson,
+                classifierGuidelines,
                 DateTime.Now,
                 DateTime.Now);
             return ValueTask.CompletedTask;

@@ -7,6 +7,27 @@ namespace DiscordBot.Tests.Services;
 public sealed class DiscordAutoResponseEvaluatorTests
 {
     [Fact]
+    public void BuildClassificationSystemPrompt_UsesDefaultGuidelines_WhenNullOrBlank()
+    {
+        var withNull = DiscordAutoResponseEvaluator.BuildClassificationSystemPrompt(null);
+        var withBlank = DiscordAutoResponseEvaluator.BuildClassificationSystemPrompt("   ");
+
+        Assert.Contains(AutoResponseOptions.DefaultClassifierGuidelines, withNull);
+        Assert.Contains(AutoResponseOptions.DefaultClassifierGuidelines, withBlank);
+    }
+
+    [Fact]
+    public void BuildClassificationSystemPrompt_UsesCustomGuidelines_WhenProvided()
+    {
+        const string CUSTOM = "should_respond=true 조건: 커스텀 관리자 지침만 사용.";
+
+        var prompt = DiscordAutoResponseEvaluator.BuildClassificationSystemPrompt(CUSTOM);
+
+        Assert.Contains(CUSTOM, prompt);
+        Assert.DoesNotContain(AutoResponseOptions.DefaultClassifierGuidelines, prompt);
+    }
+
+    [Fact]
     public void PassesStaticFilter_RejectsDirectMessages()
     {
         var message = CreateMessage("봇이 이거 할 수 있나?", isDirectMessage: true);

@@ -53,6 +53,13 @@ else
             <span>@T("AUTO_RESPONSE_LABEL_BOT_ALIASES")</span>
             <textarea @bind="botNameAliasesText" disabled="@isBusy" rows="4" maxlength="1024"></textarea>
         </label>
+        <label class="form-full">
+            <span>@T("AUTO_RESPONSE_LABEL_CLASSIFIER_GUIDELINES")</span>
+            <textarea @bind="classifierGuidelines" disabled="@isBusy" rows="10" maxlength="4000"></textarea>
+            <button class="btn-ghost" type="button" @onclick="ResetClassifierGuidelines" disabled="@isBusy">
+                @T("AUTO_RESPONSE_BUTTON_RESET_CLASSIFIER_GUIDELINES")
+            </button>
+        </label>
         <div class="form-actions">
             <button class="btn-primary" type="submit" disabled="@isBusy">
                 <span class="material-symbols-outlined">save</span>
@@ -134,6 +141,7 @@ else
     private int classifierMaxTokens;
     private string? classifierModel;
     private string botNameAliasesText = string.Empty;
+    private string classifierGuidelines = string.Empty;
     private bool isLoading = true;
     private bool isBusy;
     private string? statusMessage;
@@ -157,6 +165,7 @@ else
             classifierMaxTokens = settings.ClassifierMaxTokens;
             classifierModel = settings.ClassifierModel ?? string.Empty;
             botNameAliasesText = string.Join(Environment.NewLine, settings.BotNameAliases);
+            classifierGuidelines = settings.ClassifierGuidelines;
             await LoadEventsAsync();
         }
         catch
@@ -207,7 +216,8 @@ else
                 maxBufferedMessages,
                 classifierMaxTokens,
                 classifierModel,
-                ParseAliases(botNameAliasesText)));
+                ParseAliases(botNameAliasesText),
+                classifierGuidelines));
             SetStatus("success", T("AUTO_RESPONSE_STATUS_SAVED"));
         }
         catch
@@ -218,6 +228,11 @@ else
         {
             isBusy = false;
         }
+    }
+
+    private void ResetClassifierGuidelines()
+    {
+        classifierGuidelines = DiscordBot.Options.AutoResponseOptions.DefaultClassifierGuidelines;
     }
 
     private void SetStatus(string kind, string message)

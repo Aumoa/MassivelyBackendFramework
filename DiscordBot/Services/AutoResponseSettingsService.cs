@@ -14,6 +14,7 @@ internal sealed record AutoResponseSettingsView(
     int ClassifierMaxTokens,
     string? ClassifierModel,
     IReadOnlyList<string> BotNameAliases,
+    string ClassifierGuidelines,
     DateTime CreatedAt,
     DateTime? UpdatedAt)
 {
@@ -27,7 +28,8 @@ internal sealed record AutoResponseSettingsView(
             MaxBufferedMessages = MaxBufferedMessages,
             ClassifierMaxTokens = ClassifierMaxTokens,
             ClassifierModel = ClassifierModel,
-            BotNameAliases = [.. BotNameAliases]
+            BotNameAliases = [.. BotNameAliases],
+            ClassifierGuidelines = ClassifierGuidelines
         };
     }
 }
@@ -39,7 +41,8 @@ internal sealed record AutoResponseSettingsSaveRequest(
     int MaxBufferedMessages,
     int ClassifierMaxTokens,
     string? ClassifierModel,
-    IReadOnlyList<string> BotNameAliases);
+    IReadOnlyList<string> BotNameAliases,
+    string? ClassifierGuidelines);
 
 internal sealed record AutoResponseEventView(
     long Id,
@@ -147,6 +150,7 @@ internal sealed class AutoResponseSettingsService(
     private const int MaxAliasLength = 64;
     private const int MaxModelLength = 128;
     private const int MaxTextLength = 400;
+    private const int MaxClassifierGuidelinesLength = 4000;
     private const int MinIntervalSeconds = 1;
     private const int MaxIntervalSeconds = 600;
     private const int MinCooldownSeconds = 1;
@@ -248,7 +252,8 @@ internal sealed class AutoResponseSettingsService(
             currentOptions.MaxBufferedMessages,
             currentOptions.ClassifierMaxTokens,
             currentOptions.ClassifierModel,
-            currentOptions.BotNameAliases));
+            currentOptions.BotNameAliases,
+            currentOptions.ClassifierGuidelines));
     }
 
     private AutoResponseSettingsView Normalize(AutoResponseSettingsSaveRequest request)
@@ -277,6 +282,7 @@ internal sealed class AutoResponseSettingsService(
                 MaxClassifierMaxTokens),
             NormalizeOptional(request.ClassifierModel, MaxModelLength),
             NormalizeAliases(request.BotNameAliases),
+            NormalizeClassifierGuidelines(request.ClassifierGuidelines),
             DateTime.Now,
             null);
     }
@@ -307,8 +313,22 @@ internal sealed class AutoResponseSettingsService(
                 MaxClassifierMaxTokens),
             NormalizeOptional(data.ClassifierModel, MaxModelLength),
             ParseAliases(data.BotNameAliasesJson),
+            NormalizeClassifierGuidelines(data.ClassifierGuidelines),
             data.CreatedAt,
             data.UpdatedAt);
+    }
+
+    private string NormalizeClassifierGuidelines(string? value)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            trimmed = options.Value.ClassifierGuidelines;
+        }
+
+        return trimmed.Length <= MaxClassifierGuidelinesLength
+            ? trimmed
+            : trimmed[..MaxClassifierGuidelinesLength];
     }
 
     private AutoResponseEventView ToView(AutoResponseEventData data)
@@ -340,6 +360,7 @@ internal sealed class AutoResponseSettingsService(
             view.ClassifierMaxTokens,
             view.ClassifierModel,
             JsonSerializer.Serialize(view.BotNameAliases),
+            view.ClassifierGuidelines,
             cancellationToken);
     }
 

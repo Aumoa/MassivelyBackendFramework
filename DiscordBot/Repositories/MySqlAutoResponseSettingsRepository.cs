@@ -20,6 +20,7 @@ SELECT
     `classifier_max_tokens` AS ClassifierMaxTokens,
     `classifier_model` AS ClassifierModel,
     `bot_name_aliases_json` AS BotNameAliasesJson,
+    `classifier_guidelines` AS ClassifierGuidelines,
     `created_at` AS CreatedAt,
     `updated_at` AS UpdatedAt
 FROM `auto_response_settings`
@@ -37,15 +38,16 @@ WHERE `id` = 1";
         int classifierMaxTokens,
         string? classifierModel,
         string botNameAliasesJson,
+        string? classifierGuidelines,
         CancellationToken cancellationToken = default)
     {
         using var connection = GetConnection();
 
         const string QUERY = @"
 INSERT INTO `auto_response_settings`
-    (`id`, `enabled`, `interval_seconds`, `cooldown_seconds`, `max_buffered_messages`, `classifier_max_tokens`, `classifier_model`, `bot_name_aliases_json`)
+    (`id`, `enabled`, `interval_seconds`, `cooldown_seconds`, `max_buffered_messages`, `classifier_max_tokens`, `classifier_model`, `bot_name_aliases_json`, `classifier_guidelines`)
 VALUES
-    (1, @enabled, @intervalSeconds, @cooldownSeconds, @maxBufferedMessages, @classifierMaxTokens, @classifierModel, @botNameAliasesJson)
+    (1, @enabled, @intervalSeconds, @cooldownSeconds, @maxBufferedMessages, @classifierMaxTokens, @classifierModel, @botNameAliasesJson, @classifierGuidelines)
 ON DUPLICATE KEY UPDATE
     `enabled` = @enabled,
     `interval_seconds` = @intervalSeconds,
@@ -54,6 +56,7 @@ ON DUPLICATE KEY UPDATE
     `classifier_max_tokens` = @classifierMaxTokens,
     `classifier_model` = @classifierModel,
     `bot_name_aliases_json` = @botNameAliasesJson,
+    `classifier_guidelines` = @classifierGuidelines,
     `updated_at` = NOW()";
 
         var command = new CommandDefinition(
@@ -66,7 +69,8 @@ ON DUPLICATE KEY UPDATE
                 maxBufferedMessages,
                 classifierMaxTokens,
                 classifierModel,
-                botNameAliasesJson
+                botNameAliasesJson,
+                classifierGuidelines
             },
             cancellationToken: cancellationToken);
         await connection.ExecuteAsync(command);

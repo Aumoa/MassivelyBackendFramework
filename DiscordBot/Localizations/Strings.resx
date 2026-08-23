@@ -664,6 +664,12 @@
   <data name="AUTO_RESPONSE_LABEL_BOT_ALIASES" xml:space="preserve">
     <value>Bot Name Aliases</value>
   </data>
+  <data name="AUTO_RESPONSE_LABEL_CLASSIFIER_GUIDELINES" xml:space="preserve">
+    <value>Response Decision Criteria (Classifier Prompt)</value>
+  </data>
+  <data name="AUTO_RESPONSE_BUTTON_RESET_CLASSIFIER_GUIDELINES" xml:space="preserve">
+    <value>Reset to Default</value>
+  </data>
   <data name="AUTO_RESPONSE_BUTTON_SAVE" xml:space="preserve">
     <value>Save</value>
   </data>

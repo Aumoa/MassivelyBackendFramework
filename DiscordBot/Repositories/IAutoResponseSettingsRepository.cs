@@ -8,6 +8,7 @@ public sealed record AutoResponseSettingsData(
     int ClassifierMaxTokens,
     string? ClassifierModel,
     string BotNameAliasesJson,
+    string? ClassifierGuidelines,
     DateTime CreatedAt,
     DateTime? UpdatedAt);
 
@@ -49,6 +50,7 @@ public interface IAutoResponseSettingsRepository
         int classifierMaxTokens,
         string? classifierModel,
         string botNameAliasesJson,
+        string? classifierGuidelines,
         CancellationToken cancellationToken = default);
 }
 

@@ -182,6 +182,7 @@ public sealed class DiscordAutoResponseCoordinatorTests
                 ClassifierMaxTokens: 160,
                 ClassifierModel: "classifier-model",
                 BotNameAliases: ["봇"],
+                ClassifierGuidelines: DiscordBot.Options.AutoResponseOptions.DefaultClassifierGuidelines,
                 CreatedAt: DateTime.UtcNow,
                 UpdatedAt: null));
         }
@@ -292,6 +293,7 @@ public sealed class DiscordAutoResponseCoordinatorTests
                 ClassifierMaxTokens: 160,
                 ClassifierModel: "classifier-model",
                 BotNameAliases: ["봇"],
+                ClassifierGuidelines: DiscordBot.Options.AutoResponseOptions.DefaultClassifierGuidelines,
                 CreatedAt: DateTime.UtcNow,
                 UpdatedAt: null);
         }
@@ -312,6 +314,7 @@ public sealed class DiscordAutoResponseCoordinatorTests
                 ClassifierMaxTokens: 160,
                 ClassifierModel: "classifier-model",
                 BotNameAliases: ["봇"],
+                ClassifierGuidelines: DiscordBot.Options.AutoResponseOptions.DefaultClassifierGuidelines,
                 CreatedAt: DateTime.UtcNow,
                 UpdatedAt: null));
         }

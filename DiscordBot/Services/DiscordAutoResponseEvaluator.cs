@@ -109,7 +109,7 @@ internal sealed partial class DiscordAutoResponseEvaluator(
             operation: token => chatClient.GenerateAsync(
                 prompt,
                 completionOptions,
-                BuildClassificationSystemPrompt(),
+                BuildClassificationSystemPrompt(currentOptions.ClassifierGuidelines),
                 token),
             onRetry: (diagnostic, attempt, delay) => logger.LogWarning(
                 "Transient auto response classifier request failure on attempt {Attempt} with {ExceptionType} and HTTP status {HttpStatusCode}; retrying after {DelayMilliseconds} ms.",
@@ -288,21 +288,17 @@ internal sealed partial class DiscordAutoResponseEvaluator(
 """;
     }
 
-    private static string BuildClassificationSystemPrompt()
+    internal static string BuildClassificationSystemPrompt(string? guidelines)
     {
-        return """
+        var normalizedGuidelines = string.IsNullOrWhiteSpace(guidelines)
+            ? AutoResponseOptions.DefaultClassifierGuidelines
+            : guidelines.Trim();
+
+        return $"""
 너는 Discord 자동 응답 트리거 판정기입니다.
 비용 절약과 대화 방해 최소화가 최우선입니다.
 
-should_respond=true 조건:
-- 봇 이름, AI, 봇/인공지능 지칭이 태그 없이 언급되어 봇의 짧은 반응이 자연스러운 경우.
-- 누군가 질문이나 도움 요청을 했고, 같은 묶음 안에서 사람이 충분히 답하지 않은 경우.
-- 봇의 이전 응답에 대한 후속 반응처럼 보이는 경우.
-
-should_respond=false 조건:
-- 1:1 DM, 봇 태그/멘션, 이미 사람이 답한 대화, 잡담/감탄/밈처럼 끼어들 필요가 낮은 경우.
-- 유튜브/웹 링크, 이미지, 첨부만 던지고 "이거 어때?"처럼 AI가 내용을 볼 수 없어 판단이 어려운 경우.
-- 대화에 끼어드는 것이 어색하거나 비용 대비 가치가 낮은 경우.
+{normalizedGuidelines}
 
 JSON 이외의 문장을 출력하지 마세요.
 """;
